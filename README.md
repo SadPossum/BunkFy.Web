@@ -1,35 +1,23 @@
 # BunkFy Web
 
-Frontend app shell for BunkFy, an open-source hostel property management system.
+This is the frontend foundation repository for BunkFy, an open-source hostel property management system.
 
-## Stack
+This repository intentionally does not implement the browser app yet. It exists to establish the repository, documentation, CI, package-management, and future source layout before product UI work starts.
 
-- React
-- Vite
-- TypeScript
-- pnpm
-- Vitest and Testing Library
+## Current Scope
 
-## Local Development
-
-```powershell
-pnpm install
-pnpm dev
-```
-
-When this repository is mounted inside the root BunkFy superproject, prefer:
-
-```powershell
-.\eng\bootstrap.ps1
-.\eng\run-aspire.ps1
-```
+- pnpm workspace foundation.
+- TypeScript, ESLint, and Vitest validation.
+- Documentation structure modeled after the backend/GMA style.
+- Placeholder source folders for the future app, generated API client, components, and features.
 
 ## Validation
 
 ```powershell
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm build
+pnpm install
+pnpm verify
 ```
 
+## Documentation
+
+Start with [docs/README.md](docs/README.md).
