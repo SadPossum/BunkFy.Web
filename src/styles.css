@@ -174,7 +174,7 @@ h2 {
 
 .tableRow {
   display: grid;
-  grid-template-columns: minmax(120px, 1.1fr) minmax(110px, 1fr) 72px minmax(96px, 0.8fr);
+  grid-template-columns: minmax(120px, 1.1fr) minmax(110px, 0.9fr) 72px minmax(128px, max-content);
   gap: 12px;
   align-items: center;
   border-bottom: 1px solid #eef0eb;
@@ -195,12 +195,14 @@ h2 {
 .status {
   width: max-content;
   max-width: 100%;
+  justify-self: start;
   border-radius: 999px;
   padding: 4px 9px;
   color: #25463f;
   background: #deeee8;
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .taskList {
@@ -287,4 +289,3 @@ h2 {
     min-width: 560px;
   }
 }
-
