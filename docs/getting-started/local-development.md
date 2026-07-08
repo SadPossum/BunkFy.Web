@@ -1,6 +1,6 @@
 # Local Development
 
-The repository is app-less for the initial foundation milestone.
+The repository contains a minimal Vite smoke shell for Aspire and browser-runtime validation.
 
 Current validation commands:
 
@@ -11,9 +11,14 @@ pnpm test
 pnpm build
 ```
 
-Future frontend work should add the app shell deliberately:
+Run the smoke shell directly:
 
-- Vite or another chosen bundler.
+```powershell
+pnpm dev
+```
+
+Future frontend work should add product app structure deliberately:
+
 - React and TypeScript.
 - Router.
 - Server-state client.

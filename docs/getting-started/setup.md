@@ -22,5 +22,5 @@ When this repository is mounted inside the root BunkFy superproject, prefer the 
 
 ## Current Scope
 
-This repository currently validates repository structure and frontend tooling only. The real app shell, router, generated API client, and product screens are future work.
+This repository currently validates repository structure, frontend tooling, and a minimal Vite smoke shell. The real router, generated API client, and product screens are future work.
 

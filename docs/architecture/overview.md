@@ -10,7 +10,7 @@ Initial architectural direction:
 - Keep generated API code under `src/api/generated`.
 - Keep app composition under `src/app`.
 - Use OpenAPI-generated types/clients once backend contracts exist.
-- Keep route, API, and design-system choices explicit until a small spike proves them.
+- Keep route, API, and design-system choices explicit until a product slice proves them.
 
 ## Planned Source Layout
 
@@ -32,5 +32,5 @@ src/
   styles/
 ```
 
-The placeholder folders are present so future work lands in stable locations, but no runtime app is implemented yet.
+The repository now contains a minimal runtime shell that calls the backend smoke endpoint. It is intentionally not a product UI yet.
 

@@ -2,11 +2,12 @@
 
 This is the frontend foundation repository for BunkFy, an open-source hostel property management system.
 
-This repository intentionally does not implement the browser app yet. It exists to establish the repository, documentation, CI, package-management, and future source layout before product UI work starts.
+This repository currently implements a minimal Vite smoke shell. It exists to prove frontend tooling and Aspire wiring before product UI work starts.
 
 ## Current Scope
 
 - pnpm workspace foundation.
+- Minimal Vite smoke shell.
 - TypeScript, ESLint, and Vitest validation.
 - Documentation structure modeled after the backend/GMA style.
 - Placeholder source folders for the future app, generated API client, components, and features.
@@ -16,6 +17,12 @@ This repository intentionally does not implement the browser app yet. It exists 
 ```powershell
 pnpm install
 pnpm verify
+```
+
+Run the smoke shell directly:
+
+```powershell
+pnpm dev
 ```
 
 ## Documentation
