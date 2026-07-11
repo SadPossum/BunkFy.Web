@@ -1,16 +1,17 @@
 # Frontend Architecture Overview
 
-BunkFy Web will become the operational browser client for BunkFy.
+BunkFy Web is the operational browser client for BunkFy.
 
 Initial architectural direction:
 
-- Treat the UI as a dense operations app, not a marketing site.
+- Treat the UI as an approachable operations app, not a marketing site or generic admin dashboard.
 - Keep product features under `src/features/<feature>`.
 - Keep reusable UI primitives under `src/components`.
 - Keep generated API code under `src/api/generated`.
 - Keep app composition under `src/app`.
 - Use OpenAPI-generated types/clients once backend contracts exist.
-- Keep route, API, and design-system choices explicit until a product slice proves them.
+- Use React Router for product navigation, TanStack Query for server state, and daisyUI/Tailwind for the component system.
+- Keep authenticated requests tenant-aware and refresh expired access tokens once before signing the user out.
 
 ## Planned Source Layout
 
@@ -25,12 +26,13 @@ src/
     data-table/
     forms/
   features/
+    auth/
+    dashboard/
     reservations/
     inventory/
-    guests/
-    housekeeping/
+    properties/
   styles/
 ```
 
-The repository now contains a minimal runtime shell that calls the backend smoke endpoint. It is intentionally not a product UI yet.
+The first product slice covers the backend's current PMS spine: staff auth, Properties, Inventory, and Reservations. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
 

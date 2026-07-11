@@ -1,14 +1,60 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: bunkfy --default;
+}
+@plugin "daisyui/theme" {
+  name: "bunkfy";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: oklch(99% 0.006 85);
+  --color-base-200: oklch(96.8% 0.011 85);
+  --color-base-300: oklch(91.7% 0.016 85);
+  --color-base-content: oklch(25% 0.026 165);
+  --color-primary: oklch(38% 0.075 166);
+  --color-primary-content: oklch(98% 0.008 85);
+  --color-secondary: oklch(62% 0.105 215);
+  --color-secondary-content: oklch(20% 0.035 220);
+  --color-accent: oklch(80% 0.14 78);
+  --color-accent-content: oklch(29% 0.06 70);
+  --color-neutral: oklch(32% 0.025 165);
+  --color-neutral-content: oklch(97% 0.008 85);
+  --color-info: oklch(69% 0.12 230);
+  --color-info-content: oklch(22% 0.05 235);
+  --color-success: oklch(61% 0.13 158);
+  --color-success-content: oklch(99% 0.008 158);
+  --color-warning: oklch(78% 0.15 75);
+  --color-warning-content: oklch(27% 0.065 65);
+  --color-error: oklch(61% 0.18 25);
+  --color-error-content: oklch(98% 0.01 25);
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@theme {
+  --font-display: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+}
+
 :root {
-  color: #1e2620;
-  background: #f7f7f2;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  line-height: 1.5;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--color-base-200);
 }
 
 body {
@@ -17,96 +63,76 @@ body {
   margin: 0;
 }
 
-body,
-#app {
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+select,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.auth-grid {
   display: grid;
-  place-items: center;
+  grid-template-columns: 1fr;
 }
 
-#app {
-  width: 100%;
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.shell {
-  width: min(100%, 560px);
-  border: 1px solid #d7ddce;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 28px;
-  box-shadow: 0 18px 45px rgb(30 38 32 / 10%);
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  color: #32745d;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-h1 {
-  margin: 0 0 18px;
-  font-size: clamp(2rem, 8vw, 3rem);
-  line-height: 1;
-}
-
-.muted {
-  margin: 0;
-  color: #5f695f;
-}
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
+.status-dot {
+  position: relative;
+  width: 0.65rem;
+  height: 0.65rem;
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.95rem;
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-success) 14%, transparent);
 }
 
-.status span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+.status-dot::after {
+  position: absolute;
+  inset: -0.25rem;
+  border: 1px solid color-mix(in oklab, var(--color-success) 45%, transparent);
+  border-radius: inherit;
+  content: "";
+  animation: status-pulse 2.5s ease-out infinite;
 }
 
-.status-ok {
-  color: #133d2d;
-  background: #e1f5ea;
+.modal {
+  background: color-mix(in oklab, var(--color-neutral) 30%, transparent);
+  backdrop-filter: blur(5px);
 }
 
-.status-ok span {
-  background: #1f9d61;
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: color-mix(in oklab, var(--color-primary) 65%, transparent);
+  outline: 3px solid color-mix(in oklab, var(--color-primary) 12%, transparent);
 }
 
-.status-error {
-  color: #572426;
-  background: #fae7e5;
+@media (min-width: 1024px) {
+  .auth-grid {
+    grid-template-columns: minmax(520px, 1.25fr) minmax(420px, 0.75fr);
+  }
 }
 
-.status-error span {
-  background: #d4483f;
+@keyframes status-pulse {
+  0% { opacity: 0.75; transform: scale(0.7); }
+  70%, 100% { opacity: 0; transform: scale(1.65); }
 }
 
-dl {
-  display: grid;
-  gap: 14px;
-  margin: 22px 0 0;
-}
-
-dt {
-  color: #5f695f;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-dd {
-  overflow-wrap: anywhere;
-  margin: 2px 0 0;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
