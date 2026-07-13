@@ -32,10 +32,14 @@ src/
     dashboard/
     reservations/
     guests/
+    staff/
+    integrations/
+    notifications/
+    account/
     inventory/
     properties/
   styles/
 ```
 
-The operational product slice covers staff auth, Properties, Inventory, Reservations, and property-scoped Guest Records. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
+The operational product slice covers staff auth, Properties, Inventory, Reservations, property-scoped Guest Records, tenant-wide Staff Profiles with property assignments, and operator-facing Ingestion integrations. Reservations include grouped availability selection, canonical Guest Record linking, editable booking details with history, and the complete stay lifecycle. Integrations expose staff controls and audit trails while keeping adapter-ingress machine endpoints outside the UI. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
 

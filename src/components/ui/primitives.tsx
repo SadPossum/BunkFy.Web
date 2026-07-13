@@ -19,12 +19,13 @@ export function PageHeader({ eyebrow, title, description, action }: {
   );
 }
 
-export function Modal({ open, title, description, children, onClose }: {
+export function Modal({ open, title, description, children, onClose, size = "md" }: {
   open: boolean;
   title: string;
   description?: string;
   children: ReactNode;
   onClose: () => void;
+  size?: "md" | "lg";
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -75,9 +76,10 @@ export function Modal({ open, title, description, children, onClose }: {
   }, [open, onClose]);
 
   if (!open) return null;
+  const widthClass = size === "lg" ? "max-w-4xl" : "max-w-2xl";
   return (
     <div className="modal modal-open" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
-      <div ref={dialogRef} tabIndex={-1} className="modal-box max-h-[90vh] max-w-2xl overflow-y-auto border border-base-300 p-0 shadow-2xl outline-none">
+      <div ref={dialogRef} tabIndex={-1} className={`modal-box max-h-[90vh] ${widthClass} overflow-y-auto border border-base-300 p-0 shadow-2xl outline-none`}>
         <div className="sticky top-0 z-10 flex items-start justify-between border-b border-base-300 bg-base-100 px-6 py-5">
           <div>
             <h2 id={titleId} className="font-display text-xl font-semibold">{title}</h2>
@@ -136,11 +138,11 @@ export function InitialAvatar({ name, size = "md", variant = "soft" }: {
 
 export function StatusBadge({ status, surface = "light" }: { status: string | number; surface?: "light" | "dark" }) {
   const normalized = String(status).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-  const tone = normalized.includes("confirmed") || normalized === "active" || normalized === "available" || normalized === "checked in"
+  const tone = normalized.includes("confirmed") || normalized === "active" || normalized === "available" || normalized === "checked in" || normalized === "success" || normalized === "succeeded" || normalized === "unread"
     ? surface === "dark" ? "badge-success" : "bg-primary text-primary-content"
-    : normalized.includes("pending") || normalized.includes("unconfigured")
+    : normalized.includes("pending") || normalized.includes("unconfigured") || normalized === "suspended" || normalized === "warning"
       ? "badge-warning"
-      : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected") || normalized.includes("archived") || normalized === "no-show" || normalized === "checked out" || normalized === "released"
+      : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected") || normalized.includes("archived") || normalized.includes("failed") || normalized === "error" || normalized === "no-show" || normalized === "checked out" || normalized === "released" || normalized === "read"
         ? "badge-ghost"
         : "badge-info";
   return <span className={`badge badge-sm border-0 font-semibold capitalize ${tone}`}>{normalized}</span>;

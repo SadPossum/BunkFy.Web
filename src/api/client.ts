@@ -1,4 +1,5 @@
 export type ApiSession = { accessToken: string; tenantId: string; username: string };
+export type ApiDownload = { blob: Blob; fileName: string | null; contentType: string | null };
 
 export class ApiError extends Error {
   constructor(
@@ -47,6 +48,42 @@ export async function apiRequest<T>(
   return (await response.json()) as T;
 }
 
+export async function apiDownload(
+  path: string,
+  options: RequestInit = {},
+  session?: Pick<ApiSession, "accessToken" | "tenantId">,
+): Promise<ApiDownload> {
+  const headers = new Headers(options.headers);
+  headers.set("Accept", "application/octet-stream");
+  if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
+  if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
+
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
+  if (!response.ok) throw await toApiError(response);
+  return {
+    blob: await response.blob(),
+    fileName: fileNameFromDisposition(response.headers.get("content-disposition")),
+    contentType: response.headers.get("content-type"),
+  };
+}
+
+export async function apiStream(
+  path: string,
+  signal: AbortSignal,
+  session?: Pick<ApiSession, "accessToken" | "tenantId">,
+): Promise<Response> {
+  const headers = new Headers({ Accept: "text/event-stream" });
+  if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
+  if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, { credentials: "include", headers, signal });
+  if (!response.ok) throw await toApiError(response);
+  return response;
+}
+
 async function toApiError(response: Response): Promise<ApiError> {
   let payload: unknown;
   try {
@@ -73,4 +110,11 @@ function getNestedString(value: unknown, parent: string, key: string): string | 
 
 function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function fileNameFromDisposition(value: string | null): string | null {
+  if (!value) return null;
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(value)?.[1];
+  if (utf8) return decodeURIComponent(utf8);
+  return /filename="?([^";]+)"?/i.exec(value)?.[1] ?? null;
 }

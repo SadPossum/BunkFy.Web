@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { apiRequest, type ApiSession } from "../api/client";
+import { apiDownload, apiRequest, apiStream, type ApiDownload, type ApiSession } from "../api/client";
 import type { BrowserAuthResponse } from "../api/types";
 import { createSingleFlightRefresh, runWithBrowserSessionLock, type SessionIdentity } from "./singleFlightRefresh";
 
@@ -13,7 +13,10 @@ type SessionContextValue = {
   login: (credentials: Credentials) => Promise<void>;
   register: (credentials: Credentials) => Promise<void>;
   logout: () => Promise<void>;
+  logoutAll: () => Promise<void>;
   request: <T>(path: string, options?: RequestInit) => Promise<T>;
+  download: (path: string, options?: RequestInit) => Promise<ApiDownload>;
+  stream: (path: string, signal: AbortSignal) => Promise<Response>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -85,6 +88,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshSession]);
 
+  const download = useCallback(async (path: string, options: RequestInit = {}) => {
+    const active = sessionRef.current;
+    if (!active) throw new Error("You are signed out.");
+    try {
+      return await apiDownload(path, options, active);
+    } catch (error) {
+      if (!(error instanceof Error) || !("status" in error) || error.status !== 401) throw error;
+      const refreshed = await refreshSession(active);
+      return await apiDownload(path, options, refreshed);
+    }
+  }, [refreshSession]);
+
+  const stream = useCallback(async (path: string, signal: AbortSignal) => {
+    const active = sessionRef.current;
+    if (!active) throw new Error("You are signed out.");
+    try {
+      return await apiStream(path, signal, active);
+    } catch (error) {
+      if (!(error instanceof Error) || !("status" in error) || error.status !== 401 || signal.aborted) throw error;
+      const refreshed = await refreshSession(active);
+      return await apiStream(path, signal, refreshed);
+    }
+  }, [refreshSession]);
+
   const logout = useCallback(async () => {
     const active = sessionRef.current;
     try {
@@ -97,14 +124,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [setSession]);
 
+  const logoutAll = useCallback(async () => {
+    const active = sessionRef.current;
+    try {
+      if (active) await apiRequest<void>("/api/auth/sign-out-all", { method: "POST" }, active);
+    } finally {
+      try {
+        if (active) await apiRequest<void>("/api/auth/browser/sign-out", { method: "POST" }, active);
+      } catch {
+        // The global revocation can make the cookie sign-out request unauthorized.
+      }
+      setSession(null);
+    }
+  }, [setSession]);
+
   const value = useMemo<SessionContextValue>(() => ({
     session,
     isRestoring,
     login: (credentials) => authenticate("login", credentials),
     register: (credentials) => authenticate("register", credentials),
     logout,
+    logoutAll,
     request,
-  }), [authenticate, isRestoring, logout, request, session]);
+    download,
+    stream,
+  }), [authenticate, download, isRestoring, logout, logoutAll, request, session, stream]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

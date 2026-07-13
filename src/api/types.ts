@@ -70,20 +70,65 @@ export type ReservationStatus = Schema<"ReservationStatus">
   | "confirmed"
   | "allocationRejected"
   | "cancellationPending"
-  | "cancelled";
+  | "cancelled"
+  | "checkedIn"
+  | "noShowPending"
+  | "noShow"
+  | "checkoutPending"
+  | "checkedOut";
 
 export type ReservationSourceKind = Schema<"ReservationSourceKind"> | "direct" | "external";
+export type ReservationGuestRole = Schema<"ReservationGuestRoleKind"> | "primary";
+export type ReservationDetailsChangeOrigin = Schema<"ReservationDetailsChangeOriginKind">
+  | "staff"
+  | "adapter"
+  | "admin"
+  | "system";
+
+export type ReservationGuest = {
+  guestId: string;
+  role: ReservationGuestRole;
+};
 
 export type Reservation = Omit<
   NonNullableFields<Schema<"ReservationDto">, "inventoryUnitIds" | "primaryGuestName">,
-  "status" | "sourceKind"
+  "status" | "sourceKind" | "guests"
 > & {
   status: ReservationStatus;
   sourceKind: ReservationSourceKind;
+  guests: ReservationGuest[];
 };
 
 export type ReservationListResponse = Omit<Schema<"ReservationListResponse">, "reservations"> & {
   reservations: Reservation[];
+};
+
+export type ReservationDetailsSnapshot = {
+  arrival: string;
+  departure: string;
+  inventoryUnitIds: string[];
+  primaryGuestName: string;
+  email?: string | null;
+  phone?: string | null;
+  guestCount: number;
+  notes?: string | null;
+};
+
+export type ReservationDetailsHistoryItem = {
+  changeId: string;
+  reservationId: string;
+  propertyId: string;
+  fromRevision: number;
+  toRevision: number;
+  origin: ReservationDetailsChangeOrigin;
+  actorId?: string | null;
+  adapterConnectionId?: string | null;
+  externalOperationId?: string | null;
+  correlationId: string;
+  changedFields: string[];
+  before?: ReservationDetailsSnapshot | null;
+  after: ReservationDetailsSnapshot;
+  occurredAtUtc: string;
 };
 
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";
@@ -130,6 +175,279 @@ export type GuestStayHistoryItem = {
   isCurrentParticipant: boolean;
   reservationVersion: number;
 };
+
+export type StaffStatus = Schema<"StaffStatus"> | "active" | "suspended" | "departed";
+
+export type StaffPropertyAssignment = {
+  assignmentId: string;
+  propertyId: string;
+  propertyJobTitle?: string | null;
+  isPrimary: boolean;
+  isCurrent: boolean;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  assignedAtUtc: string;
+  unassignedAtUtc?: string | null;
+  assignedAtVersion: number;
+  unassignedAtVersion?: number | null;
+};
+
+export type StaffMember = {
+  staffMemberId: string;
+  displayName: string;
+  legalName?: string | null;
+  workEmail?: string | null;
+  workPhone?: string | null;
+  employeeNumber?: string | null;
+  jobTitle?: string | null;
+  department?: string | null;
+  authSubjectId?: string | null;
+  status: StaffStatus;
+  version: number;
+  createdAtUtc: string;
+  lastChangedAtUtc: string;
+  suspendedAtUtc?: string | null;
+  departedAtUtc?: string | null;
+  assignments: StaffPropertyAssignment[];
+};
+
+export type StaffListResponse = {
+  items: StaffMember[];
+  page: number;
+  pageSize: number;
+};
+
+export type AdapterExecutionMode = Schema<"AdapterExecutionMode"> | "polling" | "continuous" | "push" | "remotePolling";
+export type AdapterConflictPolicy = Schema<"AdapterConflictPolicy"> | "suggestionsOnly" | "autoApplyWhenAdapterBaselineUnchanged";
+export type AdapterConnectionStatus = Schema<"AdapterConnectionStatus"> | "enabled" | "disabled";
+
+export type AdapterConnection = {
+  connectionId: string;
+  propertyId: string;
+  adapterType: string;
+  executionMode: AdapterExecutionMode;
+  pollingIntervalSeconds?: number | null;
+  pollingScheduleMaxAttempts?: number | null;
+  pollingScheduleConfiguredAtUtc?: string | null;
+  conflictPolicy: AdapterConflictPolicy;
+  configurationReference: string;
+  hasSecretReference: boolean;
+  checkpoint?: string | null;
+  status: AdapterConnectionStatus;
+  version: number;
+  createdAtUtc: string;
+  updatedAtUtc?: string | null;
+};
+
+export type AdapterConnectionListResponse = { connections: AdapterConnection[]; page: number; pageSize: number; totalCount: number };
+
+export type AdapterTypeCapability = {
+  adapterType: string;
+  protocolVersion: number;
+  configurationSchemaVersion: number;
+  executionModes: AdapterExecutionMode[];
+  minimumPollingIntervalSeconds?: number | null;
+  recommendedPollingIntervalSeconds?: number | null;
+};
+export type AdapterTypeCapabilityListResponse = { adapterTypes: AdapterTypeCapability[] };
+
+export type AdapterConnectionHealth = {
+  connectionId: string;
+  propertyId: string;
+  adapterType: string;
+  connectionStatus: AdapterConnectionStatus;
+  executionMode: AdapterExecutionMode;
+  capabilityStatus: number | string;
+  protocolVersion?: number | null;
+  configurationSchemaVersion?: number | null;
+  pollingIntervalSeconds?: number | null;
+  pollingScheduleMaxAttempts?: number | null;
+  pollingScheduleConfiguredAtUtc?: string | null;
+  nextRunExpectedAtUtc?: string | null;
+  runExpected: boolean;
+  operationalState: number | string;
+  latestRunId?: string | null;
+  latestRunStatus?: number | string | null;
+  latestRunStartedAtUtc?: string | null;
+  latestRunCompletedAtUtc?: string | null;
+  latestRunError?: string | null;
+  lastSuccessfulRunAtUtc?: string | null;
+  lastObservationReceivedAtUtc?: string | null;
+  pendingReceiptCount: number;
+  rejectedReceiptCount: number;
+  expiredRawPayloadCount: number;
+  protectedRawPayloadCount: number;
+  heldExpiredRawPayloadCount: number;
+  purgingRawPayloadCount: number;
+  dueSensitiveHistoryCount: number;
+  heldDueSensitiveHistoryCount: number;
+  redactedSensitiveHistoryCount: number;
+  activeLegalHoldCount: number;
+  evaluatedAtUtc: string;
+};
+
+export type AdapterIngressCredential = {
+  credentialId: string;
+  connectionId: string;
+  slot: number;
+  label: string;
+  status: number | string;
+  expiresAtUtc: string;
+  createdBy: string;
+  createdAtUtc: string;
+  revokedBy?: string | null;
+  revokedAtUtc?: string | null;
+  lastAuthenticatedAtUtc?: string | null;
+  version: number;
+};
+export type AdapterIngressCredentialListResponse = { credentials: AdapterIngressCredential[]; page: number; pageSize: number; totalCount: number };
+export type CreateAdapterIngressCredentialResponse = { credential: AdapterIngressCredential; token: string };
+
+export type ChangeProposalStatus = Schema<"ChangeProposalStatus"> | "pending" | "applying" | "applied" | "rejected" | "superseded" | "stale" | "failed";
+export type ChangeProposalSummary = {
+  proposalId: string;
+  propertyId: string;
+  connectionId: string;
+  receiptId: string;
+  reservationId: string;
+  baseReservationDetailsRevision: number;
+  reasonCode: string;
+  sensitiveHistoryStatus: number | string;
+  sensitiveDataRetainUntilUtc?: string | null;
+  sensitiveDataRedactedAtUtc?: string | null;
+  status: ChangeProposalStatus;
+  decisionActor?: string | null;
+  decisionReason?: string | null;
+  productOperationId?: string | null;
+  version: number;
+  createdAtUtc: string;
+  decidedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+};
+export type ChangeProposal = ChangeProposalSummary & { diff?: string | null };
+export type ChangeProposalListResponse = { proposals: ChangeProposalSummary[]; page: number; pageSize: number; totalCount: number };
+
+export type IngestionRunStatus = Schema<"IngestionRunStatus"> | "running" | "succeeded" | "partiallySucceeded" | "failed" | "cancelled";
+export type IngestionRun = {
+  runId: string;
+  connectionId: string;
+  propertyId: string;
+  executionKind: number | string;
+  taskRunId?: string | null;
+  taskAttempt?: number | null;
+  remoteLeaseId?: string | null;
+  remoteClaimId?: string | null;
+  remoteLeaseEpoch?: number | null;
+  remoteWorkerId?: string | null;
+  remoteLeaseExpiresAtUtc?: string | null;
+  startingCheckpoint?: string | null;
+  acceptedCheckpoint?: string | null;
+  status: IngestionRunStatus;
+  observedCount: number;
+  acceptedCount: number;
+  rejectedCount: number;
+  errorMessage?: string | null;
+  version: number;
+  startedAtUtc: string;
+  completedAtUtc?: string | null;
+};
+export type IngestionRunListResponse = { runs: IngestionRun[]; page: number; pageSize: number; totalCount: number };
+
+export type ObservationReceiptStatus = Schema<"ObservationReceiptStatus"> | "pending" | "processed" | "rejected";
+export type ObservationReceipt = {
+  receiptId: string;
+  propertyId: string;
+  connectionId: string;
+  runId?: string | null;
+  operationId: string;
+  sourceRecordType: string;
+  externalId: string;
+  sourceRevision?: string | null;
+  contentHash: string;
+  rawPayloadFileId: string;
+  rawPayloadStatus: number | string;
+  rawPayloadRetainUntilUtc: string;
+  rawPayloadPurgedAtUtc?: string | null;
+  activeReprocessingAttemptId?: string | null;
+  reprocessingReservationExpiresAtUtc?: string | null;
+  sourceReceiptId?: string | null;
+  reprocessingAttemptId?: string | null;
+  parserType?: string | null;
+  parserVersion?: number | null;
+  parserOutputIndex?: number | null;
+  sourceUpdatedAtUtc?: string | null;
+  observedAtUtc: string;
+  status: ObservationReceiptStatus;
+  rejectionReason?: string | null;
+  receivedAtUtc: string;
+  processedAtUtc?: string | null;
+};
+export type ObservationReceiptListResponse = { receipts: ObservationReceipt[]; page: number; pageSize: number; totalCount: number };
+
+export type ObservationParserCapability = { parserType: string; parserVersion: number; supportedAdapterTypes: string[]; supportedSourceRecordTypes: string[]; outputRecordTypes: string[] };
+export type ObservationParserCapabilityListResponse = { parsers: ObservationParserCapability[] };
+
+export type ObservationReprocessingStatus = Schema<"ObservationReprocessingStatus"> | "queued" | "running" | "succeeded" | "noMatch" | "failed" | "canceled" | "expired";
+export type ObservationReprocessingAttempt = {
+  attemptId: string;
+  propertyId: string;
+  connectionId: string;
+  sourceReceiptId: string;
+  taskRunId: string;
+  parserType: string;
+  parserVersion: number;
+  requestedBy: string;
+  status: ObservationReprocessingStatus;
+  lastTaskAttempt: number;
+  parsedCount: number;
+  acceptedCount: number;
+  duplicateCount: number;
+  rejectedCount: number;
+  lastErrorCode?: string | null;
+  requestedAtUtc: string;
+  startedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+  reservationExpiresAtUtc: string;
+  version: number;
+};
+export type ObservationReprocessingOutput = { outputIndex: number; operationId: string; receiptId?: string | null; status: number | string; recordType: string; externalId: string; sourceRevision?: string | null; contentHash: string; errorCode?: string | null; recordedAtUtc: string };
+export type ObservationReprocessingAttemptDetails = { attempt: ObservationReprocessingAttempt; outputs: ObservationReprocessingOutput[] };
+export type ObservationReprocessingAttemptListResponse = { attempts: ObservationReprocessingAttempt[]; page: number; pageSize: number; totalCount: number };
+
+export type NotificationSeverity = 0 | 1 | 2 | 3 | 4 | "info" | "success" | "warning" | "error" | string;
+export type NotificationHistoryItem = {
+  id: string;
+  module: string;
+  name: string;
+  version: number;
+  title: string;
+  body?: string | null;
+  severity: NotificationSeverity;
+  streamSequence: number;
+  occurredAtUtc: string;
+  createdAtUtc: string;
+  readAtUtc?: string | null;
+  payload: unknown;
+};
+export type NotificationHistoryListResponse = { items: NotificationHistoryItem[]; page: number; pageSize: number; totalCount: number; unreadCount: number };
+export type NotificationBroadcastItem = {
+  broadcastId: string;
+  scopeId?: string | null;
+  audience: number | string;
+  module: string;
+  name: string;
+  version: number;
+  title: string;
+  body?: string | null;
+  severity: NotificationSeverity;
+  streamSequence: number;
+  occurredAtUtc: string;
+  createdAtUtc: string;
+  readAtUtc?: string | null;
+  payload: unknown;
+};
+export type NotificationBroadcastListResponse = { items: NotificationBroadcastItem[]; page: number; pageSize: number; totalCount: number; unreadCount: number };
+export type MarkAllNotificationsReadResponse = { updatedCount: number };
 
 export type BrowserAuthResponse = NonNullableFields<Schema<"BrowserAuthResponse">, "accessToken">;
 

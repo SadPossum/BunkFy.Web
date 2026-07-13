@@ -29,14 +29,15 @@ export function DashboardPage() {
   const inventoryRooms = inventory.data?.rooms ?? [];
   const reservationItems = reservations.data?.reservations ?? [];
   const activeBlocks = blocks.data?.blocks ?? [];
-  const arrivals = reservationItems.filter((item) => item.arrival === today && !reservationStatusLabel(item.status).includes("cancel"));
-  const inHouse = reservationItems.filter((item) => item.arrival <= today && item.departure > today && reservationStatusLabel(item.status) === "confirmed");
+  const arrivals = reservationItems.filter((item) => item.arrival === today && reservationStatusKey(item.status) === "confirmed");
+  const inHouse = reservationItems.filter((item) => ["checkedIn", "checkoutPending"].includes(reservationStatusKey(item.status)));
+  const needsAttention = reservationItems.filter((item) => ["pendingAllocation", "allocationRejected", "cancellationPending", "noShowPending", "checkoutPending"].includes(reservationStatusKey(item.status)));
   const sellableUnits = inventoryRooms.flatMap((room) => room.units).filter((unit) => unit.isSellable && unit.isTopologyActive);
-  const upcoming = reservationItems.filter((item) => item.arrival >= today && !reservationStatusLabel(item.status).includes("cancel")).sort((a, b) => a.arrival.localeCompare(b.arrival)).slice(0, 6);
+  const upcoming = reservationItems.filter((item) => item.arrival >= today && ["pendingAllocation", "confirmed"].includes(reservationStatusKey(item.status))).sort((a, b) => a.arrival.localeCompare(b.arrival)).slice(0, 6);
 
   return (
     <>
-      <PageHeader eyebrow={formatLongDate(new Date())} title={`Good day at ${selectedProperty.name}`} description="Here’s the operational picture across reservations and inventory." action={<Link to="/reservations" className="btn btn-primary"><Plus size={17} />New reservation</Link>} />
+      <PageHeader eyebrow={formatLongDate(new Date())} title={`Good day at ${selectedProperty.name}`} description="Here’s the operational picture across reservations and inventory." action={<Link to="/reservations?new=1" className="btn btn-primary"><Plus size={17} />New reservation</Link>} />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<CalendarClock />} label="Arrivals today" value={arrivals.length} detail={arrivals.length ? `${arrivals.reduce((sum, item) => sum + item.guestCount, 0)} guests expected` : "No arrivals scheduled"} tone="accent" />
@@ -45,11 +46,13 @@ export function DashboardPage() {
         <StatCard icon={<Blocks />} label="Active blocks" value={activeBlocks.length} detail={activeBlocks.length ? "Review inventory impact" : "Inventory is clear"} tone="warning" />
       </section>
 
+      {needsAttention.length > 0 && <Link to="/reservations" className="alert mt-4 border border-warning/25 bg-warning/10 text-base-content transition hover:border-warning/45"><CalendarClock size={19} className="text-warning" /><span><strong>{needsAttention.length} {needsAttention.length === 1 ? "reservation needs" : "reservations need"} attention.</strong> Review allocation or inventory-release progress.</span><ArrowRight size={17} /></Link>}
+
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <div className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="card-body p-0">
             <div className="flex items-center justify-between px-6 pb-4 pt-6"><div><h2 className="font-display text-xl font-semibold">Upcoming stays</h2><p className="mt-1 text-sm text-base-content/50">The next reservations needing attention.</p></div><Link to="/reservations" className="btn btn-ghost btn-sm text-primary">View all <ArrowRight size={16} /></Link></div>
-            {upcoming.length ? <div className="divide-y divide-base-300">{upcoming.map((reservation) => <Link to="/reservations" key={reservation.reservationId} className="grid gap-3 px-6 py-4 transition hover:bg-base-200 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"} · {reservation.inventoryUnitIds.length} {reservation.inventoryUnitIds.length === 1 ? "unit" : "units"}</p></div></div><div className="text-sm"><p className="font-semibold">{formatShortDate(reservation.arrival)} → {formatShortDate(reservation.departure)}</p><p className="mt-1 text-right text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></Link>)}</div> : <div className="px-6 pb-7"><EmptyState icon={<CalendarCheck2 />} title="No upcoming stays" description="New reservations will appear here as soon as they are created." action={<Link className="btn btn-sm btn-primary" to="/reservations">Add reservation</Link>} /></div>}
+            {upcoming.length ? <div className="divide-y divide-base-300">{upcoming.map((reservation) => <Link to={`/reservations?reservation=${reservation.reservationId}`} key={reservation.reservationId} className="grid gap-3 px-6 py-4 transition hover:bg-base-200 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"} · {reservation.inventoryUnitIds.length} {reservation.inventoryUnitIds.length === 1 ? "unit" : "units"}</p></div></div><div className="text-sm"><p className="font-semibold">{formatShortDate(reservation.arrival)} → {formatShortDate(reservation.departure)}</p><p className="mt-1 text-right text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></Link>)}</div> : <div className="px-6 pb-7"><EmptyState icon={<CalendarCheck2 />} title="No upcoming stays" description="New reservations will appear here as soon as they are created." action={<Link className="btn btn-sm btn-primary" to="/reservations?new=1">Add reservation</Link>} /></div>}
           </div>
         </div>
 
@@ -85,3 +88,4 @@ function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
 function formatLongDate(date: Date) { return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(date); }
 function formatShortDate(value: string) { return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T12:00:00`)); }
 function nightsBetween(arrival: string, departure: string) { return Math.max(0, Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000)); }
+function reservationStatusKey(status: import("../../api/types").ReservationStatus) { if (typeof status === "string") return status.replace(/[- ](.)/g, (_, letter: string) => letter.toUpperCase()); return ({ 1: "pendingAllocation", 2: "confirmed", 3: "allocationRejected", 4: "cancellationPending", 5: "cancelled", 6: "checkedIn", 7: "noShowPending", 8: "noShow", 9: "checkoutPending", 10: "checkedOut" } as Record<number, string>)[status] ?? "unknown"; }

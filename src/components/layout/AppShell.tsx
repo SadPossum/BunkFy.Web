@@ -1,8 +1,9 @@
-import { Blocks, Building2, CalendarDays, ChevronDown, Gauge, LogOut, Menu, UsersRound, X } from "lucide-react";
+import { Bell, Blocks, Building2, Cable, CalendarDays, ChevronDown, Gauge, LogOut, Menu, UserRoundCog, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { useNotifications } from "../../features/notifications/notifications";
 import { BrandMark } from "../ui/BrandMark";
 import { InitialAvatar } from "../ui/primitives";
 
@@ -10,13 +11,16 @@ const navigation = [
   { to: "/", label: "Overview", icon: Gauge },
   { to: "/reservations", label: "Reservations", icon: CalendarDays },
   { to: "/guests", label: "Guests", icon: UsersRound },
+  { to: "/staff", label: "Staff", icon: UserRoundCog },
   { to: "/inventory", label: "Inventory", icon: Blocks },
+  { to: "/integrations", label: "Integrations", icon: Cable },
   { to: "/properties", label: "Properties", icon: Building2 },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { session, logout } = useSession();
   const { properties, selectedPropertyId, setSelectedPropertyId } = useWorkspace();
+  const { unreadCount } = useNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -41,8 +45,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="border-t border-base-300 p-4">
           <div className="flex items-center gap-3 rounded-xl bg-base-200 p-3">
-            <InitialAvatar name={session?.username} size="sm" variant="solid" />
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{session?.username}</p><p className="truncate text-xs text-base-content/45">{session?.tenantId}</p></div>
+            <NavLink to="/account" className="flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => setMobileOpen(false)}>
+              <InitialAvatar name={session?.username} size="sm" variant="solid" />
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{session?.username}</span><span className="block truncate text-xs text-base-content/45">{session?.tenantId}</span></span>
+            </NavLink>
             <button className="btn btn-circle btn-ghost btn-sm" onClick={() => void logout()} aria-label="Sign out"><LogOut size={17} /></button>
           </div>
         </div>
@@ -69,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {properties.map((property) => <option key={property.propertyId} value={property.propertyId}>{property.name}</option>)}
             </select>
           </div>
-          <div className="flex items-center gap-2" role="status" aria-label="Workspace connected"><span className="hidden text-xs font-semibold text-base-content/45 sm:inline">Live workspace</span><span className="status-dot" aria-hidden="true" /></div>
+          <div className="flex items-center gap-2"><NavLink to="/notifications" className="btn btn-circle btn-ghost btn-sm relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}><Bell size={18} />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.6rem] font-bold leading-4 text-primary-content">{unreadCount > 99 ? "99+" : unreadCount}</span>}</NavLink><div className="flex items-center gap-2" role="status" aria-label="Workspace connected"><span className="hidden text-xs font-semibold text-base-content/45 sm:inline">Live workspace</span><span className="status-dot" aria-hidden="true" /></div></div>
         </header>
         <main className="mx-auto max-w-[1480px] p-4 sm:p-8">{children}</main>
       </div>
