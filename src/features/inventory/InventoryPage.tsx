@@ -7,6 +7,7 @@ import { permissions, propertyAccessScope, usePermissions } from "../../app/perm
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { EmptyState, ErrorState, FormActions, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import { sellableInventorySummary } from "./inventorySummary";
 
 export function InventoryPage() {
   const { request, session } = useSession();
@@ -63,7 +64,7 @@ export function InventoryPage() {
           <div className="border-b border-base-300 px-5 py-5 sm:px-6"><h2 className="font-display text-xl font-semibold">Sales setup</h2><p className="mt-1 text-sm text-base-content/50">Choose whether guests reserve the whole room or individual beds.</p></div>
           {!inventory.data?.rooms.length ? <div className="p-6"><EmptyState icon={<DoorOpen />} title="No rooms available" description="Set up rooms and beds in Properties before configuring inventory." /></div> : <div className="divide-y divide-base-300">{inventory.data.rooms.map((room) => {
             const mode = normalizeSalesMode(room.salesMode);
-            return <div key={room.roomId} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-secondary/15 text-secondary"><DoorOpen size={18} /></div><div><p className="font-semibold">{room.roomName}</p><p className="mt-1 text-xs text-base-content/45">{room.units.length} active {room.units.length === 1 ? "unit" : "units"}</p></div></div><div className="flex items-center gap-3"><StatusBadge status={mode} />{canConfigure && <select className="select select-bordered select-sm" aria-label={`Sales mode for ${room.roomName}`} value={mode} onChange={(event) => salesModeMutation.mutate({ room, salesMode: event.target.value as "roomLevel" | "bedLevel" })}><option value="unconfigured" disabled>Not configured</option><option value="roomLevel">Sell whole room</option><option value="bedLevel">Sell individual beds</option></select>}</div></div>;
+            return <div key={room.roomId} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-secondary/15 text-secondary"><DoorOpen size={18} /></div><div><p className="font-semibold">{room.roomName}</p><p className="mt-1 text-xs text-base-content/45">{sellableInventorySummary(room.units)}</p></div></div><div className="flex items-center gap-3"><StatusBadge status={mode} />{canConfigure && <select className="select select-bordered select-sm" aria-label={`Sales mode for ${room.roomName}`} value={mode} onChange={(event) => salesModeMutation.mutate({ room, salesMode: event.target.value as "roomLevel" | "bedLevel" })}><option value="unconfigured" disabled>Not configured</option><option value="roomLevel">Sell whole room</option><option value="bedLevel">Sell individual beds</option></select>}</div></div>;
           })}</div>}
           {salesModeMutation.error && <div className="p-5"><ErrorState error={salesModeMutation.error} /></div>}
         </section>

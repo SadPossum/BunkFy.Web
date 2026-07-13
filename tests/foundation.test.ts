@@ -50,6 +50,20 @@ describe("frontend repository foundation", () => {
     expect(client).toContain('credentials: "include"');
   });
 
+  it("keeps modal backdrops out of the accessibility tree without creating an unnamed button", () => {
+    const primitives = readFileSync(join(repositoryRoot, "src", "components", "ui", "primitives.tsx"), "utf8");
+
+    expect(primitives).toContain('<div className="modal-backdrop"');
+    expect(primitives).not.toContain('<button className="modal-backdrop"');
+  });
+
+  it("shows the mark-all action only for unread items in the selected inbox", () => {
+    const notifications = readFileSync(join(repositoryRoot, "src", "features", "notifications", "NotificationsPage.tsx"), "utf8");
+
+    expect(notifications).toContain("(query.data?.unreadCount ?? 0) > 0");
+    expect(notifications).not.toContain("const { unreadCount } = useNotifications()");
+  });
+
   it("does not allow callers to suppress browser session cookies", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);

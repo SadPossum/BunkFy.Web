@@ -89,7 +89,7 @@ export function Modal({ open, title, description, children, onClose, size = "md"
         </div>
         <div className="p-6">{children}</div>
       </div>
-      <button className="modal-backdrop" onClick={onClose} aria-hidden="true" tabIndex={-1} />
+      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
     </div>
   );
 }

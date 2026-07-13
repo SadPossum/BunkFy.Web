@@ -6,7 +6,6 @@ import { notificationAudienceLabel, notificationSeverityLabel } from "../../api/
 import type { MarkAllNotificationsReadResponse, NotificationBroadcastItem, NotificationBroadcastListResponse, NotificationHistoryItem, NotificationHistoryListResponse, NotificationSeverity } from "../../api/types";
 import { useSession } from "../../app/session";
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
-import { useNotifications } from "./notifications";
 
 const PAGE_SIZE = 25;
 type InboxTab = "personal" | "broadcasts";
@@ -14,7 +13,6 @@ type InboxTab = "personal" | "broadcasts";
 export function NotificationsPage() {
   const { request } = useSession();
   const queryClient = useQueryClient();
-  const { unreadCount } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<InboxTab>("personal");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -38,7 +36,7 @@ export function NotificationsPage() {
   }
   const items = query.data?.items ?? [];
   return <>
-    <PageHeader eyebrow="Live workspace" title="Notifications" description="Stay on top of operational events and workspace announcements." action={unreadCount > 0 ? <button type="button" className="btn btn-primary" onClick={() => markAll.mutate()} disabled={markAll.isPending}><CheckCheck size={17} />Mark all read</button> : undefined} />
+    <PageHeader eyebrow="Live workspace" title="Notifications" description="Stay on top of operational events and workspace announcements." action={(query.data?.unreadCount ?? 0) > 0 ? <button type="button" className="btn btn-primary" onClick={() => markAll.mutate()} disabled={markAll.isPending}><CheckCheck size={17} />Mark all read</button> : undefined} />
     <section className="card border border-base-300 bg-base-100 shadow-sm">
       <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div role="tablist" aria-label="Notification inbox" className="tabs tabs-box bg-base-200 p-1"><button role="tab" aria-selected={tab === "personal"} className={`tab gap-1.5 text-xs font-semibold sm:text-sm ${tab === "personal" ? "tab-active bg-base-100 shadow-sm" : ""}`} onClick={() => setTab("personal")}><Bell size={15} />For you</button><button role="tab" aria-selected={tab === "broadcasts"} className={`tab gap-1.5 text-xs font-semibold sm:text-sm ${tab === "broadcasts" ? "tab-active bg-base-100 shadow-sm" : ""}`} onClick={() => setTab("broadcasts")}><Megaphone size={15} />Announcements</button></div><label className="flex cursor-pointer items-center gap-2 text-sm font-medium"><input className="toggle toggle-primary toggle-sm" type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} />Unread only</label></div>
       {query.isLoading ? <LoadingState label="Loading notifications" /> : query.error ? <div className="p-6"><ErrorState error={query.error} retry={() => void query.refetch()} /></div> : !items.length ? <div className="p-6"><EmptyState icon={tab === "personal" ? <Bell /> : <Megaphone />} title={unreadOnly ? "You’re all caught up" : tab === "personal" ? "No notifications yet" : "No announcements yet"} description={unreadOnly ? "There are no unread items in this inbox." : "New operational messages will appear here automatically."} /></div> : <><div className="divide-y divide-base-300">{items.map((item) => <NotificationRow key={notificationId(item)} item={item} onOpen={() => select(item)} />)}</div><div className="flex items-center justify-between border-t border-base-300 px-4 py-3 sm:px-6"><p className="text-xs text-base-content/45">{query.data?.totalCount ?? items.length} total · {query.data?.unreadCount ?? 0} unread</p><div className="join"><button className="btn btn-sm join-item" disabled={page === 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous notifications"><ChevronLeft size={16} /></button><button className="btn btn-sm join-item" disabled={page * PAGE_SIZE >= (query.data?.totalCount ?? 0)} onClick={() => setPage((current) => current + 1)} aria-label="Next notifications"><ChevronRight size={16} /></button></div></div></>}

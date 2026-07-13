@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InventoryUnitAvailability, RoomInventory } from "../src/api/types";
 import { groupAvailabilityByRoom } from "../src/features/reservations/inventoryGrouping";
+import { sellableInventorySummary } from "../src/features/inventory/inventorySummary";
 
 function availability(roomId: string, label: string, isAvailable: boolean): InventoryUnitAvailability {
   return {
@@ -54,5 +55,23 @@ describe("reservation inventory grouping", () => {
     expect(groups.reduce((total, group) => total + group.totalCount, 0)).toBe(40);
     expect(groups.reduce((total, group) => total + group.availableCount, 0)).toBe(35);
     expect(groups.every((group) => group.units[0].isAvailable)).toBe(true);
+  });
+});
+
+describe("inventory sales summary", () => {
+  it("counts sellable beds instead of every topology node", () => {
+    const topology = [
+      { ...availability("room-1", "Dorm 101", false).unit, kind: "room" as const, bedId: null, isSellable: false },
+      ...Array.from({ length: 8 }, (_, index) => availability("room-1", `Bed ${index + 1}`, true).unit),
+    ];
+
+    expect(sellableInventorySummary(topology)).toBe("8 sellable beds");
+  });
+
+  it("describes whole-room and unconfigured inventory clearly", () => {
+    const roomUnit = { ...availability("room-1", "Dorm 101", true).unit, kind: "room" as const, bedId: null };
+
+    expect(sellableInventorySummary([roomUnit])).toBe("1 sellable room");
+    expect(sellableInventorySummary([{ ...roomUnit, isSellable: false }])).toBe("Not configured for sale");
   });
 });
