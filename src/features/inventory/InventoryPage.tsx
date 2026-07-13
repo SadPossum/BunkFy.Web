@@ -3,17 +3,27 @@ import { BedDouble, Blocks, CalendarSearch, CheckCircle2, CircleSlash2, DoorOpen
 import { useMemo, useState, type FormEvent } from "react";
 import type { InventoryAvailabilityResponse, InventoryUnit, ManualBlockListResponse, RoomInventory, RoomInventoryListResponse } from "../../api/types";
 import { inventoryKindLabel, inventorySalesModeValue } from "../../api/labels";
+import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { EmptyState, ErrorState, FormActions, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
 
 export function InventoryPage() {
-  const { request } = useSession();
+  const { request, session } = useSession();
   const { selectedProperty, selectedPropertyId } = useWorkspace();
   const queryClient = useQueryClient();
   const [blockOpen, setBlockOpen] = useState(false);
   const [range, setRange] = useState(defaultRange);
   const enabled = Boolean(selectedPropertyId);
+  const accessScope = session && selectedPropertyId
+    ? propertyAccessScope(session.tenantId, selectedPropertyId)
+    : "";
+  const access = usePermissions(accessScope ? [
+    { permission: permissions.inventoryConfigure, scope: accessScope },
+    { permission: permissions.inventoryBlocksManage, scope: accessScope },
+  ] : []);
+  const canConfigure = access.allows(permissions.inventoryConfigure, accessScope);
+  const canManageBlocks = access.allows(permissions.inventoryBlocksManage, accessScope);
   const inventory = useQuery({ queryKey: ["inventory-rooms", selectedPropertyId], queryFn: () => request<RoomInventoryListResponse>(`/api/inventory/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
   const availability = useQuery({ queryKey: ["availability", selectedPropertyId, range.arrival, range.departure], queryFn: () => request<InventoryAvailabilityResponse>(`/api/inventory/properties/${selectedPropertyId}/availability?arrival=${range.arrival}&departure=${range.departure}`), enabled: enabled && Boolean(range.arrival && range.departure) });
   const blocks = useQuery({ queryKey: ["blocks", selectedPropertyId, false], queryFn: () => request<ManualBlockListResponse>(`/api/inventory/properties/${selectedPropertyId}/blocks?includeReleased=false&page=1&pageSize=100`), enabled });
@@ -41,7 +51,7 @@ export function InventoryPage() {
 
   return (
     <>
-      <PageHeader eyebrow={selectedProperty.name} title="Inventory" description="Control how each room is sold, check availability and block units when operations need them." action={<button className="btn btn-primary" onClick={() => setBlockOpen(true)} disabled={!allUnits.some((unit) => unit.isSellable)}><Plus size={17} />Block a unit</button>} />
+      <PageHeader eyebrow={selectedProperty.name} title="Inventory" description="Control how each room is sold, check availability and block units when operations need them." action={canManageBlocks ? <button className="btn btn-primary" onClick={() => setBlockOpen(true)} disabled={!allUnits.some((unit) => unit.isSellable)}><Plus size={17} />Block a unit</button> : undefined} />
 
       <section className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="flex flex-col gap-4 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><h2 className="font-display text-xl font-semibold">Availability check</h2><p className="mt-1 text-sm text-base-content/50">See what can be assigned for a stay range.</p></div><form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); setRange({ arrival: String(data.get("arrival")), departure: String(data.get("departure")) }); }}><input className="input input-bordered input-sm" type="date" name="arrival" aria-label="Arrival date" defaultValue={range.arrival} required /><span className="hidden self-center text-base-content/30 sm:block">→</span><input className="input input-bordered input-sm" type="date" name="departure" aria-label="Departure date" defaultValue={range.departure} required /><button className="btn btn-sm btn-secondary"><CalendarSearch size={16} />Check</button></form></div>
@@ -53,19 +63,19 @@ export function InventoryPage() {
           <div className="border-b border-base-300 px-5 py-5 sm:px-6"><h2 className="font-display text-xl font-semibold">Sales setup</h2><p className="mt-1 text-sm text-base-content/50">Choose whether guests reserve the whole room or individual beds.</p></div>
           {!inventory.data?.rooms.length ? <div className="p-6"><EmptyState icon={<DoorOpen />} title="No rooms available" description="Set up rooms and beds in Properties before configuring inventory." /></div> : <div className="divide-y divide-base-300">{inventory.data.rooms.map((room) => {
             const mode = normalizeSalesMode(room.salesMode);
-            return <div key={room.roomId} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-secondary/15 text-secondary"><DoorOpen size={18} /></div><div><p className="font-semibold">{room.roomName}</p><p className="mt-1 text-xs text-base-content/45">{room.units.length} active {room.units.length === 1 ? "unit" : "units"}</p></div></div><div className="flex items-center gap-3"><StatusBadge status={mode} /><select className="select select-bordered select-sm" aria-label={`Sales mode for ${room.roomName}`} value={mode} onChange={(event) => salesModeMutation.mutate({ room, salesMode: event.target.value as "roomLevel" | "bedLevel" })}><option value="unconfigured" disabled>Not configured</option><option value="roomLevel">Sell whole room</option><option value="bedLevel">Sell individual beds</option></select></div></div>;
+            return <div key={room.roomId} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-secondary/15 text-secondary"><DoorOpen size={18} /></div><div><p className="font-semibold">{room.roomName}</p><p className="mt-1 text-xs text-base-content/45">{room.units.length} active {room.units.length === 1 ? "unit" : "units"}</p></div></div><div className="flex items-center gap-3"><StatusBadge status={mode} />{canConfigure && <select className="select select-bordered select-sm" aria-label={`Sales mode for ${room.roomName}`} value={mode} onChange={(event) => salesModeMutation.mutate({ room, salesMode: event.target.value as "roomLevel" | "bedLevel" })}><option value="unconfigured" disabled>Not configured</option><option value="roomLevel">Sell whole room</option><option value="bedLevel">Sell individual beds</option></select>}</div></div>;
           })}</div>}
           {salesModeMutation.error && <div className="p-5"><ErrorState error={salesModeMutation.error} /></div>}
         </section>
 
         <section className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="flex items-center justify-between border-b border-base-300 px-5 py-5 sm:px-6"><div><h2 className="font-display text-xl font-semibold">Active blocks</h2><p className="mt-1 text-sm text-base-content/50">Out-of-service and operational holds.</p></div><span className="badge badge-neutral">{blocks.data?.blocks.length ?? 0}</span></div>
-          {!blocks.data?.blocks.length ? <div className="p-6"><EmptyState icon={<Blocks />} title="No active blocks" description="All configured inventory is free from manual blocks." /></div> : <div className="divide-y divide-base-300">{blocks.data.blocks.map((block) => { const unit = allUnits.find((item) => item.inventoryUnitId === block.inventoryUnitId); return <div key={block.blockId} className="px-5 py-4 sm:px-6"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{unit?.label ?? "Inventory unit"}</p><p className="mt-1 text-xs text-base-content/45">{formatDate(block.arrival)} → {formatDate(block.departure)}</p></div><button className="btn btn-ghost btn-sm text-primary" onClick={() => releaseBlock.mutate({ blockId: block.blockId, expectedVersion: block.version })} disabled={releaseBlock.isPending}><Unlock size={15} />Release</button></div><p className="mt-3 rounded-lg bg-base-200 px-3 py-2 text-xs text-base-content/60">{block.reason}</p></div>; })}</div>}
+          {!blocks.data?.blocks.length ? <div className="p-6"><EmptyState icon={<Blocks />} title="No active blocks" description="All configured inventory is free from manual blocks." /></div> : <div className="divide-y divide-base-300">{blocks.data.blocks.map((block) => { const unit = allUnits.find((item) => item.inventoryUnitId === block.inventoryUnitId); return <div key={block.blockId} className="px-5 py-4 sm:px-6"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{unit?.label ?? "Inventory unit"}</p><p className="mt-1 text-xs text-base-content/45">{formatDate(block.arrival)} → {formatDate(block.departure)}</p></div>{canManageBlocks && <button className="btn btn-ghost btn-sm text-primary" onClick={() => releaseBlock.mutate({ blockId: block.blockId, expectedVersion: block.version })} disabled={releaseBlock.isPending}><Unlock size={15} />Release</button>}</div><p className="mt-3 rounded-lg bg-base-200 px-3 py-2 text-xs text-base-content/60">{block.reason}</p></div>; })}</div>}
           {releaseBlock.error && <div className="p-5"><ErrorState error={releaseBlock.error} /></div>}
         </section>
       </div>
 
-      <BlockForm open={blockOpen} units={allUnits.filter((unit) => unit.isSellable && unit.isTopologyActive)} mutation={createBlock} onClose={() => setBlockOpen(false)} />
+      <BlockForm open={blockOpen && canManageBlocks} units={allUnits.filter((unit) => unit.isSellable && unit.isTopologyActive)} mutation={createBlock} onClose={() => setBlockOpen(false)} />
     </>
   );
 }

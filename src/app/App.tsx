@@ -9,7 +9,10 @@ import { useSession } from "./session";
 import { WorkspaceProvider } from "./workspace";
 
 export function App() {
-  const { session } = useSession();
+  const { isRestoring, session } = useSession();
+  if (isRestoring) {
+    return <main className="grid min-h-screen place-items-center" aria-busy="true">Restoring your session…</main>;
+  }
   if (!session) return <AuthPage />;
 
   return (

@@ -1,6 +1,6 @@
 # Local Development
 
-The repository contains a minimal Vite smoke shell for Aspire and browser-runtime validation.
+The repository contains the BunkFy staff operations SPA and its Aspire/browser-runtime integration.
 
 Current validation commands:
 
@@ -9,22 +9,16 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
+pnpm contracts:check
 ```
 
-Run the smoke shell directly:
+Run the app directly:
 
 ```powershell
 pnpm dev
 ```
 
-Future frontend work should add product app structure deliberately:
+The generated API contract lives at `src/api/contracts.generated.ts` and the source OpenAPI snapshot at `openapi/bunkfy-api.json`. Refresh both with `pnpm contracts:generate` after an intentional backend API change; never hand-edit the generated file.
 
-- React and TypeScript.
-- Router.
-- Server-state client.
-- Form and validation libraries.
-- Generated API client.
-- Design-system primitives.
-
-Do not add production workflow screens until the API contracts and first product module boundaries are ready.
+Use the browser auth endpoints for staff sessions. Refresh credentials stay in path-scoped HttpOnly cookies, access tokens stay in memory, refresh is single-flight, and Web Locks serialize shared-cookie mutation across tabs where supported. Permission evaluation improves the UI by hiding unavailable actions, but every backend command remains independently authorized.
 

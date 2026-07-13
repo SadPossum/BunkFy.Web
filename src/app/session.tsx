@@ -1,13 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { apiRequest, type ApiSession } from "../api/client";
-import type { AuthTokens } from "../api/types";
+import type { BrowserAuthResponse } from "../api/types";
+import { createSingleFlightRefresh, runWithBrowserSessionLock, type SessionIdentity } from "./singleFlightRefresh";
 
-const STORAGE_KEY = "bunkfy.session.v1";
+const STORAGE_KEY = "bunkfy.session.identity.v2";
 
-type Credentials = { tenantId: string; username: string; password: string };
+export type Credentials = { tenantId: string; username: string; password: string };
 
 type SessionContextValue = {
   session: ApiSession | null;
+  isRestoring: boolean;
   login: (credentials: Credentials) => Promise<void>;
   register: (credentials: Credentials) => Promise<void>;
   logout: () => Promise<void>;
@@ -17,25 +19,56 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSessionState] = useState<ApiSession | null>(readSession);
-  const sessionRef = useRef(session);
+  const initialIdentity = useRef(readSessionIdentity());
+  const [session, setSessionState] = useState<ApiSession | null>(null);
+  const [isRestoring, setIsRestoring] = useState(initialIdentity.current !== null);
+  const sessionRef = useRef<ApiSession | null>(null);
 
   const setSession = useCallback((next: ApiSession | null) => {
     sessionRef.current = next;
     setSessionState(next);
-    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    else localStorage.removeItem(STORAGE_KEY);
+    writeSessionIdentity(next);
   }, []);
 
-  const authenticate = useCallback(async (mode: "login" | "register", credentials: Credentials) => {
-    const tokens = await apiRequest<AuthTokens>(`/api/auth/${mode}`, {
-      method: "POST",
-      headers: { "X-Tenant-Id": credentials.tenantId },
-      body: JSON.stringify(mode === "login"
-        ? { username: credentials.username, password: credentials.password }
-        : { username: credentials.username, usernameType: "Email", password: credentials.password }),
+  const performRefresh = useCallback(async (identity: SessionIdentity): Promise<ApiSession> => {
+    return runWithBrowserSessionLock(async () => {
+      const { accessToken } = await apiRequest<BrowserAuthResponse>("/api/auth/browser/refresh", {
+        method: "POST",
+        headers: { "X-Tenant-Id": identity.tenantId },
+      });
+      const refreshed = { ...identity, accessToken };
+      setSession(refreshed);
+      return refreshed;
     });
-    setSession({ ...tokens, tenantId: credentials.tenantId, username: credentials.username });
+  }, [setSession]);
+
+  const refreshSession = useMemo(() => createSingleFlightRefresh(async (identity: SessionIdentity) => {
+    try {
+      return await performRefresh(identity);
+    } catch (error) {
+      setSession(null);
+      throw error;
+    }
+  }), [performRefresh, setSession]);
+
+  useEffect(() => {
+    const identity = initialIdentity.current;
+    if (!identity) return;
+
+    void refreshSession(identity).finally(() => setIsRestoring(false));
+  }, [refreshSession]);
+
+  const authenticate = useCallback(async (mode: "login" | "register", credentials: Credentials) => {
+    await runWithBrowserSessionLock(async () => {
+      const response = await apiRequest<BrowserAuthResponse>(`/api/auth/browser/${mode}`, {
+        method: "POST",
+        headers: { "X-Tenant-Id": credentials.tenantId },
+        body: JSON.stringify(mode === "login"
+          ? { username: credentials.username, password: credentials.password }
+          : { username: credentials.username, usernameType: "Email", password: credentials.password }),
+      });
+      setSession({ ...response, tenantId: credentials.tenantId, username: credentials.username });
+    });
   }, [setSession]);
 
   const request = useCallback(async <T,>(path: string, options: RequestInit = {}) => {
@@ -46,30 +79,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return await apiRequest<T>(path, options, active);
     } catch (error) {
       if (!(error instanceof Error) || !("status" in error) || error.status !== 401) throw error;
-      try {
-        const tokens = await apiRequest<AuthTokens>("/api/auth/refresh", {
-          method: "POST",
-          headers: { "X-Tenant-Id": active.tenantId },
-          body: JSON.stringify({ accessToken: active.accessToken, refreshToken: active.refreshToken }),
-        });
-        const refreshed = { ...active, ...tokens };
-        setSession(refreshed);
-        return await apiRequest<T>(path, options, refreshed);
-      } catch (refreshError) {
-        setSession(null);
-        throw refreshError;
-      }
+
+      const refreshed = await refreshSession(active);
+      return await apiRequest<T>(path, options, refreshed);
     }
-  }, [setSession]);
+  }, [refreshSession]);
 
   const logout = useCallback(async () => {
     const active = sessionRef.current;
     try {
       if (active) {
-        await apiRequest<void>("/api/auth/sign-out", {
-          method: "POST",
-          body: JSON.stringify({ refreshToken: active.refreshToken }),
-        }, active);
+        await runWithBrowserSessionLock(() =>
+          apiRequest<void>("/api/auth/browser/sign-out", { method: "POST" }, active));
       }
     } finally {
       setSession(null);
@@ -78,11 +99,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SessionContextValue>(() => ({
     session,
+    isRestoring,
     login: (credentials) => authenticate("login", credentials),
     register: (credentials) => authenticate("register", credentials),
     logout,
     request,
-  }), [authenticate, logout, request, session]);
+  }), [authenticate, isRestoring, logout, request, session]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -93,11 +115,27 @@ export function useSession() {
   return value;
 }
 
-function readSession(): ApiSession | null {
+function readSessionIdentity(): SessionIdentity | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) as ApiSession : null;
+    if (!raw) return null;
+
+    const candidate = JSON.parse(raw) as Partial<SessionIdentity>;
+    return typeof candidate.tenantId === "string" && typeof candidate.username === "string"
+      ? { tenantId: candidate.tenantId, username: candidate.username }
+      : null;
   } catch {
     return null;
+  }
+}
+
+function writeSessionIdentity(session: SessionIdentity | null) {
+  if (session) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      tenantId: session.tenantId,
+      username: session.username,
+    }));
+  } else {
+    localStorage.removeItem(STORAGE_KEY);
   }
 }

@@ -3,6 +3,7 @@ import { BedDouble, CalendarDays, ChevronRight, Mail, Phone, Plus, Search, UserR
 import { useMemo, useState, type FormEvent } from "react";
 import type { InventoryAvailabilityResponse, InventoryUnitAvailability, Reservation, ReservationListResponse, ReservationStatus, RoomInventoryListResponse } from "../../api/types";
 import { inventoryKindLabel, reservationSourceLabel, reservationSourceValue, reservationStatusLabel } from "../../api/labels";
+import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { EmptyState, ErrorState, FormActions, InitialAvatar, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
@@ -11,7 +12,7 @@ import { groupAvailabilityByRoom, type InventoryRoomGroup } from "./inventoryGro
 const statusOptions = ["all", "pendingAllocation", "confirmed", "allocationRejected", "cancellationPending", "cancelled"] as const;
 
 export function ReservationsPage() {
-  const { request } = useSession();
+  const { request, session } = useSession();
   const { selectedProperty, selectedPropertyId } = useWorkspace();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<(typeof statusOptions)[number]>("all");
@@ -19,6 +20,15 @@ export function ReservationsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [detail, setDetail] = useState<Reservation | null>(null);
   const enabled = Boolean(selectedPropertyId);
+  const accessScope = session && selectedPropertyId
+    ? propertyAccessScope(session.tenantId, selectedPropertyId)
+    : "";
+  const access = usePermissions(accessScope ? [
+    { permission: permissions.reservationsCreate, scope: accessScope },
+    { permission: permissions.reservationsCancel, scope: accessScope },
+  ] : []);
+  const canCreate = access.allows(permissions.reservationsCreate, accessScope);
+  const canCancel = access.allows(permissions.reservationsCancel, accessScope);
   const reservations = useQuery({
     queryKey: ["reservations", selectedPropertyId, status],
     queryFn: () => request<ReservationListResponse>(`/api/reservations/properties/${selectedPropertyId}?${status === "all" ? "" : `status=${status}&`}page=1&pageSize=100`),
@@ -38,7 +48,7 @@ export function ReservationsPage() {
 
   return (
     <>
-      <PageHeader eyebrow={selectedProperty.name} title="Reservations" description="Create, find and manage stays without losing sight of allocation status." action={<button className="btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} />New reservation</button>} />
+      <PageHeader eyebrow={selectedProperty.name} title="Reservations" description="Create, find and manage stays without losing sight of allocation status." action={canCreate ? <button className="btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} />New reservation</button> : undefined} />
 
       <section className="card border border-base-300 bg-base-100 shadow-sm">
         <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -46,7 +56,7 @@ export function ReservationsPage() {
           <label className="input input-bordered input-sm flex w-full items-center gap-2 sm:w-64"><Search size={15} className="text-base-content/35" /><input className="grow" aria-label="Search reservations" placeholder="Guest, email or reference" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
         </div>
 
-        {reservations.isLoading ? <LoadingState label="Loading reservations" /> : reservations.error ? <div className="p-6"><ErrorState error={reservations.error} /></div> : !visible.length ? <div className="p-6"><EmptyState icon={<CalendarDays />} title={search || status !== "all" ? "No reservations match" : "No reservations yet"} description={search || status !== "all" ? "Try changing the status or search filter." : "Create the first stay and BunkFy will allocate the selected inventory."} action={!search && status === "all" ? <button className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>Add reservation</button> : undefined} /></div> : (<>
+        {reservations.isLoading ? <LoadingState label="Loading reservations" /> : reservations.error ? <div className="p-6"><ErrorState error={reservations.error} /></div> : !visible.length ? <div className="p-6"><EmptyState icon={<CalendarDays />} title={search || status !== "all" ? "No reservations match" : "No reservations yet"} description={search || status !== "all" ? "Try changing the status or search filter." : "Create the first stay and BunkFy will allocate the selected inventory."} action={canCreate && !search && status === "all" ? <button className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>Add reservation</button> : undefined} /></div> : (<>
           <div className="hidden overflow-x-auto lg:block">
             <table className="table">
               <thead><tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40"><th className="pl-6">Guest</th><th>Stay</th><th>Units</th><th>Status</th><th>Source</th><th className="pr-6" /></tr></thead>
@@ -70,8 +80,8 @@ export function ReservationsPage() {
         </>)}
       </section>
 
-      <CreateReservation open={createOpen} propertyId={selectedPropertyId} onClose={() => setCreateOpen(false)} onCreated={async () => { await queryClient.invalidateQueries({ queryKey: ["reservations", selectedPropertyId] }); setCreateOpen(false); }} />
-      <ReservationDetail reservation={detail} onClose={() => setDetail(null)} onCancel={(reservation) => cancelMutation.mutate(reservation)} cancelling={cancelMutation.isPending} error={cancelMutation.error} />
+      <CreateReservation open={createOpen && canCreate} propertyId={selectedPropertyId} onClose={() => setCreateOpen(false)} onCreated={async () => { await queryClient.invalidateQueries({ queryKey: ["reservations", selectedPropertyId] }); setCreateOpen(false); }} />
+      <ReservationDetail reservation={detail} canCancel={canCancel} onClose={() => setDetail(null)} onCancel={(reservation) => cancelMutation.mutate(reservation)} cancelling={cancelMutation.isPending} error={cancelMutation.error} />
     </>
   );
 }
@@ -194,10 +204,10 @@ function InventoryUnitOption({ item, selected, onToggle }: {
   );
 }
 
-function ReservationDetail({ reservation, onClose, onCancel, cancelling, error }: { reservation: Reservation | null; onClose: () => void; onCancel: (reservation: Reservation) => void; cancelling: boolean; error: unknown }) {
+function ReservationDetail({ reservation, canCancel, onClose, onCancel, cancelling, error }: { reservation: Reservation | null; canCancel: boolean; onClose: () => void; onCancel: (reservation: Reservation) => void; cancelling: boolean; error: unknown }) {
   if (!reservation) return null;
   const resolvedStatus = reservationStatusLabel(reservation.status);
-  const cancellable = !resolvedStatus.includes("cancel") && !resolvedStatus.includes("rejected");
+  const cancellable = canCancel && !resolvedStatus.includes("cancel") && !resolvedStatus.includes("rejected");
   return <Modal open title={reservation.primaryGuestName} description={`Reservation ${reservation.reservationId.slice(0, 8).toUpperCase()}`} onClose={onClose}><div className="space-y-5"><div className="flex items-center justify-between rounded-2xl bg-base-200 p-4"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Stay</p><p className="mt-2 font-display text-xl font-semibold">{formatDate(reservation.arrival)} → {formatDate(reservation.departure)}</p><p className="mt-1 text-sm text-base-content/50">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></div><StatusBadge status={resolvedStatus} /></div><div className="grid gap-3 sm:grid-cols-2"><DetailRow icon={<UsersRound />} label="Guests" value={String(reservation.guestCount)} /><DetailRow icon={<BedDouble />} label="Inventory units" value={String(reservation.inventoryUnitIds.length)} /><DetailRow icon={<Mail />} label="Email" value={reservation.email || "Not provided"} /><DetailRow icon={<Phone />} label="Phone" value={reservation.phone || "Not provided"} /><DetailRow icon={<UserRound />} label="Source" value={`${reservationSourceLabel(reservation.sourceKind)}${reservation.sourceSystem ? ` · ${reservation.sourceSystem}` : ""}`} /><DetailRow icon={<CalendarDays />} label="Booked" value={new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(reservation.createdAtUtc))} /></div>{reservation.notes && <div><p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-base-content/40">Notes</p><p className="rounded-xl bg-base-200 p-4 text-sm leading-6 text-base-content/65">{reservation.notes}</p></div>}{Boolean(error) && <ErrorState error={error} />}<div className="flex justify-end gap-3 border-t border-base-300 pt-5"><button className="btn btn-ghost" onClick={onClose}>Close</button>{cancellable && <button className="btn btn-error btn-outline" onClick={() => { if (confirm(`Cancel reservation for ${reservation.primaryGuestName}?`)) onCancel(reservation); }} disabled={cancelling}>{cancelling && <span className="loading loading-spinner loading-sm" />}Cancel reservation</button>}</div></div></Modal>;
 }
 

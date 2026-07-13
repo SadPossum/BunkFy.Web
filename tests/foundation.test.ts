@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { apiRequest } from "../src/api/client";
 import { inventorySalesModeValue, reservationSourceValue, reservationStatusLabel } from "../src/api/labels";
 
 const repositoryRoot = process.cwd();
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("frontend repository foundation", () => {
   it("documents the operational app surface", () => {
@@ -34,8 +37,21 @@ describe("frontend repository foundation", () => {
     const session = readFileSync(join(repositoryRoot, "src", "app", "session.tsx"), "utf8");
     const client = readFileSync(join(repositoryRoot, "src", "api", "client.ts"), "utf8");
 
-    expect(session).toContain("/api/auth/refresh");
+    expect(session).toContain("/api/auth/browser/refresh");
+    expect(session).not.toContain("refreshToken");
+    expect(session).toContain("createSingleFlightRefresh");
     expect(client).toContain("X-Tenant-Id");
+    expect(client).toContain('credentials: "include"');
+  });
+
+  it("does not allow callers to suppress browser session cookies", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiRequest<void>("/api/smoke", { credentials: "omit" });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" });
   });
 
   it("maps API enum values to the backend JSON contract", () => {

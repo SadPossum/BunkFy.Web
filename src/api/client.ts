@@ -1,6 +1,4 @@
-import type { AuthTokens } from "./types";
-
-export type ApiSession = AuthTokens & { tenantId: string; username: string };
+export type ApiSession = { accessToken: string; tenantId: string; username: string };
 
 export class ApiError extends Error {
   constructor(
@@ -32,7 +30,11 @@ export async function apiRequest<T>(
   if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
   if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
 
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, { ...options, headers });
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
 
   if (!response.ok) {
     throw await toApiError(response);

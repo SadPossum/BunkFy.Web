@@ -2,16 +2,17 @@
 
 BunkFy Web is the operational browser client for BunkFy.
 
-Initial architectural direction:
+Architectural direction:
 
 - Treat the UI as an approachable operations app, not a marketing site or generic admin dashboard.
 - Keep product features under `src/features/<feature>`.
 - Keep reusable UI primitives under `src/components`.
-- Keep generated API code under `src/api/generated`.
+- Keep generated API contracts in `src/api/contracts.generated.ts` and app-facing normalization in `src/api/types.ts`.
 - Keep app composition under `src/app`.
-- Use OpenAPI-generated types/clients once backend contracts exist.
+- Generate public API types from the checked-in backend OpenAPI snapshot and fail verification on drift.
 - Use React Router for product navigation, TanStack Query for server state, and daisyUI/Tailwind for the component system.
-- Keep authenticated requests tenant-aware and refresh expired access tokens once before signing the user out.
+- Keep authenticated requests tenant-aware, keep access tokens in memory, coalesce expired-session recovery in-process, and serialize shared-cookie mutation across tabs with Web Locks where supported.
+- Evaluate effective permissions in bounded batches to gate controls, while treating backend authorization as the security boundary.
 
 ## Planned Source Layout
 
@@ -19,7 +20,8 @@ Initial architectural direction:
 src/
   app/
   api/
-    generated/
+    contracts.generated.ts
+    types.ts
   components/
     ui/
     layout/

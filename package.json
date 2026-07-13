@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "pnpm typecheck && vite build",
+    "contracts:generate": "powershell -NoProfile -File ../../eng/update-web-contracts.ps1",
+    "contracts:check": "powershell -NoProfile -File ../../eng/update-web-contracts.ps1 -Check -NoBuild",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
@@ -22,6 +24,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "daisyui": "^5.6.16",
     "eslint": "^9.39.0",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.46.0",

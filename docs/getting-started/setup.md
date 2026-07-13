@@ -11,6 +11,7 @@
 ```powershell
 pnpm install
 pnpm verify
+pnpm contracts:check
 ```
 
 When this repository is mounted inside the root BunkFy superproject, prefer the root scripts:
@@ -22,5 +23,5 @@ When this repository is mounted inside the root BunkFy superproject, prefer the 
 
 ## Current Scope
 
-This repository currently validates repository structure, frontend tooling, and a minimal Vite smoke shell. The real router, generated API client, and product screens are future work.
+This repository contains the staff operations router and the Properties, Inventory, and Reservations workflows. Public API types are generated from the checked-in backend OpenAPI snapshot. Run `pnpm contracts:generate` after an intentional API contract change and commit the snapshot and generated TypeScript together.
 

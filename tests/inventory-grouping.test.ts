@@ -8,6 +8,7 @@ function availability(roomId: string, label: string, isAvailable: boolean): Inve
       inventoryUnitId: `${roomId}-${label}`,
       propertyId: "property",
       roomId,
+      bedId: `${roomId}-${label}`,
       kind: "bed",
       label,
       isSellable: true,

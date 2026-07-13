@@ -1,140 +1,99 @@
-export type EntityStatus = "active" | "retired" | number;
+import type { components } from "./contracts.generated";
 
-export type Property = {
-  propertyId: string;
-  name: string;
-  code: string;
-  timeZoneId: string;
-  status: EntityStatus;
-  version: number;
-  createdAtUtc: string;
-  updatedAtUtc?: string | null;
-  retiredAtUtc?: string | null;
+type Schema<Name extends keyof components["schemas"]> = components["schemas"][Name];
+type NonNullableFields<T, Keys extends keyof T> = Omit<T, Keys> & {
+  [Key in Keys]-?: NonNullable<T[Key]>;
 };
 
-export type PropertyListResponse = { properties: Property[]; page: number; pageSize: number };
+export type EntityStatus = "active" | "retired" | string;
 
-export type Room = {
-  roomId: string;
-  propertyId: string;
-  name: string;
-  buildingLabel?: string | null;
-  floorLabel?: string | null;
-  status: EntityStatus;
-  version: number;
-  createdAtUtc: string;
-  updatedAtUtc?: string | null;
-  retiredAtUtc?: string | null;
+export type Property = NonNullableFields<
+  Schema<"PropertyDto">,
+  "name" | "code" | "timeZoneId" | "status"
+>;
+
+export type PropertyListResponse = Omit<Schema<"PropertyListResponse">, "properties"> & {
+  properties: Property[];
 };
 
-export type RoomListResponse = { rooms: Room[]; page: number; pageSize: number };
+export type Room = NonNullableFields<Schema<"RoomDto">, "name" | "status">;
 
-export type Bed = {
-  bedId: string;
-  roomId: string;
-  propertyId: string;
-  label: string;
-  status: EntityStatus;
-  version: number;
-  roomVersion: number;
-  createdAtUtc: string;
-  updatedAtUtc?: string | null;
-  retiredAtUtc?: string | null;
+export type RoomListResponse = Omit<Schema<"RoomListResponse">, "rooms"> & {
+  rooms: Room[];
 };
 
-export type BedListResponse = { beds: Bed[]; page: number; pageSize: number };
+export type Bed = NonNullableFields<Schema<"BedDto">, "label" | "status">;
 
-export type InventorySalesMode = "unconfigured" | "roomLevel" | "bedLevel" | number;
-export type InventoryUnitKind = "room" | "bed" | number;
-
-export type InventoryUnit = {
-  inventoryUnitId: string;
-  propertyId: string;
-  roomId: string;
-  bedId?: string | null;
-  kind: InventoryUnitKind;
-  label: string;
-  isSellable: boolean;
-  isTopologyActive: boolean;
+export type BedListResponse = Omit<Schema<"BedListResponse">, "beds"> & {
+  beds: Bed[];
 };
 
-export type RoomInventory = {
-  propertyId: string;
-  roomId: string;
-  roomName: string;
+export type InventorySalesMode = Schema<"InventorySalesMode"> | "unconfigured" | "roomLevel" | "bedLevel";
+export type InventoryUnitKind = Schema<"InventoryUnitKind"> | "room" | "bed";
+
+export type InventoryUnit = Omit<
+  NonNullableFields<Schema<"InventoryUnitDto">, "label">,
+  "kind"
+> & { kind: InventoryUnitKind };
+
+export type RoomInventory = Omit<
+  NonNullableFields<Schema<"RoomInventoryDto">, "roomName" | "units">,
+  "salesMode" | "units"
+> & {
   salesMode: InventorySalesMode;
-  version: number;
   units: InventoryUnit[];
 };
 
-export type RoomInventoryListResponse = { rooms: RoomInventory[]; page: number; pageSize: number };
-
-export type InventoryUnitAvailability = {
-  unit: InventoryUnit;
-  isAvailable: boolean;
-  activeBlockIds: string[];
-  activeAllocationIds: string[];
+export type RoomInventoryListResponse = Omit<Schema<"RoomInventoryListResponse">, "rooms"> & {
+  rooms: RoomInventory[];
 };
 
-export type InventoryAvailabilityResponse = {
-  propertyId: string;
-  arrival: string;
-  departure: string;
+export type InventoryUnitAvailability = Omit<
+  NonNullableFields<Schema<"InventoryUnitAvailabilityDto">, "activeBlockIds" | "activeAllocationIds">,
+  "unit"
+> & { unit: InventoryUnit };
+
+export type InventoryAvailabilityResponse = Omit<Schema<"InventoryAvailabilityResponse">, "units"> & {
   units: InventoryUnitAvailability[];
 };
 
-export type ManualBlock = {
-  blockId: string;
-  propertyId: string;
-  inventoryUnitId: string;
-  arrival: string;
-  departure: string;
-  reason: string;
-  status: "active" | "released" | number;
-  version: number;
-  createdAtUtc: string;
-  releasedAtUtc?: string | null;
+export type ManualBlock = Omit<NonNullableFields<Schema<"ManualInventoryBlockDto">, "reason">, "status"> & {
+  status: Schema<"ManualInventoryBlockStatus"> | "active" | "released";
 };
 
-export type ManualBlockListResponse = { blocks: ManualBlock[]; page: number; pageSize: number };
+export type ManualBlockListResponse = Omit<Schema<"ManualInventoryBlockListResponse">, "blocks"> & {
+  blocks: ManualBlock[];
+};
 
-export type ReservationStatus =
+export type ReservationStatus = Schema<"ReservationStatus">
   | "pendingAllocation"
   | "confirmed"
   | "allocationRejected"
   | "cancellationPending"
-  | "cancelled"
-  | number;
+  | "cancelled";
 
-export type ReservationSourceKind = "direct" | "external" | number;
+export type ReservationSourceKind = Schema<"ReservationSourceKind"> | "direct" | "external";
 
-export type Reservation = {
-  reservationId: string;
-  propertyId: string;
-  arrival: string;
-  departure: string;
-  inventoryUnitIds: string[];
-  primaryGuestName: string;
-  email?: string | null;
-  phone?: string | null;
-  guestCount: number;
-  sourceKind: ReservationSourceKind;
-  sourceSystem?: string | null;
-  sourceReference?: string | null;
-  notes?: string | null;
+export type Reservation = Omit<
+  NonNullableFields<Schema<"ReservationDto">, "inventoryUnitIds" | "primaryGuestName">,
+  "status" | "sourceKind"
+> & {
   status: ReservationStatus;
-  allocationRequestId: string;
-  allocationId?: string | null;
-  allocationVersion?: number | null;
-  allocationRejection?: string | number | null;
-  version: number;
-  createdAtUtc: string;
-  updatedAtUtc?: string | null;
+  sourceKind: ReservationSourceKind;
 };
 
-export type ReservationListResponse = { reservations: Reservation[]; page: number; pageSize: number };
+export type ReservationListResponse = Omit<Schema<"ReservationListResponse">, "reservations"> & {
+  reservations: Reservation[];
+};
 
-export type AuthTokens = { accessToken: string; refreshToken: string };
+export type BrowserAuthResponse = NonNullableFields<Schema<"BrowserAuthResponse">, "accessToken">;
+
+export type AccessPermissionCheck = NonNullableFields<Schema<"AccessPermissionCheck">, "permission" | "scope">;
+export type AccessPermissionDecision = NonNullableFields<Schema<"AccessPermissionDecision">, "permission" | "scope">;
+export type AccessPermissionEvaluationResponse = Omit<
+  Schema<"AccessPermissionEvaluationResponse">,
+  "permissions"
+> & { permissions: AccessPermissionDecision[] };
 
 export type SmokeStatus = {
   application: string;
