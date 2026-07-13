@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "../src/api/client";
-import { inventorySalesModeValue, reservationSourceValue, reservationStatusLabel } from "../src/api/labels";
+import { guestStatusLabel, guestStatusValue, guestStayStatusLabel, inventorySalesModeValue, reservationSourceValue, reservationStatusLabel } from "../src/api/labels";
 
 const repositoryRoot = process.cwd();
 
@@ -15,7 +15,8 @@ describe("frontend repository foundation", () => {
 
     expect(readme).toContain("operational frontend");
     expect(readme).toContain("Reservation creation");
-    expect(overview).toContain("Properties, Inventory, and Reservations");
+    expect(readme).toContain("guest profiles");
+    expect(overview).toContain("Guest Records");
   });
 
   it("keeps future source folders in stable locations", () => {
@@ -24,6 +25,7 @@ describe("frontend repository foundation", () => {
       "src/api",
       "src/components/ui",
       "src/features/reservations",
+      "src/features/guests",
       "src/features/inventory",
       "src/features/properties",
     ];
@@ -60,5 +62,8 @@ describe("frontend repository foundation", () => {
     expect(reservationSourceValue("direct")).toBe(1);
     expect(reservationSourceValue("external")).toBe(2);
     expect(reservationStatusLabel(2)).toBe("confirmed");
+    expect(guestStatusValue("archived")).toBe(2);
+    expect(guestStatusLabel(1)).toBe("active");
+    expect(guestStayStatusLabel(10)).toBe("checked out");
   });
 });

@@ -10,6 +10,7 @@ The app is a Vite-powered React client for staff. It connects directly to the pu
 - Property, room, and bed topology management.
 - Room/bed sales-mode setup, availability checks, and manual inventory blocks.
 - Reservation creation, filtering, detail, and cancellation.
+- Property-scoped guest profiles with search, editing, archival, and stay history.
 - A property-level operations overview for arrivals, guests, inventory, and upcoming stays.
 - React, TanStack Query, React Router, Tailwind CSS, and daisyUI.
 

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { GuestsPage } from "../features/guests/GuestsPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { PropertiesPage } from "../features/properties/PropertiesPage";
 import { ReservationsPage } from "../features/reservations/ReservationsPage";
@@ -23,6 +24,7 @@ export function App() {
           <Route path="/properties" element={<PropertiesPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/reservations" element={<ReservationsPage />} />
+          <Route path="/guests" element={<GuestsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>

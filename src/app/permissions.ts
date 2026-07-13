@@ -10,6 +10,10 @@ export const permissions = {
   inventoryBlocksManage: "inventory.blocks.manage",
   reservationsCreate: "reservations.create",
   reservationsCancel: "reservations.cancel",
+  guestsRead: "guests.read",
+  guestsCreate: "guests.create",
+  guestsManage: "guests.manage",
+  guestsArchive: "guests.archive",
 } as const;
 
 export function tenantAccessScope(tenantId: string): string {

@@ -31,10 +31,11 @@ src/
     auth/
     dashboard/
     reservations/
+    guests/
     inventory/
     properties/
   styles/
 ```
 
-The first product slice covers the backend's current PMS spine: staff auth, Properties, Inventory, and Reservations. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
+The operational product slice covers staff auth, Properties, Inventory, Reservations, and property-scoped Guest Records. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
 

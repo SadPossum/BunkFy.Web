@@ -1,4 +1,4 @@
-import { Blocks, Building2, CalendarDays, ChevronDown, Gauge, LogOut, Menu, X } from "lucide-react";
+import { Blocks, Building2, CalendarDays, ChevronDown, Gauge, LogOut, Menu, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useSession } from "../../app/session";
@@ -9,6 +9,7 @@ import { InitialAvatar } from "../ui/primitives";
 const navigation = [
   { to: "/", label: "Overview", icon: Gauge },
   { to: "/reservations", label: "Reservations", icon: CalendarDays },
+  { to: "/guests", label: "Guests", icon: UsersRound },
   { to: "/inventory", label: "Inventory", icon: Blocks },
   { to: "/properties", label: "Properties", icon: Building2 },
 ];

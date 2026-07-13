@@ -1,4 +1,4 @@
-import type { InventoryUnitKind, ManualBlock, ReservationSourceKind, ReservationStatus } from "./types";
+import type { GuestStatus, GuestStayRole, GuestStayStatus, InventoryUnitKind, ManualBlock, ReservationSourceKind, ReservationStatus } from "./types";
 
 export function reservationStatusLabel(status: ReservationStatus): string {
   if (typeof status === "string") return splitCamelCase(status);
@@ -26,6 +26,36 @@ export function reservationSourceValue(source: "direct" | "external"): 1 | 2 {
 export function manualBlockStatusLabel(status: ManualBlock["status"]): string {
   if (typeof status === "string") return splitCamelCase(status);
   return ({ 1: "active", 2: "released" } as Record<number, string>)[status] ?? "unknown";
+}
+
+export function guestStatusLabel(status: GuestStatus): string {
+  if (typeof status === "string") return splitCamelCase(status);
+  return ({ 1: "active", 2: "archived" } as Record<number, string>)[status] ?? "unknown";
+}
+
+export function guestStatusValue(status: "active" | "archived"): 1 | 2 {
+  return status === "active" ? 1 : 2;
+}
+
+export function guestStayStatusLabel(status: GuestStayStatus): string {
+  if (typeof status === "string") return splitCamelCase(status);
+  return ({
+    1: "pending allocation",
+    2: "confirmed",
+    3: "allocation rejected",
+    4: "cancellation pending",
+    5: "cancelled",
+    6: "checked in",
+    7: "no-show pending",
+    8: "no-show",
+    9: "checkout pending",
+    10: "checked out",
+  } as Record<number, string>)[status] ?? "unknown";
+}
+
+export function guestStayRoleLabel(role: GuestStayRole): string {
+  if (typeof role === "string") return splitCamelCase(role);
+  return role === 1 ? "primary guest" : "guest";
 }
 
 function splitCamelCase(value: string): string {

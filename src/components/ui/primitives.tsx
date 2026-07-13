@@ -136,11 +136,11 @@ export function InitialAvatar({ name, size = "md", variant = "soft" }: {
 
 export function StatusBadge({ status, surface = "light" }: { status: string | number; surface?: "light" | "dark" }) {
   const normalized = String(status).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-  const tone = normalized.includes("confirmed") || normalized === "active" || normalized === "available"
+  const tone = normalized.includes("confirmed") || normalized === "active" || normalized === "available" || normalized === "checked in"
     ? surface === "dark" ? "badge-success" : "bg-primary text-primary-content"
     : normalized.includes("pending") || normalized.includes("unconfigured")
       ? "badge-warning"
-      : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected")
+      : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected") || normalized.includes("archived") || normalized === "no-show" || normalized === "checked out" || normalized === "released"
         ? "badge-ghost"
         : "badge-info";
   return <span className={`badge badge-sm border-0 font-semibold capitalize ${tone}`}>{normalized}</span>;
@@ -153,7 +153,7 @@ export function FormActions({ submitting, submitLabel, onCancel, disabled = fals
   disabled?: boolean;
 }) {
   return (
-    <div className="mt-6 flex justify-end gap-3 border-t border-base-300 pt-5">
+    <div className="sticky -bottom-6 z-[1] -mx-6 -mb-6 mt-6 flex justify-end gap-3 border-t border-base-300 bg-base-100 px-6 pb-6 pt-5">
       <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
       <button type="submit" className="btn btn-primary" disabled={submitting || disabled}>
         {submitting && <span className="loading loading-spinner loading-sm" />}{submitLabel}
