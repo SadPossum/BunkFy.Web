@@ -451,6 +451,43 @@ export type MarkAllNotificationsReadResponse = { updatedCount: number };
 
 export type BrowserAuthResponse = NonNullableFields<Schema<"BrowserAuthResponse">, "accessToken">;
 
+export type AuthenticationEmail = NonNullableFields<
+  Schema<"AuthenticationEmailResponse">,
+  "email"
+>;
+
+export type ExternalIdentity = NonNullableFields<
+  Schema<"ExternalIdentityResponse">,
+  "providerCode"
+>;
+
+export type AuthenticationMethods = Omit<
+  Schema<"AuthenticationMethodsResponse">,
+  "emails" | "externalIdentities"
+> & {
+  emails: AuthenticationEmail[];
+  externalIdentities: ExternalIdentity[];
+};
+
+export type ExternalAuthenticationProviderList = {
+  providers: string[];
+};
+
+export type ExternalAuthenticationChallenge = NonNullableFields<
+  Schema<"ExternalAuthenticationChallengeResponse">,
+  "startUrl"
+>;
+
+export type ExternalAuthenticationStatus = Schema<"ExternalAuthenticationStatus"> | "authenticated" | "linked";
+
+export type ExternalAuthenticationResult = Omit<
+  Schema<"ExternalAuthenticationResponse">,
+  "status" | "providerCode"
+> & {
+  status: ExternalAuthenticationStatus;
+  providerCode: string;
+};
+
 export type AccessPermissionCheck = NonNullableFields<Schema<"AccessPermissionCheck">, "permission" | "scope">;
 export type AccessPermissionDecision = NonNullableFields<Schema<"AccessPermissionDecision">, "permission" | "scope">;
 export type AccessPermissionEvaluationResponse = Omit<

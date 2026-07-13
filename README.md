@@ -6,7 +6,8 @@ The app is a Vite-powered React client for staff. It connects directly to the pu
 
 ## Current Scope
 
-- Tenant-aware staff login and registration with race-safe browser sessions.
+- Tenant-aware staff login and registration with password confirmation and race-safe browser sessions.
+- Optional external-provider sign-in/linking plus self-service password, email-verification, and session controls.
 - Property, room, and bed topology management.
 - Room/bed sales-mode setup, availability checks, and manual inventory blocks.
 - Full reservation lifecycle with grouped availability, Guest Record linking, editable booking details and history, check-in, no-show, checkout, and cancellation.
@@ -32,9 +33,11 @@ Run the app directly:
 pnpm dev
 ```
 
-The default API address is `http://localhost:5194`. Override it with `VITE_BUNKFY_API_BASE_URL`, or run the root Aspire AppHost to inject the API endpoint automatically.
+The default API address is `http://localhost:5194`. Override it with `VITE_BUNKFY_API_BASE_URL` (`/` selects the same origin), or run the root Aspire AppHost to inject the API endpoint automatically. Email verification controls are enabled only when `VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED=true` and the deployment has a working backend sender.
 
 Browser refresh state is stored only in path-scoped `HttpOnly`, `SameSite=Strict` cookies. The access token remains in memory, concurrent unauthorized requests share one refresh operation, and supported browsers serialize cookie rotation across tabs with Web Locks; no bearer or refresh token is persisted in browser storage.
+
+Mounted OpenID Connect providers are discovered from the API. Their browser challenge uses a short-lived HttpOnly handoff before returning to `/auth/complete`; provider codes and one-time exchange codes never carry access or refresh tokens in URLs. Email-verification delivery additionally requires a configured backend email sender.
 
 ## Documentation
 

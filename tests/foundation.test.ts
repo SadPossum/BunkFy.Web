@@ -50,6 +50,23 @@ describe("frontend repository foundation", () => {
     expect(client).toContain('credentials: "include"');
   });
 
+  it("keeps browser external authentication and account security on published API contracts", () => {
+    const session = readFileSync(join(repositoryRoot, "src", "app", "session.tsx"), "utf8");
+    const authPage = readFileSync(join(repositoryRoot, "src", "features", "auth", "AuthPage.tsx"), "utf8");
+    const account = readFileSync(join(repositoryRoot, "src", "features", "account", "AccountPage.tsx"), "utf8");
+
+    expect(session).toContain("/sign-in/challenge");
+    expect(session).toContain("/link/challenge");
+    expect(session).toContain("/api/auth/browser/external/exchange");
+    expect(session).not.toContain("accessToken=");
+    expect(authPage).toContain('data.get("confirmPassword")');
+    expect(account).toContain("/api/auth/methods");
+    expect(account).toContain("/api/auth/password");
+    expect(account).toContain("/api/auth/email-verification");
+    expect(account).toContain("VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED");
+    expect(account).toContain("/external-identities/");
+  });
+
   it("keeps modal backdrops out of the accessibility tree without creating an unnamed button", () => {
     const primitives = readFileSync(join(repositoryRoot, "src", "components", "ui", "primitives.tsx"), "utf8");
 

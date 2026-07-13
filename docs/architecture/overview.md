@@ -12,6 +12,7 @@ Architectural direction:
 - Generate public API types from the checked-in backend OpenAPI snapshot and fail verification on drift.
 - Use React Router for product navigation, TanStack Query for server state, and daisyUI/Tailwind for the component system.
 - Keep authenticated requests tenant-aware, keep access tokens in memory, coalesce expired-session recovery in-process, and serialize shared-cookie mutation across tabs with Web Locks where supported.
+- Discover optional external identity providers at runtime and complete sign-in/link callbacks through the API's browser challenge handoff; do not persist provider exchange codes or bearer material.
 - Evaluate effective permissions in bounded batches to gate controls, while treating backend authorization as the security boundary.
 
 ## Planned Source Layout
@@ -41,5 +42,5 @@ src/
   styles/
 ```
 
-The operational product slice covers staff auth, Properties, Inventory, Reservations, property-scoped Guest Records, tenant-wide Staff Profiles with property assignments, and operator-facing Ingestion integrations. Reservations include grouped availability selection, canonical Guest Record linking, editable booking details with history, and the complete stay lifecycle. Integrations expose staff controls and audit trails while keeping adapter-ingress machine endpoints outside the UI. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
+The operational product slice covers staff auth and account-security methods, Properties, Inventory, Reservations, property-scoped Guest Records, tenant-wide Staff Profiles with property assignments, and operator-facing Ingestion integrations. Reservations include grouped availability selection, canonical Guest Record linking, editable booking details with history, and the complete stay lifecycle. Integrations expose staff controls and audit trails while keeping adapter-ingress machine endpoints outside the UI. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
 

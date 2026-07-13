@@ -154,6 +154,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/external/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExternalAuthenticationExchangeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExternalAuthenticationResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/sign-out": {
         parameters: {
             query?: never;
@@ -218,6 +257,419 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthenticationMethodsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetPasswordRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RemovePasswordRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/external-identities/{externalIdentityId}/unlink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    externalIdentityId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UnlinkExternalIdentityRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/email-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestEmailVerificationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/email-verification/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConfirmEmailVerificationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/external/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExternalAuthenticationProviderListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/external/{provider}/sign-in/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    provider: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExternalAuthenticationChallengeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExternalAuthenticationChallengeResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/external/{provider}/link/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    provider: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExternalAuthenticationChallengeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExternalAuthenticationChallengeResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/external/{provider}/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    returnUrl: string;
+                };
+                header?: never;
+                path: {
+                    provider: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/external/{provider}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    returnUrl: string;
+                };
+                header?: never;
+                path: {
+                    provider: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -361,6 +813,45 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/external/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExternalAuthenticationExchangeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
                 };
             };
         };
@@ -2066,6 +2557,78 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/preferences/{tagKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tagKey: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetNotificationPreferenceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3862,6 +4425,20 @@ export interface components {
             expectedVersion: number;
             confirmed: boolean;
         };
+        AuthenticationEmailResponse: {
+            /** Format: uuid */
+            id: string;
+            email: string | null;
+            isActive: boolean;
+            isVerified: boolean;
+            /** Format: date-time */
+            verifiedAtUtc: string | null;
+        };
+        AuthenticationMethodsResponse: {
+            hasPassword: boolean;
+            emails: components["schemas"]["AuthenticationEmailResponse"][] | null;
+            externalIdentities: components["schemas"]["ExternalIdentityResponse"][] | null;
+        };
         BedDto: {
             /** Format: uuid */
             bedId: string;
@@ -3870,7 +4447,7 @@ export interface components {
             /** Format: uuid */
             propertyId: string;
             label: string | null;
-            status: string;
+            status: components["schemas"]["BedStatus"];
             /** Format: int64 */
             version: number;
             /** Format: int64 */
@@ -3889,6 +4466,8 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        /** @enum {string} */
+        BedStatus: "active" | "retired";
         BedWriteRequest: {
             label: string | null;
             /** Format: int64 */
@@ -3918,6 +4497,9 @@ export interface components {
             salesMode: components["schemas"]["InventorySalesMode"];
             /** Format: int64 */
             expectedVersion: number;
+        };
+        ConfirmEmailVerificationRequest: {
+            code: string | null;
         };
         CreateConnectionRequest: {
             adapterType: string | null;
@@ -3955,6 +4537,37 @@ export interface components {
             sourceSystem: string | null;
             sourceReference: string | null;
             notes: string | null;
+        };
+        ExternalAuthenticationChallengeRequest: {
+            returnUrl: string | null;
+        };
+        ExternalAuthenticationChallengeResponse: {
+            startUrl: string | null;
+        };
+        ExternalAuthenticationExchangeRequest: {
+            code: string | null;
+        };
+        ExternalAuthenticationProviderListResponse: {
+            providers: string[] | null;
+        };
+        ExternalAuthenticationResponse: {
+            status: components["schemas"]["ExternalAuthenticationStatus"];
+            providerCode: string | null;
+            accessToken: string | null;
+            refreshToken: string | null;
+            /** Format: uuid */
+            externalIdentityId: string | null;
+        };
+        /** @enum {string} */
+        ExternalAuthenticationStatus: "authenticated" | "linked";
+        ExternalIdentityResponse: {
+            /** Format: uuid */
+            id: string;
+            providerCode: string | null;
+            /** Format: date-time */
+            linkedAtUtc: string;
+            /** Format: date-time */
+            lastAuthenticatedAtUtc: string | null;
         };
         GuestProfileUpdateRequest: {
             displayName: string | null;
@@ -4099,7 +4712,7 @@ export interface components {
             name: string | null;
             code: string | null;
             timeZoneId: string | null;
-            status: string;
+            status: components["schemas"]["PropertyStatus"];
             /** Format: int64 */
             version: number;
             /** Format: date-time */
@@ -4116,6 +4729,8 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        /** @enum {string} */
+        PropertyStatus: "active" | "retired";
         PropertyUpdateRequest: {
             name: string | null;
             code: string | null;
@@ -4140,6 +4755,13 @@ export interface components {
         ReleaseManualBlockRequest: {
             /** Format: int64 */
             expectedVersion: number;
+        };
+        RemovePasswordRequest: {
+            currentPassword: string | null;
+        };
+        RequestEmailVerificationRequest: {
+            /** Format: uuid */
+            emailId: string | null;
         };
         /**
          * Format: int32
@@ -4263,7 +4885,7 @@ export interface components {
             name: string | null;
             buildingLabel: string | null;
             floorLabel: string | null;
-            status: string;
+            status: components["schemas"]["RoomStatus"];
             /** Format: int64 */
             version: number;
             /** Format: date-time */
@@ -4298,12 +4920,21 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        /** @enum {string} */
+        RoomStatus: "active" | "retired";
         RoomUpdateRequest: {
             name: string | null;
             /** Format: int64 */
             expectedVersion: number;
             buildingLabel: string | null;
             floorLabel: string | null;
+        };
+        SetNotificationPreferenceRequest: {
+            enabled: boolean;
+        };
+        SetPasswordRequest: {
+            newPassword: string | null;
+            currentPassword: string | null;
         };
         SignOutRequest: {
             refreshToken: string | null;
@@ -4371,6 +5002,9 @@ export interface components {
             businessDate: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        UnlinkExternalIdentityRequest: {
+            currentPassword: string | null;
         };
         UpdateConnectionRequest: {
             executionMode: components["schemas"]["AdapterExecutionMode"];
