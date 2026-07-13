@@ -1,7 +1,8 @@
-import { BedDouble, Building2, CalendarCheck2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Building2, CalendarCheck2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { resolveApiBaseUrl } from "../../api/client";
 import { useSession } from "../../app/session";
+import { BrandMark } from "../../components/ui/BrandMark";
 
 export function AuthPage() {
   const { login, register } = useSession();
@@ -35,7 +36,7 @@ export function AuthPage() {
         <div className="absolute -right-24 -top-24 size-96 rounded-full bg-accent/20 blur-3xl" />
         <div className="absolute -bottom-28 left-1/4 size-80 rounded-full bg-secondary/20 blur-3xl" />
         <div className="relative z-10 flex items-center gap-3">
-          <div className="grid size-11 place-items-center rounded-2xl bg-primary-content text-primary shadow-lg"><BedDouble size={24} /></div>
+          <BrandMark variant="simple-white-bold" height={52} />
           <span className="font-display text-2xl font-semibold">BunkFy</span>
         </div>
         <div className="relative z-10 max-w-xl">
@@ -53,7 +54,7 @@ export function AuthPage() {
       <section className="flex min-h-[calc(100vh-1.5rem)] items-center justify-center px-4 py-10 sm:min-h-[calc(100vh-2.5rem)] sm:px-10">
         <div className="w-full max-w-md">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-content"><BedDouble size={22} /></div>
+            <BrandMark variant="simple-white-bold" height={48} framed />
             <span className="font-display text-2xl font-semibold">BunkFy</span>
           </div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-primary">Staff workspace</p>

@@ -1,8 +1,9 @@
-import { BedDouble, Blocks, Building2, CalendarDays, ChevronDown, Gauge, LogOut, Menu, X } from "lucide-react";
+import { Blocks, Building2, CalendarDays, ChevronDown, Gauge, LogOut, Menu, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { BrandMark } from "../ui/BrandMark";
 import { InitialAvatar } from "../ui/primitives";
 
 const navigation = [
@@ -22,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-base-300 bg-base-100 transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-20 items-center justify-between px-6">
           <NavLink to="/" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
-            <div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-content shadow-sm"><BedDouble size={22} /></div>
+            <BrandMark variant="simple-white-bold" height={48} framed className="shadow-sm" />
             <div><p className="font-display text-xl font-semibold leading-none">BunkFy</p><p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-base-content/35">Hostel operations</p></div>
           </NavLink>
           <button className="btn btn-circle btn-ghost btn-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation"><X size={19} /></button>
