@@ -19,7 +19,6 @@ import { BrandMark } from "../../components/ui/BrandMark";
 export function AuthPage() {
   const { beginExternalSignIn, login, register } = useSession();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [tenantId, setTenantId] = useState("default");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [externalSubmitting, setExternalSubmitting] = useState<string | null>(
@@ -34,14 +33,12 @@ export function AuthPage() {
       ),
     staleTime: 5 * 60_000,
   });
-  const normalizedTenantId = tenantId.trim();
   const selfRegistration = useQuery({
-    queryKey: ["auth", "self-registration", normalizedTenantId],
+    queryKey: ["auth", "self-registration"],
     queryFn: () =>
       apiRequest<AuthSelfRegistration>("/api/auth/self-registration", {
-        headers: { "X-Tenant-Id": normalizedTenantId },
+        headers: { "X-Tenant-Id": "global" },
       }),
-    enabled: Boolean(normalizedTenantId),
     staleTime: 5 * 60_000,
     retry: false,
   });
@@ -77,7 +74,6 @@ export function AuthPage() {
 
     try {
       const credentials = {
-        tenantId: tenantId.trim(),
         username: String(data.get("username") ?? "").trim(),
         password,
       };
@@ -95,7 +91,7 @@ export function AuthPage() {
     setExternalSubmitting(provider);
     setError("");
     try {
-      await beginExternalSignIn(provider, tenantId);
+      await beginExternalSignIn(provider);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -158,26 +154,10 @@ export function AuthPage() {
           <p className="mt-3 text-sm leading-6 text-base-content/55">
             {mode === "login"
               ? "Sign in to continue managing your property."
-              : "Register a staff account for your tenant workspace."}
+              : "Register once, then create a workspace or join your team."}
           </p>
 
           <form className="mt-8 space-y-5" onSubmit={submit}>
-            <label className="form-control block">
-              <span className="label-text mb-2 block text-sm font-semibold">
-                Workspace ID
-              </span>
-              <input
-                name="tenantId"
-                className="input input-bordered h-12 w-full bg-base-100"
-                value={tenantId}
-                onChange={(event) => setTenantId(event.target.value)}
-                autoComplete="organization"
-                required
-              />
-              <span className="mt-2 text-xs text-base-content/45">
-                Usually "default" for a local BunkFy installation.
-              </span>
-            </label>
             <label className="form-control block">
               <span className="label-text mb-2 block text-sm font-semibold">
                 Email
@@ -253,7 +233,7 @@ export function AuthPage() {
           {passwordRegistrationEnabled ? (
             <p className="mt-6 text-center text-sm text-base-content/55">
               {mode === "login"
-                ? "New to this workspace?"
+                ? "New to BunkFy?"
                 : "Already have an account?"}{" "}
               <button
                 className="link link-primary font-semibold no-underline hover:underline"

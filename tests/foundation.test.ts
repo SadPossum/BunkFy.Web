@@ -46,6 +46,8 @@ describe("frontend repository foundation", () => {
     expect(session).toContain("/api/auth/browser/refresh");
     expect(session).not.toContain("refreshToken");
     expect(session).toContain("createSingleFlightRefresh");
+    expect(session).toContain("queryClient.removeQueries()");
+    expect(session).not.toContain("queryClient.clear()");
     expect(client).toContain("X-Tenant-Id");
     expect(client).toContain('credentials: "include"');
   });
@@ -67,6 +69,17 @@ describe("frontend repository foundation", () => {
     expect(account).toContain("/api/auth/email-verification");
     expect(account).toContain("VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED");
     expect(account).toContain("/external-identities/");
+  });
+
+  it("keeps workspace membership usable when optional staff enrichment is unavailable", () => {
+    const settings = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
+      "utf8",
+    );
+
+    expect(settings).toContain('/api/staff/members?page=1&pageSize=100');
+    expect(settings).toContain('error={members.error}');
+    expect(settings).not.toContain('members.error ?? staff.error');
   });
 
   it("keeps modal backdrops out of the accessibility tree without creating an unnamed button", () => {

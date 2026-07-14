@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSingleFlightRefresh,
+  hasSessionBoundaryChanged,
+  hasSessionIdentityChanged,
   runWithBrowserSessionLock,
   startBrowserSessionSignOut,
 } from "../src/app/singleFlightRefresh";
@@ -10,6 +12,17 @@ const identity = { tenantId: "tenant-a", username: "member@example.com" };
 afterEach(() => vi.unstubAllGlobals());
 
 describe("browser session refresh", () => {
+  it("identifies user and workspace changes as query-cache boundaries", () => {
+    expect(hasSessionBoundaryChanged(null, identity)).toBe(true);
+    expect(hasSessionBoundaryChanged(identity, null)).toBe(true);
+    expect(hasSessionBoundaryChanged(identity, identity)).toBe(false);
+    expect(hasSessionBoundaryChanged(identity, { ...identity, tenantId: "tenant-b" })).toBe(true);
+    expect(hasSessionBoundaryChanged(identity, { ...identity, username: "other@example.com" })).toBe(true);
+    expect(hasSessionBoundaryChanged(identity, { ...identity, username: "MEMBER@EXAMPLE.COM" })).toBe(false);
+    expect(hasSessionIdentityChanged(identity, { ...identity, tenantId: "tenant-b" })).toBe(false);
+    expect(hasSessionIdentityChanged(identity, { ...identity, username: "other@example.com" })).toBe(true);
+  });
+
   it("coalesces concurrent refresh attempts and resets after completion", async () => {
     let resolveFirst!: (value: string) => void;
     const first = new Promise<string>((resolve) => { resolveFirst = resolve; });

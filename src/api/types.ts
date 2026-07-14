@@ -7,6 +7,69 @@ type NonNullableFields<T, Keys extends keyof T> = Omit<T, Keys> & {
 
 export type EntityStatus = "active" | "retired" | string;
 
+export type OrganizationStatus = Schema<"OrganizationStatus">;
+export type OrganizationMembershipRole = Schema<"OrganizationMembershipRole">;
+export type OrganizationMembershipStatus = Schema<"OrganizationMembershipStatus">;
+
+export type Organization = NonNullableFields<
+  Schema<"OrganizationDto">,
+  "scopeId" | "name" | "slug"
+>;
+
+export type OrganizationMembership = NonNullableFields<
+  Schema<"OrganizationMembershipDto">,
+  "subjectId"
+>;
+
+export type OrganizationMembershipSummary = {
+  organization: Organization;
+  membership: OrganizationMembership;
+};
+
+export type OrganizationListResponse = Omit<Schema<"OrganizationListResponse">, "items"> & {
+  items: OrganizationMembershipSummary[];
+};
+
+export type OrganizationMemberListResponse = Omit<Schema<"OrganizationMemberListResponse">, "items"> & {
+  items: OrganizationMembership[];
+};
+
+export type OrganizationInvitation = NonNullableFields<
+  Schema<"OrganizationInvitationDto">,
+  "inviterSubjectId"
+>;
+
+export type OrganizationInvitationIssued = Omit<
+  Schema<"OrganizationInvitationIssuedDto">,
+  "invitation" | "token"
+> & {
+  invitation: OrganizationInvitation;
+  token: string;
+};
+
+export type OrganizationInvitationPreview = NonNullableFields<
+  Schema<"OrganizationInvitationPreviewDto">,
+  "organizationName" | "organizationSlug"
+>;
+
+export type OrganizationEnrollmentPreview = NonNullableFields<
+  Schema<"OrganizationEnrollmentPreviewDto">,
+  "organizationName" | "organizationSlug"
+>;
+
+export type OrganizationEnrollmentLink = NonNullableFields<
+  Schema<"OrganizationEnrollmentLinkDto">,
+  "creatorSubjectId"
+>;
+
+export type OrganizationEnrollmentLinkIssued = Omit<
+  Schema<"OrganizationEnrollmentLinkIssuedDto">,
+  "enrollmentLink" | "token"
+> & {
+  enrollmentLink: OrganizationEnrollmentLink;
+  token: string;
+};
+
 export type Property = NonNullableFields<
   Schema<"PropertyDto">,
   "name" | "code" | "timeZoneId" | "status"

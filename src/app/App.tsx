@@ -6,6 +6,8 @@ import { AuthCompletionPage } from "../features/auth/AuthCompletionPage";
 import { NotificationsProvider } from "../features/notifications/notifications";
 import { useSession } from "./session";
 import { WorkspaceProvider } from "./workspace";
+import { WorkspaceGate } from "../features/workspaces/WorkspaceGate";
+import { WorkspaceOnboardingPage } from "../features/workspaces/WorkspaceOnboardingPage";
 
 const AccountPage = lazy(() =>
   import("../features/account/AccountPage").then((module) => ({
@@ -52,6 +54,11 @@ const StaffPage = lazy(() =>
     default: module.StaffPage,
   })),
 );
+const WorkspaceSettingsPage = lazy(() =>
+  import("../features/workspaces/WorkspaceSettingsPage").then((module) => ({
+    default: module.WorkspaceSettingsPage,
+  })),
+);
 
 export function App() {
   const location = useLocation();
@@ -62,7 +69,7 @@ export function App() {
   if (isRestoring) {
     return (
       <main className="grid min-h-screen place-items-center" aria-busy="true">
-        Restoring your session…
+        Restoring your session...
       </main>
     );
   }
@@ -70,33 +77,37 @@ export function App() {
 
   return (
     <WorkspaceProvider>
-      <NotificationsProvider>
-        <AppShell>
-          <Suspense
-            fallback={
-              <div
-                className="grid min-h-64 place-items-center"
-                aria-busy="true"
-              >
-                <span className="loading loading-spinner loading-md text-primary" />
-              </div>
-            }
-          >
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/properties" element={<PropertiesPage />} />
-              <Route path="/inventory" element={<InventoryPage />} />
-              <Route path="/integrations" element={<IntegrationsPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/account" element={<AccountPage />} />
-              <Route path="/reservations" element={<ReservationsPage />} />
-              <Route path="/guests" element={<GuestsPage />} />
-              <Route path="/staff" element={<StaffPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </AppShell>
-      </NotificationsProvider>
+      <WorkspaceGate>
+        <NotificationsProvider>
+          <AppShell>
+            <Suspense
+              fallback={
+                <div
+                  className="grid min-h-64 place-items-center"
+                  aria-busy="true"
+                >
+                  <span className="loading loading-spinner loading-md text-primary" />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/properties" element={<PropertiesPage />} />
+                <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/integrations" element={<IntegrationsPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/account" element={<AccountPage />} />
+                <Route path="/workspace" element={<WorkspaceSettingsPage />} />
+                <Route path="/workspace/new" element={<WorkspaceOnboardingPage />} />
+                <Route path="/reservations" element={<ReservationsPage />} />
+                <Route path="/guests" element={<GuestsPage />} />
+                <Route path="/staff" element={<StaffPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </AppShell>
+        </NotificationsProvider>
+      </WorkspaceGate>
     </WorkspaceProvider>
   );
 }

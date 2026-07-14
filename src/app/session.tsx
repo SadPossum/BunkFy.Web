@@ -23,17 +23,20 @@ import type {
   ExternalAuthenticationResult,
 } from "../api/types";
 import {
+  hasSessionBoundaryChanged,
+  hasSessionIdentityChanged,
   createSingleFlightRefresh,
   runWithBrowserSessionLock,
   startBrowserSessionSignOut,
   type SessionIdentity,
 } from "./singleFlightRefresh";
+import { useQueryClient } from "@tanstack/react-query";
 
 const STORAGE_KEY = "bunkfy.session.identity.v2";
 const EXTERNAL_AUTH_KEY = "bunkfy.auth.external.pending.v1";
+const GLOBAL_IDENTITY_SCOPE = "global";
 
 export type Credentials = {
-  tenantId: string;
   username: string;
   password: string;
 };
@@ -43,7 +46,7 @@ type SessionContextValue = {
   isRestoring: boolean;
   login: (credentials: Credentials) => Promise<void>;
   register: (credentials: Credentials) => Promise<void>;
-  beginExternalSignIn: (provider: string, tenantId: string) => Promise<void>;
+  beginExternalSignIn: (provider: string) => Promise<void>;
   beginExternalLink: (provider: string) => Promise<void>;
   completeExternalAuthentication: (
     code: string,
@@ -51,6 +54,7 @@ type SessionContextValue = {
   ) => Promise<"/" | "/account?external=linked">;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
+  selectWorkspace: (workspaceId: string) => void;
   request: <T>(path: string, options?: RequestInit) => Promise<T>;
   download: (path: string, options?: RequestInit) => Promise<ApiDownload>;
   stream: (path: string, signal: AbortSignal) => Promise<Response>;
@@ -59,6 +63,7 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const initialIdentity = useRef(readSessionIdentity());
   const [session, setSessionState] = useState<ApiSession | null>(null);
   const [isRestoring, setIsRestoring] = useState(
@@ -71,10 +76,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   > | null>(null);
 
   const setSession = useCallback((next: ApiSession | null) => {
+    if (hasSessionIdentityChanged(sessionRef.current, next)) {
+      queryClient.removeQueries();
+    } else if (hasSessionBoundaryChanged(sessionRef.current, next)) {
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== "organizations",
+      });
+    }
     sessionRef.current = next;
     setSessionState(next);
     writeSessionIdentity(next);
-  }, []);
+  }, [queryClient]);
 
   const performRefresh = useCallback(
     async (identity: SessionIdentity): Promise<ApiSession> => {
@@ -87,7 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           "/api/auth/browser/refresh",
           {
             method: "POST",
-            headers: { "X-Tenant-Id": identity.tenantId },
+            headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
           },
         );
         const refreshed = { ...identity, accessToken };
@@ -129,7 +141,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           `/api/auth/browser/${mode}`,
           {
             method: "POST",
-            headers: { "X-Tenant-Id": credentials.tenantId },
+            headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
             body: JSON.stringify(
               mode === "login"
                 ? {
@@ -147,7 +159,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         acceptsRefreshRef.current = true;
         setSession({
           ...response,
-          tenantId: credentials.tenantId,
+          tenantId: GLOBAL_IDENTITY_SCOPE,
           username: credentials.username,
         });
       });
@@ -178,22 +190,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const beginExternalSignIn = useCallback(
-    async (provider: string, tenantId: string) => {
-      const normalizedTenantId = tenantId.trim();
-      if (!normalizedTenantId) throw new Error("Workspace ID is required.");
-      const returnUrl = externalReturnUrl("sign-in", normalizedTenantId);
+    async (provider: string) => {
+      const returnUrl = externalReturnUrl("sign-in");
       const challenge = await apiRequest<ExternalAuthenticationChallenge>(
         `/api/auth/external/${encodeURIComponent(provider)}/sign-in/challenge`,
         {
           method: "POST",
-          headers: { "X-Tenant-Id": normalizedTenantId },
+          headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
           body: JSON.stringify({ returnUrl }),
         },
       );
       writePendingExternalAuth({
         intent: "sign-in",
         provider,
-        tenantId: normalizedTenantId,
       });
       window.location.assign(apiUrl(challenge.startUrl));
     },
@@ -204,7 +213,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (provider: string) => {
       const active = sessionRef.current;
       if (!active) throw new Error("You are signed out.");
-      const returnUrl = externalReturnUrl("link", active.tenantId);
+      const returnUrl = externalReturnUrl("link");
       const challenge = await request<ExternalAuthenticationChallenge>(
         `/api/auth/external/${encodeURIComponent(provider)}/link/challenge`,
         { method: "POST", body: JSON.stringify({ returnUrl }) },
@@ -212,7 +221,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       writePendingExternalAuth({
         intent: "link",
         provider,
-        tenantId: active.tenantId,
       });
       window.location.assign(apiUrl(challenge.startUrl));
     },
@@ -256,13 +264,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             "/api/auth/browser/external/exchange",
             {
               method: "POST",
-              headers: { "X-Tenant-Id": pending.tenantId },
+              headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
               body: JSON.stringify({ code }),
             },
           );
           const provisional: ApiSession = {
             ...response,
-            tenantId: pending.tenantId,
+            tenantId: GLOBAL_IDENTITY_SCOPE,
             username: `${providerLabel(provider)} account`,
           };
           try {
@@ -380,6 +388,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [setSession]);
 
+  const selectWorkspace = useCallback(
+    (workspaceId: string) => {
+      const active = sessionRef.current;
+      if (!active) return;
+      const tenantId = workspaceId.trim() || GLOBAL_IDENTITY_SCOPE;
+      if (active.tenantId === tenantId) return;
+      setSession({ ...active, tenantId });
+    },
+    [setSession],
+  );
+
   const value = useMemo<SessionContextValue>(
     () => ({
       session,
@@ -391,6 +410,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       completeExternalAuthentication,
       logout,
       logoutAll,
+      selectWorkspace,
       request,
       download,
       stream,
@@ -405,6 +425,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logout,
       logoutAll,
       request,
+      selectWorkspace,
       session,
       stream,
     ],
@@ -454,16 +475,11 @@ function writeSessionIdentity(session: SessionIdentity | null) {
 type PendingExternalAuth = {
   intent: "sign-in" | "link";
   provider: string;
-  tenantId: string;
 };
 
-function externalReturnUrl(
-  intent: PendingExternalAuth["intent"],
-  tenantId: string,
-): string {
+function externalReturnUrl(intent: PendingExternalAuth["intent"]): string {
   const url = new URL("/auth/complete", window.location.origin);
   url.searchParams.set("intent", intent);
-  url.searchParams.set("tenant", tenantId);
   return url.toString();
 }
 
@@ -488,8 +504,7 @@ function readPendingExternalAuth(): PendingExternalAuth | null {
       const candidate = JSON.parse(raw) as Partial<PendingExternalAuth>;
       if (
         (candidate.intent === "sign-in" || candidate.intent === "link") &&
-        typeof candidate.provider === "string" &&
-        typeof candidate.tenantId === "string"
+        typeof candidate.provider === "string"
       ) {
         return candidate as PendingExternalAuth;
       }
@@ -501,9 +516,8 @@ function readPendingExternalAuth(): PendingExternalAuth | null {
   const parameters = new URLSearchParams(window.location.search);
   const intent = parameters.get("intent");
   const provider = parameters.get("provider");
-  const tenantId = parameters.get("tenant");
-  return (intent === "sign-in" || intent === "link") && provider && tenantId
-    ? { intent, provider, tenantId }
+  return (intent === "sign-in" || intent === "link") && provider
+    ? { intent, provider }
     : null;
 }
 

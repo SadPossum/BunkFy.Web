@@ -3099,6 +3099,1034 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/organization-enrollment/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PreviewOrganizationEnrollmentLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentPreviewDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization-enrollment/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ClaimOrganizationEnrollmentLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentOutcomeDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization-invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PreviewOrganizationInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationInvitationPreviewDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AcceptOrganizationInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationInvitationAcceptanceDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateOrganizationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMembershipSummaryDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMembershipSummaryDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateOrganizationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationLifecycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationLifecycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationLifecycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMemberListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/members/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationMembershipLifecycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMembershipDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/members/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationMembershipLifecycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMembershipDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/members/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["OrganizationMembershipLifecycleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMembershipDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/ownership/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TransferOrganizationOwnershipRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationMembershipDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationInvitationListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateOrganizationInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationInvitationIssuedDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/invitations/{invitationId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    invitationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RevokeOrganizationInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationInvitationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/invitations/{invitationId}/reissue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    invitationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReissueOrganizationInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationInvitationIssuedDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/enrollment-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateOrganizationEnrollmentLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkIssuedDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/enrollment-links/{enrollmentLinkId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    enrollmentLinkId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChangeOrganizationEnrollmentLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkMutationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/enrollment-links/{enrollmentLinkId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    enrollmentLinkId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChangeOrganizationEnrollmentLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkMutationDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/join-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationJoinRequestListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/join-requests/{claimId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    claimId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ResolveOrganizationJoinRequestRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentOutcomeDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{organizationId}/join-requests/{claimId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    claimId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ResolveOrganizationJoinRequestRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentOutcomeDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/properties": {
         parameters: {
             query?: never;
@@ -4429,6 +5457,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptOrganizationInvitationRequest: {
+            token: string | null;
+        };
         AcceptProposalRequest: {
             /** Format: int64 */
             expectedProposalVersion: number;
@@ -4598,11 +5629,20 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        ChangeOrganizationEnrollmentLinkRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: int32 */
+            replacementLifetimeHours: number | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
          */
         ChangeProposalStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        ClaimOrganizationEnrollmentLinkRequest: {
+            token: string | null;
+        };
         ConfigurePollingScheduleRequest: {
             /** Format: int32 */
             intervalSeconds: number;
@@ -4647,6 +5687,22 @@ export interface components {
             /** Format: date */
             departure: string;
             reason: string | null;
+        };
+        CreateOrganizationEnrollmentLinkRequest: {
+            /** Format: int32 */
+            lifetimeHours: number | null;
+            /** Format: int32 */
+            maximumClaims: number;
+            approvalMode: components["schemas"]["OrganizationEnrollmentApprovalMode"];
+        };
+        CreateOrganizationInvitationRequest: {
+            recipientEmail: string | null;
+            /** Format: int32 */
+            lifetimeHours: number | null;
+        };
+        CreateOrganizationRequest: {
+            name: string | null;
+            slug: string | null;
         };
         CreateReservationRequest: {
             /** Format: date */
@@ -4848,6 +5904,233 @@ export interface components {
          * @enum {integer}
          */
         ObservationReprocessingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        OrganizationDto: {
+            /** Format: uuid */
+            organizationId: string;
+            scopeId: string | null;
+            name: string | null;
+            slug: string | null;
+            status: components["schemas"]["OrganizationStatus"];
+            /** Format: int32 */
+            activeOwnerCount: number;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationEnrollmentApprovalMode: 0 | 1 | 2;
+        OrganizationEnrollmentClaimDto: {
+            /** Format: uuid */
+            claimId: string;
+            /** Format: uuid */
+            enrollmentLinkId: string;
+            /** Format: uuid */
+            organizationId: string;
+            subjectId: string | null;
+            status: components["schemas"]["OrganizationEnrollmentClaimStatus"];
+            /** Format: uuid */
+            membershipId: string | null;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationEnrollmentClaimStatus: 0 | 1 | 2 | 3;
+        OrganizationEnrollmentLinkDto: {
+            /** Format: uuid */
+            enrollmentLinkId: string;
+            /** Format: uuid */
+            organizationId: string;
+            creatorSubjectId: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            /** Format: int32 */
+            maximumClaims: number;
+            /** Format: int32 */
+            reservedClaims: number;
+            approvalMode: components["schemas"]["OrganizationEnrollmentApprovalMode"];
+            status: components["schemas"]["OrganizationEnrollmentLinkStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        OrganizationEnrollmentLinkIssuedDto: {
+            enrollmentLink: components["schemas"]["OrganizationEnrollmentLinkDto"];
+            token: string | null;
+        };
+        OrganizationEnrollmentLinkListResponse: {
+            items: components["schemas"]["OrganizationEnrollmentLinkDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        OrganizationEnrollmentLinkMutationDto: {
+            enrollmentLink: components["schemas"]["OrganizationEnrollmentLinkDto"];
+            replacementToken: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationEnrollmentLinkStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        OrganizationEnrollmentOutcomeDto: {
+            claim: components["schemas"]["OrganizationEnrollmentClaimDto"];
+            membership: components["schemas"]["OrganizationMembershipSummaryDto"];
+        };
+        OrganizationEnrollmentPreviewDto: {
+            /** Format: uuid */
+            enrollmentLinkId: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationName: string | null;
+            organizationSlug: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            /** Format: int32 */
+            remainingClaims: number;
+            approvalMode: components["schemas"]["OrganizationEnrollmentApprovalMode"];
+            status: components["schemas"]["OrganizationEnrollmentLinkStatus"];
+        };
+        OrganizationInvitationAcceptanceDto: {
+            invitation: components["schemas"]["OrganizationInvitationDto"];
+            membership: components["schemas"]["OrganizationMembershipSummaryDto"];
+        };
+        OrganizationInvitationDto: {
+            /** Format: uuid */
+            invitationId: string;
+            /** Format: uuid */
+            organizationId: string;
+            inviterSubjectId: string | null;
+            recipientEmail: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            status: components["schemas"]["OrganizationInvitationStatus"];
+            acceptedSubjectId: string | null;
+            /** Format: uuid */
+            acceptedMembershipId: string | null;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        OrganizationInvitationIssuedDto: {
+            invitation: components["schemas"]["OrganizationInvitationDto"];
+            token: string | null;
+        };
+        OrganizationInvitationListResponse: {
+            items: components["schemas"]["OrganizationInvitationDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        OrganizationInvitationPreviewDto: {
+            /** Format: uuid */
+            invitationId: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationName: string | null;
+            organizationSlug: string | null;
+            recipientBound: boolean;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            status: components["schemas"]["OrganizationInvitationStatus"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationInvitationStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        OrganizationJoinRequestListResponse: {
+            items: components["schemas"]["OrganizationEnrollmentClaimDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        OrganizationLifecycleRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        OrganizationListResponse: {
+            items: components["schemas"]["OrganizationMembershipSummaryDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        OrganizationMemberListResponse: {
+            items: components["schemas"]["OrganizationMembershipDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        OrganizationMembershipDto: {
+            /** Format: uuid */
+            membershipId: string;
+            /** Format: uuid */
+            organizationId: string;
+            subjectId: string | null;
+            role: components["schemas"]["OrganizationMembershipRole"];
+            status: components["schemas"]["OrganizationMembershipStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            joinedAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        OrganizationMembershipLifecycleRequest: {
+            targetSubjectId: string | null;
+            /** Format: int64 */
+            expectedOrganizationVersion: number;
+            /** Format: int64 */
+            expectedMembershipVersion: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationMembershipRole: 0 | 1 | 2;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationMembershipStatus: 0 | 1 | 2 | 3;
+        OrganizationMembershipSummaryDto: {
+            organization: components["schemas"]["OrganizationDto"];
+            membership: components["schemas"]["OrganizationMembershipDto"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        OrganizationStatus: 0 | 1 | 2 | 3;
+        PreviewOrganizationEnrollmentLinkRequest: {
+            token: string | null;
+        };
+        PreviewOrganizationInvitationRequest: {
+            token: string | null;
+        };
         PropertyCreateRequest: {
             name: string | null;
             code: string | null;
@@ -4893,6 +6176,12 @@ export interface components {
             username: string | null;
             usernameType: unknown;
             password: string | null;
+        };
+        ReissueOrganizationInvitationRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: int32 */
+            lifetimeHours: number | null;
         };
         RejectProposalRequest: {
             /** Format: int64 */
@@ -5001,6 +6290,10 @@ export interface components {
          * @enum {integer}
          */
         ReservationStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        ResolveOrganizationJoinRequestRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         RetireBedRequest: {
             confirmed: boolean;
             /** Format: int64 */
@@ -5016,6 +6309,10 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             cascadeBeds: boolean;
+        };
+        RevokeOrganizationInvitationRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
         };
         RoomCreateRequest: {
             name: string | null;
@@ -5152,6 +6449,15 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        TransferOrganizationOwnershipRequest: {
+            targetSubjectId: string | null;
+            /** Format: int64 */
+            expectedOrganizationVersion: number;
+            /** Format: int64 */
+            expectedCurrentOwnerVersion: number;
+            /** Format: int64 */
+            expectedTargetVersion: number;
+        };
         UnlinkExternalIdentityRequest: {
             currentPassword: string | null;
         };
@@ -5161,6 +6467,12 @@ export interface components {
             configurationReference: string | null;
             secretReference: string | null;
             clearSecretReference: boolean;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        UpdateOrganizationRequest: {
+            name: string | null;
+            slug: string | null;
             /** Format: int64 */
             expectedVersion: number;
         };

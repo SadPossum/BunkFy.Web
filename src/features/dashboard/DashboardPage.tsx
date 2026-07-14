@@ -1,22 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BedDouble, Blocks, Building2, CalendarCheck2, CalendarClock, Plus, Users } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import type { ManualBlockListResponse, ReservationListResponse, RoomInventoryListResponse, RoomListResponse } from "../../api/types";
 import { reservationStatusLabel } from "../../api/labels";
+import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { EmptyState, ErrorState, InitialAvatar, LoadingState, PageHeader, StatusBadge } from "../../components/ui/primitives";
 
 export function DashboardPage() {
   const { request } = useSession();
-  const { selectedProperty, selectedPropertyId, propertiesLoading, propertiesError } = useWorkspace();
+  const { selectedProperty, selectedPropertyId, selectedWorkspaceId, propertiesLoading, propertiesError } = useWorkspace();
+  const tenantScope = selectedWorkspaceId ? tenantAccessScope(selectedWorkspaceId) : "";
+  const access = usePermissions(tenantScope ? [
+    { permission: permissions.propertiesRead, scope: tenantScope },
+    { permission: permissions.inventoryRead, scope: tenantScope },
+    { permission: permissions.reservationsRead, scope: tenantScope },
+  ] : []);
   const enabled = Boolean(selectedPropertyId);
   const rooms = useQuery({ queryKey: ["rooms", selectedPropertyId], queryFn: () => request<RoomListResponse>(`/api/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
   const inventory = useQuery({ queryKey: ["inventory-rooms", selectedPropertyId], queryFn: () => request<RoomInventoryListResponse>(`/api/inventory/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
   const reservations = useQuery({ queryKey: ["reservations", selectedPropertyId, "all"], queryFn: () => request<ReservationListResponse>(`/api/reservations/properties/${selectedPropertyId}?page=1&pageSize=100`), enabled });
   const blocks = useQuery({ queryKey: ["blocks", selectedPropertyId, false], queryFn: () => request<ManualBlockListResponse>(`/api/inventory/properties/${selectedPropertyId}/blocks?includeReleased=false&page=1&pageSize=100`), enabled });
 
-  if (propertiesLoading) return <LoadingState />;
+  if (propertiesLoading || access.isLoading) return <LoadingState />;
+  if (access.error) return <ErrorState error={access.error} />;
+  if (![permissions.propertiesRead, permissions.inventoryRead, permissions.reservationsRead]
+    .every((permission) => access.allows(permission, tenantScope))) {
+    return <Navigate to="/properties" replace />;
+  }
   if (propertiesError) return <ErrorState error={propertiesError} />;
   if (!selectedProperty) return <EmptyState icon={<Building2 />} title="Start with your first property" description="Add a hostel property, then set up rooms, beds, inventory and reservations." action={<Link className="btn btn-primary" to="/properties"><Plus size={17} />Add property</Link>} />;
   if ([rooms, inventory, reservations, blocks].some((query) => query.isLoading)) return <LoadingState label="Preparing today’s overview" />;

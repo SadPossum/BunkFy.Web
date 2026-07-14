@@ -2,6 +2,25 @@ export type SessionIdentity = { tenantId: string; username: string };
 
 const BROWSER_SESSION_LOCK_NAME = "bunkfy.browser-session.cookies";
 
+export function hasSessionBoundaryChanged(
+  current: SessionIdentity | null,
+  next: SessionIdentity | null,
+): boolean {
+  if (!current || !next) return current !== next;
+
+  return current.tenantId !== next.tenantId ||
+    current.username.toLowerCase() !== next.username.toLowerCase();
+}
+
+export function hasSessionIdentityChanged(
+  current: SessionIdentity | null,
+  next: SessionIdentity | null,
+): boolean {
+  if (!current || !next) return current !== next;
+
+  return current.username.toLowerCase() !== next.username.toLowerCase();
+}
+
 export async function runWithBrowserSessionLock<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
   if (typeof navigator === "undefined" || !navigator.locks) return operation();
 
