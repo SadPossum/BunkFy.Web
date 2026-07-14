@@ -43,6 +43,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/self-registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthSelfRegistrationResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/register": {
         parameters: {
             query?: never;
@@ -2521,6 +2556,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/properties/{propertyId}/block-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateManualBlockGroupRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ManualInventoryBlockGroupDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/properties/{propertyId}/blocks/{blockId}/release": {
         parameters: {
             query?: never;
@@ -2553,6 +2629,44 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ManualInventoryBlockDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/block-groups/{blockGroupId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    blockGroupId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ManualInventoryBlockGroupDto"];
                     };
                 };
             };
@@ -4425,6 +4539,10 @@ export interface components {
             expectedVersion: number;
             confirmed: boolean;
         };
+        AuthSelfRegistrationResponse: {
+            passwordEnabled: boolean;
+            externalEnabled: boolean;
+        };
         AuthenticationEmailResponse: {
             /** Format: uuid */
             id: string;
@@ -4512,6 +4630,14 @@ export interface components {
             label: string | null;
             /** Format: date-time */
             expiresAtUtc: string | null;
+        };
+        CreateManualBlockGroupRequest: {
+            target: components["schemas"]["InventoryBlockTarget"];
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            reason: string | null;
         };
         CreateManualBlockRequest: {
             /** Format: uuid */
@@ -4617,6 +4743,20 @@ export interface components {
             departure: string;
             units: components["schemas"]["InventoryUnitAvailabilityDto"][] | null;
         };
+        InventoryBlockTarget: {
+            kind: components["schemas"]["InventoryBlockTargetKind"];
+            buildingLabel: string | null;
+            floorLabel: string | null;
+            /** Format: uuid */
+            roomId: string | null;
+            /** Format: uuid */
+            inventoryUnitId: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        InventoryBlockTargetKind: 0 | 1 | 2 | 3 | 4 | 5;
         /**
          * Format: int32
          * @enum {integer}
@@ -4663,6 +4803,8 @@ export interface components {
             /** Format: uuid */
             blockId: string;
             /** Format: uuid */
+            blockGroupId: string;
+            /** Format: uuid */
             propertyId: string;
             /** Format: uuid */
             inventoryUnitId: string;
@@ -4678,6 +4820,11 @@ export interface components {
             createdAtUtc: string;
             /** Format: date-time */
             releasedAtUtc: string | null;
+        };
+        ManualInventoryBlockGroupDto: {
+            /** Format: uuid */
+            blockGroupId: string;
+            blocks: components["schemas"]["ManualInventoryBlockDto"][] | null;
         };
         ManualInventoryBlockListResponse: {
             blocks: components["schemas"]["ManualInventoryBlockDto"][] | null;
@@ -4901,6 +5048,8 @@ export interface components {
             /** Format: uuid */
             roomId: string;
             roomName: string | null;
+            buildingLabel: string | null;
+            floorLabel: string | null;
             salesMode: components["schemas"]["InventorySalesMode"];
             /** Format: int64 */
             version: number;

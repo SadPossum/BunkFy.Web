@@ -60,6 +60,8 @@ describe("frontend repository foundation", () => {
     expect(session).toContain("/api/auth/browser/external/exchange");
     expect(session).not.toContain("accessToken=");
     expect(authPage).toContain('data.get("confirmPassword")');
+    expect(authPage).toContain("/api/auth/self-registration");
+    expect(authPage).toContain("passwordRegistrationEnabled");
     expect(account).toContain("/api/auth/methods");
     expect(account).toContain("/api/auth/password");
     expect(account).toContain("/api/auth/email-verification");

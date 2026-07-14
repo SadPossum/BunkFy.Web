@@ -12,6 +12,19 @@ export async function runWithBrowserSessionLock<TResult>(operation: () => Promis
   );
 }
 
+export function startBrowserSessionSignOut(
+  clearLocalSession: () => void,
+  revokeRemoteSession?: () => Promise<void>,
+): void {
+  clearLocalSession();
+
+  if (!revokeRemoteSession) return;
+
+  void runWithBrowserSessionLock(revokeRemoteSession).catch(() => {
+    // Local sign-out must succeed even when remote revocation is unavailable.
+  });
+}
+
 export function createSingleFlightRefresh<TResult>(
   refresh: (identity: SessionIdentity) => Promise<TResult>,
 ): (identity: SessionIdentity) => Promise<TResult> {

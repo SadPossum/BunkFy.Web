@@ -30,6 +30,8 @@ export type BedListResponse = Omit<Schema<"BedListResponse">, "beds"> & {
 
 export type InventorySalesMode = Schema<"InventorySalesMode"> | "unconfigured" | "roomLevel" | "bedLevel";
 export type InventoryUnitKind = Schema<"InventoryUnitKind"> | "room" | "bed";
+export type InventoryBlockTargetKind = Schema<"InventoryBlockTargetKind">;
+export type InventoryBlockTarget = Schema<"InventoryBlockTarget">;
 
 export type InventoryUnit = Omit<
   NonNullableFields<Schema<"InventoryUnitDto">, "label">,
@@ -62,6 +64,10 @@ export type ManualBlock = Omit<NonNullableFields<Schema<"ManualInventoryBlockDto
 };
 
 export type ManualBlockListResponse = Omit<Schema<"ManualInventoryBlockListResponse">, "blocks"> & {
+  blocks: ManualBlock[];
+};
+
+export type ManualBlockGroup = Omit<Schema<"ManualInventoryBlockGroupDto">, "blocks"> & {
   blocks: ManualBlock[];
 };
 
@@ -450,6 +456,8 @@ export type NotificationBroadcastListResponse = { items: NotificationBroadcastIt
 export type MarkAllNotificationsReadResponse = { updatedCount: number };
 
 export type BrowserAuthResponse = NonNullableFields<Schema<"BrowserAuthResponse">, "accessToken">;
+
+export type AuthSelfRegistration = Schema<"AuthSelfRegistrationResponse">;
 
 export type AuthenticationEmail = NonNullableFields<
   Schema<"AuthenticationEmailResponse">,

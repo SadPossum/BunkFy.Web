@@ -34,6 +34,25 @@
         }
       }
     },
+    "/api/auth/self-registration": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSelfRegistrationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "tags": [
@@ -2328,6 +2347,46 @@
         }
       }
     },
+    "/api/inventory/properties/{propertyId}/block-groups": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualBlockGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualInventoryBlockGroupDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/properties/{propertyId}/blocks/{blockId}/release": {
       "post": {
         "tags": [
@@ -2370,6 +2429,45 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ManualInventoryBlockDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/block-groups/{blockGroupId}/release": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "blockGroupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualInventoryBlockGroupDto"
                 }
               }
             }
@@ -4400,6 +4498,18 @@
         },
         "additionalProperties": false
       },
+      "AuthSelfRegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "passwordEnabled": {
+            "type": "boolean"
+          },
+          "externalEnabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "AuthenticationEmailResponse": {
         "type": "object",
         "properties": {
@@ -4646,6 +4756,27 @@
           "expiresAtUtc": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateManualBlockGroupRequest": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/InventoryBlockTarget"
+          },
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -4971,6 +5102,45 @@
         },
         "additionalProperties": false
       },
+      "InventoryBlockTarget": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/InventoryBlockTargetKind"
+          },
+          "buildingLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "floorLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "inventoryUnitId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventoryBlockTargetKind": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "InventorySalesMode": {
         "enum": [
           0,
@@ -5095,6 +5265,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "blockGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "propertyId": {
             "type": "string",
             "format": "uuid"
@@ -5129,6 +5303,23 @@
           "releasedAtUtc": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ManualInventoryBlockGroupDto": {
+        "type": "object",
+        "properties": {
+          "blockGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManualInventoryBlockDto"
+            },
             "nullable": true
           }
         },
@@ -5742,6 +5933,14 @@
             "format": "uuid"
           },
           "roomName": {
+            "type": "string",
+            "nullable": true
+          },
+          "buildingLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "floorLabel": {
             "type": "string",
             "nullable": true
           },

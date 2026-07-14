@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSingleFlightRefresh, runWithBrowserSessionLock } from "../src/app/singleFlightRefresh";
+import {
+  createSingleFlightRefresh,
+  runWithBrowserSessionLock,
+  startBrowserSessionSignOut,
+} from "../src/app/singleFlightRefresh";
 
 const identity = { tenantId: "tenant-a", username: "member@example.com" };
 
@@ -60,5 +64,29 @@ describe("browser session refresh", () => {
     await expect(runWithBrowserSessionLock(operation)).resolves.toBe("access-token");
 
     expect(operation).toHaveBeenCalledOnce();
+  });
+
+  it("clears local state before a contended browser-session lock becomes available", async () => {
+    const request = vi.fn(() => new Promise<never>(() => {}));
+    vi.stubGlobal("navigator", { locks: { request } });
+    const clearLocalSession = vi.fn();
+    const revokeRemoteSession = vi.fn().mockResolvedValue(undefined);
+
+    startBrowserSessionSignOut(clearLocalSession, revokeRemoteSession);
+
+    expect(clearLocalSession).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledOnce();
+    expect(revokeRemoteSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps local sign-out successful when remote revocation fails", async () => {
+    vi.stubGlobal("navigator", {});
+    const clearLocalSession = vi.fn();
+    const revokeRemoteSession = vi.fn().mockRejectedValue(new Error("offline"));
+
+    startBrowserSessionSignOut(clearLocalSession, revokeRemoteSession);
+    await vi.waitFor(() => expect(revokeRemoteSession).toHaveBeenCalledOnce());
+
+    expect(clearLocalSession).toHaveBeenCalledOnce();
   });
 });

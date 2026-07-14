@@ -22,7 +22,16 @@ function availability(roomId: string, label: string, isAvailable: boolean): Inve
 }
 
 function room(roomId: string, roomName: string): RoomInventory {
-  return { propertyId: "property", roomId, roomName, salesMode: "bedLevel", version: 1, units: [] };
+  return {
+    propertyId: "property",
+    roomId,
+    roomName,
+    buildingLabel: null,
+    floorLabel: null,
+    salesMode: "bedLevel",
+    version: 1,
+    units: [],
+  };
 }
 
 describe("reservation inventory grouping", () => {

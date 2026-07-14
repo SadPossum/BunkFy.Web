@@ -7,9 +7,12 @@ import {
   KeyRound,
   ShieldCheck,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { apiRequest, resolveApiBaseUrl } from "../../api/client";
-import type { ExternalAuthenticationProviderList } from "../../api/types";
+import type {
+  AuthSelfRegistration,
+  ExternalAuthenticationProviderList,
+} from "../../api/types";
 import { useSession } from "../../app/session";
 import { BrandMark } from "../../components/ui/BrandMark";
 
@@ -31,11 +34,36 @@ export function AuthPage() {
       ),
     staleTime: 5 * 60_000,
   });
+  const normalizedTenantId = tenantId.trim();
+  const selfRegistration = useQuery({
+    queryKey: ["auth", "self-registration", normalizedTenantId],
+    queryFn: () =>
+      apiRequest<AuthSelfRegistration>("/api/auth/self-registration", {
+        headers: { "X-Tenant-Id": normalizedTenantId },
+      }),
+    enabled: Boolean(normalizedTenantId),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const passwordRegistrationEnabled =
+    selfRegistration.data?.passwordEnabled === true;
+
+  useEffect(() => {
+    if (!passwordRegistrationEnabled && mode === "register") {
+      setMode("login");
+    }
+  }, [mode, passwordRegistrationEnabled]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError("");
+    if (mode === "register" && !passwordRegistrationEnabled) {
+      setError("Self-registration is not enabled for this workspace.");
+      setSubmitting(false);
+      return;
+    }
+
     const data = new FormData(event.currentTarget);
     const password = String(data.get("password") ?? "");
     if (
@@ -222,20 +250,26 @@ export function AuthPage() {
             </div>
           )}
 
-          <p className="mt-6 text-center text-sm text-base-content/55">
-            {mode === "login"
-              ? "New to this workspace?"
-              : "Already have an account?"}{" "}
-            <button
-              className="link link-primary font-semibold no-underline hover:underline"
-              onClick={() => {
-                setMode(mode === "login" ? "register" : "login");
-                setError("");
-              }}
-            >
-              {mode === "login" ? "Register" : "Sign in"}
-            </button>
-          </p>
+          {passwordRegistrationEnabled ? (
+            <p className="mt-6 text-center text-sm text-base-content/55">
+              {mode === "login"
+                ? "New to this workspace?"
+                : "Already have an account?"}{" "}
+              <button
+                className="link link-primary font-semibold no-underline hover:underline"
+                onClick={() => {
+                  setMode(mode === "login" ? "register" : "login");
+                  setError("");
+                }}
+              >
+                {mode === "login" ? "Register" : "Sign in"}
+              </button>
+            </p>
+          ) : (
+            <p className="mt-6 text-center text-sm text-base-content/45">
+              Need access? Ask a workspace administrator.
+            </p>
+          )}
           <p className="mt-10 text-center text-xs text-base-content/35">
             Connected to {resolveApiBaseUrl()}
           </p>

@@ -25,6 +25,7 @@ import type {
 import {
   createSingleFlightRefresh,
   runWithBrowserSessionLock,
+  startBrowserSessionSignOut,
   type SessionIdentity,
 } from "./singleFlightRefresh";
 
@@ -64,6 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     initialIdentity.current !== null,
   );
   const sessionRef = useRef<ApiSession | null>(null);
+  const acceptsRefreshRef = useRef(true);
   const externalCompletionRef = useRef<Promise<
     "/" | "/account?external=linked"
   > | null>(null);
@@ -77,6 +79,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const performRefresh = useCallback(
     async (identity: SessionIdentity): Promise<ApiSession> => {
       return runWithBrowserSessionLock(async () => {
+        if (!acceptsRefreshRef.current) {
+          throw new Error("You are signed out.");
+        }
+
         const { accessToken } = await apiRequest<BrowserAuthResponse>(
           "/api/auth/browser/refresh",
           {
@@ -85,6 +91,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           },
         );
         const refreshed = { ...identity, accessToken };
+        if (!acceptsRefreshRef.current) {
+          throw new Error("You are signed out.");
+        }
+
         setSession(refreshed);
         return refreshed;
       });
@@ -134,6 +144,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             ),
           },
         );
+        acceptsRefreshRef.current = true;
         setSession({
           ...response,
           tenantId: credentials.tenantId,
@@ -266,6 +277,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           } catch {
             // The access token is still valid; account metadata can load after navigation.
           }
+          acceptsRefreshRef.current = true;
           setSession(provisional);
         });
         clearPendingExternalAuth();
@@ -329,19 +341,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const active = sessionRef.current;
-    try {
-      if (active) {
-        await runWithBrowserSessionLock(() =>
+    acceptsRefreshRef.current = false;
+    startBrowserSessionSignOut(
+      () => setSession(null),
+      active
+        ? () =>
           apiRequest<void>(
             "/api/auth/browser/sign-out",
             { method: "POST" },
             active,
-          ),
-        );
-      }
-    } finally {
-      setSession(null);
-    }
+          )
+        : undefined,
+    );
   }, [setSession]);
 
   const logoutAll = useCallback(async () => {
@@ -354,6 +365,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           active,
         );
     } finally {
+      acceptsRefreshRef.current = false;
       try {
         if (active)
           await apiRequest<void>(
