@@ -70,6 +70,18 @@ export type OrganizationEnrollmentLinkIssued = Omit<
   token: string;
 };
 
+export type OrganizationEnrollmentClaim = NonNullableFields<
+  Schema<"OrganizationEnrollmentClaimDto">,
+  "subjectId"
+>;
+
+export type OrganizationJoinRequestListResponse = Omit<
+  Schema<"OrganizationJoinRequestListResponse">,
+  "items"
+> & {
+  items: OrganizationEnrollmentClaim[];
+};
+
 export type Property = NonNullableFields<
   Schema<"PropertyDto">,
   "name" | "code" | "timeZoneId" | "status"

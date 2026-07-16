@@ -8,14 +8,18 @@ import {
   QrCode,
   Settings2,
   ShieldCheck,
+  UserCheck,
   UserMinus,
+  UserX,
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   Organization,
+  OrganizationEnrollmentClaim,
   OrganizationEnrollmentLinkIssued,
   OrganizationInvitationIssued,
+  OrganizationJoinRequestListResponse,
   OrganizationMemberListResponse,
   OrganizationMembership,
   StaffListResponse,
@@ -137,11 +141,18 @@ export function WorkspaceSettingsPage() {
             />
           )}
           {tab === "invites" && owner && (
-            <InviteSettings
-              workspaceId={workspace.organizationId}
-              request={request}
-              onIssued={setIssued}
-            />
+            <div className="space-y-10">
+              <InviteSettings
+                workspaceId={workspace.organizationId}
+                request={request}
+                onIssued={setIssued}
+              />
+              <JoinRequestSettings
+                workspaceId={workspace.organizationId}
+                request={request}
+                onMembershipChanged={refreshWorkspace}
+              />
+            </div>
           )}
         </div>
       </section>
@@ -249,7 +260,7 @@ function InviteSettings({ workspaceId, request, onIssued }: {
   const enrollment = useMutation({
     mutationFn: () => request<OrganizationEnrollmentLinkIssued>(`/api/organizations/${workspaceId}/enrollment-links`, {
       method: "POST",
-      body: JSON.stringify({ lifetimeHours: 24, maximumClaims, approvalMode: 1 }),
+      body: JSON.stringify({ lifetimeHours: 24, maximumClaims, approvalMode: 2 }),
     }),
     onSuccess: (result) => onIssued({ kind: "enrollment", token: result.token, expiresAtUtc: result.enrollmentLink.expiresAtUtc }),
   });
@@ -273,7 +284,7 @@ function InviteSettings({ workspaceId, request, onIssued }: {
       <form className="border-t border-base-300 pt-8 lg:border-t-0 lg:pl-8 lg:pt-0" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
         <QrCode className="text-primary" size={22} />
         <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
-        <p className="mt-2 text-sm leading-6 text-base-content/50">A short-lived reusable link for supervised onboarding. Anyone with it can join until its limit is reached.</p>
+        <p className="mt-2 text-sm leading-6 text-base-content/50">A short-lived reusable link for supervised onboarding. Each person requests access and must be approved by the owner.</p>
         <label className="mt-5 block max-w-40">
           <span className="mb-1.5 block text-sm font-semibold">Maximum joins</span>
           <input className="input input-bordered w-full" type="number" min={1} max={100} value={maximumClaims} onChange={(event) => setMaximumClaims(Number(event.target.value))} />
@@ -286,6 +297,103 @@ function InviteSettings({ workspaceId, request, onIssued }: {
         </button>
       </form>
     </div>
+  );
+}
+
+function JoinRequestSettings({ workspaceId, request, onMembershipChanged }: {
+  workspaceId: string;
+  request: ReturnType<typeof useSession>["request"];
+  onMembershipChanged: () => Promise<void>;
+}) {
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const joinRequests = useQuery({
+    queryKey: ["organizations", workspaceId, "join-requests", page],
+    queryFn: () => request<OrganizationJoinRequestListResponse>(
+      `/api/organizations/${workspaceId}/join-requests?page=${page}&pageSize=${pageSize}`,
+    ),
+  });
+  const resolution = useMutation({
+    mutationFn: ({ claim, action }: { claim: OrganizationEnrollmentClaim; action: "approve" | "reject" }) => request(
+      `/api/organizations/${workspaceId}/join-requests/${claim.claimId}/${action}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ expectedVersion: claim.version }),
+      },
+    ),
+    onSuccess: async () => {
+      await Promise.all([joinRequests.refetch(), onMembershipChanged()]);
+    },
+  });
+
+  useEffect(() => {
+    if (!joinRequests.isFetching && page > 1 && joinRequests.data?.items.length === 0) {
+      setPage((current) => Math.max(1, current - 1));
+    }
+  }, [joinRequests.data?.items.length, joinRequests.isFetching, page]);
+
+  return (
+    <section className="border-t border-base-300 pt-8">
+      <div className="flex items-start gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <UserCheck size={20} />
+        </span>
+        <div>
+          <h2 className="font-display text-xl font-semibold">Join requests</h2>
+          <p className="mt-1 text-sm leading-6 text-base-content/55">
+            Review people who used a team QR before they receive workspace access.
+          </p>
+        </div>
+      </div>
+
+      {joinRequests.isLoading && <div className="loading loading-spinner loading-md mt-6 text-primary" />}
+      {joinRequests.error && <ErrorMessage error={joinRequests.error} />}
+      {!joinRequests.isLoading && !joinRequests.error && (
+        <>
+          <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
+            {!joinRequests.data?.items.length && (
+              <p className="py-8 text-center text-sm text-base-content/50">No pending join requests.</p>
+            )}
+            {(joinRequests.data?.items ?? []).map((claim) => (
+              <article key={claim.claimId} className="flex flex-wrap items-center justify-between gap-4 py-4">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">Workspace access request</p>
+                  <p className="mt-1 truncate text-xs text-base-content/45">{claim.subjectId}</p>
+                  <p className="mt-1 text-xs text-base-content/45">
+                    Requested {new Date(claim.createdAtUtc).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-ghost btn-sm text-error"
+                    onClick={() => resolution.mutate({ claim, action: "reject" })}
+                    disabled={resolution.isPending}
+                  >
+                    <UserX size={15} />Reject
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm text-white"
+                    onClick={() => resolution.mutate({ claim, action: "approve" })}
+                    disabled={resolution.isPending}
+                  >
+                    <UserCheck size={15} />Approve
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            itemCount={joinRequests.data?.items.length ?? 0}
+            itemLabel="request"
+            disabled={joinRequests.isFetching || resolution.isPending}
+            onPageChange={setPage}
+          />
+          {resolution.error && <ErrorMessage error={resolution.error} />}
+        </>
+      )}
+    </section>
   );
 }
 
