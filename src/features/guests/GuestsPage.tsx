@@ -21,6 +21,8 @@ import { guestStatusLabel, guestStatusValue, guestStayRoleLabel, guestStayStatus
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { DatePicker } from "../../components/ui/DatePicker";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import {
   EmptyState,
   ErrorState,
@@ -28,6 +30,7 @@ import {
   InitialAvatar,
   LoadingState,
   Modal,
+  ModalActions,
   PageHeader,
   StatusBadge,
 } from "../../components/ui/primitives";
@@ -184,20 +187,15 @@ export function GuestsPage() {
       ) : (
         <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
           <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="tabs tabs-box w-full overflow-x-auto bg-base-200 p-1 sm:w-auto" role="tablist" aria-label="Guest status">
-              {statusFilters.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  role="tab"
-                  aria-selected={status === option}
-                  className={`tab whitespace-nowrap text-xs font-semibold ${status === option ? "tab-active bg-base-100 shadow-sm" : ""}`}
-                  onClick={() => { setStatus(option); setPage(1); }}
-                >
-                  {option === "all" ? "All guests" : option === "active" ? "Active" : "Archived"}
-                </button>
-              ))}
-            </div>
+            <SegmentedTabs
+              value={status}
+              ariaLabel="Guest status"
+              onValueChange={(nextStatus) => { setStatus(nextStatus); setPage(1); }}
+              options={statusFilters.map((option) => ({
+                value: option,
+                label: option === "all" ? "All guests" : option === "active" ? "Active" : "Archived",
+              }))}
+            />
             <label className="input input-bordered input-sm flex w-full items-center gap-2 sm:w-72">
               <Search size={15} className="text-base-content/35" />
               <input
@@ -413,7 +411,7 @@ function GuestForm({ state, submitting, error, onSubmit, onClose }: {
   }
   return (
     <Modal open={state !== undefined} title={guest ? "Edit guest" : "New guest"} description="Start with the details staff need most. Optional fields can be completed later." onClose={onClose}>
-      <form key={guest?.guestId ?? "new"} onSubmit={submit} className="space-y-5">
+      <form key={guest?.guestId ?? "new"} onSubmit={submit} className="space-y-4">
         <FormField label="Display name" name="displayName" defaultValue={guest?.displayName} placeholder="Maya Chen" maxLength={256} autoComplete="name" />
         <FormField label="Legal name (optional)" name="legalName" defaultValue={guest?.legalName} placeholder="As shown on identification" maxLength={256} required={false} autoComplete="name" />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -421,11 +419,11 @@ function GuestForm({ state, submitting, error, onSubmit, onClose }: {
           <FormField label="Phone (optional)" name="phone" type="tel" defaultValue={guest?.phone} placeholder="+44 20 1234 5678" maxLength={64} required={false} autoComplete="tel" />
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <FormField label="Date of birth" name="dateOfBirth" type="date" defaultValue={guest?.dateOfBirth} required={false} autoComplete="bday" />
+          <FormDatePicker label="Date of birth" name="dateOfBirth" defaultValue={guest?.dateOfBirth} />
           <FormField label="Nationality" name="nationalityCountryCode" defaultValue={guest?.nationalityCountryCode} placeholder="GB" maxLength={2} required={false} autoComplete="country" />
           <FormField label="Language" name="preferredLanguageTag" defaultValue={guest?.preferredLanguageTag} placeholder="en-GB" maxLength={35} required={false} autoComplete="language" />
         </div>
-        <label className="form-control block"><span className="label-text mb-2 block text-sm font-semibold">Staff notes (optional)</span><textarea className="textarea textarea-bordered min-h-28 w-full" name="notes" defaultValue={guest?.notes ?? ""} maxLength={4000} placeholder="Preferences or operational notes visible to staff" /></label>
+        <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Staff notes (optional)</span><textarea className="textarea textarea-bordered min-h-20 w-full" name="notes" defaultValue={guest?.notes ?? ""} maxLength={4000} placeholder="Preferences or operational notes visible to staff" /></label>
         {Boolean(error) && <ErrorState error={error} />}
         <FormActions submitting={submitting} submitLabel={guest ? "Save changes" : "Create guest"} onCancel={onClose} />
       </form>
@@ -443,7 +441,12 @@ function FormField({ label, name, defaultValue, placeholder, type = "text", maxL
   required?: boolean;
   autoComplete?: string;
 }) {
-  return <label className="form-control block"><span className="label-text mb-2 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} maxLength={maxLength} autoComplete={autoComplete} /></label>;
+  return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} maxLength={maxLength} autoComplete={autoComplete} /></label>;
+}
+
+function FormDatePicker({ label, name, defaultValue }: { label: string; name: string; defaultValue?: string | null }) {
+  const [value, setValue] = useState(defaultValue ?? "");
+  return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" name={name} value={value} onChange={setValue} ariaLabel={label} /></div>;
 }
 
 function ArchiveGuestModal({ guest, submitting, error, onConfirm, onClose }: {
@@ -455,7 +458,7 @@ function ArchiveGuestModal({ guest, submitting, error, onConfirm, onClose }: {
 }) {
   return (
     <Modal open={Boolean(guest)} title="Archive guest profile?" description="Archived profiles remain available for historical records." onClose={onClose}>
-      {guest && <div><div className="flex items-center gap-3 rounded-xl bg-base-200 p-4"><InitialAvatar name={guest.displayName} /><div><p className="font-semibold">{guest.displayName}</p><p className="mt-1 text-xs text-base-content/45">Stay history and reservation links are preserved.</p></div></div>{Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}<div className="mt-6 flex justify-end gap-3 border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Keep active</button><button type="button" className="btn btn-error" disabled={submitting} onClick={onConfirm}>{submitting && <span className="loading loading-spinner loading-sm" />}Archive guest</button></div></div>}
+      {guest && <div><div className="flex items-center gap-3 rounded-lg bg-base-200 p-4"><InitialAvatar name={guest.displayName} /><div><p className="font-semibold">{guest.displayName}</p><p className="mt-1 text-xs text-base-content/45">Stay history and reservation links are preserved.</p></div></div>{Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}<ModalActions><button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Keep active</button><button type="button" className="btn btn-error btn-sm sm:btn-md" disabled={submitting} onClick={onConfirm}>{submitting && <span className="loading loading-spinner loading-sm" />}Archive guest</button></ModalActions></div>}
     </Modal>
   );
 }

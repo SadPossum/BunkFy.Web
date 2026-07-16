@@ -73,7 +73,7 @@ export function App() {
       </main>
     );
   }
-  if (!session) return <AuthPage />;
+  if (!session) return <AuthPage invitation={location.pathname === "/join"} />;
 
   return (
     <WorkspaceProvider>

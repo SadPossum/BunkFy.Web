@@ -1,29 +1,38 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Building2, CheckCircle2, Link2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { ApiError } from "../../api/client";
 import type {
   OrganizationEnrollmentPreview,
   OrganizationInvitationPreview,
 } from "../../api/types";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { StaffProfileFields } from "./StaffProfileFields";
+import {
+  clearInviteStaffDraft,
+  completeCurrentStaffProfile,
+  readInviteStaffDraft,
+} from "./staffOnboarding";
 import { waitForWorkspaceAccess } from "./workspaceAccess";
 
 type JoinSecret = { kind: "invitation" | "enrollment"; token: string };
 
 export function JoinWorkspacePage() {
   const navigate = useNavigate();
-  const { request, selectWorkspace } = useSession();
-  const { refetchWorkspaces, setSelectedWorkspaceId } = useWorkspace();
-  const autoJoinAttempted = useRef(false);
+  const { request, selectWorkspace, session } = useSession();
+  const {
+    refetchWorkspaces,
+    setSelectedWorkspaceId,
+    workspaces,
+  } = useWorkspace();
   const secret = readJoinSecret();
-  const preview = useQuery<
-    OrganizationInvitationPreview | OrganizationEnrollmentPreview
-  >({
+  const [staffProfile, setStaffProfile] = useState(() => readInviteStaffDraft(session?.username));
+  const preview = useQuery<OrganizationInvitationPreview | OrganizationEnrollmentPreview>({
     queryKey: ["workspace-join-preview", secret?.kind, secret?.token],
     queryFn: () => {
-      if (!secret) throw new Error("This invite link is incomplete.");
+      if (!secret) throw new Error("This invitation link is incomplete.");
       return secret.kind === "invitation"
         ? request<OrganizationInvitationPreview>("/api/organization-invitations/preview", {
             method: "POST",
@@ -39,7 +48,7 @@ export function JoinWorkspacePage() {
   });
   const join = useMutation({
     mutationFn: async () => {
-      if (!secret) throw new Error("This invite link is incomplete.");
+      if (!secret) throw new Error("This invitation link is incomplete.");
       const path = secret.kind === "invitation"
         ? "/api/organization-invitations/accept"
         : "/api/organization-enrollment/claim";
@@ -47,31 +56,44 @@ export function JoinWorkspacePage() {
         method: "POST",
         body: JSON.stringify({ token: secret.token }),
       });
-      const organizationId = preview.data?.organizationId;
-      if (organizationId) {
-        selectWorkspace(organizationId);
-        await waitForWorkspaceAccess(request, organizationId);
-        await refetchWorkspaces();
-        setSelectedWorkspaceId(organizationId);
-      }
+      const workspaceId = preview.data?.organizationId;
+      if (!workspaceId) throw new Error("The invitation does not identify a workspace.");
+
+      selectWorkspace(workspaceId);
+      await waitForWorkspaceAccess(request, workspaceId);
+      await refetchWorkspaces();
+      setSelectedWorkspaceId(workspaceId);
+      await completeCurrentStaffProfile(request, staffProfile);
+      clearInviteStaffDraft();
     },
     onSuccess: () => {
-      window.history.replaceState(null, "", "/properties");
-      navigate("/properties", { replace: true });
+      window.history.replaceState(null, "", "/");
+      navigate("/", { replace: true });
     },
   });
 
   const data = preview.data;
-  useEffect(() => {
-    if (!data || autoJoinAttempted.current) return;
-    autoJoinAttempted.current = true;
+  const alreadyJoined = join.error instanceof ApiError &&
+    join.error.code === "Organizations.MembershipConflict";
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     join.mutate();
-  }, [data, join]);
+  }
+
+  function openWorkspace() {
+    const workspaceId = data?.organizationId;
+    if (workspaceId && workspaces.some((item) => item.organization.organizationId === workspaceId)) {
+      selectWorkspace(workspaceId);
+      setSelectedWorkspaceId(workspaceId);
+    }
+    navigate("/", { replace: true });
+  }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-base-200 p-4">
-      <section className="w-full max-w-xl border border-base-300 bg-base-100 p-7 shadow-sm sm:p-10">
-        <button className="btn btn-circle btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
+    <main className="min-h-screen bg-base-200 p-4 sm:p-8">
+      <section className="mx-auto w-full max-w-2xl border border-base-300 bg-base-100 p-7 shadow-sm sm:p-10">
+        <button className="btn btn-circle btn-ghost btn-sm" onClick={() => navigate("/", { replace: true })} aria-label="Back to BunkFy">
           <ArrowLeft size={19} />
         </button>
         <div className="mt-6 flex items-center gap-3 text-primary">
@@ -79,7 +101,7 @@ export function JoinWorkspacePage() {
           <p className="text-xs font-bold uppercase">Workspace invitation</p>
         </div>
         <h1 className="mt-4 font-display text-3xl font-semibold">
-          {data ? `Join ${data.organizationName}` : "Open an invite link"}
+          {data ? `Join ${data.organizationName}` : "Open an invitation"}
         </h1>
 
         {!secret && (
@@ -99,30 +121,44 @@ export function JoinWorkspacePage() {
           </div>
         )}
         {data && (
-          <div className="mt-6 border-y border-base-300 py-5">
-            <p className="font-semibold">{data.organizationName}</p>
-            <p className="mt-1 text-sm text-base-content/50">{data.organizationSlug}</p>
-            <p className="mt-3 text-xs text-base-content/45">
-              Expires {new Date(data.expiresAtUtc).toLocaleString()}
-            </p>
-          </div>
-        )}
-        {join.error && (
-          <div className="alert alert-error mt-5 text-sm">
-            {join.error instanceof Error ? join.error.message : "Workspace joining failed."}
-          </div>
-        )}
-        {data && !join.error && (
-          <div className="mt-6 flex items-center justify-center gap-3 text-sm font-semibold text-base-content/60" aria-live="polite">
-            {join.isPending ? <span className="loading loading-spinner loading-sm" /> : <CheckCircle2 size={18} />}
-            Joining workspace
-          </div>
-        )}
-        {join.error && (
-          <button className="btn btn-primary mt-6 w-full" onClick={() => join.mutate()}>
-            <CheckCircle2 size={18} />
-            Try again
-          </button>
+          <form className="mt-6" onSubmit={submit}>
+            <div className="border-y border-base-300 py-5">
+              <p className="font-semibold">{data.organizationName}</p>
+              <p className="mt-1 text-sm text-base-content/50">{data.organizationSlug}</p>
+              <p className="mt-3 text-xs text-base-content/45">
+                Invitation expires {new Date(data.expiresAtUtc).toLocaleString()}
+              </p>
+            </div>
+            <div className="py-6">
+              <h2 className="font-display text-xl font-semibold">Your staff profile</h2>
+              <p className="mb-5 mt-1 text-sm leading-6 text-base-content/50">
+                Review the contact details your team will see after you join.
+              </p>
+              <StaffProfileFields value={staffProfile} onChange={setStaffProfile} />
+            </div>
+            {join.error && (
+              <div className="alert alert-error text-sm">
+                {alreadyJoined
+                  ? "You already belong to this workspace."
+                  : join.error.message}
+              </div>
+            )}
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className="btn btn-ghost" onClick={() => navigate("/", { replace: true })}>
+                Back to BunkFy
+              </button>
+              {alreadyJoined ? (
+                <button type="button" className="btn btn-primary" onClick={openWorkspace}>
+                  Open workspace
+                </button>
+              ) : (
+                <button className="btn btn-primary" disabled={join.isPending || !staffProfile.displayName.trim()}>
+                  {join.isPending ? <span className="loading loading-spinner loading-sm" /> : <CheckCircle2 size={18} />}
+                  Join workspace
+                </button>
+              )}
+            </div>
+          </form>
         )}
       </section>
     </main>

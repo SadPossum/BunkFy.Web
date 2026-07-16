@@ -333,6 +333,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthenticationSessionsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions/{sessionId}/sign-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/password": {
         parameters: {
             query?: never;
@@ -2449,6 +2519,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/change-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoomInventoryChangeImpactDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/properties/{propertyId}/availability": {
         parameters: {
             query?: never;
@@ -2667,6 +2775,243 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ManualInventoryBlockGroupDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/beds/{bedId}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                    bedId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestBedRetirementRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BedRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    topologyChangeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BedRetirementDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    topologyChangeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BedRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestRoomRetirementRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoomRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/room-retirements/{topologyChangeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    topologyChangeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoomRetirementDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/room-retirements/{topologyChangeId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    topologyChangeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoomRetirementDto"];
                     };
                 };
             };
@@ -4619,7 +4964,9 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    status?: components["schemas"]["ReservationStatus"];
+                    status?: components["schemas"]["ReservationStatus"][];
+                    search?: string;
+                    order?: components["schemas"]["ReservationListOrder"];
                     page?: number;
                     pageSize?: number;
                 };
@@ -4779,6 +5126,48 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reservations/properties/{propertyId}/{reservationId}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    reservationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReassignReservationInventoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationDto"];
+                    };
                 };
             };
         };
@@ -4985,6 +5374,64 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffMemberDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StaffProfileUpdateRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffMemberDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5588,6 +6035,19 @@ export interface components {
             emails: components["schemas"]["AuthenticationEmailResponse"][] | null;
             externalIdentities: components["schemas"]["ExternalIdentityResponse"][] | null;
         };
+        AuthenticationSessionResponse: {
+            /** Format: uuid */
+            sessionId: string;
+            authenticationMethod: string | null;
+            /** Format: date-time */
+            loginDateTimeUtc: string;
+            /** Format: date-time */
+            refreshTokenExpiresAtUtc: string;
+            isCurrent: boolean;
+        };
+        AuthenticationSessionsResponse: {
+            sessions: components["schemas"]["AuthenticationSessionResponse"][] | null;
+        };
         BedDto: {
             /** Format: uuid */
             bedId: string;
@@ -5615,6 +6075,39 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        BedRetirementDto: {
+            /** Format: uuid */
+            topologyChangeId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            /** Format: uuid */
+            bedId: string;
+            reason: string | null;
+            requestedBy: string | null;
+            status: components["schemas"]["InventoryRetirementStatus"];
+            rejectionReason: components["schemas"]["BedRetirementFinalizationRejectionReason"];
+            /** Format: int32 */
+            activeAllocationCount: number;
+            /** Format: int32 */
+            activeManualBlockCount: number;
+            affectedReservationIds: string[] | null;
+            affectedReservationIdsTruncated: boolean;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        BedRetirementFinalizationRejectionReason: 0 | 1 | 2 | 3;
         /** @enum {string} */
         BedStatus: "active" | "retired";
         BedWriteRequest: {
@@ -5709,6 +6202,10 @@ export interface components {
             arrival: string;
             /** Format: date */
             departure: string;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
             inventoryUnitIds: string[] | null;
             primaryGuestName: string | null;
             email: string | null;
@@ -5813,6 +6310,11 @@ export interface components {
          * @enum {integer}
          */
         InventoryBlockTargetKind: 0 | 1 | 2 | 3 | 4 | 5;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        InventoryRetirementStatus: 0 | 1 | 2 | 3 | 4 | 5;
         /**
          * Format: int32
          * @enum {integer}
@@ -6168,6 +6670,13 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        ReassignReservationInventoryRequest: {
+            /** Format: uuid */
+            amendmentRequestId: string;
+            inventoryUnitIds: string[] | null;
+            /** Format: int64 */
+            expectedDetailsRevision: number;
+        };
         RefreshTokenRequest: {
             accessToken: string | null;
             refreshToken: string | null;
@@ -6195,9 +6704,15 @@ export interface components {
         RemovePasswordRequest: {
             currentPassword: string | null;
         };
+        RequestBedRetirementRequest: {
+            reason: string | null;
+        };
         RequestEmailVerificationRequest: {
             /** Format: uuid */
             emailId: string | null;
+        };
+        RequestRoomRetirementRequest: {
+            reason: string | null;
         };
         /**
          * Format: int32
@@ -6213,6 +6728,10 @@ export interface components {
             arrival: string;
             /** Format: date */
             departure: string;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
             inventoryUnitIds: string[] | null;
             primaryGuestName: string | null;
             email: string | null;
@@ -6273,12 +6792,19 @@ export interface components {
          * @enum {integer}
          */
         ReservationGuestRoleKind: 0 | 1;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ReservationListOrder: 0 | 1 | 2 | 3;
         ReservationListResponse: {
             reservations: components["schemas"]["ReservationDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
+            /** Format: int32 */
+            totalCount: number;
         };
         /**
          * Format: int32
@@ -6339,6 +6865,23 @@ export interface components {
             /** Format: date-time */
             retiredAtUtc: string | null;
         };
+        RoomInventoryChangeImpactDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            /** Format: int32 */
+            activeAllocationCount: number;
+            /** Format: int32 */
+            activeManualBlockCount: number;
+            /** Format: int32 */
+            activeBedRetirementCount: number;
+            /** Format: int32 */
+            activeRoomRetirementCount: number;
+            affectedReservationIds: string[] | null;
+            affectedReservationIdsTruncated: boolean;
+            canChangeSalesMode: boolean;
+        };
         RoomInventoryDto: {
             /** Format: uuid */
             propertyId: string;
@@ -6366,6 +6909,39 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        RoomRetirementDto: {
+            /** Format: uuid */
+            topologyChangeId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            reason: string | null;
+            requestedBy: string | null;
+            status: components["schemas"]["InventoryRetirementStatus"];
+            rejectionReason: components["schemas"]["RoomRetirementFinalizationRejectionReason"];
+            /** Format: int32 */
+            activeAllocationCount: number;
+            /** Format: int32 */
+            activeManualBlockCount: number;
+            /** Format: int32 */
+            activeBedRetirementCount: number;
+            affectedReservationIds: string[] | null;
+            affectedReservationIdsTruncated: boolean;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RoomRetirementFinalizationRejectionReason: 0 | 1;
         /** @enum {string} */
         RoomStatus: "active" | "retired";
         RoomUpdateRequest: {
@@ -6410,6 +6986,30 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        StaffMemberDto: {
+            /** Format: uuid */
+            staffMemberId: string;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            employeeNumber: string | null;
+            jobTitle: string | null;
+            department: string | null;
+            authSubjectId: string | null;
+            status: components["schemas"]["StaffStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+            /** Format: date-time */
+            suspendedAtUtc: string | null;
+            /** Format: date-time */
+            departedAtUtc: string | null;
+            assignments: components["schemas"]["StaffPropertyAssignmentDto"][] | null;
+        };
         StaffProfileUpdateRequest: {
             displayName: string | null;
             legalName: string | null;
@@ -6430,6 +7030,27 @@ export interface components {
             jobTitle: string | null;
             department: string | null;
             authSubjectId: string | null;
+        };
+        StaffPropertyAssignmentDto: {
+            /** Format: uuid */
+            assignmentId: string;
+            /** Format: uuid */
+            propertyId: string;
+            propertyJobTitle: string | null;
+            isPrimary: boolean;
+            isCurrent: boolean;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo: string | null;
+            /** Format: date-time */
+            assignedAtUtc: string;
+            /** Format: date-time */
+            unassignedAtUtc: string | null;
+            /** Format: int64 */
+            assignedAtVersion: number;
+            /** Format: int64 */
+            unassignedAtVersion: number | null;
         };
         /**
          * Format: int32
@@ -6483,6 +7104,10 @@ export interface components {
             /** Format: int32 */
             guestCount: number;
             notes: string | null;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
             /** Format: int64 */
             expectedDetailsRevision: number;
         };

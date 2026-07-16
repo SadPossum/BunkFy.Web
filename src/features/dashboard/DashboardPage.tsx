@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import type { ManualBlockListResponse, ReservationListResponse, RoomInventoryListResponse, RoomListResponse } from "../../api/types";
 import { reservationStatusLabel } from "../../api/labels";
+import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
 import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
@@ -21,7 +22,15 @@ export function DashboardPage() {
   const enabled = Boolean(selectedPropertyId);
   const rooms = useQuery({ queryKey: ["rooms", selectedPropertyId], queryFn: () => request<RoomListResponse>(`/api/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
   const inventory = useQuery({ queryKey: ["inventory-rooms", selectedPropertyId], queryFn: () => request<RoomInventoryListResponse>(`/api/inventory/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
-  const reservations = useQuery({ queryKey: ["reservations", selectedPropertyId, "all"], queryFn: () => request<ReservationListResponse>(`/api/reservations/properties/${selectedPropertyId}?page=1&pageSize=100`), enabled });
+  const reservations = useQuery({
+    queryKey: ["reservations", selectedPropertyId, "all"],
+    queryFn: () => request<ReservationListResponse>(`/api/reservations/properties/${selectedPropertyId}?page=1&pageSize=100`),
+    enabled,
+    refetchInterval: (query) => query.state.data?.reservations.some((item) => reservationNeedsLiveRefresh(item.status))
+      ? LIVE_LIST_REFRESH_INTERVAL_MS
+      : false,
+    refetchIntervalInBackground: false,
+  });
   const blocks = useQuery({ queryKey: ["blocks", selectedPropertyId, false], queryFn: () => request<ManualBlockListResponse>(`/api/inventory/properties/${selectedPropertyId}/blocks?includeReleased=false&page=1&pageSize=100`), enabled });
 
   if (propertiesLoading || access.isLoading) return <LoadingState />;
@@ -101,4 +110,3 @@ function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
 function formatLongDate(date: Date) { return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(date); }
 function formatShortDate(value: string) { return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T12:00:00`)); }
 function nightsBetween(arrival: string, departure: string) { return Math.max(0, Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000)); }
-function reservationStatusKey(status: import("../../api/types").ReservationStatus) { if (typeof status === "string") return status.replace(/[- ](.)/g, (_, letter: string) => letter.toUpperCase()); return ({ 1: "pendingAllocation", 2: "confirmed", 3: "allocationRejected", 4: "cancellationPending", 5: "cancelled", 6: "checkedIn", 7: "noShowPending", 8: "noShow", 9: "checkoutPending", 10: "checkedOut" } as Record<number, string>)[status] ?? "unknown"; }

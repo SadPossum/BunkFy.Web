@@ -1,16 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BedDouble, CalendarDays, CheckCircle2, Clock3, Edit3, History, Link2, LogIn, LogOut, Mail, Phone, Save, StickyNote, UserRound, UsersRound, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { AlertTriangle, BedDouble, CalendarDays, CheckCircle2, ChevronRight, Clock3, Edit3, History, Link2, LogIn, LogOut, Mail, Phone, Save, StickyNote, UserPlus, UserRound, UsersRound, XCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { reservationDetailsOriginLabel, reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
-import type { GuestProfile, Reservation, ReservationDetailsHistoryItem, ReservationStatus, RoomInventoryListResponse } from "../../api/types";
+import type { GuestProfile, Reservation, ReservationDetailsHistoryItem, RoomInventoryListResponse } from "../../api/types";
+import { LIVE_DETAIL_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
-import { ErrorState, InitialAvatar, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
+import { ErrorState, InitialAvatar, InlineFormActions, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
+import { DatePicker } from "../../components/ui/DatePicker";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
+import { createAndLinkGuestRecord, hasPrimaryGuestRecord } from "./guestRecordWorkflow";
 
 export type ReservationCapabilities = {
   manage: boolean;
   manageGuests: boolean;
   readGuests: boolean;
+  createGuests: boolean;
   cancel: boolean;
   checkIn: boolean;
   noShow: boolean;
@@ -20,9 +26,10 @@ export type ReservationCapabilities = {
 type DetailTab = "overview" | "guest" | "history";
 type ReservationAction = "cancel" | "check-in" | "no-show" | "check-out";
 
-export function ReservationDetail({ propertyId, reservationId, capabilities, notice, onDismissNotice, onClose }: {
+export function ReservationDetail({ propertyId, reservationId, initialTab, capabilities, notice, onDismissNotice, onClose }: {
   propertyId: string;
   reservationId: string | null;
+  initialTab?: DetailTab;
   capabilities: ReservationCapabilities;
   notice?: string | null;
   onDismissNotice?: () => void;
@@ -34,17 +41,22 @@ export function ReservationDetail({ propertyId, reservationId, capabilities, not
   const [pendingAction, setPendingAction] = useState<ReservationAction | null>(null);
   const [businessDate, setBusinessDate] = useState("");
   const [editingDetails, setEditingDetails] = useState(false);
+  const observedVersion = useRef<{ reservationId: string; version: number } | null>(null);
 
   useEffect(() => {
-    setTab("overview");
+    setTab(initialTab ?? "overview");
     setPendingAction(null);
     setEditingDetails(false);
-  }, [reservationId]);
+  }, [initialTab, reservationId]);
 
   const reservation = useQuery({
     queryKey: ["reservation", propertyId, reservationId],
     queryFn: () => request<Reservation>(`/api/reservations/properties/${propertyId}/${reservationId}`),
     enabled: Boolean(reservationId),
+    refetchInterval: (query) => reservationNeedsLiveRefresh(query.state.data?.status)
+      ? LIVE_DETAIL_REFRESH_INTERVAL_MS
+      : false,
+    refetchIntervalInBackground: false,
   });
   const history = useQuery({
     queryKey: ["reservation-history", propertyId, reservationId],
@@ -59,13 +71,38 @@ export function ReservationDetail({ propertyId, reservationId, capabilities, not
   });
 
   async function refresh(updated?: Reservation) {
-    if (updated && reservationId) queryClient.setQueryData(["reservation", propertyId, reservationId], updated);
+    if (updated && reservationId) {
+      observedVersion.current = { reservationId: updated.reservationId, version: updated.version };
+      queryClient.setQueryData(["reservation", propertyId, reservationId], updated);
+    }
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["reservations", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["reservation-history", propertyId, reservationId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-stays", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["availability", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-rooms", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["rooms", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["beds", propertyId] }),
     ]);
   }
+
+  useEffect(() => {
+    const current = reservation.data;
+    if (!current) return;
+    const previous = observedVersion.current;
+    observedVersion.current = { reservationId: current.reservationId, version: current.version };
+    if (!previous || previous.reservationId !== current.reservationId || previous.version === current.version) return;
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["reservations", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["reservation-history", propertyId, current.reservationId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-stays", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["availability", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-rooms", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["rooms", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["beds", propertyId] }),
+    ]);
+  }, [propertyId, queryClient, reservation.data]);
 
   const actionMutation = useMutation({
     mutationFn: ({ action, date, current }: { action: ReservationAction; date: string; current: Reservation }) => request<Reservation>(
@@ -118,7 +155,7 @@ export function ReservationDetail({ propertyId, reservationId, capabilities, not
           <div className="rounded-2xl bg-base-200 p-4 sm:flex sm:items-center sm:justify-between sm:gap-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Stay</p>
-              <p className="mt-2 font-display text-xl font-semibold">{formatDate(item.arrival)} → {formatDate(item.departure)}</p>
+              <p className="mt-2 font-display text-xl font-semibold">{formatStayEndpoint(item.arrival, item.expectedArrivalTime)} → {formatStayEndpoint(item.departure, item.expectedDepartureTime)}</p>
               <p className="mt-1 text-sm text-base-content/50">{nightsBetween(item.arrival, item.departure)} nights · {item.guestCount} {item.guestCount === 1 ? "guest" : "guests"}</p>
             </div>
             <div className="mt-3 sm:mt-0"><StatusBadge status={reservationStatusLabel(item.status)} /></div>
@@ -126,21 +163,30 @@ export function ReservationDetail({ propertyId, reservationId, capabilities, not
 
           <ReservationActions reservation={item} capabilities={capabilities} pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error} onBegin={beginAction} onDateChange={setBusinessDate} onConfirm={() => pendingAction && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })} onCancel={() => { setPendingAction(null); actionMutation.reset(); }} />
 
-          <div role="tablist" aria-label="Reservation details" className="tabs tabs-box grid grid-cols-3 bg-base-200 p-1">
-            {(["overview", "guest", "history"] as const).map((value) => <button key={value} role="tab" aria-selected={tab === value} className={`tab gap-1.5 text-xs font-semibold sm:text-sm ${tab === value ? "tab-active bg-base-100 shadow-sm" : ""}`} onClick={() => setTab(value)}>{value === "overview" ? <CalendarDays size={15} /> : value === "guest" ? <UserRound size={15} /> : <History size={15} />}{value === "guest" ? "Guest & notes" : capitalize(value)}</button>)}
-          </div>
+          {!hasPrimaryGuestRecord(item) && capabilities.readGuests && capabilities.createGuests && capabilities.manageGuests && (
+            <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition hover:border-primary/35 hover:bg-primary/8" onClick={() => setTab("guest")}>
+              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-content"><UserPlus size={18} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">Keep this guest for future stays?</span>
+                <span className="mt-1 block text-xs leading-5 text-base-content/55">Create a Guest Record from the booking details or link an existing profile.</span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-primary" />
+            </button>
+          )}
+
+          <SegmentedTabs stretch value={tab} ariaLabel="Reservation details" onValueChange={setTab} options={[{ value: "overview", label: "Overview", icon: <CalendarDays size={15} /> }, { value: "guest", label: "Booking details", icon: <UserRound size={15} /> }, { value: "history", label: "History", icon: <History size={15} /> }]} />
 
           {tab === "overview" && <ReservationOverview reservation={item} inventoryLabels={inventoryLabels} />}
           {tab === "guest" && (
             <div className="space-y-5">
               <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <div><h3 className="font-display text-lg font-semibold">Booking guest details</h3><p className="mt-1 text-xs text-base-content/50">Contact and notes stored on this reservation.</p></div>
+                  <div><h3 className="font-display text-lg font-semibold">Booking details</h3><p className="mt-1 text-xs text-base-content/50">Expected local times, booking contact and staff notes.</p></div>
                   {capabilities.manage && !editingDetails && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => { setEditingDetails(true); detailsMutation.reset(); }}><Edit3 size={15} />Edit</button>}
                 </div>
                 {editingDetails ? <GuestDetailsForm reservation={item} submitting={detailsMutation.isPending} error={detailsMutation.error} onSubmit={(payload) => detailsMutation.mutate({ current: item, payload })} onCancel={() => { setEditingDetails(false); detailsMutation.reset(); }} /> : <GuestDetailsReadOnly reservation={item} />}
               </section>
-              <LinkedGuestRecord propertyId={propertyId} reservation={item} canRead={capabilities.readGuests} canManage={capabilities.manageGuests} onUpdated={refresh} />
+              <LinkedGuestRecord propertyId={propertyId} reservation={item} canRead={capabilities.readGuests} canCreate={capabilities.createGuests} canManage={capabilities.manageGuests} onUpdated={refresh} />
             </div>
           )}
           {tab === "history" && <ReservationHistory query={history} />}
@@ -176,7 +222,7 @@ function ReservationActions({ reservation, capabilities, pendingAction, business
     return (
       <section className="rounded-2xl border border-warning/30 bg-warning/8 p-4">
         <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">{copy.title}</h3><p className="mt-1 text-sm leading-6 text-base-content/60">{copy.description}</p></div></div>
-        {pendingAction !== "cancel" && <label className="form-control mt-4 block max-w-xs"><span className="label-text mb-2 block text-sm font-semibold">Business date</span><input className="input input-bordered w-full" type="date" value={businessDate} min={pendingAction === "check-out" ? reservation.checkedInBusinessDate || reservation.arrival : reservation.arrival} max={pendingAction === "check-in" ? dateBefore(reservation.departure) : undefined} onChange={(event) => onDateChange(event.target.value)} required /></label>}
+        {pendingAction !== "cancel" && <div className="form-control mt-4 block max-w-xs"><span className="label-text mb-1.5 block text-sm font-semibold">Business date</span><DatePicker className="w-full" value={businessDate} min={pendingAction === "check-out" ? reservation.checkedInBusinessDate || reservation.arrival : reservation.arrival} max={pendingAction === "check-in" ? dateBefore(reservation.departure) : undefined} onChange={onDateChange} ariaLabel="Business date" required /></div>}
         {Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}
         <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Keep reservation</button><button type="button" className={`btn btn-sm ${pendingAction === "cancel" || pendingAction === "no-show" ? "btn-error" : "btn-primary"}`} onClick={onConfirm} disabled={submitting || (pendingAction !== "cancel" && !businessDate)}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.confirmLabel}</button></div>
       </section>
@@ -223,19 +269,21 @@ function ReservationOverview({ reservation, inventoryLabels }: { reservation: Re
 }
 
 function GuestDetailsReadOnly({ reservation }: { reservation: Reservation }) {
-  return <div className="grid gap-3 sm:grid-cols-2"><DetailRow icon={<UserRound />} label="Primary guest" value={reservation.primaryGuestName} /><DetailRow icon={<UsersRound />} label="Guest count" value={String(reservation.guestCount)} /><DetailRow icon={<Mail />} label="Email" value={reservation.email || "Not provided"} /><DetailRow icon={<Phone />} label="Phone" value={reservation.phone || "Not provided"} />{reservation.notes && <div className="sm:col-span-2"><p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-base-content/40"><StickyNote size={14} />Notes</p><p className="rounded-xl bg-base-200 p-4 text-sm leading-6 text-base-content/65">{reservation.notes}</p></div>}</div>;
+  return <div className="grid gap-3 sm:grid-cols-2"><DetailRow icon={<Clock3 />} label="Expected arrival · property time" value={reservation.expectedArrivalTime ? formatTime(reservation.expectedArrivalTime) : "Not scheduled"} /><DetailRow icon={<Clock3 />} label="Expected departure · property time" value={reservation.expectedDepartureTime ? formatTime(reservation.expectedDepartureTime) : "Not scheduled"} /><DetailRow icon={<UserRound />} label="Primary guest" value={reservation.primaryGuestName} /><DetailRow icon={<UsersRound />} label="Guest count" value={String(reservation.guestCount)} /><DetailRow icon={<Mail />} label="Email" value={reservation.email || "Not provided"} /><DetailRow icon={<Phone />} label="Phone" value={reservation.phone || "Not provided"} />{reservation.notes && <div className="sm:col-span-2"><p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-base-content/40"><StickyNote size={14} />Notes</p><p className="rounded-xl bg-base-200 p-4 text-sm leading-6 text-base-content/65">{reservation.notes}</p></div>}</div>;
 }
 
 function GuestDetailsForm({ reservation, submitting, error, onSubmit, onCancel }: { reservation: Reservation; submitting: boolean; error: unknown; onSubmit: (payload: Record<string, unknown>) => void; onCancel: () => void }) {
+  const [expectedArrivalTime, setExpectedArrivalTime] = useState(reservation.expectedArrivalTime?.slice(0, 5) ?? "");
+  const [expectedDepartureTime, setExpectedDepartureTime] = useState(reservation.expectedDepartureTime?.slice(0, 5) ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    onSubmit({ primaryGuestName: String(data.get("primaryGuestName") ?? "").trim(), email: emptyToNull(data.get("email")), phone: emptyToNull(data.get("phone")), guestCount: Number(data.get("guestCount")), notes: emptyToNull(data.get("notes")), expectedDetailsRevision: reservation.detailsRevision });
+    onSubmit({ primaryGuestName: String(data.get("primaryGuestName") ?? "").trim(), email: emptyToNull(data.get("email")), phone: emptyToNull(data.get("phone")), guestCount: Number(data.get("guestCount")), notes: emptyToNull(data.get("notes")), expectedArrivalTime: emptyStringToNull(expectedArrivalTime), expectedDepartureTime: emptyStringToNull(expectedDepartureTime), expectedDetailsRevision: reservation.detailsRevision });
   }
-  return <form key={reservation.detailsRevision} className="space-y-4" onSubmit={submit}><div className="grid gap-4 sm:grid-cols-[1fr_140px]"><TextField label="Primary guest" name="primaryGuestName" defaultValue={reservation.primaryGuestName} /><TextField label="Guests" name="guestCount" type="number" min="1" defaultValue={String(reservation.guestCount)} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Email" name="email" type="email" required={false} defaultValue={reservation.email || ""} /><TextField label="Phone" name="phone" type="tel" required={false} defaultValue={reservation.phone || ""} /></div><label className="form-control block"><span className="label-text mb-2 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-24 w-full" name="notes" defaultValue={reservation.notes || ""} /></label>{Boolean(error) && <ErrorState error={error} />}<div className="flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>{submitting ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}Save details</button></div></form>;
+  return <form key={reservation.detailsRevision} className="space-y-4" onSubmit={submit}><div className="grid gap-4 sm:grid-cols-2"><TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} /><TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} /></div><div className="grid gap-4 sm:grid-cols-[1fr_140px]"><TextField label="Primary guest" name="primaryGuestName" defaultValue={reservation.primaryGuestName} /><TextField label="Guests" name="guestCount" type="number" min="1" defaultValue={String(reservation.guestCount)} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Email" name="email" type="email" required={false} defaultValue={reservation.email || ""} /><TextField label="Phone" name="phone" type="tel" required={false} defaultValue={reservation.phone || ""} /></div><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-20 w-full" name="notes" defaultValue={reservation.notes || ""} /></label>{Boolean(error) && <ErrorState error={error} />}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>{submitting ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}Save details</button></InlineFormActions></form>;
 }
 
-function LinkedGuestRecord({ propertyId, reservation, canRead, canManage, onUpdated }: { propertyId: string; reservation: Reservation; canRead: boolean; canManage: boolean; onUpdated: (updated?: Reservation) => Promise<void> }) {
+function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canManage, onUpdated }: { propertyId: string; reservation: Reservation; canRead: boolean; canCreate: boolean; canManage: boolean; onUpdated: (updated?: Reservation) => Promise<void> }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const currentLink = reservation.guests.find((guest) => guest.role === 1 || String(guest.role).toLowerCase() === "primary");
@@ -251,18 +299,35 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canManage, onUpda
     mutationFn: (guest: GuestProfile) => request<Reservation>(`/api/reservations/properties/${propertyId}/${reservation.reservationId}/guests`, { method: "PUT", body: JSON.stringify({ guestId: guest.guestId, role: 1, replaceExistingRole: Boolean(currentLink), expectedVersion: reservation.version }) }),
     onSuccess: async (updated) => { setChoosing(false); setCandidate(null); await queryClient.invalidateQueries({ queryKey: ["guest", propertyId] }); await onUpdated(updated); },
   });
+  const createMutation = useMutation({
+    mutationFn: () => createAndLinkGuestRecord(request, propertyId, reservation),
+    onSuccess: async (created) => {
+      setChoosing(false);
+      setCandidate(null);
+      await onUpdated(created.reservation);
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["guest", propertyId] }),
+        queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
+        queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
+        queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
+      ]);
+    },
+  });
   return (
     <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="font-display text-lg font-semibold">Canonical Guest Record</h3><p className="mt-1 text-xs leading-5 text-base-content/50">Linking keeps this stay in the guest’s history without replacing the booking contact details.</p></div>{currentLink && canManage && !choosing && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setChoosing(true)}><Link2 size={15} />Replace</button>}</div>
-      {currentLink && !choosing ? currentGuest.isLoading ? <div className="flex items-center gap-2 rounded-xl bg-base-200 p-4 text-sm text-base-content/55"><span className="loading loading-spinner loading-sm" />Loading linked guest</div> : currentGuest.data ? <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><InitialAvatar name={currentGuest.data.displayName} /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{currentGuest.data.displayName}</p><p className="truncate text-xs text-base-content/50">{currentGuest.data.email || currentGuest.data.phone || "Guest Record linked"}</p></div><span className="badge border-0 bg-primary text-primary-content">Linked</span></div> : <div className="rounded-xl bg-base-200 p-4 text-sm text-base-content/55">A Guest Record is linked, but its profile is not available with your current access.</div> : canManage ? <div className="space-y-3"><GuestRecordPicker propertyId={propertyId} selectedGuest={candidate} onSelect={setCandidate} disabled={!canRead} label={currentLink ? "Replacement Guest Record" : "Guest Record"} />{linkMutation.error && <ErrorState error={linkMutation.error} />}{choosing && currentLink && <div className="flex justify-end"><button type="button" className="btn btn-ghost btn-sm" onClick={() => { setChoosing(false); setCandidate(null); linkMutation.reset(); }}>Keep current guest</button></div>}{candidate && <div className="flex justify-end"><button type="button" className="btn btn-primary btn-sm" onClick={() => linkMutation.mutate(candidate)} disabled={linkMutation.isPending}>{linkMutation.isPending && <span className="loading loading-spinner loading-xs" />}{currentLink ? "Replace primary guest" : "Link Guest Record"}</button></div>}</div> : <div className="rounded-xl border border-dashed border-base-300 p-4 text-sm text-base-content/55">No canonical Guest Record is linked to this reservation.</div>}
+      {currentLink && !choosing ? currentGuest.isLoading ? <div className="flex items-center gap-2 rounded-xl bg-base-200 p-4 text-sm text-base-content/55"><span className="loading loading-spinner loading-sm" />Loading linked guest</div> : currentGuest.data ? <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><InitialAvatar name={currentGuest.data.displayName} /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{currentGuest.data.displayName}</p><p className="truncate text-xs text-base-content/50">{currentGuest.data.email || currentGuest.data.phone || "Guest Record linked"}</p></div><span className="badge border-0 bg-primary text-primary-content">Linked</span></div> : <div className="rounded-xl bg-base-200 p-4 text-sm text-base-content/55">A Guest Record is linked, but its profile is not available with your current access.</div> : canManage ? <div className="space-y-3"><GuestRecordPicker propertyId={propertyId} selectedGuest={candidate} onSelect={setCandidate} disabled={!canRead} label={currentLink ? "Replacement Guest Record" : "Guest Record"} />{!currentLink && canRead && canCreate && <div className="flex flex-col gap-3 border-y border-primary/15 bg-primary/5 p-4 sm:flex-row sm:items-center"><UserPlus size={19} className="shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">No existing profile?</p><p className="mt-1 text-xs leading-5 text-base-content/55">Create and link a Guest Record using {reservation.primaryGuestName}&apos;s booking contact details.</p></div><button type="button" className="btn btn-primary btn-sm shrink-0" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>{createMutation.isPending ? <span className="loading loading-spinner loading-xs" /> : <UserPlus size={15} />}Create and link</button></div>}{linkMutation.error && <ErrorState error={linkMutation.error} />}{createMutation.error && <ErrorState error={createMutation.error} />}{choosing && currentLink && <div className="flex justify-end"><button type="button" className="btn btn-ghost btn-sm" onClick={() => { setChoosing(false); setCandidate(null); linkMutation.reset(); createMutation.reset(); }}>Keep current guest</button></div>}{candidate && <div className="flex justify-end"><button type="button" className="btn btn-primary btn-sm" onClick={() => linkMutation.mutate(candidate)} disabled={linkMutation.isPending || createMutation.isPending}>{linkMutation.isPending && <span className="loading loading-spinner loading-xs" />}{currentLink ? "Replace primary guest" : "Link Guest Record"}</button></div>}</div> : <div className="rounded-xl border border-dashed border-base-300 p-4 text-sm text-base-content/55">No canonical Guest Record is linked to this reservation.</div>}
     </section>
   );
 }
 
+
 function ReservationHistory({ query }: { query: { isLoading: boolean; error: unknown; data?: ReservationDetailsHistoryItem[]; refetch: () => Promise<unknown> } }) {
   if (query.isLoading) return <LoadingState label="Loading change history" />;
   if (query.error) return <ErrorState error={query.error} retry={() => void query.refetch()} />;
-  if (!query.data?.length) return <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><History className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No detail changes yet</h3><p className="mt-1 text-sm text-base-content/50">Edits to guest contact details and notes will appear here.</p></div>;
+  if (!query.data?.length) return <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><History className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No detail changes yet</h3><p className="mt-1 text-sm text-base-content/50">Edits to expected times, booking contact and notes will appear here.</p></div>;
   return <div className="space-y-3">{query.data.map((item) => <article key={item.changeId} className="rounded-2xl border border-base-300 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{formatChangedFields(item.changedFields)}</p><p className="mt-1 text-xs text-base-content/50">Revision {item.fromRevision} → {item.toRevision} · {reservationDetailsOriginLabel(item.origin)}</p></div><time className="text-xs text-base-content/45" dateTime={item.occurredAtUtc}>{formatDateTime(item.occurredAtUtc)}</time></div><p className="mt-3 text-sm text-base-content/60">Changed by {formatActor(item.actorId, item.origin)}.</p><HistoryValues item={item} /></article>)}</div>;
 }
 
@@ -274,18 +339,17 @@ function HistoryValues({ item }: { item: ReservationDetailsHistoryItem }) {
   if (fields.includes("phone")) values.push({ label: "Phone", before: item.before?.phone || "—", after: item.after.phone || "—" });
   if (fields.includes("guestcount")) values.push({ label: "Guests", before: String(item.before?.guestCount ?? "—"), after: String(item.after.guestCount) });
   if (fields.includes("notes")) values.push({ label: "Notes", before: item.before?.notes || "—", after: item.after.notes || "—" });
+  if (fields.includes("expectedarrivaltime")) values.push({ label: "Arrival", before: item.before?.expectedArrivalTime ? formatTime(item.before.expectedArrivalTime) : "—", after: item.after.expectedArrivalTime ? formatTime(item.after.expectedArrivalTime) : "—" });
+  if (fields.includes("expecteddeparturetime")) values.push({ label: "Departure", before: item.before?.expectedDepartureTime ? formatTime(item.before.expectedDepartureTime) : "—", after: item.after.expectedDepartureTime ? formatTime(item.after.expectedDepartureTime) : "—" });
   if (!values.length) return null;
   return <div className="mt-3 space-y-2 rounded-xl bg-base-200 p-3">{values.map((value) => <div key={value.label} className="grid gap-1 text-xs sm:grid-cols-[80px_1fr_auto_1fr]"><span className="font-semibold text-base-content/50">{value.label}</span><span className="truncate">{value.before}</span><span aria-hidden="true" className="text-base-content/30">→</span><span className="truncate font-medium">{value.after}</span></div>)}</div>;
 }
 
 function DetailRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) { return <div className="flex items-start gap-3 rounded-xl border border-base-300 p-4"><div className="mt-0.5 text-primary">{icon}</div><div className="min-w-0"><p className="text-xs text-base-content/40">{label}</p>{href ? <a className="mt-1 block truncate text-sm font-semibold text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 truncate text-sm font-semibold">{value}</p>}</div></div>; }
 function TimelineItem({ label, value }: { label: string; value: string }) { return <div className="flex items-center gap-3"><CheckCircle2 size={16} className="shrink-0 text-primary" /><div><p className="text-xs text-base-content/45">{label}</p><p className="text-sm font-semibold">{value}</p></div></div>; }
-function TextField({ label, name, type = "text", defaultValue, required = true, min }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; min?: string }) { return <label className="form-control block"><span className="label-text mb-2 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue} required={required} min={min} /></label>; }
+function TextField({ label, name, type = "text", defaultValue, required = true, min }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; min?: string }) { return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue} required={required} min={min} /></label>; }
+function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><TimePicker className="w-full" value={value} onChange={onChange} ariaLabel={label} /></div>; }
 
-function reservationStatusKey(status: ReservationStatus): string {
-  if (typeof status === "string") return status.replace(/[- ](.)/g, (_, letter: string) => letter.toUpperCase());
-  return ({ 1: "pendingAllocation", 2: "confirmed", 3: "allocationRejected", 4: "cancellationPending", 5: "cancelled", 6: "checkedIn", 7: "noShowPending", 8: "noShow", 9: "checkoutPending", 10: "checkedOut" } as Record<number, string>)[status] ?? "unknown";
-}
 function actionCopy(action: ReservationAction, reservation: Reservation) {
   if (action === "check-in") return { title: `Check in ${reservation.primaryGuestName}?`, description: "Confirm the property business date. This marks the guest as in house.", confirmLabel: "Confirm check-in" };
   if (action === "no-show") return { title: `Mark ${reservation.primaryGuestName} as a no-show?`, description: "This releases the allocated inventory and cannot be undone from this screen.", confirmLabel: "Confirm no-show" };
@@ -306,7 +370,9 @@ function localDateKey(date: Date) { return `${date.getFullYear()}-${String(date.
 function emptyToNull(value: FormDataEntryValue | null) { const normalized = String(value ?? "").trim(); return normalized || null; }
 function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`)); }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function formatStayEndpoint(date: string, time?: string | null) { return time ? `${formatDate(date)}, ${formatTime(time)}` : formatDate(date); }
+function formatTime(value: string) { const [hours, minutes] = value.split(":").map(Number); return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(2000, 0, 1, hours, minutes)); }
+function emptyStringToNull(value: string) { const normalized = value.trim(); return normalized || null; }
 function nightsBetween(arrival: string, departure: string) { return Math.max(0, Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000)); }
-function capitalize(value: string) { return value.slice(0, 1).toUpperCase() + value.slice(1); }
 function formatChangedFields(fields: string[]) { return fields.map((field) => field.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase())).join(", "); }
 function formatActor(actorId: string | null | undefined, origin: ReservationDetailsHistoryItem["origin"]) { const originLabel = reservationDetailsOriginLabel(origin); if (!actorId) return originLabel; if (originLabel === "integration") return "the connected integration"; if (originLabel === "system") return "BunkFy"; if (originLabel === "administrator") return "an administrator"; return "a staff user"; }

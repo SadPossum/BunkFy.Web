@@ -6,6 +6,8 @@ import {
 } from "@tanstack/react-query";
 import {
   BadgeCheck,
+  Building2,
+  Clock3,
   KeyRound,
   Link2,
   LogOut,
@@ -22,10 +24,14 @@ const emailVerificationEnabled =
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type {
   AuthenticationMethods,
+  AuthenticationSessions,
   ExternalAuthenticationProviderList,
   ExternalIdentity,
+  StaffMember,
 } from "../../api/types";
 import { useSession } from "../../app/session";
+import { focusedResourceClass, useTransientResourceFocus } from "../../app/resourceFocus";
+import { useWorkspace } from "../../app/workspace";
 import {
   ErrorState,
   InitialAvatar,
@@ -33,6 +39,8 @@ import {
   PageHeader,
   StatusBadge,
 } from "../../components/ui/primitives";
+import { StaffProfileFields } from "../workspaces/StaffProfileFields";
+import type { StaffProfileDraft } from "../workspaces/staffOnboarding";
 
 type SecurityAction =
   | {
@@ -54,12 +62,8 @@ type SecurityMutation = UseMutationResult<void, Error, SecurityAction>;
 export function AccountPage() {
   const { beginExternalLink, logout, logoutAll, request, session } =
     useSession();
+  const { selectedWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
-  const tenant = useQuery({
-    queryKey: ["tenant-current", session?.tenantId],
-    queryFn: () =>
-      request<{ tenantId: string; isEnabled: boolean }>("/api/tenants/current"),
-  });
   const methods = useQuery({
     queryKey: ["auth", "methods", session?.tenantId],
     queryFn: () => request<AuthenticationMethods>("/api/auth/methods"),
@@ -72,6 +76,16 @@ export function AccountPage() {
       ),
     staleTime: 5 * 60_000,
   });
+  const sessions = useQuery({
+    queryKey: ["auth", "sessions"],
+    queryFn: () => request<AuthenticationSessions>("/api/auth/sessions"),
+  });
+  const staffProfile = useQuery({
+    queryKey: ["staff", "me", session?.tenantId],
+    queryFn: () => request<StaffMember>("/api/staff/me"),
+    retry: false,
+  });
+  const focusedResourceId = useTransientResourceFocus(Boolean(staffProfile.data));
   const [confirmAll, setConfirmAll] = useState(false);
   const [submittingSession, setSubmittingSession] = useState<
     "current" | "all" | null
@@ -139,6 +153,15 @@ export function AccountPage() {
       await queryClient.invalidateQueries({ queryKey: ["auth", "methods"] });
     },
   });
+  const revokeSession = useMutation({
+    mutationFn: (sessionId: string) => request<void>(
+      `/api/auth/sessions/${sessionId}/sign-out`,
+      { method: "POST" },
+    ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["auth", "sessions"] });
+    },
+  });
 
   async function signOut(mode: "current" | "all") {
     setSubmittingSession(mode);
@@ -178,7 +201,7 @@ export function AccountPage() {
       <PageHeader
         eyebrow="Personal settings"
         title="Account"
-        description="Review your workspace identity, authentication methods, and signed-in sessions."
+        description="Manage your profile, sign-in methods, and active sessions."
       />
       {notice && (
         <div className="alert border border-success/25 bg-success/8 text-sm">
@@ -194,7 +217,7 @@ export function AccountPage() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.2fr]">
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <section className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="card-body p-6">
             <div className="flex items-center gap-4">
@@ -203,38 +226,30 @@ export function AccountPage() {
                 <h2 className="truncate font-display text-xl font-semibold">
                   {session?.username}
                 </h2>
-                <p className="mt-1 text-sm text-base-content/50">
-                  Current sign-in identity
-                </p>
+                <p className="mt-1 text-sm text-base-content/50">Your BunkFy account</p>
               </div>
             </div>
             <div className="my-3 h-px bg-base-300" />
             <div className="space-y-3">
               <AccountRow
                 icon={<UserRound />}
-                label="Username"
+                label="Email address"
                 value={session?.username || "Unknown"}
               />
               <AccountRow
-                icon={<ShieldCheck />}
-                label="Tenant"
-                value={tenant.data?.tenantId || session?.tenantId || "Unknown"}
+                icon={<Building2 />}
+                label="Current workspace"
+                value={selectedWorkspace?.organization.name || "No workspace selected"}
               />
               <AccountRow
                 icon={<ShieldCheck />}
-                label="Tenant scoping"
-                value={
-                  tenant.isLoading
-                    ? "Checking..."
-                    : tenant.data?.isEnabled
-                      ? "Enabled"
-                      : "Unavailable"
-                }
+                label="Staff profile"
+                value={staffProfile.data?.displayName || (staffProfile.isLoading ? "Loading..." : "Not ready")}
               />
               <AccountRow
-                icon={<KeyRound />}
-                label="Session storage"
-                value="Secure browser cookie + in-memory access"
+                icon={<Clock3 />}
+                label="Member since"
+                value={staffProfile.data ? new Date(staffProfile.data.createdAtUtc).toLocaleDateString() : "Unavailable"}
               />
             </div>
           </div>
@@ -248,15 +263,48 @@ export function AccountPage() {
               </div>
               <div>
                 <h2 className="font-display text-xl font-semibold">
-                  Signed-in sessions
+                  Active sessions
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-base-content/55">
-                  Sign out this browser, or revoke every active refresh session
-                  for your account.
+                  Review where your account is signed in and sign out any device
+                  you no longer use.
                 </p>
               </div>
             </div>
             {Boolean(sessionError) && <ErrorState error={sessionError} />}
+            {sessions.isLoading ? (
+              <div className="mt-5"><LoadingState label="Loading active sessions" /></div>
+            ) : sessions.error ? (
+              <div className="mt-5"><ErrorState error={sessions.error} retry={() => void sessions.refetch()} /></div>
+            ) : (
+              <div className="mt-5 divide-y divide-base-300 rounded-lg border border-base-300">
+                {(sessions.data?.sessions ?? []).map((item) => (
+                  <div key={item.sessionId} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold">{authenticationMethodLabel(item.authenticationMethod)}</p>
+                        {item.isCurrent && <span className="badge badge-sm border-0 bg-primary font-semibold text-white">This browser</span>}
+                      </div>
+                      <p className="mt-1 text-xs text-base-content/50">
+                        Signed in {new Date(item.loginDateTimeUtc).toLocaleString()} · active until {new Date(item.refreshTokenExpiresAtUtc).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {!item.isCurrent && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm text-error"
+                        disabled={revokeSession.isPending}
+                        onClick={() => revokeSession.mutate(item.sessionId)}
+                      >
+                        <LogOut size={15} />
+                        Sign out
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {revokeSession.error && <div className="mt-4"><ErrorState error={revokeSession.error} /></div>}
             {!confirmAll ? (
               <div className="mt-6 flex flex-wrap justify-end gap-2">
                 <button
@@ -313,6 +361,15 @@ export function AccountPage() {
         </section>
       </div>
 
+      {staffProfile.data && (
+        <StaffProfilePanel
+          member={staffProfile.data}
+          focused={focusedResourceId === "workspace-profile"}
+          request={request}
+          onUpdated={(updated) => queryClient.setQueryData(["staff", "me", session?.tenantId], updated)}
+        />
+      )}
+
       {methods.isLoading ? (
         <LoadingState label="Loading account security" />
       ) : methods.error ? (
@@ -324,7 +381,7 @@ export function AccountPage() {
         </div>
       ) : (
         authentication && (
-          <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
             <PasswordPanel
               methods={authentication}
               action={passwordAction}
@@ -346,6 +403,95 @@ export function AccountPage() {
       )}
     </>
   );
+}
+
+function StaffProfilePanel({
+  member,
+  focused,
+  request,
+  onUpdated,
+}: {
+  member: StaffMember;
+  focused: boolean;
+  request: <T>(path: string, options?: RequestInit) => Promise<T>;
+  onUpdated: (member: StaffMember) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [profile, setProfile] = useState<StaffProfileDraft>(() => staffDraft(member));
+  useEffect(() => setProfile(staffDraft(member)), [member]);
+  const update = useMutation({
+    mutationFn: () => request<StaffMember>("/api/staff/me", {
+      method: "PUT",
+      body: JSON.stringify({
+        ...profile,
+        legalName: profile.legalName.trim() || null,
+        workEmail: profile.workEmail.trim() || null,
+        workPhone: profile.workPhone.trim() || null,
+        employeeNumber: member.employeeNumber ?? null,
+        jobTitle: profile.jobTitle.trim() || null,
+        department: profile.department.trim() || null,
+        expectedVersion: member.version,
+      }),
+    }),
+    onSuccess: (updated) => {
+      onUpdated(updated);
+      setEditing(false);
+    },
+  });
+
+  return (
+    <section className={`card mt-6 border border-base-300 bg-base-100 shadow-sm ${focused ? focusedResourceClass : ""}`}>
+      <div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div>
+          <h2 className="font-display text-xl font-semibold">Workspace profile</h2>
+          <p className="mt-1 text-sm text-base-content/50">Contact and role details visible to your team.</p>
+        </div>
+        {!editing && (
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>
+            Edit profile
+          </button>
+        )}
+      </div>
+      <div className="p-5 sm:p-6">
+        {editing ? (
+          <form onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
+            <StaffProfileFields value={profile} onChange={setProfile} />
+            {update.error && <div className="mt-4"><ErrorState error={update.error} /></div>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-ghost" onClick={() => { setProfile(staffDraft(member)); setEditing(false); update.reset(); }} disabled={update.isPending}>Cancel</button>
+              <button className="btn btn-primary" disabled={update.isPending || !profile.displayName.trim()}>
+                {update.isPending && <span className="loading loading-spinner loading-sm" />}
+                Save profile
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <AccountRow icon={<UserRound />} label="Display name" value={member.displayName} />
+            <AccountRow icon={<Mail />} label="Work email" value={member.workEmail || "Not provided"} />
+            <AccountRow icon={<KeyRound />} label="Job title" value={member.jobTitle || "Not provided"} />
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function staffDraft(member: StaffMember): StaffProfileDraft {
+  return {
+    displayName: member.displayName,
+    legalName: member.legalName ?? "",
+    workEmail: member.workEmail ?? "",
+    workPhone: member.workPhone ?? "",
+    jobTitle: member.jobTitle ?? "",
+    department: member.department ?? "",
+  };
+}
+
+function authenticationMethodLabel(value: string): string {
+  return value.toLowerCase() === "password"
+    ? "Password sign-in"
+    : `${providerLabel(value)} sign-in`;
 }
 
 function PasswordPanel({
@@ -394,21 +540,26 @@ function PasswordPanel({
   return (
     <section className="card border border-base-300 bg-base-100 shadow-sm">
       <div className="card-body p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-semibold">Password</h2>
-            <p className="mt-1 text-sm text-base-content/55">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <KeyRound size={20} />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-semibold">Password</h2>
+              <p className="mt-1 text-sm leading-6 text-base-content/55">
               {methods.hasPassword
                 ? "A password is configured for this account."
                 : "This account currently signs in through an external provider."}
-            </p>
+              </p>
+            </div>
           </div>
           <StatusBadge
             status={methods.hasPassword ? "configured" : "not set"}
           />
         </div>
         {!action && (
-          <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-base-300 pt-5">
             {canRemove && (
               <button
                 type="button"
@@ -541,13 +692,18 @@ function EmailPanel({
   return (
     <section className="card border border-base-300 bg-base-100 shadow-sm">
       <div className="card-body p-6">
-        <div>
-          <h2 className="font-display text-xl font-semibold">
-            Email verification
-          </h2>
-          <p className="mt-1 text-sm text-base-content/55">
-            Verified addresses can receive security and account messages.
-          </p>
+        <div className="flex items-start gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+            <Mail size={20} />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-semibold">
+              Email verification
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-base-content/55">
+              Verified addresses can receive security and account messages.
+            </p>
+          </div>
         </div>
         <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
           {methods.emails.map((email) => (
@@ -614,7 +770,7 @@ function EmailPanel({
               onSubmit={confirm}
             >
               <label className="form-control block">
-                <span className="label-text mb-2 block text-sm font-semibold">
+                <span className="label-text mb-1.5 block text-sm font-semibold">
                   Verification code
                 </span>
                 <input
@@ -678,15 +834,20 @@ function ProviderPanel({
   return (
     <section className="card border border-base-300 bg-base-100 shadow-sm xl:col-span-2">
       <div className="card-body p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-semibold">
-              External accounts
-            </h2>
-            <p className="mt-1 text-sm text-base-content/55">
-              Link optional identity providers without merging accounts by
-              email.
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Link2 size={20} />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-semibold">
+                External accounts
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-base-content/55">
+                Link optional identity providers without merging accounts by
+                email.
+              </p>
+            </div>
           </div>
           {availableProviders.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -735,9 +896,10 @@ function ProviderPanel({
           ))}
         </div>
         {!methods.externalIdentities.length && (
-          <p className="mt-5 border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">
+          <div className="mt-5 flex items-center gap-3 rounded-lg bg-base-200/70 p-4 text-sm text-base-content/55">
+            <Link2 size={18} className="shrink-0 text-base-content/35" />
             No external accounts are linked.
-          </p>
+          </div>
         )}
         {unlinkIdentity && (
           <form
@@ -802,7 +964,7 @@ function PasswordInput({
 }) {
   return (
     <label className="form-control block">
-      <span className="label-text mb-2 block text-sm font-semibold">
+      <span className="label-text mb-1.5 block text-sm font-semibold">
         {label}
       </span>
       <input
@@ -826,8 +988,8 @@ function AccountRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-3 border border-base-300 p-4">
-      <span className="mt-0.5 text-primary">{icon}</span>
+    <div className="flex items-start gap-3 rounded-lg bg-base-200/70 p-4">
+      <span className="grid size-8 shrink-0 place-items-center rounded-md bg-base-100 text-primary shadow-xs [&>svg]:size-4">{icon}</span>
       <div className="min-w-0">
         <p className="text-xs text-base-content/40">{label}</p>
         <p className="mt-1 break-all text-sm font-semibold">{value}</p>

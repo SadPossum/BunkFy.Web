@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiDownload, apiRequest, apiStream } from "../src/api/client";
+import { ApiError, apiDownload, apiRequest, apiStream } from "../src/api/client";
 import { adapterExecutionModeValue, guestStatusLabel, guestStatusValue, guestStayStatusLabel, ingestionRunStatusLabel, inventorySalesModeValue, notificationSeverityLabel, proposalStatusValue, reservationSourceValue, reservationStatusLabel, staffStatusLabel, staffStatusValue } from "../src/api/labels";
 
 const repositoryRoot = process.cwd();
@@ -82,6 +82,27 @@ describe("frontend repository foundation", () => {
     expect(settings).not.toContain('members.error ?? staff.error');
   });
 
+  it("keeps growing operator directories on bounded server pages", () => {
+    const reservations = readFileSync(
+      join(repositoryRoot, "src", "features", "reservations", "ReservationsPage.tsx"),
+      "utf8",
+    );
+    const workspace = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
+      "utf8",
+    );
+    const connection = readFileSync(
+      join(repositoryRoot, "src", "features", "integrations", "ConnectionDetail.tsx"),
+      "utf8",
+    );
+
+    expect(reservations).toContain('reservationParams.append("status"');
+    expect(reservations).toContain('totalCount={reservations.data?.totalCount}');
+    expect(reservations).not.toContain("Load more reservations");
+    expect(workspace).toContain("page=${memberPage}&pageSize=${MEMBERS_PAGE_SIZE}");
+    expect(connection).toContain("page=${page}&pageSize=${CREDENTIALS_PAGE_SIZE}");
+  });
+
   it("keeps modal backdrops out of the accessibility tree without creating an unnamed button", () => {
     const primitives = readFileSync(join(repositoryRoot, "src", "components", "ui", "primitives.tsx"), "utf8");
 
@@ -104,6 +125,24 @@ describe("frontend repository foundation", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" });
+  });
+
+  it("reads GMA Problem Details titles as stable error codes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      title: "Reservations.GuestNotLinkable",
+      detail: "The guest is not active and visible at this property.",
+      status: 409,
+    }), { status: 409, headers: { "Content-Type": "application/problem+json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const error = await apiRequest<void>("/api/reservations/link").catch((reason) => reason);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      status: 409,
+      code: "Reservations.GuestNotLinkable",
+      message: "The guest is not active and visible at this property.",
+    });
   });
 
   it("keeps authenticated downloads inside the browser session boundary", async () => {

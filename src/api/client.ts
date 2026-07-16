@@ -92,9 +92,16 @@ async function toApiError(response: Response): Promise<ApiError> {
     payload = undefined;
   }
 
-  const detail = getString(payload, "detail") || getString(payload, "message") || getString(payload, "title");
-  const code = getString(payload, "code") || getNestedString(payload, "error", "code");
+  const title = getString(payload, "title");
+  const detail = getString(payload, "detail") || getString(payload, "message") || title;
+  const code = getString(payload, "code") ||
+    getNestedString(payload, "error", "code") ||
+    (isErrorCode(title) ? title : undefined);
   return new ApiError(detail || `Request failed with HTTP ${response.status}`, response.status, code);
+}
+
+function isErrorCode(value: string | undefined): value is string {
+  return Boolean(value && /^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)+$/.test(value));
 }
 
 function getString(value: unknown, key: string): string | undefined {

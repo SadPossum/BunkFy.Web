@@ -201,6 +201,48 @@
         }
       }
     },
+    "/api/auth/sessions": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationSessionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/{sessionId}/sign-out": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/auth/password": {
       "put": {
         "tags": [
@@ -2200,6 +2242,45 @@
         }
       }
     },
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/change-impact": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomInventoryChangeImpactDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/properties/{propertyId}/availability": {
       "get": {
         "tags": [
@@ -2468,6 +2549,269 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ManualInventoryBlockGroupDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/beds/{bedId}/retirement": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bedId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestBedRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "topologyChangeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}/retry": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "topologyChangeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestRoomRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/room-retirements/{topologyChangeId}": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "topologyChangeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/room-retirements/{topologyChangeId}/retry": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "topologyChangeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRetirementDto"
                 }
               }
             }
@@ -4480,7 +4824,24 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "$ref": "#/components/schemas/ReservationStatus"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ReservationStatus"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ReservationListOrder"
             }
           },
           {
@@ -4623,6 +4984,55 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/reservations/properties/{propertyId}/{reservationId}/inventory": {
+      "put": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignReservationInventoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4840,6 +5250,52 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/staff/me": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMemberDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Staff"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffProfileUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMemberDto"
+                }
+              }
+            }
           }
         }
       }
@@ -5650,6 +6106,44 @@
         },
         "additionalProperties": false
       },
+      "AuthenticationSessionResponse": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authenticationMethod": {
+            "type": "string",
+            "nullable": true
+          },
+          "loginDateTimeUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshTokenExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuthenticationSessionsResponse": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticationSessionResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "BedDto": {
         "type": "object",
         "properties": {
@@ -5717,6 +6211,89 @@
           }
         },
         "additionalProperties": false
+      },
+      "BedRetirementDto": {
+        "type": "object",
+        "properties": {
+          "topologyChangeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bedId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryRetirementStatus"
+          },
+          "rejectionReason": {
+            "$ref": "#/components/schemas/BedRetirementFinalizationRejectionReason"
+          },
+          "activeAllocationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeManualBlockCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "affectedReservationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "affectedReservationIdsTruncated": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BedRetirementFinalizationRejectionReason": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "BedStatus": {
         "enum": [
@@ -5978,6 +6555,16 @@
           "departure": {
             "type": "string",
             "format": "date"
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
           },
           "inventoryUnitIds": {
             "type": "array",
@@ -6294,6 +6881,18 @@
         "additionalProperties": false
       },
       "InventoryBlockTargetKind": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "InventoryRetirementStatus": {
         "enum": [
           0,
           1,
@@ -7239,6 +7838,28 @@
         },
         "additionalProperties": false
       },
+      "ReassignReservationInventoryRequest": {
+        "type": "object",
+        "properties": {
+          "amendmentRequestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventoryUnitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "expectedDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "RefreshTokenRequest": {
         "type": "object",
         "properties": {
@@ -7317,12 +7938,32 @@
         },
         "additionalProperties": false
       },
+      "RequestBedRetirementRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RequestEmailVerificationRequest": {
         "type": "object",
         "properties": {
           "emailId": {
             "type": "string",
             "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestRoomRetirementRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -7357,6 +7998,16 @@
           "departure": {
             "type": "string",
             "format": "date"
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
           },
           "inventoryUnitIds": {
             "type": "array",
@@ -7527,6 +8178,16 @@
         "type": "integer",
         "format": "int32"
       },
+      "ReservationListOrder": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "ReservationListResponse": {
         "type": "object",
         "properties": {
@@ -7542,6 +8203,10 @@
             "format": "int32"
           },
           "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalCount": {
             "type": "integer",
             "format": "int32"
           }
@@ -7705,6 +8370,50 @@
         },
         "additionalProperties": false
       },
+      "RoomInventoryChangeImpactDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "activeAllocationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeManualBlockCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeBedRetirementCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeRoomRetirementCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "affectedReservationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "affectedReservationIdsTruncated": {
+            "type": "boolean"
+          },
+          "canChangeSalesMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "RoomInventoryDto": {
         "type": "object",
         "properties": {
@@ -7786,6 +8495,87 @@
           }
         },
         "additionalProperties": false
+      },
+      "RoomRetirementDto": {
+        "type": "object",
+        "properties": {
+          "topologyChangeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryRetirementStatus"
+          },
+          "rejectionReason": {
+            "$ref": "#/components/schemas/RoomRetirementFinalizationRejectionReason"
+          },
+          "activeAllocationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeManualBlockCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeBedRetirementCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "affectedReservationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "affectedReservationIdsTruncated": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoomRetirementFinalizationRejectionReason": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "RoomStatus": {
         "enum": [
@@ -7916,6 +8706,80 @@
         },
         "additionalProperties": false
       },
+      "StaffMemberDto": {
+        "type": "object",
+        "properties": {
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "workEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "workPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "employeeNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "authSubjectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/StaffStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "suspendedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "departedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffPropertyAssignmentDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "StaffProfileUpdateRequest": {
         "type": "object",
         "properties": {
@@ -7987,6 +8851,57 @@
           },
           "authSubjectId": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffPropertyAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "assignmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyJobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "effectiveTo": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "assignedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unassignedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assignedAtVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unassignedAtVersion": {
+            "type": "integer",
+            "format": "int64",
             "nullable": true
           }
         },
@@ -8132,6 +9047,16 @@
           },
           "notes": {
             "type": "string",
+            "nullable": true
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
             "nullable": true
           },
           "expectedDetailsRevision": {

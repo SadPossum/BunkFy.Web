@@ -15,10 +15,17 @@ import type {
 } from "../../api/types";
 import { useSession } from "../../app/session";
 import { BrandMark } from "../../components/ui/BrandMark";
+import { StaffProfileFields } from "../workspaces/StaffProfileFields";
+import {
+  defaultStaffProfile,
+  saveInviteStaffDraft,
+  type StaffProfileDraft,
+} from "../workspaces/staffOnboarding";
 
-export function AuthPage() {
+export function AuthPage({ invitation = false }: { invitation?: boolean }) {
   const { beginExternalSignIn, login, register } = useSession();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(invitation ? "register" : "login");
+  const [staffProfile, setStaffProfile] = useState<StaffProfileDraft>(() => defaultStaffProfile());
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [externalSubmitting, setExternalSubmitting] = useState<string | null>(
@@ -46,10 +53,10 @@ export function AuthPage() {
     selfRegistration.data?.passwordEnabled === true;
 
   useEffect(() => {
-    if (!passwordRegistrationEnabled && mode === "register") {
+    if (!selfRegistration.isLoading && selfRegistration.data && !passwordRegistrationEnabled && mode === "register") {
       setMode("login");
     }
-  }, [mode, passwordRegistrationEnabled]);
+  }, [mode, passwordRegistrationEnabled, selfRegistration.data, selfRegistration.isLoading]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,10 +80,17 @@ export function AuthPage() {
     }
 
     try {
+      const username = String(data.get("username") ?? "").trim();
       const credentials = {
-        username: String(data.get("username") ?? "").trim(),
+        username,
         password,
       };
+      if (invitation && mode === "register") {
+        saveInviteStaffDraft({
+          ...staffProfile,
+          workEmail: staffProfile.workEmail.trim() || username,
+        });
+      }
       await (mode === "login" ? login(credentials) : register(credentials));
     } catch (cause) {
       setError(
@@ -149,17 +163,21 @@ export function AuthPage() {
             Staff workspace
           </p>
           <h2 className="font-display text-4xl font-semibold">
-            {mode === "login" ? "Welcome back" : "Create your account"}
+            {mode === "login"
+              ? invitation ? "Sign in to join" : "Welcome back"
+              : invitation ? "Join your team" : "Create your account"}
           </h2>
           <p className="mt-3 text-sm leading-6 text-base-content/55">
             {mode === "login"
               ? "Sign in to continue managing your property."
-              : "Register once, then create a workspace or join your team."}
+              : invitation
+                ? "Create your account and staff profile. Your invitation stays ready after registration."
+                : "Register once, then create a workspace or join your team."}
           </p>
 
           <form className="mt-8 space-y-5" onSubmit={submit}>
             <label className="form-control block">
-              <span className="label-text mb-2 block text-sm font-semibold">
+              <span className="label-text mb-1.5 block text-sm font-semibold">
                 Email
               </span>
               <input
@@ -187,6 +205,15 @@ export function AuthPage() {
                 show={showPassword}
                 autoComplete="new-password"
               />
+            )}
+            {invitation && mode === "register" && (
+              <div className="border-t border-base-300 pt-5">
+                <h3 className="font-display text-lg font-semibold">Your staff profile</h3>
+                <p className="mb-4 mt-1 text-sm leading-6 text-base-content/50">
+                  These details will appear to your workspace team.
+                </p>
+                <StaffProfileFields value={staffProfile} onChange={setStaffProfile} compact />
+              </div>
             )}
             {error && (
               <div className="alert alert-error py-3 text-sm">
@@ -274,7 +301,7 @@ function PasswordField({
 }) {
   return (
     <label className="form-control block">
-      <span className="label-text mb-2 block text-sm font-semibold">
+      <span className="label-text mb-1.5 block text-sm font-semibold">
         {label}
       </span>
       <div className="relative">

@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
-import type { NotificationBroadcastListResponse, NotificationHistoryListResponse } from "../../api/types";
+import { ApiError } from "../../api/client";
+import type { NotificationBroadcastItem, NotificationBroadcastListResponse, NotificationHistoryItem, NotificationHistoryListResponse } from "../../api/types";
+import { operationalNotificationQueryKeys } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
 
 type NotificationsContextValue = { unreadCount: number; isLoading: boolean; refresh: () => Promise<void> };
@@ -13,14 +15,19 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const broadcastSequence = useRef(0);
   const history = useQuery({
     queryKey: ["notifications", "history", "unread-summary", session?.tenantId],
-    queryFn: () => request<NotificationHistoryListResponse>("/api/notifications?page=1&pageSize=1&unreadOnly=true"),
+    queryFn: () => request<NotificationHistoryListResponse>("/api/notifications?page=1&pageSize=1"),
     refetchInterval: 60_000,
   });
   const broadcasts = useQuery({
     queryKey: ["notifications", "broadcasts", "unread-summary", session?.tenantId],
-    queryFn: () => request<NotificationBroadcastListResponse>("/api/notifications/broadcasts?page=1&pageSize=1&unreadOnly=true"),
+    queryFn: () => request<NotificationBroadcastListResponse>("/api/notifications/broadcasts?page=1&pageSize=1"),
     refetchInterval: 60_000,
   });
+
+  useEffect(() => {
+    historySequence.current = 0;
+    broadcastSequence.current = 0;
+  }, [session?.tenantId]);
 
   useEffect(() => {
     const sequence = history.data?.items[0]?.streamSequence;
@@ -32,14 +39,22 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [broadcasts.data]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !history.isSuccess || !broadcasts.isSuccess) return;
     const controller = new AbortController();
-    const invalidateHistory = () => queryClient.invalidateQueries({ queryKey: ["notifications", "history"] });
-    const invalidateBroadcasts = () => queryClient.invalidateQueries({ queryKey: ["notifications", "broadcasts"] });
+    const invalidateHistory = (item: NotificationHistoryItem) => {
+      const invalidations = [queryClient.invalidateQueries({ queryKey: ["notifications", "history"] })];
+      for (const queryKey of operationalNotificationQueryKeys(item)) {
+        invalidations.push(queryClient.invalidateQueries({ queryKey }));
+      }
+      void Promise.all(invalidations);
+    };
+    const invalidateBroadcasts = (_item: NotificationBroadcastItem) => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications", "broadcasts"] });
+    };
     void keepStreaming("/api/notifications/history/stream", historySequence, stream, controller.signal, invalidateHistory);
     void keepStreaming("/api/notifications/broadcasts/stream", broadcastSequence, stream, controller.signal, invalidateBroadcasts);
     return () => controller.abort();
-  }, [queryClient, session, stream]);
+  }, [broadcasts.isSuccess, history.isSuccess, queryClient, session, stream]);
 
   const value = useMemo<NotificationsContextValue>(() => ({
     unreadCount: (history.data?.unreadCount ?? 0) + (broadcasts.data?.unreadCount ?? 0),
@@ -55,19 +70,27 @@ export function useNotifications() {
   return value;
 }
 
-async function keepStreaming(path: string, sequence: React.RefObject<number>, open: (path: string, signal: AbortSignal) => Promise<Response>, signal: AbortSignal, onItem: () => void) {
+async function keepStreaming<T extends { streamSequence?: number }>(path: string, sequence: React.RefObject<number>, open: (path: string, signal: AbortSignal) => Promise<Response>, signal: AbortSignal, onItem: (item: T) => void) {
   while (!signal.aborted) {
     try {
       const response = await open(`${path}?afterSequence=${sequence.current}`, signal);
       await consumeSse(response, sequence, signal, onItem);
-    } catch {
-      if (signal.aborted) return;
+    } catch (error) {
+      if (signal.aborted || !shouldRetryNotificationStream(error)) return;
     }
     await waitForRetry(signal);
   }
 }
 
-async function consumeSse(response: Response, sequence: React.RefObject<number>, signal: AbortSignal, onItem: () => void) {
+export function shouldRetryNotificationStream(error: unknown) {
+  return !(error instanceof ApiError
+    && error.status >= 400
+    && error.status < 500
+    && error.status !== 408
+    && error.status !== 429);
+}
+
+async function consumeSse<T extends { streamSequence?: number }>(response: Response, sequence: React.RefObject<number>, signal: AbortSignal, onItem: (item: T) => void) {
   const reader = response.body?.getReader();
   if (!reader) return;
   const decoder = new TextDecoder();
@@ -83,9 +106,9 @@ async function consumeSse(response: Response, sequence: React.RefObject<number>,
       const data = block.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
       if (data) {
         try {
-          const item = JSON.parse(data) as { streamSequence?: number };
+          const item = JSON.parse(data) as T;
           if (typeof item.streamSequence === "number") sequence.current = Math.max(sequence.current, item.streamSequence);
-          onItem();
+          onItem(item);
         } catch {
           // Ignore malformed events and continue the durable stream.
         }

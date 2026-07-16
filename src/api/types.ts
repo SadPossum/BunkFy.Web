@@ -113,6 +113,27 @@ export type RoomInventoryListResponse = Omit<Schema<"RoomInventoryListResponse">
   rooms: RoomInventory[];
 };
 
+export type RoomInventoryChangeImpact = Omit<
+  Schema<"RoomInventoryChangeImpactDto">,
+  "affectedReservationIds"
+> & { affectedReservationIds: string[] };
+
+export type BedRetirement = Omit<
+  NonNullableFields<Schema<"BedRetirementDto">, "reason" | "requestedBy" | "affectedReservationIds">,
+  "status"
+> & {
+  status: Schema<"InventoryRetirementStatus">;
+};
+
+export type RoomRetirement = Omit<
+  NonNullableFields<Schema<"RoomRetirementDto">, "reason" | "requestedBy" | "affectedReservationIds">,
+  "status"
+> & {
+  status: Schema<"InventoryRetirementStatus">;
+};
+
+export type TopologyRetirement = BedRetirement | RoomRetirement;
+
 export type InventoryUnitAvailability = Omit<
   NonNullableFields<Schema<"InventoryUnitAvailabilityDto">, "activeBlockIds" | "activeAllocationIds">,
   "unit"
@@ -175,6 +196,8 @@ export type ReservationListResponse = Omit<Schema<"ReservationListResponse">, "r
 export type ReservationDetailsSnapshot = {
   arrival: string;
   departure: string;
+  expectedArrivalTime?: string | null;
+  expectedDepartureTime?: string | null;
   inventoryUnitIds: string[];
   primaryGuestName: string;
   email?: string | null;
@@ -538,6 +561,18 @@ export type AuthenticationMethods = Omit<
 > & {
   emails: AuthenticationEmail[];
   externalIdentities: ExternalIdentity[];
+};
+
+export type AuthenticationSession = NonNullableFields<
+  Schema<"AuthenticationSessionResponse">,
+  "authenticationMethod"
+>;
+
+export type AuthenticationSessions = Omit<
+  Schema<"AuthenticationSessionsResponse">,
+  "sessions"
+> & {
+  sessions: AuthenticationSession[];
 };
 
 export type ExternalAuthenticationProviderList = {

@@ -1,4 +1,4 @@
-import { Bell, Blocks, Building2, Cable, CalendarDays, ChevronDown, Gauge, LogOut, Menu, Settings2, UserRoundCog, UsersRound, X } from "lucide-react";
+import { Bell, Blocks, Building2, Cable, CalendarDays, Gauge, LogOut, Menu, Settings2, UserRoundCog, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
@@ -7,6 +7,7 @@ import { useWorkspace } from "../../app/workspace";
 import { useNotifications } from "../../features/notifications/notifications";
 import { BrandMark } from "../ui/BrandMark";
 import { InitialAvatar } from "../ui/primitives";
+import { SelectPicker } from "../ui/SelectPicker";
 
 const navigation = [
   { to: "/", label: "Overview", icon: Gauge, required: [permissions.propertiesRead, permissions.inventoryRead, permissions.reservationsRead] },
@@ -42,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen overflow-x-hidden bg-base-200">
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-base-300 bg-base-100 transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-20 items-center justify-between px-6">
           <NavLink to="/" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
@@ -55,26 +56,27 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="border-y border-base-300 px-4 py-4 lg:hidden">
           <label className="block">
             <span className="mb-2 block text-xs font-semibold text-base-content/45">Current workspace</span>
-            <select
-              className="select select-bordered select-sm w-full"
+            <SelectPicker
+              className="w-full"
               value={selectedWorkspaceId}
-              onChange={(event) => {
-                if (event.target.value === "__new") {
+              onValueChange={(value) => {
+                if (value === "__new") {
                   setMobileOpen(false);
                   navigate("/workspace/new");
                   return;
                 }
-                setSelectedWorkspaceId(event.target.value);
+                setSelectedWorkspaceId(value);
               }}
-              aria-label="Current workspace"
-            >
-              {workspaces.map((item) => (
-                <option key={item.organization.organizationId} value={item.organization.organizationId}>
-                  {item.organization.name}
-                </option>
-              ))}
-              <option value="__new">Create workspace</option>
-            </select>
+              ariaLabel="Current workspace"
+              size="sm"
+              options={[
+                ...workspaces.map((item) => ({
+                  value: item.organization.organizationId,
+                  label: item.organization.name,
+                })),
+                { value: "__new", label: "Create workspace" },
+              ]}
+            />
           </label>
         </div>
 
@@ -106,30 +108,43 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="hidden items-center gap-8 lg:flex">
             <div>
               <p className="text-xs font-medium text-base-content/40">Workspace</p>
-              <div className="relative mt-1">
-                <select className="select h-auto min-h-0 appearance-none border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-bold focus:outline-none" value={selectedWorkspaceId} onChange={(event) => event.target.value === "__new" ? navigate("/workspace/new") : setSelectedWorkspaceId(event.target.value)} aria-label="Current workspace">
-                  {workspaces.map((item) => <option key={item.organization.organizationId} value={item.organization.organizationId}>{item.organization.name}</option>)}
-                  <option value="__new">Create workspace</option>
-                </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-base-content/45" />
-              </div>
+              <SelectPicker
+                className="mt-1 max-w-52"
+                variant="plain"
+                size="sm"
+                value={selectedWorkspaceId}
+                onValueChange={(value) => value === "__new" ? navigate("/workspace/new") : setSelectedWorkspaceId(value)}
+                ariaLabel="Current workspace"
+                options={[
+                  ...workspaces.map((item) => ({ value: item.organization.organizationId, label: item.organization.name })),
+                  { value: "__new", label: "Create workspace" },
+                ]}
+              />
             </div>
             <div>
               <p className="text-xs font-medium text-base-content/40">Current property</p>
-              <div className="relative mt-1">
-              <select className="select h-auto min-h-0 appearance-none border-0 bg-transparent py-0 pl-0 pr-7 text-sm font-bold focus:outline-none" value={selectedPropertyId} onChange={(event) => setSelectedPropertyId(event.target.value)} aria-label="Current property">
-                {!properties.length && <option value="">No property yet</option>}
-                {properties.map((property) => <option key={property.propertyId} value={property.propertyId}>{property.name}</option>)}
-              </select>
-              <ChevronDown size={14} className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-base-content/45" />
-              </div>
+              <SelectPicker
+                className="mt-1 max-w-52"
+                variant="plain"
+                size="sm"
+                value={selectedPropertyId}
+                onValueChange={setSelectedPropertyId}
+                ariaLabel="Current property"
+                placeholder="No property yet"
+                options={properties.map((property) => ({ value: property.propertyId, label: property.name }))}
+              />
             </div>
           </div>
           <div className="lg:hidden">
-            <select className="select select-bordered select-sm max-w-44" value={selectedPropertyId} onChange={(event) => setSelectedPropertyId(event.target.value)} aria-label="Current property">
-              {!properties.length && <option value="">No property</option>}
-              {properties.map((property) => <option key={property.propertyId} value={property.propertyId}>{property.name}</option>)}
-            </select>
+            <SelectPicker
+              className="w-40"
+              size="sm"
+              value={selectedPropertyId}
+              onValueChange={setSelectedPropertyId}
+              ariaLabel="Current property"
+              placeholder="No property"
+              options={properties.map((property) => ({ value: property.propertyId, label: property.name }))}
+            />
           </div>
           <div className="flex items-center gap-2"><NavLink to="/notifications" className="btn btn-circle btn-ghost btn-sm relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}><Bell size={18} />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.6rem] font-bold leading-4 text-primary-content">{unreadCount > 99 ? "99+" : unreadCount}</span>}</NavLink><div className="flex items-center gap-2" role="status" aria-label="Workspace connected"><span className="hidden text-xs font-semibold text-base-content/45 sm:inline">Live workspace</span><span className="status-dot" aria-hidden="true" /></div></div>
         </header>

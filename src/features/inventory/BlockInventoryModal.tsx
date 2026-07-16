@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { InventoryBlockTarget, RoomInventory } from "../../api/types";
 import { ErrorState, FormActions, Modal } from "../../components/ui/primitives";
+import { DatePicker } from "../../components/ui/DatePicker";
 import {
   buildBlockTargetOptions,
   type BlockTargetKind,
@@ -61,6 +62,8 @@ export function BlockInventoryModal({
   const [targetKind, setTargetKind] = useState<BlockTargetKind>("room");
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
+  const [arrival, setArrival] = useState(() => defaultRange().arrival);
+  const [departure, setDeparture] = useState(() => defaultRange().departure);
   const resetMutation = mutation.reset;
 
   useEffect(() => {
@@ -68,6 +71,9 @@ export function BlockInventoryModal({
     setTargetKind(availableKinds.some(({ kind }) => kind === "room") ? "room" : availableKinds[0]?.kind ?? "property");
     setSelectedId("");
     setSearch("");
+    const range = defaultRange();
+    setArrival(range.arrival);
+    setDeparture(range.departure);
     resetMutation();
   }, [availableKinds, open, resetMutation]);
 
@@ -92,13 +98,11 @@ export function BlockInventoryModal({
     const data = new FormData(event.currentTarget);
     mutation.mutate({
       target: selectedOption.target,
-      arrival: String(data.get("arrival")),
-      departure: String(data.get("departure")),
+      arrival,
+      departure,
       reason: String(data.get("reason")),
     });
   }
-
-  const range = defaultRange();
 
   return (
     <Modal
@@ -106,17 +110,16 @@ export function BlockInventoryModal({
       title="Block inventory"
       description="Choose the physical scope that operations need to take out of service."
       onClose={onClose}
-      size="lg"
     >
-      <form onSubmit={submit} className="space-y-5">
+      <form onSubmit={submit} className="space-y-4">
         <fieldset>
-          <legend className="mb-2 text-sm font-semibold">Scope</legend>
-          <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-base-200 p-1" aria-label="Inventory block scope">
+          <legend className="mb-1.5 text-sm font-semibold">Scope</legend>
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-base-200 p-1 sm:grid-cols-5" aria-label="Inventory block scope">
             {availableKinds.map(({ kind, label, icon: Icon }) => (
               <button
                 key={kind}
                 type="button"
-                className={`btn btn-sm min-w-max flex-1 rounded-md border-0 ${targetKind === kind ? "bg-base-100 shadow-sm" : "btn-ghost"}`}
+                className={`btn btn-sm w-full rounded-md border-0 ${targetKind === kind ? "bg-base-100 shadow-sm" : "btn-ghost"}`}
                 aria-pressed={targetKind === kind}
                 onClick={() => chooseKind(kind)}
               >
@@ -167,14 +170,14 @@ export function BlockInventoryModal({
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <DateInput label="From" name="arrival" defaultValue={range.arrival} />
-          <DateInput label="Until" name="departure" defaultValue={range.departure} />
+          <DateInput label="From" value={arrival} onChange={setArrival} />
+          <DateInput label="Until" value={departure} min={arrival} onChange={setDeparture} />
         </div>
 
         <label className="form-control block">
-          <span className="label-text mb-2 block text-sm font-semibold">Reason</span>
+          <span className="label-text mb-1.5 block text-sm font-semibold">Reason</span>
           <textarea
-            className="textarea textarea-bordered min-h-24 w-full"
+            className="textarea textarea-bordered min-h-20 w-full"
             name="reason"
             placeholder="Maintenance, private use, deep clean..."
             required
@@ -221,12 +224,12 @@ function BlockTargetRow({
   );
 }
 
-function DateInput({ label, name, defaultValue }: { label: string; name: string; defaultValue: string }) {
+function DateInput({ label, value, min, onChange }: { label: string; value: string; min?: string; onChange: (value: string) => void }) {
   return (
-    <label className="form-control block">
-      <span className="label-text mb-2 block text-sm font-semibold">{label}</span>
-      <input className="input input-bordered w-full" type="date" name={name} defaultValue={defaultValue} required />
-    </label>
+    <div className="form-control block">
+      <span className="label-text mb-1.5 block text-sm font-semibold">{label}</span>
+      <DatePicker className="w-full" value={value} min={min} onChange={onChange} ariaLabel={label} required />
+    </div>
   );
 }
 

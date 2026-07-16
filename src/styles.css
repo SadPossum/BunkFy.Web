@@ -1,3 +1,4 @@
+@import "@daypicker/react/style.css";
 @import "tailwindcss";
 @plugin "daisyui" {
   themes: bunkfy --default;
@@ -78,6 +79,15 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+.btn-primary:not(.btn-outline),
+.btn-secondary:not(.btn-outline),
+.btn-info:not(.btn-outline),
+.badge-primary:not(.badge-outline),
+.badge-secondary:not(.badge-outline),
+.badge-info:not(.badge-outline) {
+  color: white;
+}
+
 .font-display {
   font-family: var(--font-display);
 }
@@ -105,6 +115,20 @@ textarea {
   animation: status-pulse 2.5s ease-out infinite;
 }
 
+.resource-focus {
+  position: relative;
+  z-index: 1;
+  animation: resource-focus-reveal 5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+tr.resource-focus > td {
+  animation: resource-focus-cell-reveal 5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+tr.resource-focus > td:first-child {
+  animation: resource-focus-first-cell-reveal 5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .modal {
   background: color-mix(in oklab, var(--color-neutral) 30%, transparent);
   backdrop-filter: blur(5px);
@@ -115,6 +139,21 @@ textarea {
 .textarea:focus {
   border-color: color-mix(in oklab, var(--color-primary) 65%, transparent);
   outline: 3px solid color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+
+.bunkfy-day-picker {
+  --rdp-accent-color: var(--color-primary);
+  --rdp-accent-background-color: color-mix(in oklab, var(--color-primary) 13%, transparent);
+  --rdp-day_button-border-radius: 0.5rem;
+  --rdp-day_button-height: 2.25rem;
+  --rdp-day_button-width: 2.25rem;
+  margin: 0;
+  color: var(--color-base-content);
+}
+
+.bunkfy-day-picker button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 @media (min-width: 1024px) {
@@ -128,11 +167,77 @@ textarea {
   70%, 100% { opacity: 0; transform: scale(1.65); }
 }
 
+@keyframes resource-focus-reveal {
+  0% {
+    background-color: color-mix(in oklab, var(--color-primary) 16%, var(--color-base-100));
+    box-shadow:
+      inset 4px 0 0 var(--color-primary),
+      0 0 0 6px color-mix(in oklab, var(--color-primary) 13%, transparent);
+  }
+  12% {
+    background-color: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
+    box-shadow:
+      inset 4px 0 0 var(--color-primary),
+      0 0 0 2px color-mix(in oklab, var(--color-primary) 8%, transparent);
+  }
+  72% {
+    background-color: color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100));
+    box-shadow:
+      inset 3px 0 0 color-mix(in oklab, var(--color-primary) 78%, transparent),
+      0 0 0 1px transparent;
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 transparent, 0 0 0 1px transparent;
+  }
+}
+
+@keyframes resource-focus-cell-reveal {
+  0% { background-color: color-mix(in oklab, var(--color-primary) 16%, var(--color-base-100)); }
+  12% { background-color: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100)); }
+  72% { background-color: color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100)); }
+  100% { background-color: transparent; }
+}
+
+@keyframes resource-focus-first-cell-reveal {
+  0% {
+    background-color: color-mix(in oklab, var(--color-primary) 16%, var(--color-base-100));
+    box-shadow: inset 4px 0 0 var(--color-primary);
+  }
+  12% {
+    background-color: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
+    box-shadow: inset 4px 0 0 var(--color-primary);
+  }
+  72% {
+    background-color: color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100));
+    box-shadow: inset 3px 0 0 color-mix(in oklab, var(--color-primary) 78%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .resource-focus {
+    animation: none !important;
+    background-color: color-mix(in oklab, var(--color-primary) 9%, var(--color-base-100));
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+
+  tr.resource-focus > td {
+    animation: none !important;
+    background-color: color-mix(in oklab, var(--color-primary) 9%, var(--color-base-100));
+  }
+
+  tr.resource-focus > td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-primary);
   }
 }

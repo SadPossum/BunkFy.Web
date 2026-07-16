@@ -10,9 +10,8 @@ import {
   ShieldCheck,
   UserMinus,
   UsersRound,
-  X,
 } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   Organization,
   OrganizationEnrollmentLinkIssued,
@@ -23,11 +22,15 @@ import type {
 } from "../../api/types";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { Modal, PageHeader } from "../../components/ui/primitives";
+import { PaginationBar } from "../../components/ui/PaginationBar";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 
 type IssuedJoinLink = { kind: "invitation" | "enrollment"; token: string; expiresAtUtc: string };
+const MEMBERS_PAGE_SIZE = 25;
 
 export function WorkspaceSettingsPage() {
-  const { request } = useSession();
+  const { request, session } = useSession();
   const {
     selectedWorkspace,
     refetchWorkspaces,
@@ -35,12 +38,13 @@ export function WorkspaceSettingsPage() {
   const [tab, setTab] = useState<"general" | "members" | "invites">("general");
   const [issued, setIssued] = useState<IssuedJoinLink | null>(null);
   const [copied, setCopied] = useState(false);
+  const [memberPage, setMemberPage] = useState(1);
   const workspace = selectedWorkspace?.organization;
   const owner = isOwner(selectedWorkspace?.membership.role);
   const members = useQuery({
-    queryKey: ["organizations", workspace?.organizationId, "members"],
+    queryKey: ["organizations", workspace?.organizationId, "members", memberPage],
     queryFn: () => request<OrganizationMemberListResponse>(
-      `/api/organizations/${workspace?.organizationId}/members?page=1&pageSize=100`,
+      `/api/organizations/${workspace?.organizationId}/members?page=${memberPage}&pageSize=${MEMBERS_PAGE_SIZE}`,
     ),
     enabled: Boolean(workspace && owner && tab === "members"),
   });
@@ -57,6 +61,12 @@ export function WorkspaceSettingsPage() {
     ),
     [staff.data?.items],
   );
+  useEffect(() => setMemberPage(1), [workspace?.organizationId]);
+  useEffect(() => {
+    if (!members.isFetching && memberPage > 1 && members.data?.items.length === 0) {
+      setMemberPage((current) => Math.max(1, current - 1));
+    }
+  }, [memberPage, members.data?.items.length, members.isFetching]);
 
   if (!workspace || !selectedWorkspace) return null;
 
@@ -72,93 +82,89 @@ export function WorkspaceSettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase text-primary">Workspace</p>
-          <h1 className="mt-2 font-display text-3xl font-semibold">{workspace.name}</h1>
-          <p className="mt-2 text-sm text-base-content/50">{workspace.slug}</p>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Workspace settings"
+        title={workspace.name}
+        description={`Manage team access and workspace identity for ${workspace.slug}.`}
+        action={(
+          <span className={`badge h-8 gap-2 border-0 px-3 font-semibold text-white ${owner ? "bg-primary" : "bg-neutral"}`}>
+            <ShieldCheck size={15} />
+            {owner ? "Owner" : "Front desk"}
+          </span>
+        )}
+      />
+
+      <section className="card overflow-visible border border-base-300 bg-base-100 shadow-sm">
+        <div className="border-b border-base-300 p-3 sm:px-5">
+          <SegmentedTabs
+            value={tab}
+            ariaLabel="Workspace settings"
+            onValueChange={setTab}
+            options={[
+              { value: "general", label: "General", icon: <Settings2 size={15} /> },
+              { value: "members", label: "Members", icon: <UsersRound size={15} />, disabled: !owner },
+              { value: "invites", label: "Invites", icon: <MailPlus size={15} />, disabled: !owner },
+            ]}
+          />
         </div>
-        <span className="badge badge-outline gap-2 py-3">
-          <ShieldCheck size={14} />
-          {owner ? "Owner" : "Member"}
-        </span>
-      </header>
 
-      <div className="join" role="tablist" aria-label="Workspace settings">
-        {([
-          ["general", "General", Settings2],
-          ["members", "Members", UsersRound],
-          ["invites", "Invites", MailPlus],
-        ] as const).map(([value, label, Icon]) => (
-          <button
-            key={value}
-            className={`btn join-item btn-sm ${tab === value ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setTab(value)}
-            disabled={!owner && value !== "general"}
-          >
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "general" && (
-        <GeneralSettings
-          key={workspace.organizationId}
-          workspace={workspace}
-          canManage={owner}
-          request={request}
-          onSaved={refetchWorkspaces}
-        />
-      )}
-      {tab === "members" && owner && (
-        <MembersSettings
-          workspace={workspace}
-          currentMembership={selectedWorkspace.membership}
-          memberships={members.data?.items ?? []}
-          staffBySubject={staffBySubject}
-          loading={members.isLoading}
-          error={members.error}
-          request={request}
-          onChanged={refreshWorkspace}
-        />
-      )}
-      {tab === "invites" && owner && (
-        <InviteSettings
-          workspaceId={workspace.organizationId}
-          request={request}
-          onIssued={setIssued}
-        />
-      )}
+        <div className="p-5 sm:p-6">
+          {tab === "general" && (
+            <GeneralSettings
+              key={workspace.organizationId}
+              workspace={workspace}
+              canManage={owner}
+              request={request}
+              onSaved={refetchWorkspaces}
+            />
+          )}
+          {tab === "members" && owner && (
+            <MembersSettings
+              workspace={workspace}
+              currentMembership={selectedWorkspace.membership}
+              memberships={members.data?.items ?? []}
+              staffBySubject={staffBySubject}
+              currentUsername={session?.username ?? ""}
+              page={memberPage}
+              pageSize={MEMBERS_PAGE_SIZE}
+              loading={members.isLoading}
+              fetching={members.isFetching}
+              error={members.error}
+              request={request}
+              onChanged={refreshWorkspace}
+              onPageChange={setMemberPage}
+            />
+          )}
+          {tab === "invites" && owner && (
+            <InviteSettings
+              workspaceId={workspace.organizationId}
+              request={request}
+              onIssued={setIssued}
+            />
+          )}
+        </div>
+      </section>
 
       {issued && (
-        <div className="modal modal-open" role="dialog" aria-modal="true" aria-label="Workspace join link">
-          <div className="modal-box max-w-md rounded-lg">
-            <button
-              className="btn btn-circle btn-ghost btn-sm absolute right-4 top-4"
-              onClick={() => setIssued(null)}
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-            <h2 className="font-display text-2xl font-semibold">
-              {issued.kind === "invitation" ? "Invitation ready" : "Team QR ready"}
-            </h2>
-            <div className="mx-auto mt-6 w-fit bg-white p-4">
-              <QRCodeSVG value={joinUrl(issued)} size={208} level="M" />
-            </div>
-            <p className="mt-5 break-all text-xs text-base-content/50">{joinUrl(issued)}</p>
-            <p className="mt-2 text-xs text-base-content/40">
-              Expires {new Date(issued.expiresAtUtc).toLocaleString()}
-            </p>
-            <button className="btn btn-primary mt-5 w-full" onClick={() => void copyIssuedLink()}>
-              {copied ? <Check size={17} /> : <Copy size={17} />}
-              {copied ? "Copied" : "Copy link"}
-            </button>
+        <Modal
+          open
+          title={issued.kind === "invitation" ? "Invitation ready" : "Team QR ready"}
+          description="Share this link only with the person or team you expect to join."
+          onClose={() => setIssued(null)}
+        >
+          <div className="mx-auto w-fit rounded-lg bg-white p-4 shadow-xs">
+            <QRCodeSVG value={joinUrl(issued)} size={208} level="M" />
           </div>
-          <button className="modal-backdrop" onClick={() => setIssued(null)} aria-label="Close" />
-        </div>
+          <p className="mt-5 break-all rounded-lg bg-base-200 p-3 font-mono text-xs text-base-content/60">{joinUrl(issued)}</p>
+          <p className="mt-2 text-xs text-base-content/45">
+            Expires {new Date(issued.expiresAtUtc).toLocaleString()}
+          </p>
+          <button className="btn btn-primary mt-5 w-full text-white" onClick={() => void copyIssuedLink()}>
+            {copied ? <Check size={17} /> : <Copy size={17} />}
+            {copied ? "Copied" : "Copy link"}
+          </button>
+        </Modal>
       )}
     </div>
   );
@@ -185,24 +191,42 @@ function GeneralSettings({
     onSuccess: onSaved,
   });
   return (
-    <section className="max-w-2xl border-t border-base-300 pt-6">
-      <h2 className="font-display text-xl font-semibold">Workspace details</h2>
+    <section className="max-w-3xl">
+      <div className="flex items-start gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <Settings2 size={20} />
+        </span>
+        <div>
+          <h2 className="font-display text-xl font-semibold">Workspace details</h2>
+          <p className="mt-1 text-sm leading-6 text-base-content/55">
+            The name and handle shown throughout your team workspace.
+          </p>
+        </div>
+      </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label>
-          <span className="mb-2 block text-sm font-semibold">Name</span>
+        <label className="form-control block">
+          <span className="mb-1.5 block text-sm font-semibold">Name</span>
           <input className="input input-bordered w-full" value={name} onChange={(event) => setName(event.target.value)} disabled={!canManage} />
         </label>
-        <label>
-          <span className="mb-2 block text-sm font-semibold">Handle</span>
+        <label className="form-control block">
+          <span className="mb-1.5 block text-sm font-semibold">Handle</span>
           <input className="input input-bordered w-full" value={slug} onChange={(event) => setSlug(event.target.value)} disabled={!canManage} />
         </label>
       </div>
+      {!canManage && (
+        <div className="mt-5 flex items-start gap-3 rounded-lg bg-base-200/70 p-4 text-sm text-base-content/60">
+          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
+          Workspace identity can only be changed by the owner.
+        </div>
+      )}
       {update.error && <ErrorMessage error={update.error} />}
       {canManage && (
-        <button className="btn btn-primary mt-5" onClick={() => update.mutate()} disabled={update.isPending}>
-          {update.isPending && <span className="loading loading-spinner loading-sm" />}
-          Save changes
-        </button>
+        <div className="mt-5 flex justify-end border-t border-base-300 pt-5">
+          <button className="btn btn-primary text-white" onClick={() => update.mutate()} disabled={update.isPending || (!name.trim() || !slug.trim())}>
+            {update.isPending && <span className="loading loading-spinner loading-sm" />}
+            Save changes
+          </button>
+        </div>
       )}
     </section>
   );
@@ -230,32 +254,32 @@ function InviteSettings({ workspaceId, request, onIssued }: {
     onSuccess: (result) => onIssued({ kind: "enrollment", token: result.token, expiresAtUtc: result.enrollmentLink.expiresAtUtc }),
   });
   return (
-    <div className="grid gap-10 border-t border-base-300 pt-6 lg:grid-cols-2">
-      <form onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
+    <div className="grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-base-300">
+      <form className="lg:pr-8" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
         <MailPlus className="text-primary" size={22} />
         <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
         <p className="mt-2 text-sm leading-6 text-base-content/50">Bind the invite to a verified email for the safest handoff. The link can only be accepted once.</p>
         <label className="mt-5 block">
-          <span className="mb-2 block text-sm font-semibold">Email</span>
+          <span className="mb-1.5 block text-sm font-semibold">Email</span>
           <input className="input input-bordered w-full" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="staff@example.com" />
         </label>
         {invite.error && <ErrorMessage error={invite.error} />}
-        <button className="btn btn-primary mt-5" disabled={invite.isPending}>
+        <button className="btn btn-primary mt-5 w-full text-white sm:w-auto" disabled={invite.isPending}>
           {invite.isPending && <span className="loading loading-spinner loading-sm" />}
           <Link2 size={17} />
           Create invite
         </button>
       </form>
-      <form onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
+      <form className="border-t border-base-300 pt-8 lg:border-t-0 lg:pl-8 lg:pt-0" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
         <QrCode className="text-primary" size={22} />
         <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
         <p className="mt-2 text-sm leading-6 text-base-content/50">A short-lived reusable link for supervised onboarding. Anyone with it can join until its limit is reached.</p>
         <label className="mt-5 block max-w-40">
-          <span className="mb-2 block text-sm font-semibold">Maximum joins</span>
+          <span className="mb-1.5 block text-sm font-semibold">Maximum joins</span>
           <input className="input input-bordered w-full" type="number" min={1} max={100} value={maximumClaims} onChange={(event) => setMaximumClaims(Number(event.target.value))} />
         </label>
         {enrollment.error && <ErrorMessage error={enrollment.error} />}
-        <button className="btn btn-outline mt-5" disabled={enrollment.isPending}>
+        <button className="btn btn-outline mt-5 w-full sm:w-auto" disabled={enrollment.isPending}>
           {enrollment.isPending && <span className="loading loading-spinner loading-sm" />}
           <QrCode size={17} />
           Create QR
@@ -270,19 +294,29 @@ function MembersSettings({
   currentMembership,
   memberships,
   staffBySubject,
+  currentUsername,
+  page,
+  pageSize,
   loading,
+  fetching,
   error,
   request,
   onChanged,
+  onPageChange,
 }: {
   workspace: Organization;
   currentMembership: OrganizationMembership;
   memberships: OrganizationMembership[];
   staffBySubject: Map<string, StaffListResponse["items"][number]>;
+  currentUsername: string;
+  page: number;
+  pageSize: number;
   loading: boolean;
+  fetching: boolean;
   error: unknown;
   request: ReturnType<typeof useSession>["request"];
   onChanged: () => Promise<void>;
+  onPageChange: (page: number) => void;
 }) {
   const action = useMutation({
     mutationFn: ({ membership, actionName }: { membership: OrganizationMembership; actionName: "suspend" | "resume" | "remove" | "owner" }) => {
@@ -312,21 +346,37 @@ function MembersSettings({
   if (loading) return <div className="loading loading-spinner loading-md text-primary" />;
   if (error) return <ErrorMessage error={error} />;
   return (
-    <section className="border-t border-base-300 pt-6">
-      <h2 className="font-display text-xl font-semibold">Workspace members</h2>
+    <section>
+      <div className="flex items-start gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <UsersRound size={20} />
+        </span>
+        <div>
+          <h2 className="font-display text-xl font-semibold">Workspace members</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
+            Front desk staff can manage reservations and guest records, block inventory,
+            view properties and rooms, and use the Staff directory. Workspace setup and
+            team administration remain owner-only.
+          </p>
+        </div>
+      </div>
       <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
+        {!memberships.length && <p className="py-8 text-center text-sm text-base-content/50">No members on this page.</p>}
         {memberships.map((membership) => {
           const profile = staffBySubject.get(membership.subjectId);
           const self = membership.membershipId === currentMembership.membershipId;
           const active = isActive(membership.status);
+          const displayName = self ? "You" : profile?.displayName ?? "Workspace member";
+          const accountLabel = self ? currentUsername : profile?.workEmail ?? membership.subjectId;
           return (
             <article key={membership.membershipId} className="flex flex-wrap items-center justify-between gap-4 py-4">
               <div className="min-w-0">
-                <p className="truncate font-semibold">{profile?.displayName ?? membership.subjectId}</p>
-                <p className="mt-1 truncate text-xs text-base-content/45">{profile?.workEmail ?? membership.subjectId}</p>
+                <p className="truncate font-semibold">{displayName}</p>
+                <p className="mt-1 truncate text-xs text-base-content/45">{accountLabel}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="badge badge-outline">{isOwner(membership.role) ? "Owner" : active ? "Member" : statusLabel(membership.status)}</span>
+                {self && <span className="badge border-0 bg-primary font-semibold text-white">Current account</span>}
+                <span className="badge badge-outline">{isOwner(membership.role) ? "Owner" : active ? "Front desk" : statusLabel(membership.status)}</span>
                 {!self && active && !isOwner(membership.role) && (
                   <button className="btn btn-ghost btn-sm" onClick={() => action.mutate({ membership, actionName: "owner" })} disabled={action.isPending}>
                     <ShieldCheck size={15} />Make owner
@@ -346,6 +396,7 @@ function MembersSettings({
           );
         })}
       </div>
+      <PaginationBar page={page} pageSize={pageSize} itemCount={memberships.length} itemLabel="member" disabled={fetching} onPageChange={onPageChange} />
       {action.error && <ErrorMessage error={action.error} />}
     </section>
   );
