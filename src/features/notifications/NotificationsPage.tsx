@@ -34,6 +34,12 @@ import {
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { notificationDestination } from "./notificationDestination";
 import {
+  captureNotificationAttention,
+  dismissNotificationAttention,
+  notificationAttentionKey,
+  type NotificationInboxKind,
+} from "./notificationAttentionState";
+import {
   decrementNotificationUnreadCountLocally,
   markNotificationReadLocally,
   notificationItemId,
@@ -43,20 +49,22 @@ import {
 
 const PAGE_SIZE = 25;
 type InboxTab = "personal" | "broadcasts";
-type InboxKind = "history" | "broadcasts";
 
 export function NotificationsPage() {
-  const { request } = useSession();
+  const { request, session } = useSession();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<InboxTab>("personal");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(1);
+  const [attentionIds, setAttentionIds] = useState<ReadonlySet<string>>(() => new Set());
   const pendingReadIds = useRef(new Set<string>());
+  const attentionScope = `${session?.username ?? "anonymous"}:${session?.tenantId ?? "global"}`;
 
   useEffect(() => setPage(1), [tab, unreadOnly]);
+  useEffect(() => setAttentionIds(new Set()), [attentionScope]);
 
-  const kind: InboxKind = tab === "personal" ? "history" : "broadcasts";
+  const kind: NotificationInboxKind = tab === "personal" ? "history" : "broadcasts";
   const path = tab === "personal" ? "/api/notifications" : "/api/notifications/broadcasts";
   const query = useQuery({
     queryKey: ["notifications", kind, "list", page, unreadOnly],
@@ -112,6 +120,27 @@ export function NotificationsPage() {
   }
 
   const items = query.data?.items ?? [];
+  useEffect(() => {
+    setAttentionIds((current) => captureNotificationAttention(current, kind, items));
+  }, [items, kind]);
+
+  const selectedPersonalId = searchParams.get("notification");
+  const selectedBroadcastId = searchParams.get("broadcast");
+  useEffect(() => {
+    const key = selectedPersonalId
+      ? notificationAttentionKey("history", selectedPersonalId)
+      : selectedBroadcastId
+        ? notificationAttentionKey("broadcasts", selectedBroadcastId)
+        : null;
+    if (key) setAttentionIds((current) => dismissNotificationAttention(current, key));
+  }, [selectedBroadcastId, selectedPersonalId]);
+
+  function open(item: NotificationInboxItem) {
+    const key = notificationAttentionKey(kind, notificationItemId(item));
+    setAttentionIds((current) => dismissNotificationAttention(current, key));
+    select(item);
+  }
+
   return <>
     <PageHeader
       eyebrow="Live workspace"
@@ -168,7 +197,8 @@ export function NotificationsPage() {
             <NotificationRow
               key={notificationItemId(item)}
               item={item}
-              onOpen={() => select(item)}
+              attention={attentionIds.has(notificationAttentionKey(kind, notificationItemId(item)))}
+              onOpen={() => open(item)}
               onVisible={acknowledgeVisible}
             />
           ))}
@@ -216,8 +246,9 @@ export function NotificationsPage() {
   </>;
 }
 
-function NotificationRow({ item, onOpen, onVisible }: {
+function NotificationRow({ item, attention, onOpen, onVisible }: {
   item: NotificationInboxItem;
+  attention: boolean;
   onOpen: () => void;
   onVisible: (item: NotificationInboxItem) => void;
 }) {
@@ -246,14 +277,18 @@ function NotificationRow({ item, onOpen, onVisible }: {
     <button
       ref={rowRef}
       type="button"
-      className={`grid w-full gap-3 p-5 text-left transition hover:bg-base-200/70 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:px-6 ${unread ? "bg-primary/[0.035]" : ""}`}
+      className={`grid w-full gap-3 border-l-4 p-5 text-left transition sm:grid-cols-[auto_1fr_auto] sm:items-center sm:px-6 ${attention ? "notification-attention" : unread ? "border-transparent bg-primary/[0.035] hover:bg-base-200/70" : "border-transparent hover:bg-base-200/70"}`}
       onClick={onOpen}
     >
       <SeverityIcon severity={item.severity} />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className={`truncate ${unread ? "font-bold" : "font-semibold"}`}>{item.title}</p>
-          {unread && <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+          <p className={`truncate ${unread || attention ? "font-bold" : "font-semibold"}`}>{item.title}</p>
+          {attention ? (
+            <span className="badge badge-primary h-5 shrink-0 px-2 text-[0.68rem] font-bold">New</span>
+          ) : unread ? (
+            <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+          ) : null}
         </div>
         <p className="mt-1 line-clamp-2 text-sm text-base-content/55">{item.body || humanize(item.name)}</p>
         <p className="mt-1 text-xs text-base-content/40">
@@ -273,7 +308,7 @@ function NotificationDetail({ kind, id, onClose, onVisible }: {
 }) {
   const { request } = useSession();
   const navigate = useNavigate();
-  const inboxKind: InboxKind = kind === "personal" ? "history" : "broadcasts";
+  const inboxKind: NotificationInboxKind = kind === "personal" ? "history" : "broadcasts";
   const base = kind === "personal" ? "/api/notifications" : "/api/notifications/broadcasts";
   const item = useQuery({
     queryKey: ["notifications", inboxKind, "detail", id],

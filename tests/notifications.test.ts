@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api/client";
 import type { NotificationHistoryListResponse } from "../src/api/types";
 import {
+  captureNotificationAttention,
+  dismissNotificationAttention,
+  notificationAttentionKey,
+} from "../src/features/notifications/notificationAttentionState";
+import {
   decrementNotificationUnreadCountLocally,
   markNotificationReadLocally,
 } from "../src/features/notifications/notificationReadState";
@@ -85,5 +90,46 @@ describe("notification read state", () => {
 
     expect(updated?.unreadCount).toBe(3);
     expect(updated?.items[0].readAtUtc).toBeNull();
+  });
+});
+
+describe("notification visit attention", () => {
+  const unreadNotification = {
+    id: "notification-a",
+    streamSequence: 1,
+    name: "reservation-updated",
+    module: "reservations",
+    version: 1,
+    title: "Reservation updated",
+    body: "The stay changed.",
+    severity: "warning",
+    payload: {},
+    occurredAtUtc: "2026-07-15T12:00:00Z",
+    createdAtUtc: "2026-07-15T12:00:00Z",
+    readAtUtc: null,
+  } satisfies NotificationHistoryListResponse["items"][number];
+
+  it("keeps a newly visible notification highlighted after it becomes read", () => {
+    const captured = captureNotificationAttention(new Set(), "history", [unreadNotification]);
+    const afterRead = captureNotificationAttention(captured, "history", [
+      { ...unreadNotification, readAtUtc: "2026-07-15T12:01:00Z" },
+    ]);
+
+    expect(afterRead.has(notificationAttentionKey("history", unreadNotification.id))).toBe(true);
+  });
+
+  it("removes attention when the notification is opened", () => {
+    const key = notificationAttentionKey("history", unreadNotification.id);
+    const captured = captureNotificationAttention(new Set(), "history", [unreadNotification]);
+
+    expect(dismissNotificationAttention(captured, key).has(key)).toBe(false);
+  });
+
+  it("does not highlight the same read notification on a later page visit", () => {
+    const laterVisit = captureNotificationAttention(new Set(), "history", [
+      { ...unreadNotification, readAtUtc: "2026-07-15T12:01:00Z" },
+    ]);
+
+    expect(laterVisit.size).toBe(0);
   });
 });
