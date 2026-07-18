@@ -516,6 +516,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password-recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PasswordRecoveryRequest"];
+                };
+            };
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password-recovery/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConfirmPasswordRecoveryRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/email-verification": {
         parameters: {
             query?: never;
@@ -6152,6 +6226,10 @@ export interface components {
         ConfirmEmailVerificationRequest: {
             code: string | null;
         };
+        ConfirmPasswordRecoveryRequest: {
+            code: string | null;
+            newPassword: string | null;
+        };
         CreateConnectionRequest: {
             adapterType: string | null;
             executionMode: components["schemas"]["AdapterExecutionMode"];
@@ -6627,6 +6705,9 @@ export interface components {
          * @enum {integer}
          */
         OrganizationStatus: 0 | 1 | 2 | 3;
+        PasswordRecoveryRequest: {
+            email: string | null;
+        };
         PreviewOrganizationEnrollmentLinkRequest: {
             token: string | null;
         };
