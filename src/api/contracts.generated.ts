@@ -189,6 +189,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/step-up/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PasswordStepUpRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/external/exchange": {
         parameters: {
             query?: never;
@@ -950,6 +989,45 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/step-up/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserPasswordStepUpRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -6095,6 +6173,10 @@ export interface components {
             passwordEnabled: boolean;
             externalEnabled: boolean;
         };
+        AuthTokensResponse: {
+            accessToken: string | null;
+            refreshToken: string | null;
+        };
         AuthenticationEmailResponse: {
             /** Format: uuid */
             id: string;
@@ -6191,6 +6273,9 @@ export interface components {
         };
         BrowserAuthResponse: {
             accessToken: string | null;
+        };
+        BrowserPasswordStepUpRequest: {
+            password: string | null;
         };
         CancelReservationRequest: {
             /** Format: int64 */
@@ -6707,6 +6792,10 @@ export interface components {
         OrganizationStatus: 0 | 1 | 2 | 3;
         PasswordRecoveryRequest: {
             email: string | null;
+        };
+        PasswordStepUpRequest: {
+            password: string | null;
+            refreshToken: string | null;
         };
         PreviewOrganizationEnrollmentLinkRequest: {
             token: string | null;
