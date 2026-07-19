@@ -6809,7 +6809,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["CurrentTenantResponse"];
+                    };
                 };
             };
         };
@@ -7259,6 +7261,10 @@ export interface components {
             sourceSystem: string | null;
             sourceReference: string | null;
             notes: string | null;
+        };
+        CurrentTenantResponse: {
+            tenantId: string | null;
+            isEnabled: boolean;
         };
         ExternalAuthenticationChallengeRequest: {
             returnUrl: string | null;
