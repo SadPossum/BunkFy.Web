@@ -92,7 +92,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiFactorChallengeResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -166,6 +183,16 @@
         "responses": {
           "200": {
             "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalAuthenticationResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -437,6 +464,156 @@
         }
       }
     },
+    "/api/auth/mfa": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiFactorStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/totp/enrollment": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpEnrollmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/totp/activate": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateTotpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpActivationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/challenges/complete": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteMultiFactorChallengeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/recovery-codes/regenerate": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyMultiFactorCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiFactorRecoveryCodesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/totp/disable": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyMultiFactorCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/auth/external/providers": {
       "get": {
         "tags": [
@@ -648,6 +825,16 @@
                 }
               }
             }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiFactorChallengeResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -700,6 +887,118 @@
         }
       }
     },
+    "/api/auth/browser/mfa/totp/activate": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserActivateTotpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserTotpActivationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/mfa/challenges/complete": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteMultiFactorChallengeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/auth/browser/mfa/recovery-codes/regenerate": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserVerifyMultiFactorCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserMultiFactorRecoveryCodesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/mfa/totp/disable": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserVerifyMultiFactorCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/auth/browser/sign-out": {
       "post": {
         "tags": [
@@ -734,6 +1033,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BrowserAuthResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiFactorChallengeResponse"
                 }
               }
             }
@@ -5917,6 +6226,20 @@
         },
         "additionalProperties": false
       },
+      "ActivateTotpRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AdapterConflictPolicy": {
         "enum": [
           0,
@@ -6432,6 +6755,16 @@
         },
         "additionalProperties": false
       },
+      "BrowserActivateTotpRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "BrowserAuthResponse": {
         "type": "object",
         "properties": {
@@ -6442,10 +6775,57 @@
         },
         "additionalProperties": false
       },
+      "BrowserMultiFactorRecoveryCodesResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "BrowserPasswordStepUpRequest": {
         "type": "object",
         "properties": {
           "password": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BrowserTotpActivationResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BrowserVerifyMultiFactorCodeRequest": {
+        "type": "object",
+        "properties": {
+          "codeType": {
+            "$ref": "#/components/schemas/MultiFactorCodeType"
+          },
+          "code": {
             "type": "string",
             "nullable": true
           }
@@ -6495,6 +6875,23 @@
         "type": "object",
         "properties": {
           "token": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompleteMultiFactorChallengeRequest": {
+        "type": "object",
+        "properties": {
+          "challengeToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "codeType": {
+            "$ref": "#/components/schemas/MultiFactorCodeType"
+          },
+          "code": {
             "type": "string",
             "nullable": true
           }
@@ -6813,6 +7210,9 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          },
+          "multiFactorChallenge": {
+            "$ref": "#/components/schemas/MultiFactorChallengeResponse"
           }
         },
         "additionalProperties": false
@@ -6820,7 +7220,8 @@
       "ExternalAuthenticationStatus": {
         "enum": [
           "authenticated",
-          "linked"
+          "linked",
+          "mfa-required"
         ],
         "type": "string"
       },
@@ -7257,6 +7658,89 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "MultiFactorChallengeResponse": {
+        "type": "object",
+        "properties": {
+          "challengeToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "availableCodeTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MultiFactorCodeType"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MultiFactorCodeType": {
+        "enum": [
+          "totp",
+          "recovery-code"
+        ],
+        "type": "string"
+      },
+      "MultiFactorRecoveryCodesResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MultiFactorStatusResponse": {
+        "type": "object",
+        "properties": {
+          "providerAvailable": {
+            "type": "boolean"
+          },
+          "isPending": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "unusedRecoveryCodeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enrollmentExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "activatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "recoveryCodesRegeneratedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "ObservationReceiptStatus": {
         "enum": [
@@ -9113,6 +9597,45 @@
         },
         "additionalProperties": false
       },
+      "TotpActivationResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TotpEnrollmentResponse": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "nullable": true
+          },
+          "provisioningUri": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "TransferOrganizationOwnershipRequest": {
         "type": "object",
         "properties": {
@@ -9226,6 +9749,23 @@
           "expectedDetailsRevision": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyMultiFactorCodeRequest": {
+        "type": "object",
+        "properties": {
+          "codeType": {
+            "$ref": "#/components/schemas/MultiFactorCodeType"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

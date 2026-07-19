@@ -142,7 +142,18 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
+                };
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MultiFactorChallengeResponse"];
+                    };
                 };
             };
         };
@@ -252,6 +263,15 @@ export interface paths {
             responses: {
                 /** @description OK */
                 200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExternalAuthenticationResponse"];
+                    };
+                };
+                /** @description Accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -703,6 +723,237 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MultiFactorStatusResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/totp/enrollment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TotpEnrollmentResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/totp/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ActivateTotpRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TotpActivationResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/challenges/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CompleteMultiFactorChallengeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/recovery-codes/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["VerifyMultiFactorCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MultiFactorRecoveryCodesResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["VerifyMultiFactorCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/external/providers": {
         parameters: {
             query?: never;
@@ -964,6 +1215,15 @@ export interface paths {
                         "application/json": components["schemas"]["BrowserAuthResponse"];
                     };
                 };
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MultiFactorChallengeResponse"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -1046,6 +1306,167 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/browser/mfa/totp/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserActivateTotpRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserTotpActivationResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/mfa/challenges/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CompleteMultiFactorChallengeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/mfa/recovery-codes/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserVerifyMultiFactorCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserMultiFactorRecoveryCodesResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/mfa/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserVerifyMultiFactorCodeRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/browser/sign-out": {
         parameters: {
             query?: never;
@@ -1108,6 +1529,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
+                };
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MultiFactorChallengeResponse"];
                     };
                 };
             };
@@ -6080,6 +6510,10 @@ export interface components {
         AccessPermissionEvaluationResponse: {
             permissions: components["schemas"]["AccessPermissionDecision"][] | null;
         };
+        ActivateTotpRequest: {
+            code: string | null;
+            refreshToken: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -6271,11 +6705,26 @@ export interface components {
             /** Format: int64 */
             expectedRoomVersion: number;
         };
+        BrowserActivateTotpRequest: {
+            code: string | null;
+        };
         BrowserAuthResponse: {
             accessToken: string | null;
         };
+        BrowserMultiFactorRecoveryCodesResponse: {
+            accessToken: string | null;
+            recoveryCodes: string[] | null;
+        };
         BrowserPasswordStepUpRequest: {
             password: string | null;
+        };
+        BrowserTotpActivationResponse: {
+            accessToken: string | null;
+            recoveryCodes: string[] | null;
+        };
+        BrowserVerifyMultiFactorCodeRequest: {
+            codeType: components["schemas"]["MultiFactorCodeType"];
+            code: string | null;
         };
         CancelReservationRequest: {
             /** Format: int64 */
@@ -6294,6 +6743,11 @@ export interface components {
         ChangeProposalStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
         ClaimOrganizationEnrollmentLinkRequest: {
             token: string | null;
+        };
+        CompleteMultiFactorChallengeRequest: {
+            challengeToken: string | null;
+            codeType: components["schemas"]["MultiFactorCodeType"];
+            code: string | null;
         };
         ConfigurePollingScheduleRequest: {
             /** Format: int32 */
@@ -6399,9 +6853,10 @@ export interface components {
             refreshToken: string | null;
             /** Format: uuid */
             externalIdentityId: string | null;
+            multiFactorChallenge: components["schemas"]["MultiFactorChallengeResponse"];
         };
         /** @enum {string} */
-        ExternalAuthenticationStatus: "authenticated" | "linked";
+        ExternalAuthenticationStatus: "authenticated" | "linked" | "mfa-required";
         ExternalIdentityResponse: {
             /** Format: uuid */
             id: string;
@@ -6559,6 +7014,32 @@ export interface components {
          * @enum {integer}
          */
         ManualInventoryBlockStatus: 0 | 1 | 2;
+        MultiFactorChallengeResponse: {
+            challengeToken: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            availableCodeTypes: components["schemas"]["MultiFactorCodeType"][] | null;
+        };
+        /** @enum {string} */
+        MultiFactorCodeType: "totp" | "recovery-code";
+        MultiFactorRecoveryCodesResponse: {
+            accessToken: string | null;
+            refreshToken: string | null;
+            recoveryCodes: string[] | null;
+        };
+        MultiFactorStatusResponse: {
+            providerAvailable: boolean;
+            isPending: boolean;
+            isActive: boolean;
+            /** Format: int32 */
+            unusedRecoveryCodeCount: number;
+            /** Format: date-time */
+            enrollmentExpiresAtUtc: string | null;
+            /** Format: date-time */
+            activatedAtUtc: string | null;
+            /** Format: date-time */
+            recoveryCodesRegeneratedAtUtc: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -7240,6 +7721,17 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        TotpActivationResponse: {
+            accessToken: string | null;
+            refreshToken: string | null;
+            recoveryCodes: string[] | null;
+        };
+        TotpEnrollmentResponse: {
+            secret: string | null;
+            provisioningUri: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+        };
         TransferOrganizationOwnershipRequest: {
             targetSubjectId: string | null;
             /** Format: int64 */
@@ -7280,6 +7772,11 @@ export interface components {
             expectedDepartureTime: string | null;
             /** Format: int64 */
             expectedDetailsRevision: number;
+        };
+        VerifyMultiFactorCodeRequest: {
+            codeType: components["schemas"]["MultiFactorCodeType"];
+            code: string | null;
+            refreshToken: string | null;
         };
         VersionRequest: {
             /** Format: int64 */
