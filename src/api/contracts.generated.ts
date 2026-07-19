@@ -43,6 +43,345 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/access-control/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    scope: string;
+                    includeArchived?: boolean;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileDtoAccessControlPage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query: {
+                    scope: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateAccessProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/access-control/profiles/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/access-control/profiles/{profileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    scope: string;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query: {
+                    scope: string;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateAccessProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/access-control/profiles/{profileId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query: {
+                    scope: string;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ArchiveAccessProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/access-control/profiles/{profileId}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    scope: string;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileAssignmentDtoAccessControlPage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query: {
+                    scope: string;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AccessProfileAssignmentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileAssignmentDto"];
+                    };
+                };
+            };
+        };
+        delete: {
+            parameters: {
+                query: {
+                    scope: string;
+                    subjectKind: string;
+                    subjectId: string;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/access-control/profiles/{profileId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    scope: string;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessProfileChangeDtoAccessControlPage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/self-registration": {
         parameters: {
             query?: never;
@@ -6510,6 +6849,83 @@ export interface components {
         AccessPermissionEvaluationResponse: {
             permissions: components["schemas"]["AccessPermissionDecision"][] | null;
         };
+        AccessProfileAssignmentDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            subjectKind: string | null;
+            subjectId: string | null;
+            createdByKind: string | null;
+            createdById: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+        };
+        AccessProfileAssignmentDtoAccessControlPage: {
+            items: components["schemas"]["AccessProfileAssignmentDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        AccessProfileAssignmentRequest: {
+            subjectKind: string | null;
+            subjectId: string | null;
+        };
+        AccessProfileChangeDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            kind: components["schemas"]["AccessProfileChangeKind"];
+            actorKind: string | null;
+            actorId: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            /** Format: int64 */
+            profileVersion: number;
+            /** Format: date-time */
+            occurredAtUtc: string;
+        };
+        AccessProfileChangeDtoAccessControlPage: {
+            items: components["schemas"]["AccessProfileChangeDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        /** @enum {string} */
+        AccessProfileChangeKind: "created" | "updated" | "archived" | "assigned" | "unassigned";
+        AccessProfileDto: {
+            /** Format: uuid */
+            id: string;
+            ownerScope: string | null;
+            key: string | null;
+            displayName: string | null;
+            description: string | null;
+            status: components["schemas"]["AccessProfileStatus"];
+            /** Format: int64 */
+            version: number;
+            permissions: string[] | null;
+            /** Format: int32 */
+            assignmentCount: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        AccessProfileDtoAccessControlPage: {
+            items: components["schemas"]["AccessProfileDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        /** @enum {string} */
+        AccessProfileStatus: "active" | "archived";
         ActivateTotpRequest: {
             code: string | null;
             refreshToken: string | null;
@@ -6598,6 +7014,10 @@ export interface components {
          * @enum {integer}
          */
         AdapterRunOutcome: 0 | 1 | 2 | 3 | 4;
+        ArchiveAccessProfileRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         ArchiveGuestProfileRequest: {
             /** Format: int64 */
             expectedVersion: number;
@@ -6768,6 +7188,12 @@ export interface components {
         ConfirmPasswordRecoveryRequest: {
             code: string | null;
             newPassword: string | null;
+        };
+        CreateAccessProfileRequest: {
+            key: string | null;
+            displayName: string | null;
+            description: string | null;
+            permissions: string[] | null;
         };
         CreateConnectionRequest: {
             adapterType: string | null;
@@ -7743,6 +8169,13 @@ export interface components {
         };
         UnlinkExternalIdentityRequest: {
             currentPassword: string | null;
+        };
+        UpdateAccessProfileRequest: {
+            displayName: string | null;
+            description: string | null;
+            permissions: string[] | null;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         UpdateConnectionRequest: {
             executionMode: components["schemas"]["AdapterExecutionMode"];
