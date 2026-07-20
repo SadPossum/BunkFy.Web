@@ -497,7 +497,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterMemberApiRequest"
+                "$ref": "#/components/schemas/RegisterMemberRequest"
               }
             }
           },
@@ -505,7 +505,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -566,7 +573,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -655,8 +669,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -667,8 +681,8 @@
           "Auth"
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -728,8 +742,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -751,7 +765,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -773,7 +794,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -806,7 +834,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -871,8 +906,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "202": {
+            "description": "Accepted"
           }
         }
       }
@@ -893,8 +928,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -1170,8 +1205,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "302": {
+            "description": "Found"
           }
         }
       }
@@ -1200,8 +1235,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "302": {
+            "description": "Found"
           }
         }
       }
@@ -1215,7 +1250,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterMemberApiRequest"
+                "$ref": "#/components/schemas/RegisterMemberRequest"
               }
             }
           },
@@ -1303,6 +1338,104 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BrowserPasswordStepUpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/password": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserSetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/password/remove": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserRemovePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/external-identities/{externalIdentityId}/unlink": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "parameters": [
+          {
+            "name": "externalIdentityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserUnlinkExternalIdentityRequest"
               }
             }
           },
@@ -1440,8 +1573,8 @@
           "Auth"
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -7246,6 +7379,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "absoluteExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
           "isCurrent": {
             "type": "boolean"
           }
@@ -7484,6 +7621,30 @@
         },
         "additionalProperties": false
       },
+      "BrowserRemovePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BrowserSetPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentPassword": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "BrowserTotpActivationResponse": {
         "type": "object",
         "properties": {
@@ -7496,6 +7657,16 @@
             "items": {
               "type": "string"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BrowserUnlinkExternalIdentityRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -9242,14 +9413,16 @@
         },
         "additionalProperties": false
       },
-      "RegisterMemberApiRequest": {
+      "RegisterMemberRequest": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
             "nullable": true
           },
-          "usernameType": { },
+          "usernameType": {
+            "$ref": "#/components/schemas/UsernameType"
+          },
           "password": {
             "type": "string",
             "nullable": true
@@ -9300,6 +9473,10 @@
         "type": "object",
         "properties": {
           "currentPassword": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
             "type": "string",
             "nullable": true
           }
@@ -9990,6 +10167,10 @@
             "type": "string",
             "nullable": true
           },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
           "currentPassword": {
             "type": "string",
             "nullable": true
@@ -10381,6 +10562,10 @@
       "UnlinkExternalIdentityRequest": {
         "type": "object",
         "properties": {
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
           "currentPassword": {
             "type": "string",
             "nullable": true
@@ -10497,6 +10682,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "UsernameType": {
+        "enum": [
+          "email",
+          "phone"
+        ],
+        "type": "string"
       },
       "VerifyMultiFactorCodeRequest": {
         "type": "object",

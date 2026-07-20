@@ -435,7 +435,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["RegisterMemberApiRequest"];
+                    "application/json": components["schemas"]["RegisterMemberRequest"];
                 };
             };
             responses: {
@@ -444,7 +444,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
                 };
             };
         };
@@ -529,7 +531,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
                 };
             };
         };
@@ -648,8 +652,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -681,8 +685,8 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -786,8 +790,8 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -827,7 +831,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
                 };
             };
         };
@@ -865,7 +871,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
                 };
             };
         };
@@ -904,7 +912,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AuthTokensResponse"];
+                    };
                 };
             };
         };
@@ -1010,8 +1020,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Accepted */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1047,8 +1057,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1430,8 +1440,8 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Found */
+                302: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1467,8 +1477,8 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Found */
+                302: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1502,7 +1512,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["RegisterMemberApiRequest"];
+                    "application/json": components["schemas"]["RegisterMemberRequest"];
                 };
             };
             responses: {
@@ -1625,6 +1635,125 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["BrowserPasswordStepUpRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserSetPasswordRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/password/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserRemovePasswordRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BrowserAuthResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/external-identities/{externalIdentityId}/unlink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    externalIdentityId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BrowserUnlinkExternalIdentityRequest"];
                 };
             };
             responses: {
@@ -1824,8 +1953,8 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7055,6 +7184,8 @@ export interface components {
             loginDateTimeUtc: string;
             /** Format: date-time */
             refreshTokenExpiresAtUtc: string;
+            /** Format: date-time */
+            absoluteExpiresAtUtc: string;
             isCurrent: boolean;
         };
         AuthenticationSessionsResponse: {
@@ -7140,9 +7271,19 @@ export interface components {
         BrowserPasswordStepUpRequest: {
             password: string | null;
         };
+        BrowserRemovePasswordRequest: {
+            currentPassword: string | null;
+        };
+        BrowserSetPasswordRequest: {
+            newPassword: string | null;
+            currentPassword: string | null;
+        };
         BrowserTotpActivationResponse: {
             accessToken: string | null;
             recoveryCodes: string[] | null;
+        };
+        BrowserUnlinkExternalIdentityRequest: {
+            currentPassword: string | null;
         };
         BrowserVerifyMultiFactorCodeRequest: {
             codeType: components["schemas"]["MultiFactorCodeType"];
@@ -7764,9 +7905,9 @@ export interface components {
             accessToken: string | null;
             refreshToken: string | null;
         };
-        RegisterMemberApiRequest: {
+        RegisterMemberRequest: {
             username: string | null;
-            usernameType: unknown;
+            usernameType: components["schemas"]["UsernameType"];
             password: string | null;
         };
         ReissueOrganizationInvitationRequest: {
@@ -7786,6 +7927,7 @@ export interface components {
         };
         RemovePasswordRequest: {
             currentPassword: string | null;
+            refreshToken: string | null;
         };
         RequestBedRetirementRequest: {
             reason: string | null;
@@ -8039,6 +8181,7 @@ export interface components {
         };
         SetPasswordRequest: {
             newPassword: string | null;
+            refreshToken: string | null;
             currentPassword: string | null;
         };
         SignOutRequest: {
@@ -8174,6 +8317,7 @@ export interface components {
             expectedTargetVersion: number;
         };
         UnlinkExternalIdentityRequest: {
+            refreshToken: string | null;
             currentPassword: string | null;
         };
         UpdateAccessProfileRequest: {
@@ -8212,6 +8356,8 @@ export interface components {
             /** Format: int64 */
             expectedDetailsRevision: number;
         };
+        /** @enum {string} */
+        UsernameType: "email" | "phone";
         VerifyMultiFactorCodeRequest: {
             codeType: components["schemas"]["MultiFactorCodeType"];
             code: string | null;
