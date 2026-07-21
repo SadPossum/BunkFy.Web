@@ -35,6 +35,7 @@ export function IntegrationsPage() {
     { permission: permissions.ingestionConnectionsManage, scope },
     { permission: permissions.ingestionCredentialsManage, scope },
     { permission: permissions.ingestionRawPayloadsRead, scope },
+    { permission: permissions.ingestionSensitiveHistoryRead, scope },
     { permission: permissions.ingestionProposalsDecide, scope },
     { permission: permissions.guestsRead, scope },
     { permission: permissions.guestsCreate, scope },
@@ -44,6 +45,7 @@ export function IntegrationsPage() {
   const canManage = access.allows(permissions.ingestionConnectionsManage, scope);
   const canManageCredentials = access.allows(permissions.ingestionCredentialsManage, scope);
   const canReadRawPayloads = access.allows(permissions.ingestionRawPayloadsRead, scope);
+  const canReadSensitiveHistory = access.allows(permissions.ingestionSensitiveHistoryRead, scope);
   const canDecideProposals = access.allows(permissions.ingestionProposalsDecide, scope);
   const canSuggestGuestRecords = access.allows(permissions.guestsRead, scope)
     && access.allows(permissions.guestsCreate, scope)
@@ -80,7 +82,7 @@ export function IntegrationsPage() {
       ]}
     />
     {tab === "connections" && <section className="card border border-base-300 bg-base-100 shadow-sm"><div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><h2 className="font-display text-xl font-semibold">Connections</h2><p className="mt-1 text-sm text-base-content/50">Configured adapter endpoints and execution modes.</p></div><SelectPicker className="w-full sm:w-44" size="sm" value={status} ariaLabel="Connection status" onValueChange={(value) => setStatus(value as ConnectionStatusFilter)} options={[{ value: "all", label: "All statuses" }, { value: "enabled", label: "Enabled" }, { value: "disabled", label: "Disabled" }]} /></div>{connections.isLoading || adapterTypes.isLoading ? <LoadingState label="Loading connections" /> : connections.error || adapterTypes.error ? <div className="p-6"><ErrorState error={connections.error || adapterTypes.error} retry={() => { void connections.refetch(); void adapterTypes.refetch(); }} /></div> : !connectionItems.length ? <div className="p-6"><EmptyState icon={<Cable />} title={status === "all" ? "No connections yet" : `No ${status} connections`} description={status === "all" ? "Create a connection to bring an external reservation source into BunkFy." : "Choose another status filter."} action={canManage && status === "all" ? <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>Create connection</button> : undefined} /></div> : <><div className="divide-y divide-base-300">{connectionItems.map((connection) => <ConnectionRow key={connection.connectionId} connection={connection} onOpen={() => selectConnection(connection.connectionId)} />)}</div><div className="flex items-center justify-between border-t border-base-300 px-4 py-3 sm:px-6"><p className="text-xs text-base-content/45">{connections.data?.totalCount ?? connectionItems.length} total · page {page}</p><div className="join"><button className="btn btn-sm join-item" disabled={page === 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous connections"><ChevronLeft size={16} /></button><button className="btn btn-sm join-item" disabled={page * PAGE_SIZE >= (connections.data?.totalCount ?? 0)} onClick={() => setPage((current) => current + 1)} aria-label="Next connections"><ChevronRight size={16} /></button></div></div></>}</section>}
-    {tab === "review" && <ProposalQueue propertyId={selectedPropertyId} canDecide={canDecideProposals} canSuggestGuestRecords={canSuggestGuestRecords} />}
+    {tab === "review" && <ProposalQueue propertyId={selectedPropertyId} canReadSensitiveHistory={canReadSensitiveHistory} canDecide={canDecideProposals} canSuggestGuestRecords={canSuggestGuestRecords} />}
     {tab === "activity" && <IngestionActivity propertyId={selectedPropertyId} connections={allConnectionItems} adapterTypes={capabilityItems} canReadRawPayloads={canReadRawPayloads} />}
     <CreateConnectionModal open={createOpen} propertyId={selectedPropertyId} adapterTypes={capabilityItems} onClose={() => setCreateOpen(false)} onCreated={async (created) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["ingestion-connections", selectedPropertyId] }), queryClient.invalidateQueries({ queryKey: ["ingestion-connection", selectedPropertyId, created.connectionId] })]); setCreateOpen(false); selectConnection(created.connectionId); }} />
     <ConnectionDetail propertyId={selectedPropertyId} connectionId={searchParams.get("connection")} adapterTypes={capabilityItems} canManage={canManage} canManageCredentials={canManageCredentials} onClose={() => selectConnection(null)} />

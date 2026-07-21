@@ -7182,7 +7182,6 @@ export interface components {
             rejectedCount: number;
             acceptedCheckpoint: string | null;
             errorCode: string | null;
-            errorMessage: string | null;
         };
         /**
          * Format: int32

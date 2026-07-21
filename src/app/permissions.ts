@@ -31,6 +31,7 @@ export const permissions = {
   ingestionConnectionsManage: "ingestion.connections.manage",
   ingestionCredentialsManage: "ingestion.credentials.manage",
   ingestionRawPayloadsRead: "ingestion.raw-payloads.read",
+  ingestionSensitiveHistoryRead: "ingestion.sensitive-history.read",
   ingestionProposalsDecide: "ingestion.proposals.decide",
 } as const;
 

@@ -405,7 +405,7 @@ export type AdapterConnectionHealth = {
   latestRunStatus?: number | string | null;
   latestRunStartedAtUtc?: string | null;
   latestRunCompletedAtUtc?: string | null;
-  latestRunError?: string | null;
+  latestRunErrorCode?: string | null;
   lastSuccessfulRunAtUtc?: string | null;
   lastObservationReceivedAtUtc?: string | null;
   pendingReceiptCount: number;
@@ -481,7 +481,7 @@ export type IngestionRun = {
   observedCount: number;
   acceptedCount: number;
   rejectedCount: number;
-  errorMessage?: string | null;
+  errorCode?: string | null;
   version: number;
   startedAtUtc: string;
   completedAtUtc?: string | null;
