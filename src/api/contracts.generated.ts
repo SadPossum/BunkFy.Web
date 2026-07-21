@@ -6420,7 +6420,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryListResponse"];
+                    };
                 };
             };
         };
@@ -6443,7 +6445,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffMemberDto"];
+                    };
                 };
             };
         };
@@ -6476,7 +6480,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -6500,10 +6506,49 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffMemberDto"];
+                    };
                 };
             };
         };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/members/{staffMemberId}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffMemberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffMemberDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -6539,7 +6584,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffMemberDto"];
+                    };
                 };
             };
         };
@@ -6579,7 +6626,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -6618,7 +6667,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -6657,7 +6708,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -6695,7 +6748,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryListResponse"];
+                    };
                 };
             };
         };
@@ -6731,7 +6786,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -6772,7 +6829,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -6813,7 +6872,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
                 };
             };
         };
@@ -8249,6 +8310,34 @@ export interface components {
             reason: string | null;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        StaffDirectoryAssignmentDto: {
+            /** Format: uuid */
+            assignmentId: string;
+            /** Format: uuid */
+            propertyId: string;
+            propertyJobTitle: string | null;
+            isPrimary: boolean;
+            /** Format: date */
+            effectiveFrom: string;
+        };
+        StaffDirectoryListResponse: {
+            items: components["schemas"]["StaffDirectoryMemberDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        StaffDirectoryMemberDto: {
+            /** Format: uuid */
+            staffMemberId: string;
+            displayName: string | null;
+            jobTitle: string | null;
+            department: string | null;
+            status: components["schemas"]["StaffStatus"];
+            /** Format: int64 */
+            version: number;
+            assignments: components["schemas"]["StaffDirectoryAssignmentDto"][] | null;
         };
         StaffLifecycleRequest: {
             reason: string | null;

@@ -73,15 +73,16 @@ describe("frontend repository foundation", () => {
     expect(account).toContain("/external-identities/");
   });
 
-  it("keeps workspace membership usable when optional staff enrichment is unavailable", () => {
+  it("keeps workspace membership independent from sensitive staff enrichment", () => {
     const settings = readFileSync(
       join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
       "utf8",
     );
 
-    expect(settings).toContain('/api/staff/members?page=1&pageSize=100');
+    expect(settings).toContain('/api/organizations/${workspace?.organizationId}/members');
     expect(settings).toContain('error={members.error}');
-    expect(settings).not.toContain('members.error ?? staff.error');
+    expect(settings).not.toContain('/api/staff/members');
+    expect(settings).not.toContain('authSubjectId');
   });
 
   it("keeps growing operator directories on bounded server pages", () => {

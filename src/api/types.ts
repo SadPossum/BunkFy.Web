@@ -327,6 +327,24 @@ export type StaffPropertyAssignment = {
   unassignedAtVersion?: number | null;
 };
 
+export type StaffDirectoryAssignment = {
+  assignmentId: string;
+  propertyId: string;
+  propertyJobTitle?: string | null;
+  isPrimary: boolean;
+  effectiveFrom: string;
+};
+
+export type StaffDirectoryMember = {
+  staffMemberId: string;
+  displayName: string;
+  jobTitle?: string | null;
+  department?: string | null;
+  status: StaffStatus;
+  version: number;
+  assignments: StaffDirectoryAssignment[];
+};
+
 export type StaffMember = {
   staffMemberId: string;
   displayName: string;
@@ -346,8 +364,8 @@ export type StaffMember = {
   assignments: StaffPropertyAssignment[];
 };
 
-export type StaffListResponse = {
-  items: StaffMember[];
+export type StaffDirectoryListResponse = {
+  items: StaffDirectoryMember[];
   page: number;
   pageSize: number;
 };

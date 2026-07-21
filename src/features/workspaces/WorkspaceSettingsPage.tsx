@@ -14,14 +14,13 @@ import {
   UserX,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type {
   Organization,
   OrganizationEnrollmentLinkIssued,
   OrganizationInvitationIssued,
   OrganizationMemberListResponse,
   OrganizationMembership,
-  StaffListResponse,
   WorkspaceStaffOnboarding,
   WorkspaceStaffOnboardingListResponse,
 } from "../../api/types";
@@ -54,19 +53,6 @@ export function WorkspaceSettingsPage() {
     ),
     enabled: Boolean(workspace && owner && tab === "members"),
   });
-  const staff = useQuery({
-    queryKey: ["staff-members", workspace?.organizationId, "workspace-settings"],
-    queryFn: () => request<StaffListResponse>("/api/staff/members?page=1&pageSize=100"),
-    enabled: Boolean(workspace && owner && tab === "members"),
-  });
-  const staffBySubject = useMemo(
-    () => new Map(
-      (staff.data?.items ?? [])
-        .filter((item) => item.authSubjectId)
-        .map((item) => [item.authSubjectId!, item]),
-    ),
-    [staff.data?.items],
-  );
   useEffect(() => setMemberPage(1), [workspace?.organizationId]);
   useEffect(() => {
     if (!members.isFetching && memberPage > 1 && members.data?.items.length === 0) {
@@ -130,7 +116,6 @@ export function WorkspaceSettingsPage() {
               workspace={workspace}
               currentMembership={selectedWorkspace.membership}
               memberships={members.data?.items ?? []}
-              staffBySubject={staffBySubject}
               currentUsername={session?.username ?? ""}
               page={memberPage}
               pageSize={MEMBERS_PAGE_SIZE}
@@ -447,7 +432,6 @@ function MembersSettings({
   workspace,
   currentMembership,
   memberships,
-  staffBySubject,
   currentUsername,
   page,
   pageSize,
@@ -461,7 +445,6 @@ function MembersSettings({
   workspace: Organization;
   currentMembership: OrganizationMembership;
   memberships: OrganizationMembership[];
-  staffBySubject: Map<string, StaffListResponse["items"][number]>;
   currentUsername: string;
   page: number;
   pageSize: number;
@@ -517,11 +500,10 @@ function MembersSettings({
       <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
         {!memberships.length && <p className="py-8 text-center text-sm text-base-content/50">No members on this page.</p>}
         {memberships.map((membership) => {
-          const profile = staffBySubject.get(membership.subjectId);
           const self = membership.membershipId === currentMembership.membershipId;
           const active = isActive(membership.status);
-          const displayName = self ? "You" : profile?.displayName ?? "Workspace member";
-          const accountLabel = self ? currentUsername : profile?.workEmail ?? membership.subjectId;
+          const displayName = self ? "You" : "Workspace member";
+          const accountLabel = self ? currentUsername : membership.subjectId;
           return (
             <article key={membership.membershipId} className="flex flex-wrap items-center justify-between gap-4 py-4">
               <div className="min-w-0">

@@ -23,6 +23,7 @@ export const permissions = {
   guestsManage: "guests.manage",
   guestsArchive: "guests.archive",
   staffRead: "staff.read",
+  staffSensitiveProfileRead: "staff.sensitive-profile.read",
   staffCreate: "staff.create",
   staffManage: "staff.manage",
   staffAssignProperties: "staff.assign-properties",
