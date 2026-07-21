@@ -10,11 +10,11 @@ import {
   Settings2,
   ShieldCheck,
   UserCheck,
-  UserMinus,
   UserX,
   UsersRound,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import type {
   Organization,
   OrganizationEnrollmentLinkIssued,
@@ -456,27 +456,16 @@ function MembersSettings({
   onPageChange: (page: number) => void;
 }) {
   const action = useMutation({
-    mutationFn: ({ membership, actionName }: { membership: OrganizationMembership; actionName: "suspend" | "resume" | "remove" | "owner" }) => {
-      if (actionName === "owner") {
-        return request(`/api/organizations/${workspace.organizationId}/ownership/transfer`, {
-          method: "POST",
-          body: JSON.stringify({
-            targetSubjectId: membership.subjectId,
-            expectedOrganizationVersion: workspace.version,
-            expectedCurrentOwnerVersion: currentMembership.version,
-            expectedTargetVersion: membership.version,
-          }),
-        });
-      }
-      return request(`/api/organizations/${workspace.organizationId}/members/${actionName}`, {
+    mutationFn: (membership: OrganizationMembership) =>
+      request(`/api/organizations/${workspace.organizationId}/ownership/transfer`, {
         method: "POST",
         body: JSON.stringify({
           targetSubjectId: membership.subjectId,
           expectedOrganizationVersion: workspace.version,
-          expectedMembershipVersion: membership.version,
+          expectedCurrentOwnerVersion: currentMembership.version,
+          expectedTargetVersion: membership.version,
         }),
-      });
-    },
+      }),
     onSuccess: onChanged,
   });
 
@@ -484,18 +473,23 @@ function MembersSettings({
   if (error) return <ErrorMessage error={error} />;
   return (
     <section>
-      <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-          <UsersRound size={20} />
-        </span>
-        <div>
-          <h2 className="font-display text-xl font-semibold">Workspace members</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
-            Front desk staff can manage reservations and guest records, block inventory,
-            view properties and rooms, and use the Staff directory. Workspace setup and
-            team administration remain owner-only.
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+            <UsersRound size={20} />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-semibold">Workspace members</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
+              Front desk staff can manage reservations and guest records, block inventory,
+              view properties and rooms, and use the Staff directory. Workspace setup and
+              team administration remain owner-only.
+            </p>
+          </div>
         </div>
+        <Link className="btn btn-outline btn-sm shrink-0" to="/staff">
+          <UsersRound size={15} />Manage staff
+        </Link>
       </div>
       <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
         {!memberships.length && <p className="py-8 text-center text-sm text-base-content/50">No members on this page.</p>}
@@ -514,17 +508,8 @@ function MembersSettings({
                 {self && <span className="badge border-0 bg-primary font-semibold text-white">Current account</span>}
                 <span className="badge badge-outline">{isOwner(membership.role) ? "Owner" : active ? "Front desk" : statusLabel(membership.status)}</span>
                 {!self && active && !isOwner(membership.role) && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => action.mutate({ membership, actionName: "owner" })} disabled={action.isPending}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => action.mutate(membership)} disabled={action.isPending}>
                     <ShieldCheck size={15} />Make owner
-                  </button>
-                )}
-                {!self && (
-                  <button
-                    className="btn btn-ghost btn-sm text-error"
-                    onClick={() => action.mutate({ membership, actionName: active ? "suspend" : "resume" })}
-                    disabled={action.isPending}
-                  >
-                    <UserMinus size={15} />{active ? "Suspend" : "Resume"}
                   </button>
                 )}
               </div>
