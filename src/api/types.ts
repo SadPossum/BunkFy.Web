@@ -52,6 +52,14 @@ export type OrganizationInvitationPreview = NonNullableFields<
   "organizationName" | "organizationSlug"
 >;
 
+export type OrganizationInvitationAcceptance = Omit<
+  Schema<"OrganizationInvitationAcceptanceDto">,
+  "invitation" | "membership"
+> & {
+  invitation: OrganizationInvitation;
+  membership: OrganizationMembershipSummary;
+};
+
 export type OrganizationEnrollmentPreview = NonNullableFields<
   Schema<"OrganizationEnrollmentPreviewDto">,
   "organizationName" | "organizationSlug"
@@ -75,11 +83,34 @@ export type OrganizationEnrollmentClaim = NonNullableFields<
   "subjectId"
 >;
 
+export type OrganizationEnrollmentOutcome = Omit<
+  Schema<"OrganizationEnrollmentOutcomeDto">,
+  "claim" | "membership"
+> & {
+  claim: OrganizationEnrollmentClaim;
+  membership: OrganizationMembershipSummary | null;
+};
+
 export type OrganizationJoinRequestListResponse = Omit<
   Schema<"OrganizationJoinRequestListResponse">,
   "items"
 > & {
   items: OrganizationEnrollmentClaim[];
+};
+
+export type WorkspaceStaffOnboardingSourceKind = Schema<"WorkspaceStaffOnboardingSourceKind">;
+export type WorkspaceStaffOnboardingStatus = Schema<"WorkspaceStaffOnboardingStatus">;
+
+export type WorkspaceStaffOnboarding = NonNullableFields<
+  Schema<"WorkspaceStaffOnboardingDto">,
+  "subjectId"
+>;
+
+export type WorkspaceStaffOnboardingListResponse = Omit<
+  Schema<"WorkspaceStaffOnboardingListResponse">,
+  "items"
+> & {
+  items: WorkspaceStaffOnboarding[];
 };
 
 export type Property = NonNullableFields<

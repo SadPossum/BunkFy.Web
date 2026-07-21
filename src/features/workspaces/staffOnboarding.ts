@@ -1,7 +1,8 @@
 import { ApiError } from "../../api/client";
 import type { StaffMember } from "../../api/types";
 
-const INVITE_STAFF_DRAFT_KEY = "bunkfy.invite.staff-profile.v1";
+const INVITE_STAFF_DRAFT_KEY = "bunkfy.invite.staff-profile.v2";
+const LEGACY_INVITE_STAFF_DRAFT_KEY = "bunkfy.invite.staff-profile.v1";
 
 export type StaffProfileDraft = {
   displayName: string;
@@ -29,22 +30,27 @@ export function defaultStaffProfile(email = ""): StaffProfileDraft {
   };
 }
 
-export function saveInviteStaffDraft(profile: StaffProfileDraft): void {
-  window.sessionStorage.setItem(INVITE_STAFF_DRAFT_KEY, JSON.stringify(profile));
+export function saveInviteStaffDraft(
+  profile: StaffProfileDraft,
+  identity = "",
+): void {
+  window.sessionStorage.setItem(staffDraftKey(identity), JSON.stringify(profile));
 }
 
 export function readInviteStaffDraft(email = ""): StaffProfileDraft {
   const fallback = defaultStaffProfile(email);
   try {
-    const parsed = JSON.parse(window.sessionStorage.getItem(INVITE_STAFF_DRAFT_KEY) ?? "null") as Partial<StaffProfileDraft> | null;
+    const stored = window.sessionStorage.getItem(staffDraftKey(email));
+    const legacy = stored ? null : readCompatibleLegacyDraft(email);
+    const parsed = JSON.parse(stored ?? legacy ?? "null") as Partial<StaffProfileDraft> | null;
     return parsed ? { ...fallback, ...parsed, workEmail: parsed.workEmail || fallback.workEmail } : fallback;
   } catch {
     return fallback;
   }
 }
 
-export function clearInviteStaffDraft(): void {
-  window.sessionStorage.removeItem(INVITE_STAFF_DRAFT_KEY);
+export function clearInviteStaffDraft(identity = ""): void {
+  window.sessionStorage.removeItem(staffDraftKey(identity));
 }
 
 export async function completeCurrentStaffProfile(
@@ -83,4 +89,27 @@ async function waitForCurrentStaffProfile(
 
 function emptyToNull(value: string): string | null {
   return value.trim() || null;
+}
+
+function staffDraftKey(identity: string): string {
+  const account = identity.trim().toLowerCase() || "anonymous";
+  return `${INVITE_STAFF_DRAFT_KEY}:${encodeURIComponent(account)}`;
+}
+
+function readCompatibleLegacyDraft(identity: string): string | null {
+  const legacy = window.sessionStorage.getItem(LEGACY_INVITE_STAFF_DRAFT_KEY);
+  if (!legacy || !identity.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(legacy) as Partial<StaffProfileDraft>;
+    if (parsed.workEmail?.trim().toLowerCase() !== identity.trim().toLowerCase()) {
+      return null;
+    }
+
+    window.sessionStorage.removeItem(LEGACY_INVITE_STAFF_DRAFT_KEY);
+    window.sessionStorage.setItem(staffDraftKey(identity), legacy);
+    return legacy;
+  } catch {
+    return null;
+  }
 }

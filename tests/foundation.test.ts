@@ -54,6 +54,7 @@ describe("frontend repository foundation", () => {
 
   it("keeps browser external authentication and account security on published API contracts", () => {
     const session = readFileSync(join(repositoryRoot, "src", "app", "session.tsx"), "utf8");
+    const environment = readFileSync(join(repositoryRoot, "src", "app", "environment.ts"), "utf8");
     const authPage = readFileSync(join(repositoryRoot, "src", "features", "auth", "AuthPage.tsx"), "utf8");
     const account = readFileSync(join(repositoryRoot, "src", "features", "account", "AccountPage.tsx"), "utf8");
 
@@ -67,7 +68,8 @@ describe("frontend repository foundation", () => {
     expect(account).toContain("/api/auth/methods");
     expect(account).toContain("/api/auth/password");
     expect(account).toContain("/api/auth/email-verification");
-    expect(account).toContain("VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED");
+    expect(environment).toContain("VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED");
+    expect(account).toContain("emailVerificationEnabled");
     expect(account).toContain("/external-identities/");
   });
 

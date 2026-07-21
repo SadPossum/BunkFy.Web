@@ -6858,6 +6858,144 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspace-staff-enrollment/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SubmitWorkspaceStaffOnboardingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/{organizationId}/applications/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    sourceKind: components["schemas"]["WorkspaceStaffOnboardingSourceKind"];
+                    sourceId: string;
+                };
+                header?: never;
+                path: {
+                    organizationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/applications/{applicationId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    applicationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8202,6 +8340,17 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        SubmitWorkspaceStaffOnboardingRequest: {
+            sourceKind: components["schemas"]["WorkspaceStaffOnboardingSourceKind"];
+            token: string | null;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            employeeNumber: string | null;
+            jobTitle: string | null;
+            department: string | null;
+        };
         TotpActivationResponse: {
             accessToken: string | null;
             refreshToken: string | null;
@@ -8273,6 +8422,55 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        WorkspaceStaffOnboardingDto: {
+            /** Format: uuid */
+            applicationId: string;
+            /** Format: uuid */
+            organizationId: string;
+            sourceKind: components["schemas"]["WorkspaceStaffOnboardingSourceKind"];
+            /** Format: uuid */
+            sourceId: string;
+            /** Format: uuid */
+            claimId: string | null;
+            /** Format: int64 */
+            claimVersion: number | null;
+            subjectId: string | null;
+            verifiedAccountEmail: string | null;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            employeeNumber: string | null;
+            jobTitle: string | null;
+            department: string | null;
+            status: components["schemas"]["WorkspaceStaffOnboardingStatus"];
+            /** Format: uuid */
+            staffMemberId: string | null;
+            /** Format: int64 */
+            version: number;
+            failureCode: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        WorkspaceStaffOnboardingListResponse: {
+            items: components["schemas"]["WorkspaceStaffOnboardingDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffOnboardingSourceKind: 0 | 1 | 2;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
     };
     responses: never;
     parameters: never;

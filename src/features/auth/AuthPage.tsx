@@ -86,10 +86,13 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
         password,
       };
       if (invitation && mode === "register") {
-        saveInviteStaffDraft({
-          ...staffProfile,
-          workEmail: staffProfile.workEmail.trim() || username,
-        });
+        saveInviteStaffDraft(
+          {
+            ...staffProfile,
+            workEmail: staffProfile.workEmail.trim() || username,
+          },
+          username,
+        );
       }
       await (mode === "login" ? login(credentials) : register(credentials));
     } catch (cause) {

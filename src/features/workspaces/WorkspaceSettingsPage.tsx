@@ -6,6 +6,7 @@ import {
   Link2,
   MailPlus,
   QrCode,
+  RotateCw,
   Settings2,
   ShieldCheck,
   UserCheck,
@@ -16,15 +17,16 @@ import {
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   Organization,
-  OrganizationEnrollmentClaim,
   OrganizationEnrollmentLinkIssued,
   OrganizationInvitationIssued,
-  OrganizationJoinRequestListResponse,
   OrganizationMemberListResponse,
   OrganizationMembership,
   StaffListResponse,
+  WorkspaceStaffOnboarding,
+  WorkspaceStaffOnboardingListResponse,
 } from "../../api/types";
 import { useSession } from "../../app/session";
+import { emailVerificationEnabled } from "../../app/environment";
 import { useWorkspace } from "../../app/workspace";
 import { Modal, PageHeader } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
@@ -269,11 +271,16 @@ function InviteSettings({ workspaceId, request, onIssued }: {
       <form className="lg:pr-8" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
         <MailPlus className="text-primary" size={22} />
         <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
-        <p className="mt-2 text-sm leading-6 text-base-content/50">Bind the invite to a verified email for the safest handoff. The link can only be accepted once.</p>
+        <p className="mt-2 text-sm leading-6 text-base-content/50">Create a one-time link. Optionally restrict it to a verified account email.</p>
         <label className="mt-5 block">
-          <span className="mb-1.5 block text-sm font-semibold">Email</span>
+          <span className="mb-1.5 block text-sm font-semibold">Recipient email (optional)</span>
           <input className="input input-bordered w-full" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="staff@example.com" />
         </label>
+        {!emailVerificationEnabled && email.trim() && (
+          <p className="mt-3 text-xs leading-5 text-warning">
+            Email delivery is disabled in this deployment. Leave this blank for a usable one-time link, or use the team QR.
+          </p>
+        )}
         {invite.error && <ErrorMessage error={invite.error} />}
         <button className="btn btn-primary mt-5 w-full text-white sm:w-auto" disabled={invite.isPending}>
           {invite.isPending && <span className="loading loading-spinner loading-sm" />}
@@ -308,19 +315,37 @@ function JoinRequestSettings({ workspaceId, request, onMembershipChanged }: {
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const joinRequests = useQuery({
-    queryKey: ["organizations", workspaceId, "join-requests", page],
-    queryFn: () => request<OrganizationJoinRequestListResponse>(
-      `/api/organizations/${workspaceId}/join-requests?page=${page}&pageSize=${pageSize}`,
+    queryKey: ["workspace-staff-onboarding", workspaceId, "actionable", page],
+    queryFn: () => request<WorkspaceStaffOnboardingListResponse>(
+      `/api/workspace-staff-enrollment/applications?page=${page}&pageSize=${pageSize}`,
     ),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
   const resolution = useMutation({
-    mutationFn: ({ claim, action }: { claim: OrganizationEnrollmentClaim; action: "approve" | "reject" }) => request(
-      `/api/organizations/${workspaceId}/join-requests/${claim.claimId}/${action}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ expectedVersion: claim.version }),
-      },
-    ),
+    mutationFn: ({ application, action }: {
+      application: WorkspaceStaffOnboarding;
+      action: "approve" | "reject" | "retry";
+    }) => {
+      if (action === "retry") {
+        return request(
+          `/api/workspace-staff-enrollment/applications/${application.applicationId}/retry`,
+          { method: "POST" },
+        );
+      }
+
+      if (!application.claimId || !application.claimVersion) {
+        throw new Error("This join request is still being prepared.");
+      }
+
+      return request(
+        `/api/organizations/${workspaceId}/join-requests/${application.claimId}/${action}`,
+        {
+          method: "POST",
+          body: JSON.stringify({ expectedVersion: application.claimVersion }),
+        },
+      );
+    },
     onSuccess: async () => {
       await Promise.all([joinRequests.refetch(), onMembershipChanged()]);
     },
@@ -352,32 +377,53 @@ function JoinRequestSettings({ workspaceId, request, onMembershipChanged }: {
         <>
           <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
             {!joinRequests.data?.items.length && (
-              <p className="py-8 text-center text-sm text-base-content/50">No pending join requests.</p>
+              <p className="py-8 text-center text-sm text-base-content/50">No join requests need attention.</p>
             )}
-            {(joinRequests.data?.items ?? []).map((claim) => (
-              <article key={claim.claimId} className="flex flex-wrap items-center justify-between gap-4 py-4">
+            {(joinRequests.data?.items ?? []).map((application) => (
+              <article key={application.applicationId} className="flex flex-wrap items-center justify-between gap-4 py-4">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">Workspace access request</p>
-                  <p className="mt-1 truncate text-xs text-base-content/45">{claim.subjectId}</p>
-                  <p className="mt-1 text-xs text-base-content/45">
-                    Requested {new Date(claim.createdAtUtc).toLocaleString()}
+                  <p className="truncate font-semibold">
+                    {application.displayName ?? application.verifiedAccountEmail ?? "Staff applicant"}
                   </p>
+                  <p className="mt-1 truncate text-xs text-base-content/50">
+                    {application.workEmail ?? application.verifiedAccountEmail}
+                    {application.jobTitle ? ` · ${application.jobTitle}` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-base-content/45">
+                    {application.status === 6 ? "Provisioning needs attention" : "Requested"}{" "}
+                    {new Date(application.createdAtUtc).toLocaleString()}
+                  </p>
+                  {application.failureCode && (
+                    <p className="mt-1 text-xs font-medium text-warning">{application.failureCode}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-ghost btn-sm text-error"
-                    onClick={() => resolution.mutate({ claim, action: "reject" })}
-                    disabled={resolution.isPending}
-                  >
-                    <UserX size={15} />Reject
-                  </button>
-                  <button
-                    className="btn btn-primary btn-sm text-white"
-                    onClick={() => resolution.mutate({ claim, action: "approve" })}
-                    disabled={resolution.isPending}
-                  >
-                    <UserCheck size={15} />Approve
-                  </button>
+                  {application.status === 6 ? (
+                    <button
+                      className="btn btn-primary btn-sm text-white"
+                      onClick={() => resolution.mutate({ application, action: "retry" })}
+                      disabled={resolution.isPending}
+                    >
+                      <RotateCw size={15} />Retry setup
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="btn btn-ghost btn-sm text-error"
+                        onClick={() => resolution.mutate({ application, action: "reject" })}
+                        disabled={resolution.isPending || !application.claimId}
+                      >
+                        <UserX size={15} />Reject
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm text-white"
+                        onClick={() => resolution.mutate({ application, action: "approve" })}
+                        disabled={resolution.isPending || !application.claimId}
+                      >
+                        <UserCheck size={15} />Approve
+                      </button>
+                    </>
+                  )}
                 </div>
               </article>
             ))}

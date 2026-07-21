@@ -18,9 +18,6 @@ import {
   Unlink,
   UserRound,
 } from "lucide-react";
-
-const emailVerificationEnabled =
-  import.meta.env.VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED === "true";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type {
   AuthenticationMethods,
@@ -30,6 +27,7 @@ import type {
   StaffMember,
 } from "../../api/types";
 import { useSession } from "../../app/session";
+import { emailVerificationEnabled } from "../../app/environment";
 import { focusedResourceClass, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useWorkspace } from "../../app/workspace";
 import {

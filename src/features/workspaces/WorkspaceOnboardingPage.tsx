@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Building2, Link2 } from "lucide-react";
+import { Building2, Link2, LogOut } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { OrganizationMembershipSummary } from "../../api/types";
@@ -15,7 +15,7 @@ import {
 
 export function WorkspaceOnboardingPage() {
   const navigate = useNavigate();
-  const { request, selectWorkspace, session } = useSession();
+  const { logout, request, selectWorkspace, session } = useSession();
   const { refetchWorkspaces, setSelectedWorkspaceId } = useWorkspace();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -57,9 +57,19 @@ export function WorkspaceOnboardingPage() {
   return (
     <main className="min-h-screen bg-base-200 px-4 py-8 sm:px-8 sm:py-14">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center gap-3">
-          <BrandMark variant="simple-white-bold" height={48} framed />
-          <span className="font-display text-2xl font-semibold">BunkFy</span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <BrandMark variant="simple-white-bold" height={48} framed />
+            <span className="font-display text-2xl font-semibold">BunkFy</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => void logout()}
+          >
+            <LogOut size={16} />
+            Sign out
+          </button>
         </div>
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_30rem] lg:items-start">
           <section>

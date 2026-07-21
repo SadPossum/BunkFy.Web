@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { AuthPage } from "../features/auth/AuthPage";
@@ -8,6 +8,7 @@ import { useSession } from "./session";
 import { WorkspaceProvider } from "./workspace";
 import { WorkspaceGate } from "../features/workspaces/WorkspaceGate";
 import { WorkspaceOnboardingPage } from "../features/workspaces/WorkspaceOnboardingPage";
+import { preserveWorkspaceJoinSecret } from "../features/workspaces/workspaceJoin";
 
 const AccountPage = lazy(() =>
   import("../features/account/AccountPage").then((module) => ({
@@ -63,6 +64,15 @@ const WorkspaceSettingsPage = lazy(() =>
 export function App() {
   const location = useLocation();
   const { isRestoring, session } = useSession();
+  useEffect(() => {
+    if (location.pathname !== "/join" || !preserveWorkspaceJoinSecret(location.hash)) return;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${location.pathname}${location.search}`,
+    );
+  }, [location.hash, location.pathname, location.search]);
+
   if (location.pathname === "/auth/complete") {
     return <AuthCompletionPage />;
   }
