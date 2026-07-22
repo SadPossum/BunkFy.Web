@@ -113,6 +113,88 @@ export type WorkspaceStaffOnboardingListResponse = Omit<
   items: WorkspaceStaffOnboarding[];
 };
 
+export type WorkspaceAccessPermission = Omit<
+  NonNullableFields<
+    Schema<"WorkspaceAccessPermissionDto">,
+    "code" | "group" | "label" | "description"
+  >,
+  "requiredPermissions"
+> & {
+  requiredPermissions: string[];
+};
+
+export type WorkspaceAccessCatalogue = Omit<
+  Schema<"WorkspaceAccessCatalogueDto">,
+  "permissions" | "protectedSeedKeys"
+> & {
+  permissions: WorkspaceAccessPermission[];
+  protectedSeedKeys: string[];
+};
+
+export type WorkspaceAccessProfile = Omit<
+  NonNullableFields<
+    Schema<"WorkspaceAccessProfileDto">,
+    "key" | "displayName" | "description"
+  >,
+  "permissions"
+> & {
+  permissions: string[];
+};
+
+export type WorkspaceAccessProfileListResponse = Omit<
+  Schema<"WorkspaceAccessProfileListResponse">,
+  "items"
+> & {
+  items: WorkspaceAccessProfile[];
+};
+
+export type WorkspaceMemberAccessAssignment = NonNullableFields<
+  Schema<"WorkspaceMemberAccessAssignmentDto">,
+  "profileKey" | "profileDisplayName"
+>;
+
+export type WorkspaceMemberAccess = Omit<
+  NonNullableFields<Schema<"WorkspaceMemberAccessDto">, "subjectId">,
+  "assignments"
+> & {
+  assignments: WorkspaceMemberAccessAssignment[];
+};
+
+export type WorkspaceStaffAccessPlan = Omit<
+  NonNullableFields<Schema<"WorkspaceStaffAccessPlanDto">, "profileKey">,
+  "propertyIds"
+> & {
+  propertyIds: string[];
+};
+
+export type WorkspaceStaffJoinSource = Omit<
+  Schema<"WorkspaceStaffJoinSourceDto">,
+  "accessPlan"
+> & {
+  accessPlan: WorkspaceStaffAccessPlan | null;
+};
+
+export type WorkspaceStaffJoinSourceListResponse = Omit<
+  Schema<"WorkspaceStaffJoinSourceListResponse">,
+  "items"
+> & {
+  items: WorkspaceStaffJoinSource[];
+};
+
+export type WorkspaceStaffJoinSourceIssuance = Omit<
+  Schema<"WorkspaceStaffJoinSourceIssuanceDto">,
+  "plan"
+> & {
+  plan: WorkspaceStaffAccessPlan;
+};
+
+export type WorkspaceStaffJoinSourceReplacement = Omit<
+  Schema<"WorkspaceStaffJoinSourceReplacementDto">,
+  "replacement"
+> & {
+  replacement: WorkspaceStaffJoinSourceIssuance;
+};
+
 export type Property = NonNullableFields<
   Schema<"PropertyDto">,
   "name" | "code" | "timeZoneId" | "status"

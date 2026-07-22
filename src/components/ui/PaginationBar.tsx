@@ -7,6 +7,7 @@ type PaginationBarProps = {
   itemLabel: string;
   onPageChange: (page: number) => void;
   totalCount?: number;
+  hasMore?: boolean;
   disabled?: boolean;
 };
 
@@ -17,13 +18,14 @@ export function PaginationBar({
   itemLabel,
   onPageChange,
   totalCount,
+  hasMore,
   disabled = false,
 }: PaginationBarProps) {
   const totalPages = totalCount === undefined
     ? undefined
     : Math.max(1, Math.ceil(totalCount / pageSize));
   const hasNext = totalPages === undefined
-    ? itemCount === pageSize
+    ? hasMore ?? itemCount === pageSize
     : page < totalPages;
 
   if (page === 1 && !hasNext) return null;

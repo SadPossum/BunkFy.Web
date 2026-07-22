@@ -480,7 +480,14 @@ type PendingExternalAuth = {
 function externalReturnUrl(intent: PendingExternalAuth["intent"]): string {
   const url = new URL("/auth/complete", window.location.origin);
   url.searchParams.set("intent", intent);
-  return url.toString();
+  const apiBaseUrl = resolveApiBaseUrl();
+  const apiOrigin = apiBaseUrl
+    ? new URL(apiBaseUrl, window.location.origin).origin
+    : window.location.origin;
+
+  return apiOrigin === window.location.origin
+    ? `${url.pathname}${url.search}`
+    : url.toString();
 }
 
 function apiUrl(path: string): string {

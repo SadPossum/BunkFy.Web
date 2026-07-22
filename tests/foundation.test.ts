@@ -78,11 +78,35 @@ describe("frontend repository foundation", () => {
       join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
       "utf8",
     );
+    const members = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceMembersSettings.tsx"),
+      "utf8",
+    );
 
     expect(settings).toContain('/api/organizations/${workspace?.organizationId}/members');
     expect(settings).toContain('error={members.error}');
-    expect(settings).not.toContain('/api/staff/members');
-    expect(settings).not.toContain('authSubjectId');
+    expect(members).toContain("/api/workspace-access/members/");
+    expect(`${settings}\n${members}`).not.toContain('/api/staff/members');
+    expect(`${settings}\n${members}`).not.toContain('authSubjectId');
+  });
+
+  it("keeps workspace access workflows behind the BunkFy product facade", () => {
+    const roles = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceRolesSettings.tsx"),
+      "utf8",
+    );
+    const invites = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceInvitesSettings.tsx"),
+      "utf8",
+    );
+
+    expect(roles).toContain("/api/workspace-access/catalogue");
+    expect(roles).toContain("/api/workspace-access/profiles");
+    expect(invites).toContain("/api/workspace-staff-enrollment/sources/invitations");
+    expect(invites).toContain("/api/workspace-staff-enrollment/sources/enrollment-links");
+    expect(invites).not.toContain('/api/organizations/${workspaceId}/invitations');
+    expect(invites).not.toContain('/api/organizations/${workspaceId}/enrollment-links');
+    expect(invites).toContain("page=${page}&pageSize=${SOURCE_PAGE_SIZE}");
   });
 
   it("keeps growing operator directories on bounded server pages", () => {

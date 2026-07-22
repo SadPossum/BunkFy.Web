@@ -69,7 +69,7 @@ export function SegmentedTabs<TValue extends string>({
             onClick={() => onValueChange(option.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
           >
-            {option.icon}
+            {option.icon && <span className="hidden sm:inline-flex">{option.icon}</span>}
             {option.label}
           </button>
         );

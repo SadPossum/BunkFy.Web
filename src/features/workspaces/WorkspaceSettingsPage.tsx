@@ -1,48 +1,29 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { QRCodeSVG } from "qrcode.react";
-import {
-  Check,
-  Copy,
-  Link2,
-  MailPlus,
-  QrCode,
-  RotateCw,
-  Settings2,
-  ShieldCheck,
-  UserCheck,
-  UserX,
-  UsersRound,
-} from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { MailPlus, Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import type {
   Organization,
-  OrganizationEnrollmentLinkIssued,
-  OrganizationInvitationIssued,
   OrganizationMemberListResponse,
   OrganizationMembership,
-  WorkspaceStaffOnboarding,
-  WorkspaceStaffOnboardingListResponse,
 } from "../../api/types";
 import { useSession } from "../../app/session";
-import { emailVerificationEnabled } from "../../app/environment";
 import { useWorkspace } from "../../app/workspace";
-import { Modal, PageHeader } from "../../components/ui/primitives";
-import { PaginationBar } from "../../components/ui/PaginationBar";
+import { PageHeader } from "../../components/ui/primitives";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import { WorkspaceInvitesSettings } from "./WorkspaceInvitesSettings";
+import { WorkspaceMembersSettings } from "./WorkspaceMembersSettings";
+import { WorkspaceRolesSettings } from "./WorkspaceRolesSettings";
 
-type IssuedJoinLink = { kind: "invitation" | "enrollment"; token: string; expiresAtUtc: string };
 const MEMBERS_PAGE_SIZE = 25;
 
 export function WorkspaceSettingsPage() {
   const { request, session } = useSession();
   const {
     selectedWorkspace,
+    properties,
     refetchWorkspaces,
   } = useWorkspace();
-  const [tab, setTab] = useState<"general" | "members" | "invites">("general");
-  const [issued, setIssued] = useState<IssuedJoinLink | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useState<"general" | "members" | "roles" | "invites">("general");
   const [memberPage, setMemberPage] = useState(1);
   const workspace = selectedWorkspace?.organization;
   const owner = isOwner(selectedWorkspace?.membership.role);
@@ -53,6 +34,7 @@ export function WorkspaceSettingsPage() {
     ),
     enabled: Boolean(workspace && owner && tab === "members"),
   });
+
   useEffect(() => setMemberPage(1), [workspace?.organizationId]);
   useEffect(() => {
     if (!members.isFetching && memberPage > 1 && members.data?.items.length === 0) {
@@ -66,13 +48,6 @@ export function WorkspaceSettingsPage() {
     await Promise.all([refetchWorkspaces(), members.refetch()]);
   }
 
-  async function copyIssuedLink() {
-    if (!issued) return;
-    await navigator.clipboard.writeText(joinUrl(issued));
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -82,7 +57,7 @@ export function WorkspaceSettingsPage() {
         action={(
           <span className={`badge h-8 gap-2 border-0 px-3 font-semibold text-white ${owner ? "bg-primary" : "bg-neutral"}`}>
             <ShieldCheck size={15} />
-            {owner ? "Owner" : "Front desk"}
+            {owner ? "Owner" : "Member"}
           </span>
         )}
       />
@@ -96,6 +71,7 @@ export function WorkspaceSettingsPage() {
             options={[
               { value: "general", label: "General", icon: <Settings2 size={15} /> },
               { value: "members", label: "Members", icon: <UsersRound size={15} />, disabled: !owner },
+              { value: "roles", label: "Roles", icon: <ShieldCheck size={15} />, disabled: !owner },
               { value: "invites", label: "Invites", icon: <MailPlus size={15} />, disabled: !owner },
             ]}
           />
@@ -107,63 +83,35 @@ export function WorkspaceSettingsPage() {
               key={workspace.organizationId}
               workspace={workspace}
               canManage={owner}
-              request={request}
               onSaved={refetchWorkspaces}
             />
           )}
           {tab === "members" && owner && (
-            <MembersSettings
+            <WorkspaceMembersSettings
               workspace={workspace}
               currentMembership={selectedWorkspace.membership}
               memberships={members.data?.items ?? []}
               currentUsername={session?.username ?? ""}
+              properties={properties}
               page={memberPage}
               pageSize={MEMBERS_PAGE_SIZE}
               loading={members.isLoading}
               fetching={members.isFetching}
               error={members.error}
-              request={request}
               onChanged={refreshWorkspace}
               onPageChange={setMemberPage}
             />
           )}
+          {tab === "roles" && owner && <WorkspaceRolesSettings workspaceId={workspace.organizationId} />}
           {tab === "invites" && owner && (
-            <div className="space-y-10">
-              <InviteSettings
-                workspaceId={workspace.organizationId}
-                request={request}
-                onIssued={setIssued}
-              />
-              <JoinRequestSettings
-                workspaceId={workspace.organizationId}
-                request={request}
-                onMembershipChanged={refreshWorkspace}
-              />
-            </div>
+            <WorkspaceInvitesSettings
+              workspaceId={workspace.organizationId}
+              properties={properties}
+              onMembershipChanged={refreshWorkspace}
+            />
           )}
         </div>
       </section>
-
-      {issued && (
-        <Modal
-          open
-          title={issued.kind === "invitation" ? "Invitation ready" : "Team QR ready"}
-          description="Share this link only with the person or team you expect to join."
-          onClose={() => setIssued(null)}
-        >
-          <div className="mx-auto w-fit rounded-lg bg-white p-4 shadow-xs">
-            <QRCodeSVG value={joinUrl(issued)} size={208} level="M" />
-          </div>
-          <p className="mt-5 break-all rounded-lg bg-base-200 p-3 font-mono text-xs text-base-content/60">{joinUrl(issued)}</p>
-          <p className="mt-2 text-xs text-base-content/45">
-            Expires {new Date(issued.expiresAtUtc).toLocaleString()}
-          </p>
-          <button className="btn btn-primary mt-5 w-full text-white" onClick={() => void copyIssuedLink()}>
-            {copied ? <Check size={17} /> : <Copy size={17} />}
-            {copied ? "Copied" : "Copy link"}
-          </button>
-        </Modal>
-      )}
     </div>
   );
 }
@@ -171,14 +119,13 @@ export function WorkspaceSettingsPage() {
 function GeneralSettings({
   workspace,
   canManage,
-  request,
   onSaved,
 }: {
   workspace: Organization;
   canManage: boolean;
-  request: ReturnType<typeof useSession>["request"];
   onSaved: () => Promise<void>;
 }) {
+  const { request } = useSession();
   const [name, setName] = useState(workspace.name);
   const [slug, setSlug] = useState(workspace.slug);
   const update = useMutation({
@@ -196,9 +143,7 @@ function GeneralSettings({
         </span>
         <div>
           <h2 className="font-display text-xl font-semibold">Workspace details</h2>
-          <p className="mt-1 text-sm leading-6 text-base-content/55">
-            The name and handle shown throughout your team workspace.
-          </p>
+          <p className="mt-1 text-sm leading-6 text-base-content/55">The name and handle shown throughout your team workspace.</p>
         </div>
       </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -213,16 +158,14 @@ function GeneralSettings({
       </div>
       {!canManage && (
         <div className="mt-5 flex items-start gap-3 rounded-lg bg-base-200/70 p-4 text-sm text-base-content/60">
-          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
-          Workspace identity can only be changed by the owner.
+          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />Workspace identity can only be changed by the owner.
         </div>
       )}
-      {update.error && <ErrorMessage error={update.error} />}
+      {update.error && <SettingsError error={update.error} />}
       {canManage && (
         <div className="mt-5 flex justify-end border-t border-base-300 pt-5">
-          <button className="btn btn-primary text-white" onClick={() => update.mutate()} disabled={update.isPending || (!name.trim() || !slug.trim())}>
-            {update.isPending && <span className="loading loading-spinner loading-sm" />}
-            Save changes
+          <button className="btn btn-primary text-white" onClick={() => update.mutate()} disabled={update.isPending || !name.trim() || !slug.trim()}>
+            {update.isPending && <span className="loading loading-spinner loading-sm" />}Save changes
           </button>
         </div>
       )}
@@ -230,321 +173,10 @@ function GeneralSettings({
   );
 }
 
-function InviteSettings({ workspaceId, request, onIssued }: {
-  workspaceId: string;
-  request: ReturnType<typeof useSession>["request"];
-  onIssued: (link: IssuedJoinLink) => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [maximumClaims, setMaximumClaims] = useState(20);
-  const invite = useMutation({
-    mutationFn: () => request<OrganizationInvitationIssued>(`/api/organizations/${workspaceId}/invitations`, {
-      method: "POST",
-      body: JSON.stringify({ recipientEmail: email.trim() || null, lifetimeHours: 72 }),
-    }),
-    onSuccess: (result) => onIssued({ kind: "invitation", token: result.token, expiresAtUtc: result.invitation.expiresAtUtc }),
-  });
-  const enrollment = useMutation({
-    mutationFn: () => request<OrganizationEnrollmentLinkIssued>(`/api/organizations/${workspaceId}/enrollment-links`, {
-      method: "POST",
-      body: JSON.stringify({ lifetimeHours: 24, maximumClaims, approvalMode: 2 }),
-    }),
-    onSuccess: (result) => onIssued({ kind: "enrollment", token: result.token, expiresAtUtc: result.enrollmentLink.expiresAtUtc }),
-  });
-  return (
-    <div className="grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-base-300">
-      <form className="lg:pr-8" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
-        <MailPlus className="text-primary" size={22} />
-        <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
-        <p className="mt-2 text-sm leading-6 text-base-content/50">Create a one-time link. Optionally restrict it to a verified account email.</p>
-        <label className="mt-5 block">
-          <span className="mb-1.5 block text-sm font-semibold">Recipient email (optional)</span>
-          <input className="input input-bordered w-full" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="staff@example.com" />
-        </label>
-        {!emailVerificationEnabled && email.trim() && (
-          <p className="mt-3 text-xs leading-5 text-warning">
-            Email delivery is disabled in this deployment. Leave this blank for a usable one-time link, or use the team QR.
-          </p>
-        )}
-        {invite.error && <ErrorMessage error={invite.error} />}
-        <button className="btn btn-primary mt-5 w-full text-white sm:w-auto" disabled={invite.isPending}>
-          {invite.isPending && <span className="loading loading-spinner loading-sm" />}
-          <Link2 size={17} />
-          Create invite
-        </button>
-      </form>
-      <form className="border-t border-base-300 pt-8 lg:border-t-0 lg:pl-8 lg:pt-0" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
-        <QrCode className="text-primary" size={22} />
-        <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
-        <p className="mt-2 text-sm leading-6 text-base-content/50">A short-lived reusable link for supervised onboarding. Each person requests access and must be approved by the owner.</p>
-        <label className="mt-5 block max-w-40">
-          <span className="mb-1.5 block text-sm font-semibold">Maximum joins</span>
-          <input className="input input-bordered w-full" type="number" min={1} max={100} value={maximumClaims} onChange={(event) => setMaximumClaims(Number(event.target.value))} />
-        </label>
-        {enrollment.error && <ErrorMessage error={enrollment.error} />}
-        <button className="btn btn-outline mt-5 w-full sm:w-auto" disabled={enrollment.isPending}>
-          {enrollment.isPending && <span className="loading loading-spinner loading-sm" />}
-          <QrCode size={17} />
-          Create QR
-        </button>
-      </form>
-    </div>
-  );
-}
-
-function JoinRequestSettings({ workspaceId, request, onMembershipChanged }: {
-  workspaceId: string;
-  request: ReturnType<typeof useSession>["request"];
-  onMembershipChanged: () => Promise<void>;
-}) {
-  const [page, setPage] = useState(1);
-  const pageSize = 25;
-  const joinRequests = useQuery({
-    queryKey: ["workspace-staff-onboarding", workspaceId, "actionable", page],
-    queryFn: () => request<WorkspaceStaffOnboardingListResponse>(
-      `/api/workspace-staff-enrollment/applications?page=${page}&pageSize=${pageSize}`,
-    ),
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
-  });
-  const resolution = useMutation({
-    mutationFn: ({ application, action }: {
-      application: WorkspaceStaffOnboarding;
-      action: "approve" | "reject" | "retry";
-    }) => {
-      if (action === "retry") {
-        return request(
-          `/api/workspace-staff-enrollment/applications/${application.applicationId}/retry`,
-          { method: "POST" },
-        );
-      }
-
-      if (!application.claimId || !application.claimVersion) {
-        throw new Error("This join request is still being prepared.");
-      }
-
-      return request(
-        `/api/organizations/${workspaceId}/join-requests/${application.claimId}/${action}`,
-        {
-          method: "POST",
-          body: JSON.stringify({ expectedVersion: application.claimVersion }),
-        },
-      );
-    },
-    onSuccess: async () => {
-      await Promise.all([joinRequests.refetch(), onMembershipChanged()]);
-    },
-  });
-
-  useEffect(() => {
-    if (!joinRequests.isFetching && page > 1 && joinRequests.data?.items.length === 0) {
-      setPage((current) => Math.max(1, current - 1));
-    }
-  }, [joinRequests.data?.items.length, joinRequests.isFetching, page]);
-
-  return (
-    <section className="border-t border-base-300 pt-8">
-      <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-          <UserCheck size={20} />
-        </span>
-        <div>
-          <h2 className="font-display text-xl font-semibold">Join requests</h2>
-          <p className="mt-1 text-sm leading-6 text-base-content/55">
-            Review people who used a team QR before they receive workspace access.
-          </p>
-        </div>
-      </div>
-
-      {joinRequests.isLoading && <div className="loading loading-spinner loading-md mt-6 text-primary" />}
-      {joinRequests.error && <ErrorMessage error={joinRequests.error} />}
-      {!joinRequests.isLoading && !joinRequests.error && (
-        <>
-          <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
-            {!joinRequests.data?.items.length && (
-              <p className="py-8 text-center text-sm text-base-content/50">No join requests need attention.</p>
-            )}
-            {(joinRequests.data?.items ?? []).map((application) => (
-              <article key={application.applicationId} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">
-                    {application.displayName ?? application.verifiedAccountEmail ?? "Staff applicant"}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-base-content/50">
-                    {application.workEmail ?? application.verifiedAccountEmail}
-                    {application.jobTitle ? ` · ${application.jobTitle}` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-base-content/45">
-                    {application.status === 6 ? "Provisioning needs attention" : "Requested"}{" "}
-                    {new Date(application.createdAtUtc).toLocaleString()}
-                  </p>
-                  {application.failureCode && (
-                    <p className="mt-1 text-xs font-medium text-warning">{application.failureCode}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {application.status === 6 ? (
-                    <button
-                      className="btn btn-primary btn-sm text-white"
-                      onClick={() => resolution.mutate({ application, action: "retry" })}
-                      disabled={resolution.isPending}
-                    >
-                      <RotateCw size={15} />Retry setup
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className="btn btn-ghost btn-sm text-error"
-                        onClick={() => resolution.mutate({ application, action: "reject" })}
-                        disabled={resolution.isPending || !application.claimId}
-                      >
-                        <UserX size={15} />Reject
-                      </button>
-                      <button
-                        className="btn btn-primary btn-sm text-white"
-                        onClick={() => resolution.mutate({ application, action: "approve" })}
-                        disabled={resolution.isPending || !application.claimId}
-                      >
-                        <UserCheck size={15} />Approve
-                      </button>
-                    </>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-          <PaginationBar
-            page={page}
-            pageSize={pageSize}
-            itemCount={joinRequests.data?.items.length ?? 0}
-            itemLabel="request"
-            disabled={joinRequests.isFetching || resolution.isPending}
-            onPageChange={setPage}
-          />
-          {resolution.error && <ErrorMessage error={resolution.error} />}
-        </>
-      )}
-    </section>
-  );
-}
-
-function MembersSettings({
-  workspace,
-  currentMembership,
-  memberships,
-  currentUsername,
-  page,
-  pageSize,
-  loading,
-  fetching,
-  error,
-  request,
-  onChanged,
-  onPageChange,
-}: {
-  workspace: Organization;
-  currentMembership: OrganizationMembership;
-  memberships: OrganizationMembership[];
-  currentUsername: string;
-  page: number;
-  pageSize: number;
-  loading: boolean;
-  fetching: boolean;
-  error: unknown;
-  request: ReturnType<typeof useSession>["request"];
-  onChanged: () => Promise<void>;
-  onPageChange: (page: number) => void;
-}) {
-  const action = useMutation({
-    mutationFn: (membership: OrganizationMembership) =>
-      request(`/api/organizations/${workspace.organizationId}/ownership/transfer`, {
-        method: "POST",
-        body: JSON.stringify({
-          targetSubjectId: membership.subjectId,
-          expectedOrganizationVersion: workspace.version,
-          expectedCurrentOwnerVersion: currentMembership.version,
-          expectedTargetVersion: membership.version,
-        }),
-      }),
-    onSuccess: onChanged,
-  });
-
-  if (loading) return <div className="loading loading-spinner loading-md text-primary" />;
-  if (error) return <ErrorMessage error={error} />;
-  return (
-    <section>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-            <UsersRound size={20} />
-          </span>
-          <div>
-            <h2 className="font-display text-xl font-semibold">Workspace members</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
-              Front desk staff can manage reservations and guest records, block inventory,
-              view properties and rooms, and use the Staff directory. Workspace setup and
-              team administration remain owner-only.
-            </p>
-          </div>
-        </div>
-        <Link className="btn btn-outline btn-sm shrink-0" to="/staff">
-          <UsersRound size={15} />Manage staff
-        </Link>
-      </div>
-      <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
-        {!memberships.length && <p className="py-8 text-center text-sm text-base-content/50">No members on this page.</p>}
-        {memberships.map((membership) => {
-          const self = membership.membershipId === currentMembership.membershipId;
-          const active = isActive(membership.status);
-          const displayName = self ? "You" : "Workspace member";
-          const accountLabel = self ? currentUsername : membership.subjectId;
-          return (
-            <article key={membership.membershipId} className="flex flex-wrap items-center justify-between gap-4 py-4">
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{displayName}</p>
-                <p className="mt-1 truncate text-xs text-base-content/45">{accountLabel}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {self && <span className="badge border-0 bg-primary font-semibold text-white">Current account</span>}
-                <span className="badge badge-outline">{isOwner(membership.role) ? "Owner" : active ? "Front desk" : statusLabel(membership.status)}</span>
-                {!self && active && !isOwner(membership.role) && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => action.mutate(membership)} disabled={action.isPending}>
-                    <ShieldCheck size={15} />Make owner
-                  </button>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      <PaginationBar page={page} pageSize={pageSize} itemCount={memberships.length} itemLabel="member" disabled={fetching} onPageChange={onPageChange} />
-      {action.error && <ErrorMessage error={action.error} />}
-    </section>
-  );
-}
-
-function ErrorMessage({ error }: { error: unknown }) {
-  return (
-    <div className="alert alert-error mt-5 py-3 text-sm">
-      {error instanceof Error ? error.message : "The request could not be completed."}
-    </div>
-  );
+function SettingsError({ error }: { error: unknown }) {
+  return <div className="alert alert-error mt-5 py-3 text-sm">{error instanceof Error ? error.message : "The request could not be completed."}</div>;
 }
 
 function isOwner(role: OrganizationMembership["role"] | undefined): boolean {
   return role === 2 || String(role).toLowerCase() === "owner";
-}
-
-function isActive(status: OrganizationMembership["status"]): boolean {
-  return status === 1 || String(status).toLowerCase() === "active";
-}
-
-function statusLabel(status: OrganizationMembership["status"]): string {
-  return status === 2 || String(status).toLowerCase() === "suspended" ? "Suspended" : "Removed";
-}
-
-function joinUrl(link: IssuedJoinLink): string {
-  const url = new URL("/join", window.location.origin);
-  url.hash = new URLSearchParams({ [link.kind]: link.token }).toString();
-  return url.toString();
 }
