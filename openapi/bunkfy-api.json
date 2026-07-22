@@ -406,6 +406,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "assignmentScope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6755,6 +6762,235 @@
         }
       }
     },
+    "/api/workspace-access/catalogue": {
+      "get": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceAccessCatalogueDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-access/profiles": {
+      "get": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceAccessProfileListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkspaceAccessProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceAccessProfileDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-access/profiles/{profileId}": {
+      "put": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkspaceAccessProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceAccessProfileDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-access/profiles/{profileId}/archive": {
+      "post": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveWorkspaceAccessProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/workspace-access/members/{subjectId}/access": {
+      "get": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "parameters": [
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceMemberAccessDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Workspace Access"
+        ],
+        "parameters": [
+          {
+            "name": "subjectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkspaceMemberAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceMemberAccessDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspace-staff-enrollment/applications": {
       "post": {
         "tags": [
@@ -6812,6 +7048,269 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceStaffOnboardingListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources/invitations": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueWorkspaceInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceIssuanceDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources/enrollment-links": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueWorkspaceEnrollmentLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceIssuanceDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources": {
+      "get": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "sourceKind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceStaffOnboardingSourceKind"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources/invitations/{sourceId}/revoke": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManageWorkspaceJoinSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources/enrollment-links/{sourceId}/disable": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManageWorkspaceJoinSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources/invitations/{sourceId}/replace": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceWorkspaceJoinSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceReplacementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/sources/enrollment-links/{sourceId}/replace": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceWorkspaceJoinSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffJoinSourceReplacementDto"
                 }
               }
             }
@@ -7010,6 +7509,10 @@
           "createdAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "assignmentScope": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -7046,6 +7549,10 @@
             "nullable": true
           },
           "subjectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignmentScope": {
             "type": "string",
             "nullable": true
           }
@@ -7089,6 +7596,10 @@
           "occurredAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "assignmentScope": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -7457,6 +7968,16 @@
           },
           "confirmed": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ArchiveWorkspaceAccessProfileRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -8198,6 +8719,31 @@
         },
         "additionalProperties": false
       },
+      "CreateWorkspaceAccessProfileRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "CurrentTenantResponse": {
         "type": "object",
         "properties": {
@@ -8594,6 +9140,69 @@
         "type": "integer",
         "format": "int32"
       },
+      "IssueWorkspaceEnrollmentLinkRequest": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifetimeHours": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumClaims": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approvalMode": {
+            "$ref": "#/components/schemas/OrganizationEnrollmentApprovalMode"
+          },
+          "profileKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "propertyIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueWorkspaceInvitationRequest": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "lifetimeHours": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profileKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "propertyIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "LinkReservationGuestRequest": {
         "type": "object",
         "properties": {
@@ -8624,6 +9233,16 @@
           "password": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ManageWorkspaceJoinSourceRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -9654,6 +10273,24 @@
           "refreshToken": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceWorkspaceJoinSourceRequest": {
+        "type": "object",
+        "properties": {
+          "replacementSourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lifetimeHours": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -10981,6 +11618,49 @@
         },
         "additionalProperties": false
       },
+      "UpdateWorkspaceAccessProfileRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateWorkspaceMemberAccessRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "UsernameType": {
         "enum": [
           "email",
@@ -11014,6 +11694,364 @@
           }
         },
         "additionalProperties": false
+      },
+      "WorkspaceAccessCatalogueDto": {
+        "type": "object",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceAccessPermissionDto"
+            },
+            "nullable": true
+          },
+          "protectedSeedKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceAccessPermissionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "group": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isSensitive": {
+            "type": "boolean"
+          },
+          "requiredPermissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceAccessProfileDto": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkspaceAccessProfileStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "assignmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isSeed": {
+            "type": "boolean"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceAccessProfileListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceAccessProfileDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceAccessProfileStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "WorkspaceMemberAccessAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "profileDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "profileVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceMemberAccessDto": {
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMemberAccessAssignmentDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffAccessPlanDto": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "$ref": "#/components/schemas/WorkspaceStaffOnboardingSourceKind"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "propertyIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkspaceStaffAccessPlanStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffAccessPlanStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "WorkspaceStaffJoinSourceDto": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKind": {
+            "$ref": "#/components/schemas/WorkspaceStaffOnboardingSourceKind"
+          },
+          "recipientEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/WorkspaceStaffJoinSourceStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maximumClaims": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "reservedClaims": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "approvalMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "accessPlan": {
+            "$ref": "#/components/schemas/WorkspaceStaffAccessPlanDto"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffJoinSourceIssuanceDto": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/WorkspaceStaffAccessPlanDto"
+          },
+          "token": {
+            "type": "string",
+            "nullable": true
+          },
+          "alreadyIssued": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffJoinSourceListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceStaffJoinSourceDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffJoinSourceReplacementDto": {
+        "type": "object",
+        "properties": {
+          "previousSourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousStatus": {
+            "$ref": "#/components/schemas/WorkspaceStaffJoinSourceStatus"
+          },
+          "previousVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "replacement": {
+            "$ref": "#/components/schemas/WorkspaceStaffJoinSourceIssuanceDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffJoinSourceStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "WorkspaceStaffOnboardingDto": {
         "type": "object",
@@ -11219,6 +12257,9 @@
     },
     {
       "name": "Tenancy"
+    },
+    {
+      "name": "Workspace Access"
     },
     {
       "name": "Workspace Staff Enrollment"

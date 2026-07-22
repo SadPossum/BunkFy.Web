@@ -318,6 +318,7 @@ export interface paths {
                     scope: string;
                     subjectKind: string;
                     subjectId: string;
+                    assignmentScope?: string;
                 };
                 header?: never;
                 path: {
@@ -6919,6 +6920,245 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspace-access/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceAccessCatalogueDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-access/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    includeArchived?: boolean;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceAccessProfileListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateWorkspaceAccessProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceAccessProfileDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-access/profiles/{profileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateWorkspaceAccessProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceAccessProfileDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-access/profiles/{profileId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    profileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ArchiveWorkspaceAccessProfileRequest"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-access/members/{subjectId}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    subjectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceMemberAccessDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    subjectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateWorkspaceMemberAccessRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceMemberAccessDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workspace-staff-enrollment/applications": {
         parameters: {
             query?: never;
@@ -6970,6 +7210,287 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["WorkspaceStaffOnboardingDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IssueWorkspaceInvitationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceIssuanceDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources/enrollment-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IssueWorkspaceEnrollmentLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceIssuanceDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    sourceKind: components["schemas"]["WorkspaceStaffOnboardingSourceKind"];
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources/invitations/{sourceId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sourceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ManageWorkspaceJoinSourceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources/enrollment-links/{sourceId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sourceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ManageWorkspaceJoinSourceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources/invitations/{sourceId}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sourceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReplaceWorkspaceJoinSourceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceReplacementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/sources/enrollment-links/{sourceId}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sourceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReplaceWorkspaceJoinSourceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffJoinSourceReplacementDto"];
                     };
                 };
             };
@@ -7096,6 +7617,7 @@ export interface components {
             createdById: string | null;
             /** Format: date-time */
             createdAtUtc: string;
+            assignmentScope: string | null;
         };
         AccessProfileAssignmentDtoAccessControlPage: {
             items: components["schemas"]["AccessProfileAssignmentDto"][] | null;
@@ -7108,6 +7630,7 @@ export interface components {
         AccessProfileAssignmentRequest: {
             subjectKind: string | null;
             subjectId: string | null;
+            assignmentScope: string | null;
         };
         AccessProfileChangeDto: {
             /** Format: uuid */
@@ -7123,6 +7646,7 @@ export interface components {
             profileVersion: number;
             /** Format: date-time */
             occurredAtUtc: string;
+            assignmentScope: string | null;
         };
         AccessProfileChangeDtoAccessControlPage: {
             items: components["schemas"]["AccessProfileChangeDto"][] | null;
@@ -7257,6 +7781,10 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             confirmed: boolean;
+        };
+        ArchiveWorkspaceAccessProfileRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
         };
         AuthSelfRegistrationResponse: {
             passwordEnabled: boolean;
@@ -7507,6 +8035,13 @@ export interface components {
             sourceReference: string | null;
             notes: string | null;
         };
+        CreateWorkspaceAccessProfileRequest: {
+            /** Format: uuid */
+            requestId: string;
+            displayName: string | null;
+            description: string | null;
+            permissions: string[] | null;
+        };
         CurrentTenantResponse: {
             tenantId: string | null;
             isEnabled: boolean;
@@ -7640,6 +8175,26 @@ export interface components {
          * @enum {integer}
          */
         InventoryUnitKind: 0 | 1 | 2;
+        IssueWorkspaceEnrollmentLinkRequest: {
+            /** Format: uuid */
+            sourceId: string;
+            /** Format: int32 */
+            lifetimeHours: number;
+            /** Format: int32 */
+            maximumClaims: number;
+            approvalMode: components["schemas"]["OrganizationEnrollmentApprovalMode"];
+            profileKey: string | null;
+            propertyIds: string[] | null;
+        };
+        IssueWorkspaceInvitationRequest: {
+            /** Format: uuid */
+            sourceId: string;
+            recipientEmail: string | null;
+            /** Format: int32 */
+            lifetimeHours: number;
+            profileKey: string | null;
+            propertyIds: string[] | null;
+        };
         LinkReservationGuestRequest: {
             /** Format: uuid */
             guestId: string;
@@ -7651,6 +8206,10 @@ export interface components {
         LoginMemberRequest: {
             username: string | null;
             password: string | null;
+        };
+        ManageWorkspaceJoinSourceRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
         };
         ManualInventoryBlockDto: {
             /** Format: uuid */
@@ -8032,6 +8591,14 @@ export interface components {
         RemovePasswordRequest: {
             currentPassword: string | null;
             refreshToken: string | null;
+        };
+        ReplaceWorkspaceJoinSourceRequest: {
+            /** Format: uuid */
+            replacementSourceId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: int32 */
+            lifetimeHours: number;
         };
         RequestBedRetirementRequest: {
             reason: string | null;
@@ -8499,6 +9066,18 @@ export interface components {
             /** Format: int64 */
             expectedDetailsRevision: number;
         };
+        UpdateWorkspaceAccessProfileRequest: {
+            displayName: string | null;
+            description: string | null;
+            permissions: string[] | null;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        UpdateWorkspaceMemberAccessRequest: {
+            /** Format: uuid */
+            profileId: string;
+            propertyIds: string[] | null;
+        };
         /** @enum {string} */
         UsernameType: "email" | "phone";
         VerifyMultiFactorCodeRequest: {
@@ -8510,6 +9089,130 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        WorkspaceAccessCatalogueDto: {
+            permissions: components["schemas"]["WorkspaceAccessPermissionDto"][] | null;
+            protectedSeedKeys: string[] | null;
+        };
+        WorkspaceAccessPermissionDto: {
+            code: string | null;
+            group: string | null;
+            label: string | null;
+            description: string | null;
+            isSensitive: boolean;
+            requiredPermissions: string[] | null;
+        };
+        WorkspaceAccessProfileDto: {
+            /** Format: uuid */
+            profileId: string;
+            key: string | null;
+            displayName: string | null;
+            description: string | null;
+            status: components["schemas"]["WorkspaceAccessProfileStatus"];
+            /** Format: int64 */
+            version: number;
+            permissions: string[] | null;
+            /** Format: int32 */
+            assignmentCount: number;
+            isSeed: boolean;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        WorkspaceAccessProfileListResponse: {
+            items: components["schemas"]["WorkspaceAccessProfileDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceAccessProfileStatus: 0 | 1 | 2;
+        WorkspaceMemberAccessAssignmentDto: {
+            /** Format: uuid */
+            profileId: string;
+            profileKey: string | null;
+            profileDisplayName: string | null;
+            /** Format: int64 */
+            profileVersion: number;
+            /** Format: uuid */
+            propertyId: string | null;
+        };
+        WorkspaceMemberAccessDto: {
+            subjectId: string | null;
+            assignments: components["schemas"]["WorkspaceMemberAccessAssignmentDto"][] | null;
+        };
+        WorkspaceStaffAccessPlanDto: {
+            /** Format: uuid */
+            sourceId: string;
+            sourceKind: components["schemas"]["WorkspaceStaffOnboardingSourceKind"];
+            /** Format: uuid */
+            profileId: string;
+            profileKey: string | null;
+            propertyIds: string[] | null;
+            status: components["schemas"]["WorkspaceStaffAccessPlanStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffAccessPlanStatus: 0 | 1 | 2 | 3;
+        WorkspaceStaffJoinSourceDto: {
+            /** Format: uuid */
+            sourceId: string;
+            sourceKind: components["schemas"]["WorkspaceStaffOnboardingSourceKind"];
+            recipientEmail: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            status: components["schemas"]["WorkspaceStaffJoinSourceStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: int32 */
+            maximumClaims: number | null;
+            /** Format: int32 */
+            reservedClaims: number | null;
+            approvalMode: string | null;
+            accessPlan: components["schemas"]["WorkspaceStaffAccessPlanDto"];
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        WorkspaceStaffJoinSourceIssuanceDto: {
+            plan: components["schemas"]["WorkspaceStaffAccessPlanDto"];
+            token: string | null;
+            alreadyIssued: boolean;
+        };
+        WorkspaceStaffJoinSourceListResponse: {
+            items: components["schemas"]["WorkspaceStaffJoinSourceDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        WorkspaceStaffJoinSourceReplacementDto: {
+            /** Format: uuid */
+            previousSourceId: string;
+            previousStatus: components["schemas"]["WorkspaceStaffJoinSourceStatus"];
+            /** Format: int64 */
+            previousVersion: number;
+            replacement: components["schemas"]["WorkspaceStaffJoinSourceIssuanceDto"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffJoinSourceStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
         WorkspaceStaffOnboardingDto: {
             /** Format: uuid */
             applicationId: string;
