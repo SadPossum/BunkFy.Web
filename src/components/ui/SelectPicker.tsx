@@ -45,7 +45,7 @@ function BasicSelectPicker({
 }: SelectPickerProps) {
   return (
     <Select.Root
-      value={value || undefined}
+      value={normalizeSelectValue(value)}
       onValueChange={onValueChange}
       name={name}
       disabled={disabled}
@@ -267,4 +267,8 @@ export function filterSelectOptions(
       .toLocaleLowerCase()
       .includes(normalized),
   );
+}
+
+export function normalizeSelectValue(value?: string): string {
+  return value ?? "";
 }
