@@ -22,3 +22,10 @@ The generated API contract lives at `src/api/contracts.generated.ts` and the sou
 
 Use the browser auth endpoints for staff sessions. Refresh credentials stay in path-scoped HttpOnly cookies, access tokens stay in memory, refresh is single-flight, and Web Locks serialize shared-cookie mutation across tabs where supported. Permission evaluation improves the UI by hiding unavailable actions, but every backend command remains independently authorized.
 
+The backend Development environment loads the digest-pinned
+`development-hostel-example` country pack. It is synthetic, carries an
+`Engineering` launch status, and is rejected by Production mode. New and
+existing properties still begin unconfigured; explicitly enable the pack from
+the selected property's Data processing panel before exercising guest,
+reservation, or ingestion writes.
+

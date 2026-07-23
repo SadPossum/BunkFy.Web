@@ -195,10 +195,76 @@ export type WorkspaceStaffJoinSourceReplacement = Omit<
   replacement: WorkspaceStaffJoinSourceIssuance;
 };
 
-export type Property = NonNullableFields<
-  Schema<"PropertyDto">,
-  "name" | "code" | "timeZoneId" | "status"
+export type PropertyProcessingStatus = Schema<"PropertyProcessingStatus">;
+export type PropertyProcessingEffectiveStatus = Schema<"PropertyProcessingEffectiveStatus">;
+
+export type PropertyGovernanceAcknowledgement = NonNullableFields<
+  Schema<"PropertyGovernanceAcknowledgementDto">,
+  "acknowledgementId"
 >;
+
+export type PropertyGovernancePolicyBinding = Omit<
+  NonNullableFields<
+    Schema<"PropertyGovernancePolicyBindingDto">,
+    | "operatingCountryCode"
+    | "policyId"
+    | "dataRegionId"
+    | "transferProfileId"
+    | "retentionPolicyId"
+    | "contentSha256"
+  >,
+  "acknowledgements"
+> & {
+  acknowledgements: PropertyGovernanceAcknowledgement[];
+};
+
+export type Property = Omit<
+  NonNullableFields<
+    Schema<"PropertyDto">,
+    "name" | "code" | "timeZoneId" | "status" | "processingStatus"
+  >,
+  "governancePolicy"
+> & {
+  governancePolicy: PropertyGovernancePolicyBinding | null;
+};
+
+export type PropertyProcessingState = Omit<
+  NonNullableFields<Schema<"PropertyProcessingStateDto">, "reasonCode">,
+  "governancePolicy"
+> & {
+  governancePolicy: PropertyGovernancePolicyBinding | null;
+};
+
+export type CountryPolicyRetention = NonNullableFields<
+  Schema<"CountryPolicyRetentionDescriptorDto">,
+  "retentionPolicyId"
+>;
+
+export type CountryPolicy = Omit<
+  NonNullableFields<
+    Schema<"CountryPolicyDescriptorDto">,
+    | "policyId"
+    | "operatingCountryCode"
+    | "launchStatus"
+    | "approvalState"
+    | "contentSha256"
+  >,
+  | "accommodationTypes"
+  | "permittedDataRegions"
+  | "permittedTransferProfiles"
+  | "retentionPolicies"
+  | "requiredAcknowledgements"
+> & {
+  accommodationTypes: string[];
+  permittedDataRegions: string[];
+  permittedTransferProfiles: string[];
+  retentionPolicies: CountryPolicyRetention[];
+  requiredAcknowledgements: PropertyGovernanceAcknowledgement[];
+};
+
+export type CountryPolicyListResponse = Omit<Schema<"CountryPolicyListResponse">, "items"> & {
+  items: CountryPolicy[];
+};
 
 export type PropertyListResponse = Omit<Schema<"PropertyListResponse">, "properties"> & {
   properties: Property[];

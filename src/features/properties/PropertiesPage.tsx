@@ -17,6 +17,7 @@ import {
   timeZoneDescription,
   timeZoneLabel,
 } from "./propertyFormOptions";
+import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
 import { TopologyRetirementModal, type RetirementTarget } from "./TopologyRetirementModal";
 
 type PropertyFormState = { property?: Property } | null;
@@ -118,7 +119,7 @@ export function PropertiesPage() {
       queryClient.invalidateQueries({ queryKey: ["rooms", selectedPropertyId] }),
       queryClient.invalidateQueries({ queryKey: ["inventory-rooms", selectedPropertyId] }),
     ]);
-    workspace.refetchProperties();
+    await workspace.refetchProperties();
   };
 
   const propertyMutation = useMutation({
@@ -207,7 +208,7 @@ export function PropertiesPage() {
       <PageHeader eyebrow="Setup" title="Properties" description="Keep each hostel’s physical layout accurate so availability and reservations stay trustworthy." action={canCreateProperty ? <button className="btn btn-primary" onClick={() => setPropertyForm({})}><Plus size={17} />New property</button> : undefined} />
 
       {!workspace.properties.length ? <EmptyState icon={<Building2 />} title="No properties yet" description="Create your first hostel property to begin adding rooms and beds." action={canCreateProperty ? <button className="btn btn-primary" onClick={() => setPropertyForm({})}><Plus size={17} />Add property</button> : undefined} /> : (
-        <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
+        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-3">
             {workspace.properties.map((property) => (
               <button key={property.propertyId} onClick={() => workspace.setSelectedPropertyId(property.propertyId)} className={`w-full rounded-2xl border p-4 text-left transition ${property.propertyId === selectedPropertyId ? "border-primary bg-primary text-primary-content shadow-md" : "border-base-300 bg-base-100 hover:border-primary/35"}`}>
@@ -218,8 +219,14 @@ export function PropertiesPage() {
             ))}
           </aside>
 
-          {selectedProperty && <section className="space-y-6">
+          {selectedProperty && <section className="min-w-0 space-y-6">
             <div className="card border border-base-300 bg-base-100 shadow-sm"><div className="card-body gap-5 p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex items-center gap-3"><h2 className="font-display text-2xl font-semibold">{selectedProperty.name}</h2><StatusBadge status={selectedProperty.status} /></div><p className="mt-2 flex items-center gap-2 text-sm text-base-content/50"><MapPin size={15} />{selectedProperty.timeZoneId} · Code {selectedProperty.code}</p></div>{canManageProperty && <div className="flex gap-2"><button className="btn btn-sm btn-ghost" onClick={() => setPropertyForm({ property: selectedProperty })}><Edit3 size={16} />Edit</button><button className="btn btn-sm btn-ghost text-error" onClick={() => setRetirementTarget({ kind: "property", entity: selectedProperty })}><Trash2 size={16} />Retire</button></div>}</div></div></div>
+
+            <PropertyProcessingPanel
+              property={selectedProperty}
+              canManage={canManageProperty}
+              onChanged={invalidateProperty}
+            />
 
             <div className="card border border-base-300 bg-base-100 shadow-sm">
               <div className="flex items-center justify-between border-b border-base-300 px-5 py-5 sm:px-6"><div><h2 className="font-display text-xl font-semibold">Rooms & beds</h2><p className="mt-1 text-sm text-base-content/50">The physical topology used by inventory.</p></div>{canManageRooms && <button className="btn btn-sm btn-primary" onClick={() => setRoomForm({})}><Plus size={16} />Add room</button>}</div>

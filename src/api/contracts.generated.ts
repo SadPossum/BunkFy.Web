@@ -5490,6 +5490,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/properties/{propertyId}/country-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CountryPolicyListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/properties/{propertyId}": {
         parameters: {
             query?: never;
@@ -5552,6 +5589,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/properties/{propertyId}/processing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyProcessingStateDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/properties/{propertyId}/retire": {
         parameters: {
             query?: never;
@@ -5573,6 +5647,86 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["RetirePropertyRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{propertyId}/processing/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ActivatePropertyProcessingRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{propertyId}/processing/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SuspendPropertyProcessingRequest"];
                 };
             };
             responses: {
@@ -7686,6 +7840,21 @@ export interface components {
         };
         /** @enum {string} */
         AccessProfileStatus: "active" | "archived";
+        ActivatePropertyProcessingRequest: {
+            operatingCountryCode: string | null;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            dataRegionId: string | null;
+            transferProfileId: string | null;
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
+            acceptedAcknowledgements: components["schemas"]["PropertyGovernanceAcknowledgementDto"][] | null;
+            confirmed: boolean;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         ActivateTotpRequest: {
             code: string | null;
             refreshToken: string | null;
@@ -7963,6 +8132,32 @@ export interface components {
         ConfirmPasswordRecoveryRequest: {
             code: string | null;
             newPassword: string | null;
+        };
+        CountryPolicyDescriptorDto: {
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            operatingCountryCode: string | null;
+            launchStatus: string | null;
+            approvalState: string | null;
+            /** Format: date-time */
+            effectiveAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            contentSha256: string | null;
+            accommodationTypes: string[] | null;
+            permittedDataRegions: string[] | null;
+            permittedTransferProfiles: string[] | null;
+            retentionPolicies: components["schemas"]["CountryPolicyRetentionDescriptorDto"][] | null;
+            requiredAcknowledgements: components["schemas"]["PropertyGovernanceAcknowledgementDto"][] | null;
+        };
+        CountryPolicyListResponse: {
+            items: components["schemas"]["CountryPolicyDescriptorDto"][] | null;
+        };
+        CountryPolicyRetentionDescriptorDto: {
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
         };
         CreateAccessProfileRequest: {
             key: string | null;
@@ -8532,6 +8727,8 @@ export interface components {
             code: string | null;
             timeZoneId: string | null;
             status: components["schemas"]["PropertyStatus"];
+            processingStatus: components["schemas"]["PropertyProcessingStatus"];
+            governancePolicy: components["schemas"]["PropertyGovernancePolicyBindingDto"];
             /** Format: int64 */
             version: number;
             /** Format: date-time */
@@ -8541,6 +8738,30 @@ export interface components {
             /** Format: date-time */
             retiredAtUtc: string | null;
         };
+        PropertyGovernanceAcknowledgementDto: {
+            acknowledgementId: string | null;
+            /** Format: int32 */
+            acknowledgementVersion: number;
+        };
+        PropertyGovernancePolicyBindingDto: {
+            operatingCountryCode: string | null;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            dataRegionId: string | null;
+            transferProfileId: string | null;
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
+            contentSha256: string | null;
+            /** Format: date-time */
+            policyEffectiveAtUtc: string;
+            /** Format: date-time */
+            policyExpiresAtUtc: string;
+            /** Format: date-time */
+            activatedAtUtc: string;
+            acknowledgements: components["schemas"]["PropertyGovernanceAcknowledgementDto"][] | null;
+        };
         PropertyListResponse: {
             properties: components["schemas"]["PropertyDto"][] | null;
             /** Format: int32 */
@@ -8548,6 +8769,22 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        /** @enum {string} */
+        PropertyProcessingEffectiveStatus: "unconfigured" | "enabled" | "suspended" | "expired" | "revoked";
+        PropertyProcessingStateDto: {
+            /** Format: uuid */
+            propertyId: string;
+            configuredStatus: components["schemas"]["PropertyProcessingStatus"];
+            effectiveStatus: components["schemas"]["PropertyProcessingEffectiveStatus"];
+            reasonCode: string | null;
+            governancePolicy: components["schemas"]["PropertyGovernancePolicyBindingDto"];
+            /** Format: int64 */
+            propertyVersion: number;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+        };
+        /** @enum {string} */
+        PropertyProcessingStatus: "unconfigured" | "enabled" | "suspended";
         /** @enum {string} */
         PropertyStatus: "active" | "retired";
         PropertyUpdateRequest: {
@@ -9005,6 +9242,11 @@ export interface components {
             employeeNumber: string | null;
             jobTitle: string | null;
             department: string | null;
+        };
+        SuspendPropertyProcessingRequest: {
+            confirmed: boolean;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         TotpActivationResponse: {
             accessToken: string | null;

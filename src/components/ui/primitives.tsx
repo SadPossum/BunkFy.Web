@@ -152,6 +152,11 @@ export function ErrorState({ error, retry, title = "Something went wrong" }: { e
 function friendlyErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === "Organizations.MembershipConflict") return "You already belong to this workspace.";
+    if (error.code === "Properties.ConfirmationRequired") return "Confirm the change before continuing.";
+    if (error.code === "Properties.PropertyProcessingNotEnabled") return "Data processing is not enabled for this property.";
+    if (error.code === "Properties.CountryPolicy.PolicyExpired") return "This country policy has expired. Choose another configured policy.";
+    if (error.code === "Properties.CountryPolicy.RequiredAcknowledgementMissing") return "Accept every acknowledgement required by the selected policy.";
+    if (error.code?.startsWith("Properties.CountryPolicy.")) return "These policy coordinates are no longer accepted. Refresh and choose a configured policy.";
     if (error.status === 403) return "Your account does not have access to this action.";
     if (error.status === 404) return "The requested item is no longer available.";
   }

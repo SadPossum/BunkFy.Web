@@ -5153,6 +5153,36 @@
         }
       }
     },
+    "/api/properties/{propertyId}/country-policies": {
+      "get": {
+        "tags": [
+          "Properties"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountryPolicyListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/properties/{propertyId}": {
       "get": {
         "tags": [
@@ -5221,6 +5251,36 @@
         }
       }
     },
+    "/api/properties/{propertyId}/processing": {
+      "get": {
+        "tags": [
+          "Properties"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyProcessingStateDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/properties/{propertyId}/retire": {
       "post": {
         "tags": [
@@ -5242,6 +5302,79 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RetirePropertyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/properties/{propertyId}/processing/activate": {
+      "post": {
+        "tags": [
+          "Properties"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivatePropertyProcessingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{propertyId}/processing/suspend": {
+      "post": {
+        "tags": [
+          "Properties"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendPropertyProcessingRequest"
               }
             }
           },
@@ -7721,6 +7854,54 @@
         ],
         "type": "string"
       },
+      "ActivatePropertyProcessingRequest": {
+        "type": "object",
+        "properties": {
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dataRegionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedAcknowledgements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyGovernanceAcknowledgementDto"
+            },
+            "nullable": true
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "ActivateTotpRequest": {
         "type": "object",
         "properties": {
@@ -8498,6 +8679,106 @@
           "newPassword": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CountryPolicyDescriptorDto": {
+        "type": "object",
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalState": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "accommodationTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "permittedDataRegions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "permittedTransferProfiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "retentionPolicies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CountryPolicyRetentionDescriptorDto"
+            },
+            "nullable": true
+          },
+          "requiredAcknowledgements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyGovernanceAcknowledgementDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CountryPolicyListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CountryPolicyDescriptorDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CountryPolicyRetentionDescriptorDto": {
+        "type": "object",
+        "properties": {
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -10100,6 +10381,12 @@
           "status": {
             "$ref": "#/components/schemas/PropertyStatus"
           },
+          "processingStatus": {
+            "$ref": "#/components/schemas/PropertyProcessingStatus"
+          },
+          "governancePolicy": {
+            "$ref": "#/components/schemas/PropertyGovernancePolicyBindingDto"
+          },
           "version": {
             "type": "integer",
             "format": "int64"
@@ -10116,6 +10403,77 @@
           "retiredAtUtc": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PropertyGovernanceAcknowledgementDto": {
+        "type": "object",
+        "properties": {
+          "acknowledgementId": {
+            "type": "string",
+            "nullable": true
+          },
+          "acknowledgementVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PropertyGovernancePolicyBindingDto": {
+        "type": "object",
+        "properties": {
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dataRegionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyEffectiveAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policyExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyGovernanceAcknowledgementDto"
+            },
             "nullable": true
           }
         },
@@ -10141,6 +10499,55 @@
           }
         },
         "additionalProperties": false
+      },
+      "PropertyProcessingEffectiveStatus": {
+        "enum": [
+          "unconfigured",
+          "enabled",
+          "suspended",
+          "expired",
+          "revoked"
+        ],
+        "type": "string"
+      },
+      "PropertyProcessingStateDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "configuredStatus": {
+            "$ref": "#/components/schemas/PropertyProcessingStatus"
+          },
+          "effectiveStatus": {
+            "$ref": "#/components/schemas/PropertyProcessingEffectiveStatus"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "governancePolicy": {
+            "$ref": "#/components/schemas/PropertyGovernancePolicyBindingDto"
+          },
+          "propertyVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PropertyProcessingStatus": {
+        "enum": [
+          "unconfigured",
+          "enabled",
+          "suspended"
+        ],
+        "type": "string"
       },
       "PropertyStatus": {
         "enum": [
@@ -11429,6 +11836,19 @@
           "department": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SuspendPropertyProcessingRequest": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
