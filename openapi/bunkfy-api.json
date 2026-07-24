@@ -1914,6 +1914,90 @@
         }
       }
     },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/decision": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionedDataRightsCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/decision/outcome": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDataRightsDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/cancel": {
       "post": {
         "tags": [
@@ -9545,6 +9629,28 @@
         "type": "integer",
         "format": "int32"
       },
+      "DataRightsDecisionOutcome": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "DataRightsDecisionReason": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DataRightsOperation": {
         "enum": [
           0,
@@ -11192,6 +11298,22 @@
             "nullable": true
           },
           "expectedDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecordDataRightsDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/DataRightsDecisionOutcome"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/DataRightsDecisionReason"
+          },
+          "expectedVersion": {
             "type": "integer",
             "format": "int64"
           }

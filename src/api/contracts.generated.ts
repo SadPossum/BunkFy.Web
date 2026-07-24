@@ -2308,6 +2308,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["VersionedDataRightsCaseRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/decision/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RecordDataRightsDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/cancel": {
         parameters: {
             query?: never;
@@ -8708,6 +8788,16 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
+        DataRightsDecisionOutcome: 0 | 1 | 2;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsDecisionReason: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
         DataRightsOperation: 0 | 1 | 2 | 4 | 8 | 16;
         /**
          * Format: int32
@@ -9296,6 +9386,12 @@ export interface components {
             inventoryUnitIds: string[] | null;
             /** Format: int64 */
             expectedDetailsRevision: number;
+        };
+        RecordDataRightsDecisionRequest: {
+            decision: components["schemas"]["DataRightsDecisionOutcome"];
+            reason: components["schemas"]["DataRightsDecisionReason"];
+            /** Format: int64 */
+            expectedVersion: number;
         };
         RecordRequesterVerificationRequest: {
             verified: boolean;
