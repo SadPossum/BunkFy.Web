@@ -2348,6 +2348,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/subjects/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DiscoverDataRightsSubjectsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/subjects/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SelectDataRightsSubjectRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/subjects/unselect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UnselectDataRightsSubjectRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guests/properties/{propertyId}": {
         parameters: {
             query?: never;
@@ -8558,6 +8714,29 @@ export interface components {
          * @enum {integer}
          */
         DataRightsRequesterRelationship: 0 | 1 | 2 | 3 | 4;
+        DataRightsSubjectCoordinate: {
+            ownerKey: string | null;
+            recordType: string | null;
+            /** Format: uuid */
+            recordId: string;
+            /** Format: int64 */
+            recordVersion: number;
+        };
+        DataRightsSubjectCoordinateKey: {
+            ownerKey: string | null;
+            recordType: string | null;
+            /** Format: uuid */
+            recordId: string;
+        };
+        DiscoverDataRightsSubjectsRequest: {
+            /** Format: uuid */
+            recordId: string | null;
+            email: string | null;
+            phone: string | null;
+            name: string | null;
+            /** Format: date */
+            dateOfBirth: string | null;
+        };
         ExternalAuthenticationChallengeRequest: {
             returnUrl: string | null;
         };
@@ -9406,6 +9585,11 @@ export interface components {
             buildingLabel: string | null;
             floorLabel: string | null;
         };
+        SelectDataRightsSubjectRequest: {
+            coordinate: components["schemas"]["DataRightsSubjectCoordinate"];
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         SetNotificationPreferenceRequest: {
             enabled: boolean;
         };
@@ -9593,6 +9777,11 @@ export interface components {
         UnlinkExternalIdentityRequest: {
             refreshToken: string | null;
             currentPassword: string | null;
+        };
+        UnselectDataRightsSubjectRequest: {
+            coordinate: components["schemas"]["DataRightsSubjectCoordinateKey"];
+            /** Format: int64 */
+            expectedVersion: number;
         };
         UpdateAccessProfileRequest: {
             displayName: string | null;
