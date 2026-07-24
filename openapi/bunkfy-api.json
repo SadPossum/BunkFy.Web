@@ -2426,6 +2426,150 @@
         }
       }
     },
+    "/api/guests/properties/{propertyId}/data-rights-restrictions": {
+      "post": {
+        "tags": [
+          "Guests"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyGuestProcessingRestrictionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestProcessingRestrictionReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guests/properties/{propertyId}/data-rights-restrictions/{restrictionId}/release": {
+      "post": {
+        "tags": [
+          "Guests"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "restrictionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseGuestProcessingRestrictionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestProcessingRestrictionReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guests/properties/{propertyId}/{guestId}/data-rights-restrictions": {
+      "get": {
+        "tags": [
+          "Guests"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "guestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestProcessingRestrictionListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/guests/properties/{propertyId}/{guestId}/archive": {
       "post": {
         "tags": [
@@ -8731,6 +8875,36 @@
         "type": "integer",
         "format": "int32"
       },
+      "ApplyGuestProcessingRestrictionRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGuestVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedProjectionRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "ArchiveAccessProfileRequest": {
         "type": "object",
         "properties": {
@@ -9997,6 +10171,134 @@
           "notes": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestProcessingRestrictionActionDto": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "GuestProcessingRestrictionDto": {
+        "type": "object",
+        "properties": {
+          "restrictionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applyCaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applyApprovalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selectedGuestVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "appliedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "appliedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestProcessingRestrictionListResponse": {
+        "type": "object",
+        "properties": {
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestProcessingRestrictionDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestProcessingRestrictionReceiptDto": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restrictionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "$ref": "#/components/schemas/GuestProcessingRestrictionActionDto"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selectedGuestVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "restrictionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectionRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "effectiveRestricted": {
+            "type": "boolean"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -11545,6 +11847,40 @@
           "reason": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReleaseGuestProcessingRestrictionRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGuestVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedRestrictionVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedProjectionRevision": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false

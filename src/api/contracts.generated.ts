@@ -2784,6 +2784,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guests/properties/{propertyId}/data-rights-restrictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ApplyGuestProcessingRestrictionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestProcessingRestrictionReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guests/properties/{propertyId}/data-rights-restrictions/{restrictionId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    restrictionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReleaseGuestProcessingRestrictionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestProcessingRestrictionReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guests/properties/{propertyId}/{guestId}/data-rights-restrictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    propertyId: string;
+                    guestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestProcessingRestrictionListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guests/properties/{propertyId}/{guestId}/archive": {
         parameters: {
             query?: never;
@@ -8517,6 +8641,20 @@ export interface components {
          * @enum {integer}
          */
         AdapterRunOutcome: 0 | 1 | 2 | 3 | 4;
+        ApplyGuestProcessingRestrictionRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: int64 */
+            expectedGuestVersion: number;
+            /** Format: int64 */
+            expectedProjectionRevision: number;
+        };
         ArchiveAccessProfileRequest: {
             /** Format: int64 */
             expectedVersion: number;
@@ -8945,6 +9083,62 @@ export interface components {
             nationalityCountryCode: string | null;
             preferredLanguageTag: string | null;
             notes: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        GuestProcessingRestrictionActionDto: 0 | 1 | 2;
+        GuestProcessingRestrictionDto: {
+            /** Format: uuid */
+            restrictionId: string;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: uuid */
+            applyCaseId: string;
+            /** Format: int64 */
+            applyApprovalRevision: number;
+            /** Format: int64 */
+            selectedGuestVersion: number;
+            /** Format: int64 */
+            version: number;
+            appliedBy: string | null;
+            /** Format: date-time */
+            appliedAtUtc: string;
+        };
+        GuestProcessingRestrictionListResponse: {
+            restrictions: components["schemas"]["GuestProcessingRestrictionDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        GuestProcessingRestrictionReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            restrictionId: string;
+            action: components["schemas"]["GuestProcessingRestrictionActionDto"];
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: int64 */
+            selectedGuestVersion: number;
+            /** Format: int64 */
+            restrictionVersion: number;
+            /** Format: int64 */
+            projectionRevision: number;
+            effectiveRestricted: boolean;
+            actorId: string | null;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: date-time */
+            completedAtUtc: string;
         };
         GuestProfileUpdateRequest: {
             displayName: string | null;
@@ -9504,6 +9698,22 @@ export interface components {
             /** Format: int64 */
             expectedProposalVersion: number;
             reason: string | null;
+        };
+        ReleaseGuestProcessingRestrictionRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: int64 */
+            expectedGuestVersion: number;
+            /** Format: int64 */
+            expectedRestrictionVersion: number;
+            /** Format: int64 */
+            expectedProjectionRevision: number;
         };
         ReleaseManualBlockRequest: {
             /** Format: int64 */
