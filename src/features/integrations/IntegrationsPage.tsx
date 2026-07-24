@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, Cable, ChevronLeft, ChevronRight, ClipboardCheck, Plus, Radio, ShieldAlert, Zap } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
 import type { AdapterConnection, AdapterConnectionListResponse, AdapterTypeCapability, AdapterTypeCapabilityListResponse } from "../../api/types";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";

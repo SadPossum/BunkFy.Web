@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router";
 import { AppShell } from "../components/layout/AppShell";
 import { AuthPage } from "../features/auth/AuthPage";
 import { AuthCompletionPage } from "../features/auth/AuthCompletionPage";

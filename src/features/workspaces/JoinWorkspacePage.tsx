@@ -9,7 +9,7 @@ import {
   MailCheck,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { ApiError } from "../../api/client";
 import type {
   AuthenticationMethods,

@@ -12,7 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { notificationAudienceLabel, notificationSeverityLabel } from "../../api/labels";
 import type {
   MarkAllNotificationsReadResponse,

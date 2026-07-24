@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { useWorkspace } from "./workspace";
 
 export const focusedResourceClass = "resource-focus";

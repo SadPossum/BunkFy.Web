@@ -11,7 +11,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import type {
   InventoryAvailabilityResponse,
   ManualBlockGroup,

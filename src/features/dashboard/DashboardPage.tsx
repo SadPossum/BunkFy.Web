@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BedDouble, Blocks, Building2, CalendarCheck2, CalendarClock, Plus, Users } from "lucide-react";
-import { Link } from "react-router-dom";
-import { Navigate } from "react-router-dom";
+import { Link } from "react-router";
+import { Navigate } from "react-router";
 import type { ManualBlockListResponse, ReservationListResponse, RoomInventoryListResponse, RoomListResponse } from "../../api/types";
 import { reservationStatusLabel } from "../../api/labels";
 import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";

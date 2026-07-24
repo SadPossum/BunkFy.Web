@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Activity, Braces, ChevronLeft, ChevronRight, Clock3, Database, Download, FileJson2, GitBranch, ListRestart, PlayCircle, Rows3 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { adapterExecutionModeLabel, ingestionRunStatusLabel, rawPayloadStatusLabel, receiptStatusLabel, reprocessingStatusLabel } from "../../api/labels";
 import type { AdapterConnection, AdapterTypeCapability, IngestionRun, IngestionRunListResponse, ObservationParserCapabilityListResponse, ObservationReceipt, ObservationReceiptListResponse, ObservationReprocessingAttemptDetails, ObservationReprocessingAttemptListResponse } from "../../api/types";
 import { ingestionRunNeedsLiveRefresh, LIVE_DETAIL_REFRESH_INTERVAL_MS, LIVE_LIST_REFRESH_INTERVAL_MS, receiptNeedsLiveRefresh, reprocessingNeedsLiveRefresh } from "../../app/liveUpdates";

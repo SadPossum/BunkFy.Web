@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { useWorkspace } from "../../app/workspace";
 import { JoinWorkspacePage } from "./JoinWorkspacePage";
 import { WorkspaceOnboardingPage } from "./WorkspaceOnboardingPage";

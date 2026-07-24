@@ -1,6 +1,6 @@
 import { Bell, Blocks, Building2, Cable, CalendarDays, Gauge, LogOut, Menu, Settings2, UserRoundCog, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router";
 import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";

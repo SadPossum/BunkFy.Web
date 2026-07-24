@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, CalendarClock } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { RoomInventory, RoomInventoryChangeImpact } from "../../api/types";
 import { ErrorState, LoadingState, Modal, ModalActions } from "../../components/ui/primitives";
 

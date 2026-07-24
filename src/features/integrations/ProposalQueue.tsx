@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, FileDiff, UserPlus, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router";
 import { proposalStatusLabel, proposalStatusValue } from "../../api/labels";
 import type { ChangeProposal, ChangeProposalListResponse, ChangeProposalSummary, Reservation } from "../../api/types";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, LIVE_LIST_REFRESH_INTERVAL_MS, proposalNeedsLiveRefresh } from "../../app/liveUpdates";

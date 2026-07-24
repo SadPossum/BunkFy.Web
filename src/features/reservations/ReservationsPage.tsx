@@ -1,7 +1,7 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BedDouble, CalendarDays, ChevronRight, Plus, Search, X } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import type { Reservation, ReservationListResponse, ReservationStatus } from "../../api/types";
 import { reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
 import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh } from "../../app/liveUpdates";

@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { Bed, Property, Room, TopologyRetirement } from "../../api/types";
 import { ErrorState, Modal, ModalActions } from "../../components/ui/primitives";
 

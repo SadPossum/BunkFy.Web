@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, BriefcaseBusiness, Building2, ChevronLeft, ChevronRight, CircleUserRound, Edit3, KeyRound, Mail, Phone, Plus, Search, ShieldAlert, UserRoundCheck, UserRoundMinus, UserRoundX, UsersRound } from "lucide-react";
 import { useDeferredValue, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { staffStatusLabel, staffStatusValue } from "../../api/labels";
 import type { Property, StaffDirectoryAssignment, StaffDirectoryListResponse, StaffDirectoryMember, StaffMember, StaffPropertyAssignment, StaffStatus } from "../../api/types";
 import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";

@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { Building2, Link2, LogOut } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import type { OrganizationMembershipSummary } from "../../api/types";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
