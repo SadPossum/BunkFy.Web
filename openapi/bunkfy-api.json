@@ -9439,6 +9439,9 @@
           "requestedOperations": {
             "$ref": "#/components/schemas/DataRightsOperation"
           },
+          "restrictionDirective": {
+            "$ref": "#/components/schemas/DataRightsRestrictionDirective"
+          },
           "requesterRelationship": {
             "$ref": "#/components/schemas/DataRightsRequesterRelationship"
           }
@@ -9710,6 +9713,15 @@
           2,
           3,
           4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "DataRightsRestrictionDirective": {
+        "enum": [
+          0,
+          1,
+          2
         ],
         "type": "integer",
         "format": "int32"

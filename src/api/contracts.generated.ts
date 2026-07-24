@@ -8749,6 +8749,7 @@ export interface components {
         };
         CreateDataRightsCaseRequest: {
             requestedOperations: components["schemas"]["DataRightsOperation"];
+            restrictionDirective: components["schemas"]["DataRightsRestrictionDirective"];
             requesterRelationship: components["schemas"]["DataRightsRequesterRelationship"];
         };
         CreateIngressCredentialRequest: {
@@ -8845,6 +8846,11 @@ export interface components {
          * @enum {integer}
          */
         DataRightsRequesterRelationship: 0 | 1 | 2 | 3 | 4;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsRestrictionDirective: 0 | 1 | 2;
         DataRightsSubjectCoordinate: {
             ownerKey: string | null;
             recordType: string | null;
