@@ -2584,6 +2584,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartDataRightsExecutionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guests/properties/{propertyId}": {
         parameters: {
             query?: never;
@@ -10122,6 +10182,12 @@ export interface components {
             /** Format: date */
             effectiveTo: string;
             reason: string | null;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        StartDataRightsExecutionRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
             /** Format: int64 */
             expectedVersion: number;
         };
