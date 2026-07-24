@@ -2743,6 +2743,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guests/properties/{propertyId}/data-rights-corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GuestDataRightsCorrectionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestDataRightsCorrectionReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guests/properties/{propertyId}/{guestId}/archive": {
         parameters: {
             query?: never;
@@ -8858,6 +8899,46 @@ export interface components {
             linkedAtUtc: string;
             /** Format: date-time */
             lastAuthenticatedAtUtc: string | null;
+        };
+        GuestDataRightsCorrectionReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: int64 */
+            previousVersion: number;
+            /** Format: int64 */
+            currentVersion: number;
+            changedFields: string[] | null;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        GuestDataRightsCorrectionRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            displayName: string | null;
+            legalName: string | null;
+            email: string | null;
+            phone: string | null;
+            /** Format: date */
+            dateOfBirth: string | null;
+            nationalityCountryCode: string | null;
+            preferredLanguageTag: string | null;
+            notes: string | null;
         };
         GuestProfileUpdateRequest: {
             displayName: string | null;
