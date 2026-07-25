@@ -2968,6 +2968,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guests/properties/{propertyId}/{guestId}/data-holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["GuestDataHoldStatus"];
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    propertyId: string;
+                    guestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestDataHoldListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    guestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PlaceGuestDataHoldRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestDataHoldReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guests/properties/{propertyId}/{guestId}/data-holds/{holdId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    guestId: string;
+                    holdId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReleaseGuestDataHoldRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GuestDataHoldReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guests/properties/{propertyId}/{guestId}/archive": {
         parameters: {
             query?: never;
@@ -9104,6 +9215,62 @@ export interface components {
             /** Format: date-time */
             lastAuthenticatedAtUtc: string | null;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        GuestDataHoldAction: 0 | 1 | 2;
+        GuestDataHoldDto: {
+            /** Format: uuid */
+            holdId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            guestId: string;
+            reasonCode: string | null;
+            status: components["schemas"]["GuestDataHoldStatus"];
+            placedBy: string | null;
+            /** Format: date-time */
+            placedAtUtc: string;
+            releasedBy: string | null;
+            /** Format: date-time */
+            releasedAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+        };
+        GuestDataHoldListResponse: {
+            holds: components["schemas"]["GuestDataHoldDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        GuestDataHoldReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: uuid */
+            holdId: string;
+            action: components["schemas"]["GuestDataHoldAction"];
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            guestId: string;
+            reasonCode: string | null;
+            /** Format: int64 */
+            selectedGuestVersion: number;
+            /** Format: int64 */
+            resultingHoldVersion: number;
+            actorId: string | null;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        GuestDataHoldStatus: 0 | 1 | 2;
         GuestDataRightsCorrectionReceiptDto: {
             /** Format: uuid */
             receiptId: string;
@@ -9636,6 +9803,13 @@ export interface components {
             password: string | null;
             refreshToken: string | null;
         };
+        PlaceGuestDataHoldRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedGuestVersion: number;
+            reasonCode: string | null;
+        };
         PreviewOrganizationEnrollmentLinkRequest: {
             token: string | null;
         };
@@ -9758,6 +9932,15 @@ export interface components {
             /** Format: int64 */
             expectedProposalVersion: number;
             reason: string | null;
+        };
+        ReleaseGuestDataHoldRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedGuestVersion: number;
+            /** Format: int64 */
+            expectedHoldVersion: number;
+            confirmed: boolean;
         };
         ReleaseGuestProcessingRestrictionRequest: {
             /** Format: uuid */
