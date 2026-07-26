@@ -25,6 +25,7 @@ describe("frontend repository foundation", () => {
       "src/api",
       "src/components/ui",
       "src/features/reservations",
+      "src/features/data-rights",
       "src/features/guests",
       "src/features/staff",
       "src/features/integrations",

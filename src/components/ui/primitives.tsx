@@ -157,6 +157,9 @@ function friendlyErrorMessage(error: unknown): string {
     if (error.code === "Properties.CountryPolicy.PolicyExpired") return "This country policy has expired. Choose another configured policy.";
     if (error.code === "Properties.CountryPolicy.RequiredAcknowledgementMissing") return "Accept every acknowledgement required by the selected policy.";
     if (error.code?.startsWith("Properties.CountryPolicy.")) return "These policy coordinates are no longer accepted. Refresh and choose a configured policy.";
+    if (error.code === "DataRights.DecisionActorCannotExecute") return "A different authorized staff member must execute this approved request.";
+    if (error.code === "DataRights.VersionConflict") return "This privacy request changed. Review the latest state and try again.";
+    if (error.code === "Security.InsufficientAuthentication") return "Sign in again before removing personal data.";
     if (error.status === 403) return "Your account does not have access to this action.";
     if (error.status === 404) return "The requested item is no longer available.";
   }

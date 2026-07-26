@@ -414,6 +414,55 @@ export type ReservationDetailsHistoryItem = {
   occurredAtUtc: string;
 };
 
+export type DataRightsCaseStatus = Schema<"DataRightsCaseStatus">;
+export type DataRightsDecisionOutcome = Schema<"DataRightsDecisionOutcome">;
+export type DataRightsDecisionReason = Schema<"DataRightsDecisionReason">;
+export type DataRightsExecutionWorkItemStatus = Schema<"DataRightsExecutionWorkItemStatus">;
+export type DataRightsRequesterRelationship = Schema<"DataRightsRequesterRelationship">;
+
+export type DataRightsCase = Omit<Schema<"DataRightsCaseDto">, "approvalEvidence"> & {
+  approvalEvidence: Schema<"DataRightsApprovalEvidence"> | null;
+};
+export type DataRightsCaseListResponse = Omit<Schema<"DataRightsCaseListResponse">, "items"> & {
+  items: DataRightsCase[];
+};
+export type DataRightsSubjectCoordinate = NonNullableFields<
+  Schema<"DataRightsSubjectCoordinate">,
+  "ownerKey" | "recordType"
+>;
+export type DataRightsSubjectCandidate = Omit<
+  NonNullableFields<Schema<"DataRightsSubjectCandidate">, "displayName">,
+  "coordinate"
+> & {
+  coordinate: DataRightsSubjectCoordinate;
+};
+export type DataRightsSubjectDiscoveryResponse = Omit<
+  Schema<"DataRightsSubjectDiscoveryResponse">,
+  "candidates"
+> & {
+  candidates: DataRightsSubjectCandidate[];
+};
+export type DataRightsSelectedSubject = NonNullableFields<
+  Schema<"DataRightsSelectedSubjectDto">,
+  "ownerKey" | "recordType"
+>;
+export type DataRightsSelectedSubjectsResponse = Omit<
+  Schema<"DataRightsSelectedSubjectsResponse">,
+  "subjects"
+> & {
+  subjects: DataRightsSelectedSubject[];
+};
+export type DataRightsExecution = Omit<
+  Schema<"DataRightsExecutionDto">,
+  "case" | "workItem"
+> & {
+  case: DataRightsCase;
+  workItem: NonNullableFields<
+    Schema<"DataRightsExecutionWorkItemDto">,
+    "ownerKey" | "recordType"
+  >;
+};
+
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";
 
 export type GuestProfile = {

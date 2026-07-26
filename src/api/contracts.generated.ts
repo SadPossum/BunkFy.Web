@@ -2077,7 +2077,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseListResponse"];
+                    };
                 };
             };
         };
@@ -2102,7 +2104,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2136,7 +2140,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2178,7 +2184,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2218,7 +2226,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2258,7 +2268,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2298,7 +2310,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2338,7 +2352,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2378,7 +2394,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2418,7 +2436,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2452,7 +2472,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsSelectedSubjectsResponse"];
+                    };
                 };
             };
         };
@@ -2494,7 +2516,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsSubjectDiscoveryResponse"];
+                    };
                 };
             };
         };
@@ -2534,7 +2558,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2574,7 +2600,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
                 };
             };
         };
@@ -2608,7 +2636,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExecutionDto"];
+                    };
                 };
             };
         };
@@ -2634,7 +2664,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExecutionDto"];
+                    };
                 };
             };
         };
@@ -9130,11 +9162,79 @@ export interface components {
             tenantId: string | null;
             isEnabled: boolean;
         };
+        DataRightsApprovalEvidence: {
+            /** Format: int32 */
+            schemaVersion: number;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int64 */
+            propertyVersion: number;
+            operatingCountryCode: string | null;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
+            contentSha256: string | null;
+            purposeCode: string | null;
+            surface: string | null;
+            sourceProvenance: string | null;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+            requiresDistinctExecutor: boolean;
+        };
+        DataRightsCaseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            propertyId: string | null;
+            type: components["schemas"]["DataRightsCaseType"];
+            requestedOperations: components["schemas"]["DataRightsOperation"];
+            restrictionDirective: components["schemas"]["DataRightsRestrictionDirective"];
+            requesterRelationship: components["schemas"]["DataRightsRequesterRelationship"];
+            verificationStatus: components["schemas"]["DataRightsVerificationStatus"];
+            routingStatus: components["schemas"]["DataRightsRoutingStatus"];
+            status: components["schemas"]["DataRightsCaseStatus"];
+            decision: components["schemas"]["DataRightsDecisionOutcome"];
+            decisionReason: components["schemas"]["DataRightsDecisionReason"];
+            /** Format: int64 */
+            decisionRevision: number | null;
+            /** Format: date-time */
+            decidedAtUtc: string | null;
+            /** Format: int64 */
+            executionRevision: number | null;
+            /** Format: date-time */
+            executionStartedAtUtc: string | null;
+            /** Format: int32 */
+            selectedSubjectCount: number;
+            /** Format: date-time */
+            dueAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+            approvalEvidence: components["schemas"]["DataRightsApprovalEvidence"];
+        };
+        DataRightsCaseListResponse: {
+            items: components["schemas"]["DataRightsCaseDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
         /**
          * Format: int32
          * @enum {integer}
          */
         DataRightsCaseStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsCaseType: 0 | 1 | 2;
         /**
          * Format: int32
          * @enum {integer}
@@ -9145,6 +9245,72 @@ export interface components {
          * @enum {integer}
          */
         DataRightsDecisionReason: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        DataRightsExecutionDto: {
+            case: components["schemas"]["DataRightsCaseDto"];
+            workItem: components["schemas"]["DataRightsExecutionWorkItemDto"];
+        };
+        DataRightsExecutionWorkItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: int64 */
+            executionRevision: number;
+            operation: components["schemas"]["DataRightsOperation"];
+            ownerKey: string | null;
+            recordType: string | null;
+            /** Format: uuid */
+            recordId: string;
+            /** Format: int64 */
+            selectedRecordVersion: number;
+            /** Format: int32 */
+            policyEvidenceSchemaVersion: number;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
+            policyContentSha256: string | null;
+            /** Format: int32 */
+            ownerContractVersion: number;
+            status: components["schemas"]["DataRightsExecutionWorkItemStatus"];
+            /** Format: int32 */
+            attemptCount: number;
+            /** Format: uuid */
+            taskRunId: string | null;
+            /** Format: int32 */
+            lastTaskAttempt: number;
+            /** Format: date-time */
+            lastAttemptAtUtc: string | null;
+            /** Format: int32 */
+            ownerReceiptContractVersion: number | null;
+            /** Format: uuid */
+            ownerReceiptId: string | null;
+            /** Format: int64 */
+            resultingRecordVersion: number | null;
+            ownerDispositionCode: string | null;
+            ownerReasonCode: string | null;
+            ownerReceiptSha256: string | null;
+            /** Format: date-time */
+            ownerCompletedAtUtc: string | null;
+            outcomeCode: string | null;
+            /** Format: date-time */
+            outcomeAtUtc: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: int64 */
+            version: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsExecutionWorkItemStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
         /**
          * Format: int32
          * @enum {integer}
@@ -9160,6 +9326,32 @@ export interface components {
          * @enum {integer}
          */
         DataRightsRestrictionDirective: 0 | 1 | 2;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsRoutingStatus: 0 | 1 | 2 | 3;
+        DataRightsSelectedSubjectDto: {
+            ownerKey: string | null;
+            recordType: string | null;
+            /** Format: uuid */
+            recordId: string;
+            /** Format: int64 */
+            recordVersion: number;
+            /** Format: date-time */
+            selectedAtUtc: string;
+        };
+        DataRightsSelectedSubjectsResponse: {
+            /** Format: int64 */
+            caseVersion: number;
+            subjects: components["schemas"]["DataRightsSelectedSubjectDto"][] | null;
+        };
+        DataRightsSubjectCandidate: {
+            coordinate: components["schemas"]["DataRightsSubjectCoordinate"];
+            displayName: string | null;
+            emailHint: string | null;
+            phoneHint: string | null;
+        };
         DataRightsSubjectCoordinate: {
             ownerKey: string | null;
             recordType: string | null;
@@ -9174,6 +9366,14 @@ export interface components {
             /** Format: uuid */
             recordId: string;
         };
+        DataRightsSubjectDiscoveryResponse: {
+            candidates: components["schemas"]["DataRightsSubjectCandidate"][] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsVerificationStatus: 0 | 1 | 2 | 3 | 4;
         DiscoverDataRightsSubjectsRequest: {
             /** Format: uuid */
             recordId: string | null;
@@ -9182,6 +9382,7 @@ export interface components {
             name: string | null;
             /** Format: date */
             dateOfBirth: string | null;
+            ownerKey: string | null;
         };
         ExternalAuthenticationChallengeRequest: {
             returnUrl: string | null;

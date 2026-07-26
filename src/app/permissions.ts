@@ -34,6 +34,13 @@ export const permissions = {
   ingestionRawPayloadsRead: "ingestion.raw-payloads.read",
   ingestionSensitiveHistoryRead: "ingestion.sensitive-history.read",
   ingestionProposalsDecide: "ingestion.proposals.decide",
+  dataRightsRead: "data-rights.read",
+  dataRightsCreate: "data-rights.create",
+  dataRightsDiscover: "data-rights.discover",
+  dataRightsReview: "data-rights.review",
+  dataRightsDecide: "data-rights.decide",
+  dataRightsErase: "data-rights.erase",
+  dataRightsManage: "data-rights.manage",
 } as const;
 
 export function tenantAccessScope(tenantId: string): string {

@@ -1678,7 +1678,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -1709,7 +1716,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1741,7 +1755,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1783,7 +1804,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1825,7 +1853,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1867,7 +1902,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1909,7 +1951,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1951,7 +2000,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1993,7 +2049,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2035,7 +2098,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2067,7 +2137,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsSelectedSubjectsResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2109,7 +2186,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsSubjectDiscoveryResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2151,7 +2235,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2193,7 +2284,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2225,7 +2323,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsExecutionDto"
+                }
+              }
+            }
           }
         }
       },
@@ -2265,7 +2370,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsExecutionDto"
+                }
+              }
+            }
           }
         }
       }
@@ -10067,6 +10179,174 @@
         },
         "additionalProperties": false
       },
+      "DataRightsApprovalEvidence": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "purposeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "surface": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceProvenance": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requiresDistinctExecutor": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsCaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/DataRightsCaseType"
+          },
+          "requestedOperations": {
+            "$ref": "#/components/schemas/DataRightsOperation"
+          },
+          "restrictionDirective": {
+            "$ref": "#/components/schemas/DataRightsRestrictionDirective"
+          },
+          "requesterRelationship": {
+            "$ref": "#/components/schemas/DataRightsRequesterRelationship"
+          },
+          "verificationStatus": {
+            "$ref": "#/components/schemas/DataRightsVerificationStatus"
+          },
+          "routingStatus": {
+            "$ref": "#/components/schemas/DataRightsRoutingStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DataRightsCaseStatus"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DataRightsDecisionOutcome"
+          },
+          "decisionReason": {
+            "$ref": "#/components/schemas/DataRightsDecisionReason"
+          },
+          "decisionRevision": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "decidedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "executionRevision": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "executionStartedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "selectedSubjectCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dueAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvalEvidence": {
+            "$ref": "#/components/schemas/DataRightsApprovalEvidence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsCaseListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRightsCaseDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "DataRightsCaseStatus": {
         "enum": [
           0,
@@ -10081,6 +10361,15 @@
           9,
           10,
           11
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "DataRightsCaseType": {
+        "enum": [
+          0,
+          1,
+          2
         ],
         "type": "integer",
         "format": "int32"
@@ -10103,6 +10392,175 @@
           4,
           5,
           6
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "DataRightsExecutionDto": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/DataRightsCaseDto"
+          },
+          "workItem": {
+            "$ref": "#/components/schemas/DataRightsExecutionWorkItemDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsExecutionWorkItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "executionRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/DataRightsOperation"
+          },
+          "ownerKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordType": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "selectedRecordVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "policyEvidenceSchemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyContentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerContractVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DataRightsExecutionWorkItemStatus"
+          },
+          "attemptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "taskRunId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lastTaskAttempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastAttemptAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ownerReceiptContractVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "ownerReceiptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "resultingRecordVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "ownerDispositionCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerReasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerReceiptSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerCompletedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "outcomeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcomeAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsExecutionWorkItemStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
         ],
         "type": "integer",
         "format": "int32"
@@ -10138,6 +10596,80 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "DataRightsRoutingStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "DataRightsSelectedSubjectDto": {
+        "type": "object",
+        "properties": {
+          "ownerKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordType": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selectedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsSelectedSubjectsResponse": {
+        "type": "object",
+        "properties": {
+          "caseVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRightsSelectedSubjectDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsSubjectCandidate": {
+        "type": "object",
+        "properties": {
+          "coordinate": {
+            "$ref": "#/components/schemas/DataRightsSubjectCoordinate"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "emailHint": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneHint": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "DataRightsSubjectCoordinate": {
         "type": "object",
@@ -10179,6 +10711,30 @@
         },
         "additionalProperties": false
       },
+      "DataRightsSubjectDiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRightsSubjectCandidate"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsVerificationStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DiscoverDataRightsSubjectsRequest": {
         "type": "object",
         "properties": {
@@ -10202,6 +10758,10 @@
           "dateOfBirth": {
             "type": "string",
             "format": "date",
+            "nullable": true
+          },
+          "ownerKey": {
+            "type": "string",
             "nullable": true
           }
         },

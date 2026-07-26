@@ -45,6 +45,11 @@ const PropertiesPage = lazy(() =>
     default: module.PropertiesPage,
   })),
 );
+const PrivacyRequestsPage = lazy(() =>
+  import("../features/data-rights/PrivacyRequestsPage").then((module) => ({
+    default: module.PrivacyRequestsPage,
+  })),
+);
 const ReservationsPage = lazy(() =>
   import("../features/reservations/ReservationsPage").then((module) => ({
     default: module.ReservationsPage,
@@ -103,6 +108,7 @@ export function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/properties" element={<PropertiesPage />} />
+                <Route path="/privacy-requests" element={<PrivacyRequestsPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/integrations" element={<IntegrationsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
