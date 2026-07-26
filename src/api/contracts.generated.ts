@@ -9988,7 +9988,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        ReservationDetailsChangeOriginKind: 0 | 1 | 2 | 3 | 4 | 5;
+        ReservationDetailsChangeOriginKind: 0 | 1 | 2 | 3 | 4 | 5 | 6;
         ReservationDto: {
             /** Format: uuid */
             reservationId: string;
