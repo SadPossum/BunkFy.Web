@@ -452,15 +452,18 @@ export type DataRightsSelectedSubjectsResponse = Omit<
 > & {
   subjects: DataRightsSelectedSubject[];
 };
+export type DataRightsExecutionBatch = Schema<"DataRightsExecutionBatchDto">;
+export type DataRightsExecutionWorkItem = NonNullableFields<
+  Schema<"DataRightsExecutionWorkItemDto">,
+  "ownerKey" | "recordType"
+>;
 export type DataRightsExecution = Omit<
   Schema<"DataRightsExecutionDto">,
-  "case" | "workItem"
+  "case" | "batch" | "workItems"
 > & {
   case: DataRightsCase;
-  workItem: NonNullableFields<
-    Schema<"DataRightsExecutionWorkItemDto">,
-    "ownerKey" | "recordType"
-  >;
+  batch: DataRightsExecutionBatch;
+  workItems: DataRightsExecutionWorkItem[];
 };
 
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";

@@ -4,6 +4,7 @@ import {
   availableDataRightsActions,
   dataRightsCaseNeedsLiveRefresh,
   dataRightsCaseStatusLabel,
+  dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionNeedsLiveRefresh,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
@@ -39,7 +40,7 @@ describe("privacy request workflow", () => {
     }), allCapabilities)).toEqual(["begin-discovery", "cancel"]);
   });
 
-  it("requires one selected reservation before review", () => {
+  it("requires at least one explicitly selected subject before review", () => {
     expect(availableDataRightsActions(dataRightsCase({
       status: 2,
       selectedSubjectCount: 0,
@@ -47,6 +48,10 @@ describe("privacy request workflow", () => {
     expect(availableDataRightsActions(dataRightsCase({
       status: 2,
       selectedSubjectCount: 1,
+    }), allCapabilities)).toEqual(["discover-subject", "review", "cancel"]);
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      selectedSubjectCount: 3,
     }), allCapabilities)).toEqual(["discover-subject", "review", "cancel"]);
   });
 
@@ -64,6 +69,9 @@ describe("privacy request workflow", () => {
     expect(dataRightsExecutionNeedsLiveRefresh(2)).toBe(true);
     expect(dataRightsExecutionNeedsLiveRefresh(5)).toBe(false);
     expect(dataRightsExecutionNeedsLiveRefresh(6)).toBe(false);
+    expect(dataRightsExecutionBatchNeedsLiveRefresh([{ status: 5 }, { status: 2 }])).toBe(true);
+    expect(dataRightsExecutionBatchNeedsLiveRefresh([{ status: 5 }, { status: 6 }])).toBe(false);
+    expect(dataRightsExecutionBatchNeedsLiveRefresh([])).toBe(false);
   });
 
   it("formats safe operator labels without exposing coordinates", () => {

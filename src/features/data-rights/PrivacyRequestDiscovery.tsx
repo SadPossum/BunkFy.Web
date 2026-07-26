@@ -3,6 +3,7 @@ import { Search, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type {
   DataRightsCase,
+  DataRightsSelectedSubject,
   DataRightsSelectedSubjectsResponse,
   DataRightsSubjectCandidate,
   DataRightsSubjectDiscoveryResponse,
@@ -11,7 +12,14 @@ import { useSession } from "../../app/session";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { ErrorState } from "../../components/ui/primitives";
 
+type DataOwner = "guests" | "reservations" | "ingestion";
 type LookupKind = "recordId" | "email" | "phone";
+
+const ownerOptions = [
+  { value: "guests", label: "Guest record" },
+  { value: "reservations", label: "Reservation" },
+  { value: "ingestion", label: "Source evidence" },
+] as const;
 
 export function PrivacyRequestDiscovery({
   propertyId,
@@ -29,11 +37,12 @@ export function PrivacyRequestDiscovery({
   refreshSelected: () => Promise<unknown>;
 }) {
   const { request } = useSession();
+  const [ownerKey, setOwnerKey] = useState<DataOwner>("reservations");
   const [lookupKind, setLookupKind] = useState<LookupKind>("recordId");
   const [lookup, setLookup] = useState("");
   const [name, setName] = useState("");
   const [candidates, setCandidates] = useState<DataRightsSubjectCandidate[]>([]);
-  const selectedSubject = selected?.subjects[0];
+  const selectedSubjects = selected?.subjects ?? [];
   const discover = useMutation({
     mutationFn: () => request<DataRightsSubjectDiscoveryResponse>(
       `/api/data-rights/properties/${propertyId}/cases/${dataRightsCase.id}/subjects/discover`,
@@ -43,9 +52,9 @@ export function PrivacyRequestDiscovery({
           recordId: lookupKind === "recordId" ? lookup.trim() : null,
           email: lookupKind === "email" ? lookup.trim() : null,
           phone: lookupKind === "phone" ? lookup.trim() : null,
-          name: name.trim() || null,
+          name: ownerKey === "ingestion" ? null : name.trim() || null,
           dateOfBirth: null,
-          ownerKey: "reservations",
+          ownerKey,
         }),
       },
     ),
@@ -69,15 +78,15 @@ export function PrivacyRequestDiscovery({
     },
   });
   const unselect = useMutation({
-    mutationFn: () => request<DataRightsCase>(
+    mutationFn: (subject: DataRightsSelectedSubject) => request<DataRightsCase>(
       `/api/data-rights/properties/${propertyId}/cases/${dataRightsCase.id}/subjects/unselect`,
       {
         method: "POST",
         body: JSON.stringify({
           coordinate: {
-            ownerKey: selectedSubject?.ownerKey,
-            recordType: selectedSubject?.recordType,
-            recordId: selectedSubject?.recordId,
+            ownerKey: subject.ownerKey,
+            recordType: subject.recordType,
+            recordId: subject.recordId,
           },
           expectedVersion: dataRightsCase.version,
         }),
@@ -90,11 +99,21 @@ export function PrivacyRequestDiscovery({
   });
 
   useEffect(() => {
+    setOwnerKey("reservations");
     setLookupKind("recordId");
     setLookup("");
     setName("");
     setCandidates([]);
   }, [dataRightsCase.id, propertyId]);
+
+  function changeOwner(nextOwner: DataOwner) {
+    setOwnerKey(nextOwner);
+    setLookupKind("recordId");
+    setLookup("");
+    setName("");
+    setCandidates([]);
+    discover.reset();
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,98 +125,129 @@ export function PrivacyRequestDiscovery({
     <section className="border-t border-base-300 pt-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-lg font-semibold">Reservation match</h3>
-          <p className="mt-1 text-sm text-base-content/55">
-            Search one exact identifier. Contact details remain masked in the results.
+          <h3 className="font-display text-lg font-semibold">Data subject match</h3>
+          <p className="mt-1 max-w-2xl text-sm text-base-content/55">
+            Select only records confirmed to belong to this request. Contact details stay masked,
+            and source evidence is found only through an exact reservation ID.
           </p>
         </div>
-        {selectedSubject && (
+        {dataRightsCase.selectedSubjectCount > 0 && (
           <span className="inline-flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs font-semibold text-success">
             <ShieldCheck size={15} />
-            One reservation selected
+            {selectionCountLabel(dataRightsCase.selectedSubjectCount)}
           </span>
         )}
       </div>
 
-      {dataRightsCase.selectedSubjectCount > 0 && selectedLoading && (
+      {dataRightsCase.selectedSubjectCount > 0 && selectedLoading && !selectedSubjects.length && (
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-base-200 px-4 py-4 text-sm text-base-content/55">
           <span className="loading loading-spinner loading-sm text-primary" />
-          Loading selected reservation
+          Loading selected records
         </div>
       )}
 
-      {selectedSubject
-        ? (
-          <div className="mt-4 flex flex-col gap-3 rounded-lg border border-success/25 bg-success/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Reservation {shortRecordId(selectedSubject.recordId)}</p>
-              <p className="mt-1 text-xs text-base-content/50">
-                Selection version {selectedSubject.recordVersion} - matched {formatDateTime(selectedSubject.selectedAtUtc)}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost text-error"
-              disabled={unselect.isPending}
-              onClick={() => unselect.mutate()}
+      {selectedSubjects.length > 0 && (
+        <div className="mt-4 divide-y divide-base-300 rounded-lg border border-success/25 bg-success/5">
+          {selectedSubjects.map((subject) => (
+            <div
+              key={subjectKey(subject)}
+              className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              <Trash2 size={15} />
-              Remove selection
-            </button>
-          </div>
-        )
-        : dataRightsCase.selectedSubjectCount === 0 && (
-          <form className="mt-4 space-y-4" onSubmit={submit}>
-            <SegmentedTabs
-              value={lookupKind}
-              ariaLabel="Reservation lookup type"
-              onValueChange={(value) => {
-                setLookupKind(value);
-                setLookup("");
-                setCandidates([]);
-              }}
-              options={[
-                { value: "recordId", label: "Reservation ID" },
-                { value: "email", label: "Email" },
-                { value: "phone", label: "Phone" },
-              ]}
-            />
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-              <label className="form-control block">
-                <span className="label-text mb-1.5 block text-sm font-semibold">
-                  {lookupLabel(lookupKind)}
-                </span>
-                <input
-                  className="input input-bordered w-full"
-                  type={lookupKind === "email" ? "email" : "text"}
-                  value={lookup}
-                  onChange={(event) => setLookup(event.target.value)}
-                  placeholder={lookupPlaceholder(lookupKind)}
-                  required
-                />
-              </label>
-              <label className="form-control block">
-                <span className="label-text mb-1.5 block text-sm font-semibold">Guest name (optional)</span>
-                <input
-                  className="input input-bordered w-full"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Used only to narrow the match"
-                />
-              </label>
+              <div>
+                <p className="text-sm font-semibold">
+                  {dataOwnerLabel(subject.ownerKey)} {shortRecordId(subject.recordId)}
+                </p>
+                <p className="mt-1 text-xs text-base-content/50">
+                  Record version {subject.recordVersion} - selected {formatDateTime(subject.selectedAtUtc)}
+                </p>
+              </div>
               <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={discover.isPending || !lookup.trim()}
+                type="button"
+                className="btn btn-sm btn-ghost text-error"
+                disabled={unselect.isPending || select.isPending}
+                onClick={() => unselect.mutate(subject)}
               >
-                {discover.isPending
-                  ? <span className="loading loading-spinner loading-sm" />
-                  : <Search size={16} />}
-                Search
+                <Trash2 size={15} />
+                Remove
               </button>
             </div>
-          </form>
+          ))}
+        </div>
+      )}
+
+      <form className="mt-5 space-y-4" onSubmit={submit}>
+        <div>
+          <span className="mb-2 block text-sm font-semibold">Record owner</span>
+          <SegmentedTabs
+            value={ownerKey}
+            ariaLabel="Data record owner"
+            stretch
+            onValueChange={changeOwner}
+            options={ownerOptions}
+          />
+        </div>
+
+        {ownerKey !== "ingestion" && (
+          <SegmentedTabs
+            value={lookupKind}
+            ariaLabel={`${dataOwnerLabel(ownerKey)} lookup type`}
+            onValueChange={(value) => {
+              setLookupKind(value);
+              setLookup("");
+              setCandidates([]);
+              discover.reset();
+            }}
+            options={[
+              { value: "recordId", label: ownerKey === "guests" ? "Guest ID" : "Reservation ID" },
+              { value: "email", label: "Email" },
+              { value: "phone", label: "Phone" },
+            ]}
+          />
         )}
+
+        <div className={`grid gap-3 sm:items-end ${
+          ownerKey === "ingestion"
+            ? "sm:grid-cols-[minmax(0,1fr)_auto]"
+            : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+        }`}>
+          <label className="form-control block">
+            <span className="label-text mb-1.5 block text-sm font-semibold">
+              {lookupLabel(ownerKey, lookupKind)}
+            </span>
+            <input
+              className="input input-bordered w-full"
+              type={lookupKind === "email" ? "email" : "text"}
+              value={lookup}
+              onChange={(event) => setLookup(event.target.value)}
+              placeholder={lookupPlaceholder(lookupKind)}
+              required
+            />
+          </label>
+          {ownerKey !== "ingestion" && (
+            <label className="form-control block">
+              <span className="label-text mb-1.5 block text-sm font-semibold">
+                Guest name (optional)
+              </span>
+              <input
+                className="input input-bordered w-full"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Used only to narrow the match"
+              />
+            </label>
+          )}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={discover.isPending || select.isPending || unselect.isPending || !lookup.trim()}
+          >
+            {discover.isPending
+              ? <span className="loading loading-spinner loading-sm" />
+              : <Search size={16} />}
+            Search
+          </button>
+        </div>
+      </form>
 
       {(discover.error || select.error || unselect.error) && (
         <div className="mt-4">
@@ -205,49 +255,105 @@ export function PrivacyRequestDiscovery({
         </div>
       )}
 
-      {!selectedSubject && candidates.length > 0 && (
+      {candidates.length > 0 && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {candidates.map((candidate) => (
-            <button
-              key={`${candidate.coordinate.recordType}:${candidate.coordinate.recordId}`}
-              type="button"
-              className="rounded-lg border border-base-300 bg-base-100 p-4 text-left transition hover:border-primary/40 hover:bg-primary/5 focus-visible:border-primary"
-              disabled={select.isPending}
-              onClick={() => select.mutate(candidate)}
-            >
-              <span className="block font-semibold">{candidate.displayName}</span>
-              <span className="mt-2 block text-xs leading-5 text-base-content/50">
-                {candidate.emailHint || "No email hint"}
-                <br />
-                {candidate.phoneHint || "No phone hint"}
-              </span>
-              <span className="mt-3 block text-xs font-semibold text-primary">
-                Select reservation {shortRecordId(candidate.coordinate.recordId)}
-              </span>
-            </button>
+            <CandidateButton
+              key={candidateKey(candidate)}
+              candidate={candidate}
+              alreadySelected={selectedSubjects.some((subject) =>
+                subject.ownerKey === candidate.coordinate.ownerKey &&
+                subject.recordType === candidate.coordinate.recordType &&
+                subject.recordId === candidate.coordinate.recordId)}
+              contactHintsVisible={ownerKey !== "ingestion"}
+              disabled={select.isPending || unselect.isPending}
+              onSelect={() => select.mutate(candidate)}
+            />
           ))}
         </div>
       )}
 
-      {!selectedSubject && discover.isSuccess && candidates.length === 0 && (
+      {discover.isSuccess && candidates.length === 0 && (
         <p className="mt-4 rounded-lg bg-base-200 px-4 py-3 text-sm text-base-content/55">
-          No reservation matched that exact identifier in this property.
+          No {dataOwnerLabel(ownerKey).toLowerCase()} matched that exact identifier in this property.
         </p>
       )}
     </section>
   );
 }
 
-function lookupLabel(kind: LookupKind): string {
-  if (kind === "recordId") return "Reservation ID";
-  if (kind === "email") return "Booking email";
-  return "Booking phone";
+function CandidateButton({
+  candidate,
+  alreadySelected,
+  contactHintsVisible,
+  disabled,
+  onSelect,
+}: {
+  candidate: DataRightsSubjectCandidate;
+  alreadySelected: boolean;
+  contactHintsVisible: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="rounded-lg border border-base-300 bg-base-100 p-4 text-left transition hover:border-primary/40 hover:bg-primary/5 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-55"
+      disabled={disabled || alreadySelected}
+      onClick={onSelect}
+    >
+      <span className="block font-semibold">{candidate.displayName}</span>
+      {contactHintsVisible && (
+        <span className="mt-2 block text-xs leading-5 text-base-content/50">
+          {candidate.emailHint || "No email hint"}
+          <br />
+          {candidate.phoneHint || "No phone hint"}
+        </span>
+      )}
+      <span className="mt-3 block text-xs font-semibold text-primary">
+        {alreadySelected
+          ? "Already selected"
+          : (
+            <>
+              Select {dataOwnerLabel(candidate.coordinate.ownerKey).toLowerCase()}{" "}
+              {shortRecordId(candidate.coordinate.recordId)}
+            </>
+          )}
+      </span>
+    </button>
+  );
+}
+
+function lookupLabel(owner: DataOwner, kind: LookupKind): string {
+  if (owner === "ingestion") return "Reservation ID";
+  if (kind === "recordId") return owner === "guests" ? "Guest ID" : "Reservation ID";
+  if (kind === "email") return owner === "guests" ? "Guest email" : "Booking email";
+  return owner === "guests" ? "Guest phone" : "Booking phone";
 }
 
 function lookupPlaceholder(kind: LookupKind): string {
   if (kind === "recordId") return "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
   if (kind === "email") return "guest@example.com";
   return "+44 20 1234 5678";
+}
+
+function dataOwnerLabel(ownerKey: string): string {
+  if (ownerKey === "guests") return "Guest record";
+  if (ownerKey === "reservations") return "Reservation";
+  if (ownerKey === "ingestion") return "Source evidence";
+  return "Data record";
+}
+
+function selectionCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "record" : "records"} selected`;
+}
+
+function subjectKey(subject: DataRightsSelectedSubject): string {
+  return `${subject.ownerKey}:${subject.recordType}:${subject.recordId}`;
+}
+
+function candidateKey(candidate: DataRightsSubjectCandidate): string {
+  return `${candidate.coordinate.ownerKey}:${candidate.coordinate.recordType}:${candidate.coordinate.recordId}`;
 }
 
 function shortRecordId(value: string): string {

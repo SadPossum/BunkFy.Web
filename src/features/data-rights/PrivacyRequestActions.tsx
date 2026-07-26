@@ -96,7 +96,7 @@ export function PrivacyRequestActions({
               onClick={() => onPerform("/discovery")}
             >
               <Search size={15} />
-              Match reservation
+              Match records
             </button>
           )}
           {actions.includes("review") && (
@@ -278,7 +278,7 @@ function confirmationTitle(confirmation: PrivacyRequestConfirmation): string {
   if (confirmation === "approve") return "Approve permanent data removal?";
   if (confirmation === "deny") return "Deny this privacy request?";
   if (confirmation === "cancel") return "Cancel this privacy request?";
-  return "Permanently remove reservation personal data?";
+  return "Permanently remove the selected personal data?";
 }
 
 function confirmationDescription(confirmation: PrivacyRequestConfirmation): string {

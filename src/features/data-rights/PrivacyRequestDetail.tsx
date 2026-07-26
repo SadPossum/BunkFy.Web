@@ -29,7 +29,7 @@ import {
   dataRightsCaseNeedsLiveRefresh,
   dataRightsCaseStatusKey,
   dataRightsCaseStatusLabel,
-  dataRightsExecutionNeedsLiveRefresh,
+  dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionStatusLabel,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
@@ -81,7 +81,7 @@ export function PrivacyRequestDetail({
     queryKey: ["data-rights-execution", propertyId, caseId],
     queryFn: () => request<DataRightsExecution>(`${basePath}/execution`),
     enabled: Boolean(caseId && ["executing", "blocked", "completed", "partiallyCompleted"].includes(status)),
-    refetchInterval: (query) => dataRightsExecutionNeedsLiveRefresh(query.state.data?.workItem.status)
+    refetchInterval: (query) => dataRightsExecutionBatchNeedsLiveRefresh(query.state.data?.workItems)
       ? 2_000
       : false,
     refetchIntervalInBackground: false,
@@ -152,21 +152,30 @@ export function PrivacyRequestDetail({
   }, [caseId, propertyId]);
 
   useEffect(() => {
-    const workItem = execution.data?.workItem;
-    if (!workItem || dataRightsExecutionNeedsLiveRefresh(workItem.status)) return;
-    const terminalKey = `${workItem.id}:${workItem.version}:${workItem.status}`;
+    const workItems = execution.data?.workItems;
+    if (!workItems?.length || dataRightsExecutionBatchNeedsLiveRefresh(workItems)) return;
+    const terminalKey = workItems
+      .map((workItem) => `${workItem.id}:${workItem.version}:${workItem.status}`)
+      .sort()
+      .join("|");
     if (observedTerminalExecution.current === terminalKey) return;
     observedTerminalExecution.current = terminalKey;
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ["data-rights-cases", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["data-rights-case", propertyId, caseId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["reservations", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["reservation", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["reservation-history", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-stays", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["availability", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["ingestion-proposals", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["ingestion-receipts", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["ingestion-runs", propertyId] }),
     ]);
-  }, [caseId, execution.data?.workItem, propertyId, queryClient]);
+  }, [caseId, execution.data?.workItems, propertyId, queryClient]);
 
   function perform(suffix: string, body: Record<string, unknown> = {}) {
     if (!dataRightsCase) return;
@@ -188,7 +197,7 @@ export function PrivacyRequestDetail({
     <Modal
       open={Boolean(caseId)}
       title={dataRightsCase ? `Privacy request ${shortDataRightsCaseId(dataRightsCase.id)}` : "Privacy request"}
-      description="One reservation, one controlled decision, and a separately authorized removal."
+      description="Explicit records, one controlled decision, and separately authorized removal."
       onClose={onClose}
       size="lg"
     >
@@ -216,17 +225,27 @@ export function PrivacyRequestDetail({
                 dataRightsCase.selectedSubjectCount > 0 &&
                 capabilities.discover && (
                 <section className="border-t border-base-300 pt-5">
-                  <h3 className="font-display text-lg font-semibold">Selected reservation</h3>
+                  <h3 className="font-display text-lg font-semibold">Selected records</h3>
                   {selected.isLoading
-                    ? <p className="mt-3 text-sm text-base-content/50">Loading selection...</p>
-                    : selected.data?.subjects[0]
+                    ? <p className="mt-3 text-sm text-base-content/50">Loading selections...</p>
+                    : selected.data?.subjects.length
                       ? (
-                        <p className="mt-3 rounded-lg bg-base-200 px-4 py-3 text-sm">
-                          Reservation <strong>{shortRecordId(selected.data.subjects[0].recordId)}</strong>
-                          <span className="ml-2 text-base-content/50">
-                            at record version {selected.data.subjects[0].recordVersion}
-                          </span>
-                        </p>
+                        <div className="mt-3 divide-y divide-base-300 rounded-lg bg-base-200 px-4">
+                          {selected.data.subjects.map((subject) => (
+                            <p
+                              key={`${subject.ownerKey}:${subject.recordType}:${subject.recordId}`}
+                              className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                            >
+                              <span>
+                                {dataOwnerLabel(subject.ownerKey)}{" "}
+                                <strong>{shortRecordId(subject.recordId)}</strong>
+                              </span>
+                              <span className="text-xs text-base-content/50">
+                                Record version {subject.recordVersion}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
                       )
                       : null}
                 </section>
@@ -265,7 +284,7 @@ function RequestSummary({
     <section className="rounded-lg bg-base-200 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-base-content/45">Reservation data removal</p>
+          <p className="text-xs font-semibold text-base-content/45">Selected data removal</p>
           <p className="mt-2 font-display text-xl font-semibold">
             {requesterLabel(dataRightsCase.requesterRelationship)}
           </p>
@@ -280,9 +299,26 @@ function RequestSummary({
         </div>
       </div>
       {execution && (
-        <div className="mt-4 flex items-center justify-between gap-4 border-t border-base-300 pt-4 text-sm">
-          <span className="text-base-content/55">Removal work item</span>
-          <StatusBadge status={dataRightsExecutionStatusLabel(execution.workItem.status)} />
+        <div className="mt-4 border-t border-base-300 pt-4 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <span className="font-semibold">Removal work</span>
+            <span className="text-xs text-base-content/50">
+              {execution.workItems.length} of {execution.batch.selectedSubjectCount} records prepared
+            </span>
+          </div>
+          <div className="mt-2 divide-y divide-base-300">
+            {execution.workItems.map((workItem) => (
+              <div
+                key={workItem.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-2"
+              >
+                <span className="text-base-content/55">
+                  {dataOwnerLabel(workItem.ownerKey)} {shortRecordId(workItem.recordId)}
+                </span>
+                <StatusBadge status={dataRightsExecutionStatusLabel(workItem.status)} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -340,6 +376,13 @@ function requesterLabel(relationship: number): string {
 
 function shortRecordId(value: string): string {
   return value.replaceAll("-", "").slice(0, 8).toUpperCase();
+}
+
+function dataOwnerLabel(ownerKey: string): string {
+  if (ownerKey === "guests") return "Guest record";
+  if (ownerKey === "reservations") return "Reservation";
+  if (ownerKey === "ingestion") return "Source evidence";
+  return "Data record";
 }
 
 function formatDateTime(value: string): string {

@@ -9245,13 +9245,34 @@ export interface components {
          * @enum {integer}
          */
         DataRightsDecisionReason: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        DataRightsExecutionBatchDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: int64 */
+            executionRevision: number;
+            /** Format: int32 */
+            selectedSubjectCount: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: int64 */
+            version: number;
+        };
         DataRightsExecutionDto: {
             case: components["schemas"]["DataRightsCaseDto"];
-            workItem: components["schemas"]["DataRightsExecutionWorkItemDto"];
+            batch: components["schemas"]["DataRightsExecutionBatchDto"];
+            workItems: components["schemas"]["DataRightsExecutionWorkItemDto"][] | null;
         };
         DataRightsExecutionWorkItemDto: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            batchId: string;
             /** Format: uuid */
             caseId: string;
             /** Format: uuid */

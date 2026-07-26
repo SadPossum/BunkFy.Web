@@ -2,6 +2,7 @@ import type {
   DataRightsCase,
   DataRightsCaseStatus,
   DataRightsDecisionReason,
+  DataRightsExecutionWorkItem,
   DataRightsExecutionWorkItemStatus,
 } from "../../api/types";
 
@@ -93,6 +94,15 @@ export function dataRightsExecutionNeedsLiveRefresh(
   );
 }
 
+export function dataRightsExecutionBatchNeedsLiveRefresh(
+  workItems: readonly Pick<DataRightsExecutionWorkItem, "status">[] | null | undefined,
+): boolean {
+  return Boolean(
+    workItems?.length &&
+    workItems.some((workItem) => dataRightsExecutionNeedsLiveRefresh(workItem.status)),
+  );
+}
+
 export function dataRightsDecisionReasonLabel(reason: DataRightsDecisionReason): string {
   const key = typeof reason === "number"
     ? ({
@@ -133,7 +143,7 @@ export function availableDataRightsActions(
 
   if (status === "discovery" && capabilities.discover) {
     actions.push("discover-subject");
-    if (dataRightsCase.selectedSubjectCount === 1 && capabilities.review) {
+    if (dataRightsCase.selectedSubjectCount > 0 && capabilities.review) {
       actions.push("review");
     }
   }

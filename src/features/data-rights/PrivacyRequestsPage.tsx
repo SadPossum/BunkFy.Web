@@ -115,7 +115,7 @@ export function PrivacyRequestsPage() {
       <EmptyState
         icon={<ShieldCheck />}
         title="Choose a property first"
-        description="Privacy requests are handled within the property that owns the reservation."
+        description="Privacy requests are handled within the property that owns the selected records."
       />
     );
   }
@@ -125,7 +125,7 @@ export function PrivacyRequestsPage() {
       <PageHeader
         eyebrow={selectedProperty.name}
         title="Privacy requests"
-        description="Review and separately approve removal of personal data from completed reservation records."
+        description="Review and separately approve removal of personal data from property records."
         action={capabilities.create
           ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -141,7 +141,7 @@ export function PrivacyRequestsPage() {
           <div>
             <h2 className="font-display text-lg font-semibold">Request queue</h2>
             <p className="mt-1 text-xs text-base-content/50">
-              Sensitive reservation matching happens only inside an open request.
+              Sensitive record matching happens only inside an open request.
             </p>
           </div>
           <SelectPicker
@@ -178,7 +178,7 @@ export function PrivacyRequestsPage() {
                       icon={<ShieldCheck />}
                       title={status === "all" ? "No privacy requests yet" : "No requests have this status"}
                       description={status === "all"
-                        ? "Create a request when a guest asks for personal data to be removed from a reservation."
+                        ? "Create a request when a guest asks for personal data to be removed."
                         : "Choose another status to review the rest of the queue."}
                       action={capabilities.create && status === "all"
                         ? (
@@ -249,7 +249,7 @@ function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () 
           <FileLock2 size={18} />
         </span>
         <span className="min-w-0">
-          <span className="block font-semibold">Reservation data removal</span>
+          <span className="block font-semibold">Selected data removal</span>
           <span className="mt-1 block text-xs text-base-content/45">
             Request {shortDataRightsCaseId(item.id)} - opened {formatDateTime(item.createdAtUtc)}
           </span>
@@ -257,7 +257,9 @@ function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () 
       </div>
       <span className="text-xs text-base-content/50 sm:text-right">
         <span className="block font-semibold text-base-content/70">{stageDescription(status)}</span>
-        <span className="mt-1 block">{item.selectedSubjectCount} reservation selected</span>
+        <span className="mt-1 block">
+          {item.selectedSubjectCount} {item.selectedSubjectCount === 1 ? "record" : "records"} selected
+        </span>
       </span>
       <span className="flex items-center justify-between gap-3 sm:justify-end">
         <StatusBadge status={dataRightsCaseStatusLabel(item.status)} />
@@ -308,7 +310,7 @@ function CreatePrivacyRequestModal({
     <Modal
       open={open}
       title="New privacy request"
-      description="Start a controlled workflow for one reservation. Approval and removal remain separate actions."
+      description="Start a controlled workflow. Record selection, approval, and removal remain separate actions."
       onClose={onClose}
     >
       <form className="space-y-5" onSubmit={submit}>
@@ -358,7 +360,7 @@ function CreatePrivacyRequestModal({
 
 function stageDescription(status: string): string {
   if (status === "draft") return "Intake";
-  if (status === "discovery") return "Match reservation";
+  if (status === "discovery") return "Match records";
   if (status === "reviewRequired" || status === "decisionPending") return "Review";
   if (status === "approved") return "Ready for another operator";
   if (status === "executing") return "Removal in progress";

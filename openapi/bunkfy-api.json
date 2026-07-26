@@ -10396,14 +10396,59 @@
         "type": "integer",
         "format": "int32"
       },
+      "DataRightsExecutionBatchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "executionRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selectedSubjectCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "DataRightsExecutionDto": {
         "type": "object",
         "properties": {
           "case": {
             "$ref": "#/components/schemas/DataRightsCaseDto"
           },
-          "workItem": {
-            "$ref": "#/components/schemas/DataRightsExecutionWorkItemDto"
+          "batch": {
+            "$ref": "#/components/schemas/DataRightsExecutionBatchDto"
+          },
+          "workItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRightsExecutionWorkItemDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10412,6 +10457,10 @@
         "type": "object",
         "properties": {
           "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batchId": {
             "type": "string",
             "format": "uuid"
           },
