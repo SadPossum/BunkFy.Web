@@ -12,8 +12,8 @@ import { useSession } from "../../app/session";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { ErrorState } from "../../components/ui/primitives";
 
-type DataOwner = "guests" | "reservations" | "ingestion";
-type LookupKind = "recordId" | "email" | "phone";
+type DataOwner = "guests" | "reservations" | "ingestion" | "staff";
+type LookupKind = "recordId" | "email" | "phone" | "accountSubjectId";
 
 const ownerOptions = [
   { value: "guests", label: "Guest record" },
@@ -22,14 +22,16 @@ const ownerOptions = [
 ] as const;
 
 export function PrivacyRequestDiscovery({
-  propertyId,
+  basePath,
+  scopeKind,
   dataRightsCase,
   selected,
   selectedLoading,
   onCaseUpdated,
   refreshSelected,
 }: {
-  propertyId: string;
+  basePath: string;
+  scopeKind: "guest" | "staff";
   dataRightsCase: DataRightsCase;
   selected: DataRightsSelectedSubjectsResponse | undefined;
   selectedLoading: boolean;
@@ -37,7 +39,9 @@ export function PrivacyRequestDiscovery({
   refreshSelected: () => Promise<unknown>;
 }) {
   const { request } = useSession();
-  const [ownerKey, setOwnerKey] = useState<DataOwner>("reservations");
+  const [ownerKey, setOwnerKey] = useState<DataOwner>(
+    scopeKind === "staff" ? "staff" : "reservations",
+  );
   const [lookupKind, setLookupKind] = useState<LookupKind>("recordId");
   const [lookup, setLookup] = useState("");
   const [name, setName] = useState("");
@@ -45,15 +49,18 @@ export function PrivacyRequestDiscovery({
   const selectedSubjects = selected?.subjects ?? [];
   const discover = useMutation({
     mutationFn: () => request<DataRightsSubjectDiscoveryResponse>(
-      `/api/data-rights/properties/${propertyId}/cases/${dataRightsCase.id}/subjects/discover`,
+      `${basePath}/subjects/discover`,
       {
         method: "POST",
         body: JSON.stringify({
           recordId: lookupKind === "recordId" ? lookup.trim() : null,
           email: lookupKind === "email" ? lookup.trim() : null,
           phone: lookupKind === "phone" ? lookup.trim() : null,
-          name: ownerKey === "ingestion" ? null : name.trim() || null,
+          name: scopeKind === "guest" && ownerKey !== "ingestion"
+            ? name.trim() || null
+            : null,
           dateOfBirth: null,
+          accountSubjectId: lookupKind === "accountSubjectId" ? lookup.trim() : null,
           ownerKey,
         }),
       },
@@ -62,7 +69,7 @@ export function PrivacyRequestDiscovery({
   });
   const select = useMutation({
     mutationFn: (candidate: DataRightsSubjectCandidate) => request<DataRightsCase>(
-      `/api/data-rights/properties/${propertyId}/cases/${dataRightsCase.id}/subjects/select`,
+      `${basePath}/subjects/select`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -79,7 +86,7 @@ export function PrivacyRequestDiscovery({
   });
   const unselect = useMutation({
     mutationFn: (subject: DataRightsSelectedSubject) => request<DataRightsCase>(
-      `/api/data-rights/properties/${propertyId}/cases/${dataRightsCase.id}/subjects/unselect`,
+      `${basePath}/subjects/unselect`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -99,12 +106,12 @@ export function PrivacyRequestDiscovery({
   });
 
   useEffect(() => {
-    setOwnerKey("reservations");
+    setOwnerKey(scopeKind === "staff" ? "staff" : "reservations");
     setLookupKind("recordId");
     setLookup("");
     setName("");
     setCandidates([]);
-  }, [dataRightsCase.id, propertyId]);
+  }, [dataRightsCase.id, scopeKind]);
 
   function changeOwner(nextOwner: DataOwner) {
     setOwnerKey(nextOwner);
@@ -127,8 +134,9 @@ export function PrivacyRequestDiscovery({
         <div>
           <h3 className="font-display text-lg font-semibold">Data subject match</h3>
           <p className="mt-1 max-w-2xl text-sm text-base-content/55">
-            Select only records confirmed to belong to this request. Contact details stay masked,
-            and source evidence is found only through an exact reservation ID.
+            {scopeKind === "staff"
+              ? "Select one staff profile using its exact Staff ID or exact account subject ID. Contact details remain masked."
+              : "Select only records confirmed to belong to this request. Contact details stay masked, and source evidence is found only through an exact reservation ID."}
           </p>
         </div>
         {dataRightsCase.selectedSubjectCount > 0 && (
@@ -176,18 +184,37 @@ export function PrivacyRequestDiscovery({
       )}
 
       <form className="mt-5 space-y-4" onSubmit={submit}>
-        <div>
-          <span className="mb-2 block text-sm font-semibold">Record owner</span>
-          <SegmentedTabs
-            value={ownerKey}
-            ariaLabel="Data record owner"
-            stretch
-            onValueChange={changeOwner}
-            options={ownerOptions}
-          />
-        </div>
+        {scopeKind === "guest" && (
+          <div>
+            <span className="mb-2 block text-sm font-semibold">Record owner</span>
+            <SegmentedTabs
+              value={ownerKey}
+              ariaLabel="Data record owner"
+              stretch
+              onValueChange={changeOwner}
+              options={ownerOptions}
+            />
+          </div>
+        )}
 
-        {ownerKey !== "ingestion" && (
+        {scopeKind === "staff" && (
+          <SegmentedTabs
+            value={lookupKind}
+            ariaLabel="Staff lookup type"
+            onValueChange={(value) => {
+              setLookupKind(value);
+              setLookup("");
+              setCandidates([]);
+              discover.reset();
+            }}
+            options={[
+              { value: "recordId", label: "Staff ID" },
+              { value: "accountSubjectId", label: "Account subject ID" },
+            ]}
+          />
+        )}
+
+        {scopeKind === "guest" && ownerKey !== "ingestion" && (
           <SegmentedTabs
             value={lookupKind}
             ariaLabel={`${dataOwnerLabel(ownerKey)} lookup type`}
@@ -206,7 +233,7 @@ export function PrivacyRequestDiscovery({
         )}
 
         <div className={`grid gap-3 sm:items-end ${
-          ownerKey === "ingestion"
+          scopeKind === "staff" || ownerKey === "ingestion"
             ? "sm:grid-cols-[minmax(0,1fr)_auto]"
             : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
         }`}>
@@ -223,7 +250,7 @@ export function PrivacyRequestDiscovery({
               required
             />
           </label>
-          {ownerKey !== "ingestion" && (
+          {scopeKind === "guest" && ownerKey !== "ingestion" && (
             <label className="form-control block">
               <span className="label-text mb-1.5 block text-sm font-semibold">
                 Guest name (optional)
@@ -273,9 +300,10 @@ export function PrivacyRequestDiscovery({
         </div>
       )}
 
-      {discover.isSuccess && candidates.length === 0 && (
+      {discover.isSuccess && discover.data.candidates.length === 0 && (
         <p className="mt-4 rounded-lg bg-base-200 px-4 py-3 text-sm text-base-content/55">
-          No {dataOwnerLabel(ownerKey).toLowerCase()} matched that exact identifier in this property.
+          No {dataOwnerLabel(ownerKey).toLowerCase()} matched that exact identifier
+          {scopeKind === "guest" ? " in this property" : " in this workspace"}.
         </p>
       )}
     </section>
@@ -325,6 +353,9 @@ function CandidateButton({
 }
 
 function lookupLabel(owner: DataOwner, kind: LookupKind): string {
+  if (owner === "staff") {
+    return kind === "accountSubjectId" ? "Account subject ID" : "Staff ID";
+  }
   if (owner === "ingestion") return "Reservation ID";
   if (kind === "recordId") return owner === "guests" ? "Guest ID" : "Reservation ID";
   if (kind === "email") return owner === "guests" ? "Guest email" : "Booking email";
@@ -332,12 +363,14 @@ function lookupLabel(owner: DataOwner, kind: LookupKind): string {
 }
 
 function lookupPlaceholder(kind: LookupKind): string {
+  if (kind === "accountSubjectId") return "Exact authentication subject ID";
   if (kind === "recordId") return "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
   if (kind === "email") return "guest@example.com";
   return "+44 20 1234 5678";
 }
 
 function dataOwnerLabel(ownerKey: string): string {
+  if (ownerKey === "staff") return "Staff profile";
   if (ownerKey === "guests") return "Guest record";
   if (ownerKey === "reservations") return "Reservation";
   if (ownerKey === "ingestion") return "Source evidence";

@@ -2676,6 +2676,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExportArtifactDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestDataRightsExportRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExportArtifactDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/export/{artifactId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                    artifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/tenant/cases": {
         parameters: {
             query?: never;
@@ -3216,6 +3317,104 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/tenant/cases/{caseId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExportArtifactDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestDataRightsExportRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExportArtifactDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/tenant/cases/{caseId}/export/{artifactId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                    artifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -9878,6 +10077,35 @@ export interface components {
          * @enum {integer}
          */
         DataRightsExecutionWorkItemStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        DataRightsExportArtifactDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            propertyId: string | null;
+            caseType: components["schemas"]["DataRightsCaseType"];
+            /** Format: int64 */
+            decisionRevision: number;
+            /** Format: int32 */
+            selectedSubjectCount: number;
+            status: components["schemas"]["DataRightsExportArtifactStatus"];
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            generationStartedAtUtc: string | null;
+            /** Format: date-time */
+            availableAtUtc: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            /** Format: int64 */
+            version: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsExportArtifactStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
         /**
          * Format: int32
          * @enum {integer}
@@ -10745,6 +10973,12 @@ export interface components {
         };
         RequestBedRetirementRequest: {
             reason: string | null;
+        };
+        RequestDataRightsExportRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         RequestEmailVerificationRequest: {
             /** Format: uuid */

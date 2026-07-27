@@ -4,7 +4,12 @@ import type {
   DataRightsDecisionReason,
   DataRightsExecutionWorkItem,
   DataRightsExecutionWorkItemStatus,
+  DataRightsExportArtifactStatus,
 } from "../../api/types";
+
+export type DataRightsRequestScope =
+  | { kind: "guest"; propertyId: string }
+  | { kind: "staff" };
 
 export type DataRightsCapabilities = {
   read: boolean;
@@ -13,6 +18,8 @@ export type DataRightsCapabilities = {
   review: boolean;
   decide: boolean;
   manage: boolean;
+  export: boolean;
+  downloadExport: boolean;
   erase: boolean;
 };
 
@@ -26,8 +33,12 @@ export type DataRightsAction =
   | "begin-decision"
   | "approve"
   | "deny"
+  | "generate-export"
   | "execute"
   | "cancel";
+
+export const DATA_RIGHTS_ACCESS_EXPORT = 1;
+export const DATA_RIGHTS_ANONYMISATION = 16;
 
 const caseStatusNames: Record<number, string> = {
   0: "unknown",
@@ -55,6 +66,17 @@ const executionStatusNames: Record<number, string> = {
   7: "ownerProofRecorded",
 };
 
+const exportStatusNames: Record<number, string> = {
+  0: "unknown",
+  1: "requested",
+  2: "generating",
+  3: "available",
+  4: "failed",
+  5: "expired",
+  6: "deleting",
+  7: "deleted",
+};
+
 export function dataRightsCaseStatusKey(status: DataRightsCaseStatus | string): string {
   return typeof status === "number"
     ? caseStatusNames[status] ?? "unknown"
@@ -79,6 +101,20 @@ export function dataRightsExecutionStatusLabel(
   return words(dataRightsExecutionStatusKey(status));
 }
 
+export function dataRightsExportStatusKey(
+  status: DataRightsExportArtifactStatus | string,
+): string {
+  return typeof status === "number"
+    ? exportStatusNames[status] ?? "unknown"
+    : normalizeStatus(status);
+}
+
+export function dataRightsExportStatusLabel(
+  status: DataRightsExportArtifactStatus | string,
+): string {
+  return words(dataRightsExportStatusKey(status));
+}
+
 export function dataRightsCaseNeedsLiveRefresh(
   status: DataRightsCaseStatus | string | undefined,
 ): boolean {
@@ -101,6 +137,62 @@ export function dataRightsExecutionBatchNeedsLiveRefresh(
     workItems?.length &&
     workItems.some((workItem) => dataRightsExecutionNeedsLiveRefresh(workItem.status)),
   );
+}
+
+export function dataRightsExportNeedsLiveRefresh(
+  status: DataRightsExportArtifactStatus | string | undefined,
+): boolean {
+  return status !== undefined &&
+    ["requested", "generating"].includes(dataRightsExportStatusKey(status));
+}
+
+export function dataRightsScopeKey(scope: DataRightsRequestScope): string {
+  return scope.kind === "staff" ? "staff" : `guest:${scope.propertyId}`;
+}
+
+export function dataRightsCasesPath(scope: DataRightsRequestScope): string {
+  return scope.kind === "staff"
+    ? "/api/data-rights/tenant/cases"
+    : `/api/data-rights/properties/${scope.propertyId}/cases`;
+}
+
+export function dataRightsCaseHasOperation(
+  dataRightsCase: Pick<DataRightsCase, "requestedOperations">,
+  operation: number,
+): boolean {
+  return (Number(dataRightsCase.requestedOperations) & operation) === operation;
+}
+
+export function isDataRightsAccessExport(
+  dataRightsCase: Pick<DataRightsCase, "requestedOperations">,
+): boolean {
+  return Number(dataRightsCase.requestedOperations) === DATA_RIGHTS_ACCESS_EXPORT;
+}
+
+export function dataRightsRequestLabel(
+  dataRightsCase: Pick<DataRightsCase, "requestedOperations" | "type">,
+): string {
+  if (isDataRightsAccessExport(dataRightsCase)) {
+    return Number(dataRightsCase.type) === 3 ? "Staff data export" : "Guest data export";
+  }
+  if (dataRightsCaseHasOperation(dataRightsCase, DATA_RIGHTS_ANONYMISATION)) {
+    return "Selected data removal";
+  }
+  return "Privacy request";
+}
+
+export function dataRightsRequesterLabel(
+  relationship: number,
+  scopeKind: DataRightsRequestScope["kind"],
+): string {
+  if (relationship === 1) {
+    return scopeKind === "staff"
+      ? "Requested by the staff member"
+      : "Requested by the guest";
+  }
+  if (relationship === 2) return "Requested by an authorized representative";
+  if (relationship === 3) return "Workspace initiated";
+  return "Privacy request";
 }
 
 export function dataRightsDecisionReasonLabel(reason: DataRightsDecisionReason): string {
@@ -156,8 +248,12 @@ export function availableDataRightsActions(
     actions.push("approve", "deny");
   }
 
-  if (status === "approved" && capabilities.erase) {
-    actions.push("execute");
+  if (status === "approved") {
+    if (isDataRightsAccessExport(dataRightsCase)) {
+      if (capabilities.export) actions.push("generate-export");
+    } else if (capabilities.erase) {
+      actions.push("execute");
+    }
   }
 
   if (

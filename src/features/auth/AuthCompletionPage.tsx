@@ -1,12 +1,27 @@
 import { AlertTriangle, CheckCircle2, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type {
+  MultiFactorChallenge,
+  MultiFactorCodeType,
+} from "../../api/types";
 import { useSession } from "../../app/session";
 import { BrandMark } from "../../components/ui/BrandMark";
+import { MultiFactorChallengeForm } from "./MultiFactorChallengeForm";
 
 export function AuthCompletionPage() {
-  const { completeExternalAuthentication, isRestoring, session } = useSession();
+  const {
+    completeExternalAuthentication,
+    completeMultiFactorSignIn,
+    isRestoring,
+    session,
+  } = useSession();
   const started = useRef(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [multiFactor, setMultiFactor] = useState<{
+    challenge: MultiFactorChallenge;
+    username: string;
+  } | null>(null);
   const parameters = new URLSearchParams(window.location.search);
   const code = parameters.get("code") || "";
   const provider = parameters.get("provider") || "";
@@ -25,7 +40,16 @@ export function AuthCompletionPage() {
     }
 
     void completeExternalAuthentication(code, provider)
-      .then((destination) => window.location.replace(destination))
+      .then((completion) => {
+        if (completion.kind === "redirect") {
+          window.location.replace(completion.destination);
+          return;
+        }
+        setMultiFactor({
+          challenge: completion.challenge,
+          username: completion.username,
+        });
+      })
       .catch((cause) => {
         setError(
           cause instanceof Error
@@ -41,6 +65,29 @@ export function AuthCompletionPage() {
     providerError,
   ]);
 
+  async function completeMultiFactor(
+    codeType: MultiFactorCodeType,
+    verificationCode: string,
+  ) {
+    if (!multiFactor) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await completeMultiFactorSignIn(
+        multiFactor.challenge.challengeToken,
+        codeType,
+        verificationCode,
+        multiFactor.username,
+      );
+      window.location.replace("/");
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Verification failed.",
+      );
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="grid min-h-screen place-items-center bg-base-200 p-5">
       <section className="w-full max-w-md border border-base-300 bg-base-100 p-7 shadow-sm sm:p-9">
@@ -53,7 +100,25 @@ export function AuthCompletionPage() {
             </p>
           </div>
         </div>
-        {error ? (
+        {multiFactor ? (
+          <div className="mt-8">
+            <CheckCircle2 className="text-primary" size={30} />
+            <h1 className="mt-4 font-display text-2xl font-semibold">
+              Verify sign-in
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-base-content/60">
+              The provider was verified. Complete multi-factor authentication
+              to open BunkFy.
+            </p>
+            <MultiFactorChallengeForm
+              challenge={multiFactor.challenge}
+              error={error}
+              submitting={submitting}
+              onSubmit={completeMultiFactor}
+              onCancel={() => window.location.replace("/")}
+            />
+          </div>
+        ) : error ? (
           <div className="mt-8">
             <AlertTriangle className="text-error" size={28} />
             <h1 className="mt-4 font-display text-2xl font-semibold">

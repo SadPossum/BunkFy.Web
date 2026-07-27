@@ -15,6 +15,7 @@ export type PrivacyRequestConfirmation =
 
 export function PrivacyRequestActions({
   actions,
+  accessExport,
   confirmation,
   denialReason,
   destructiveConfirmation,
@@ -26,6 +27,7 @@ export function PrivacyRequestActions({
   onExecute,
 }: {
   actions: DataRightsAction[];
+  accessExport: boolean;
   confirmation: PrivacyRequestConfirmation | null;
   denialReason: string;
   destructiveConfirmation: string;
@@ -36,15 +38,7 @@ export function PrivacyRequestActions({
   onPerform: (suffix: string, body?: Record<string, unknown>) => void;
   onExecute: () => void;
 }) {
-  if (actions.length === 0) {
-    return (
-      <section className="border-t border-base-300 pt-5">
-        <p className="text-sm text-base-content/55">
-          No further action is available for this request with your current access.
-        </p>
-      </section>
-    );
-  }
+  if (actions.length === 0) return null;
 
   return (
     <section className="border-t border-base-300 pt-5">
@@ -127,7 +121,7 @@ export function PrivacyRequestActions({
               disabled={pending}
               onClick={() => onConfirmationChange("approve")}
             >
-              Approve removal
+              {accessExport ? "Approve export" : "Approve removal"}
             </button>
           )}
           {actions.includes("deny") && (
@@ -167,6 +161,7 @@ export function PrivacyRequestActions({
         <div className="mt-4 rounded-lg border border-warning/30 bg-warning/8 p-4">
           <ConfirmationPanel
             confirmation={confirmation}
+            accessExport={accessExport}
             denialReason={denialReason}
             destructiveConfirmation={destructiveConfirmation}
             pending={pending}
@@ -198,6 +193,7 @@ export function PrivacyRequestActions({
 
 function ConfirmationPanel({
   confirmation,
+  accessExport,
   denialReason,
   destructiveConfirmation,
   pending,
@@ -207,6 +203,7 @@ function ConfirmationPanel({
   onConfirm,
 }: {
   confirmation: PrivacyRequestConfirmation;
+  accessExport: boolean;
   denialReason: string;
   destructiveConfirmation: string;
   pending: boolean;
@@ -221,9 +218,11 @@ function ConfirmationPanel({
       <div className="flex items-start gap-3">
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning-content" />
         <div>
-          <p className="text-sm font-semibold">{confirmationTitle(confirmation)}</p>
+          <p className="text-sm font-semibold">
+            {confirmationTitle(confirmation, accessExport)}
+          </p>
           <p className="mt-1 text-xs leading-5 text-base-content/55">
-            {confirmationDescription(confirmation)}
+            {confirmationDescription(confirmation, accessExport)}
           </p>
         </div>
       </div>
@@ -273,20 +272,30 @@ function ConfirmationPanel({
   );
 }
 
-function confirmationTitle(confirmation: PrivacyRequestConfirmation): string {
+function confirmationTitle(
+  confirmation: PrivacyRequestConfirmation,
+  accessExport: boolean,
+): string {
   if (confirmation === "reject-verification") return "Record failed identity verification?";
-  if (confirmation === "approve") return "Approve permanent data removal?";
+  if (confirmation === "approve") {
+    return accessExport ? "Approve this protected data export?" : "Approve permanent data removal?";
+  }
   if (confirmation === "deny") return "Deny this privacy request?";
   if (confirmation === "cancel") return "Cancel this privacy request?";
   return "Permanently remove the selected personal data?";
 }
 
-function confirmationDescription(confirmation: PrivacyRequestConfirmation): string {
+function confirmationDescription(
+  confirmation: PrivacyRequestConfirmation,
+  accessExport: boolean,
+): string {
   if (confirmation === "reject-verification") {
     return "The request cannot continue after verification is recorded as failed.";
   }
   if (confirmation === "approve") {
-    return "Policy eligibility is checked by the server. A different authorized staff member must execute the approved request.";
+    return accessExport
+      ? "Generation stays limited to the selected records. A separate permission and recent authentication are required before the export can be created."
+      : "Policy eligibility is checked by the server. A different authorized staff member must execute the approved request.";
   }
   if (confirmation === "deny") {
     return "The reason becomes part of the durable privacy case record.";

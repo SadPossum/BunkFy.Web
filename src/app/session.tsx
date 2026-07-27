@@ -19,8 +19,11 @@ import {
 import type {
   AuthenticationMethods,
   BrowserAuthResponse,
+  BrowserTotpActivation,
   ExternalAuthenticationChallenge,
   ExternalAuthenticationResult,
+  MultiFactorChallenge,
+  MultiFactorCodeType,
 } from "../api/types";
 import {
   hasSessionBoundaryChanged,
@@ -31,6 +34,7 @@ import {
   type SessionIdentity,
 } from "./singleFlightRefresh";
 import { useQueryClient } from "@tanstack/react-query";
+import { isMultiFactorChallenge } from "../features/auth/authenticationFlow";
 
 const STORAGE_KEY = "bunkfy.session.identity.v2";
 const EXTERNAL_AUTH_KEY = "bunkfy.auth.external.pending.v1";
@@ -41,19 +45,39 @@ export type Credentials = {
   password: string;
 };
 
+export type ExternalAuthenticationCompletion =
+  | {
+      kind: "redirect";
+      destination: "/" | "/account?external=linked";
+    }
+  | {
+      kind: "mfa";
+      challenge: MultiFactorChallenge;
+      username: string;
+    };
+
 type SessionContextValue = {
   session: ApiSession | null;
   isRestoring: boolean;
-  login: (credentials: Credentials) => Promise<void>;
+  login: (credentials: Credentials) => Promise<MultiFactorChallenge | null>;
   register: (credentials: Credentials) => Promise<void>;
+  completeMultiFactorSignIn: (
+    challengeToken: string,
+    codeType: MultiFactorCodeType,
+    code: string,
+    username: string,
+  ) => Promise<void>;
+  activateTotp: (code: string) => Promise<string[]>;
+  disableTotp: (codeType: MultiFactorCodeType, code: string) => Promise<void>;
   beginExternalSignIn: (provider: string) => Promise<void>;
   beginExternalLink: (provider: string) => Promise<void>;
   completeExternalAuthentication: (
     code: string,
     provider: string,
-  ) => Promise<"/" | "/account?external=linked">;
+  ) => Promise<ExternalAuthenticationCompletion>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
+  stepUpWithPassword: (password: string) => Promise<void>;
   selectWorkspace: (workspaceId: string) => void;
   request: <T>(path: string, options?: RequestInit) => Promise<T>;
   download: (path: string, options?: RequestInit) => Promise<ApiDownload>;
@@ -72,7 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<ApiSession | null>(null);
   const acceptsRefreshRef = useRef(true);
   const externalCompletionRef = useRef<Promise<
-    "/" | "/account?external=linked"
+    ExternalAuthenticationCompletion
   > | null>(null);
 
   const setSession = useCallback((next: ApiSession | null) => {
@@ -135,9 +159,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refreshSession]);
 
   const authenticate = useCallback(
-    async (mode: "login" | "register", credentials: Credentials) => {
-      await runWithBrowserSessionLock(async () => {
-        const response = await apiRequest<BrowserAuthResponse>(
+    async (
+      mode: "login" | "register",
+      credentials: Credentials,
+    ): Promise<MultiFactorChallenge | null> => {
+      return await runWithBrowserSessionLock(async () => {
+        const response = await apiRequest<BrowserAuthResponse | MultiFactorChallenge>(
           `/api/auth/browser/${mode}`,
           {
             method: "POST",
@@ -156,12 +183,56 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             ),
           },
         );
+        if (isMultiFactorChallenge(response)) {
+          return response;
+        }
         acceptsRefreshRef.current = true;
         setSession({
           ...response,
           tenantId: GLOBAL_IDENTITY_SCOPE,
           username: credentials.username,
         });
+        return null;
+      });
+    },
+    [setSession],
+  );
+
+  const completeMultiFactorSignIn = useCallback(
+    async (
+      challengeToken: string,
+      codeType: MultiFactorCodeType,
+      code: string,
+      username: string,
+    ) => {
+      await runWithBrowserSessionLock(async () => {
+        const response = await apiRequest<BrowserAuthResponse>(
+          "/api/auth/browser/mfa/challenges/complete",
+          {
+            method: "POST",
+            headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
+            body: JSON.stringify({ challengeToken, codeType, code }),
+          },
+        );
+        acceptsRefreshRef.current = true;
+        const authenticated: ApiSession = {
+          ...response,
+          tenantId: GLOBAL_IDENTITY_SCOPE,
+          username,
+        };
+        try {
+          const methods = await apiRequest<AuthenticationMethods>(
+            "/api/auth/methods",
+            {},
+            authenticated,
+          );
+          authenticated.username =
+            methods.emails.find((email) => email.isActive)?.email ||
+            authenticated.username;
+        } catch {
+          // The authenticated session remains valid if profile metadata is unavailable.
+        }
+        setSession(authenticated);
       });
     },
     [setSession],
@@ -231,9 +302,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (code: string, provider: string) => {
       if (externalCompletionRef.current) return externalCompletionRef.current;
 
-      const completion = (async (): Promise<
-        "/" | "/account?external=linked"
-      > => {
+      const completion = (async (): Promise<ExternalAuthenticationCompletion> => {
         const pending = readPendingExternalAuth();
         if (
           !pending ||
@@ -256,11 +325,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             throw new Error("The external account was not linked.");
           }
           clearPendingExternalAuth();
-          return "/account?external=linked";
+          return {
+            kind: "redirect",
+            destination: "/account?external=linked",
+          };
         }
 
-        await runWithBrowserSessionLock(async () => {
-          const response = await apiRequest<BrowserAuthResponse>(
+        const response = await runWithBrowserSessionLock(async () => {
+          return await apiRequest<BrowserAuthResponse | MultiFactorChallenge>(
             "/api/auth/browser/external/exchange",
             {
               method: "POST",
@@ -268,6 +340,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               body: JSON.stringify({ code }),
             },
           );
+        });
+        clearPendingExternalAuth();
+        if (isMultiFactorChallenge(response)) {
+          return {
+            kind: "mfa",
+            challenge: response,
+            username: `${providerLabel(provider)} account`,
+          };
+        }
+
+        await runWithBrowserSessionLock(async () => {
           const provisional: ApiSession = {
             ...response,
             tenantId: GLOBAL_IDENTITY_SCOPE,
@@ -288,8 +371,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           acceptsRefreshRef.current = true;
           setSession(provisional);
         });
-        clearPendingExternalAuth();
-        return "/";
+        return { kind: "redirect", destination: "/" };
       })();
 
       externalCompletionRef.current = completion;
@@ -345,6 +427,58 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     },
     [refreshSession],
+  );
+
+  const stepUpWithPassword = useCallback(
+    async (password: string) => {
+      const active = sessionRef.current;
+      if (!active) throw new Error("You are signed out.");
+      const response = await apiRequest<BrowserAuthResponse>(
+        "/api/auth/browser/step-up/password",
+        {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        },
+        active,
+      );
+      setSession({ ...active, accessToken: response.accessToken });
+    },
+    [setSession],
+  );
+
+  const activateTotp = useCallback(
+    async (code: string): Promise<string[]> => {
+      const active = sessionRef.current;
+      if (!active) throw new Error("You are signed out.");
+      const response = await apiRequest<BrowserTotpActivation>(
+        "/api/auth/browser/mfa/totp/activate",
+        {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        },
+        active,
+      );
+      setSession({ ...active, accessToken: response.accessToken });
+      return response.recoveryCodes;
+    },
+    [setSession],
+  );
+
+  const disableTotp = useCallback(
+    async (codeType: MultiFactorCodeType, code: string) => {
+      const active = sessionRef.current;
+      if (!active) throw new Error("You are signed out.");
+      await apiRequest<void>(
+        "/api/auth/browser/mfa/totp/disable",
+        {
+          method: "POST",
+          body: JSON.stringify({ codeType, code }),
+        },
+        active,
+      );
+      setSession(null);
+    },
+    [setSession],
   );
 
   const logout = useCallback(async () => {
@@ -404,12 +538,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       session,
       isRestoring,
       login: (credentials) => authenticate("login", credentials),
-      register: (credentials) => authenticate("register", credentials),
+      register: async (credentials) => {
+        await authenticate("register", credentials);
+      },
+      completeMultiFactorSignIn,
+      activateTotp,
+      disableTotp,
       beginExternalSignIn,
       beginExternalLink,
       completeExternalAuthentication,
       logout,
       logoutAll,
+      stepUpWithPassword,
       selectWorkspace,
       request,
       download,
@@ -417,9 +557,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }),
     [
       authenticate,
+      activateTotp,
       beginExternalLink,
       beginExternalSignIn,
+      completeMultiFactorSignIn,
       completeExternalAuthentication,
+      disableTotp,
       download,
       isRestoring,
       logout,
@@ -427,6 +570,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       request,
       selectWorkspace,
       session,
+      stepUpWithPassword,
       stream,
     ],
   );

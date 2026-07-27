@@ -415,9 +415,12 @@ export type ReservationDetailsHistoryItem = {
 };
 
 export type DataRightsCaseStatus = Schema<"DataRightsCaseStatus">;
+export type DataRightsCaseType = Schema<"DataRightsCaseType">;
 export type DataRightsDecisionOutcome = Schema<"DataRightsDecisionOutcome">;
 export type DataRightsDecisionReason = Schema<"DataRightsDecisionReason">;
 export type DataRightsExecutionWorkItemStatus = Schema<"DataRightsExecutionWorkItemStatus">;
+export type DataRightsExportArtifactStatus = Schema<"DataRightsExportArtifactStatus">;
+export type DataRightsOperation = Schema<"DataRightsOperation">;
 export type DataRightsRequesterRelationship = Schema<"DataRightsRequesterRelationship">;
 
 export type DataRightsCase = Omit<Schema<"DataRightsCaseDto">, "approvalEvidence"> & {
@@ -465,6 +468,7 @@ export type DataRightsExecution = Omit<
   batch: DataRightsExecutionBatch;
   workItems: DataRightsExecutionWorkItem[];
 };
+export type DataRightsExportArtifact = Schema<"DataRightsExportArtifactDto">;
 
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";
 
@@ -803,6 +807,23 @@ export type NotificationBroadcastListResponse = { items: NotificationBroadcastIt
 export type MarkAllNotificationsReadResponse = { updatedCount: number };
 
 export type BrowserAuthResponse = NonNullableFields<Schema<"BrowserAuthResponse">, "accessToken">;
+export type BrowserTotpActivation = Omit<
+  Schema<"BrowserTotpActivationResponse">,
+  "accessToken" | "recoveryCodes"
+> & {
+  accessToken: string;
+  recoveryCodes: string[];
+};
+export type MultiFactorChallenge = NonNullableFields<
+  Schema<"MultiFactorChallengeResponse">,
+  "challengeToken" | "availableCodeTypes"
+>;
+export type MultiFactorCodeType = Schema<"MultiFactorCodeType">;
+export type MultiFactorStatus = Schema<"MultiFactorStatusResponse">;
+export type TotpEnrollment = NonNullableFields<
+  Schema<"TotpEnrollmentResponse">,
+  "secret" | "provisioningUri"
+>;
 
 export type AuthSelfRegistration = Schema<"AuthSelfRegistrationResponse">;
 

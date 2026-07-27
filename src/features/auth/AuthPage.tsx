@@ -12,6 +12,8 @@ import { apiRequest, resolveApiBaseUrl } from "../../api/client";
 import type {
   AuthSelfRegistration,
   ExternalAuthenticationProviderList,
+  MultiFactorChallenge,
+  MultiFactorCodeType,
 } from "../../api/types";
 import { useSession } from "../../app/session";
 import { BrandMark } from "../../components/ui/BrandMark";
@@ -21,9 +23,15 @@ import {
   saveInviteStaffDraft,
   type StaffProfileDraft,
 } from "../workspaces/staffOnboarding";
+import { MultiFactorChallengeForm } from "./MultiFactorChallengeForm";
 
 export function AuthPage({ invitation = false }: { invitation?: boolean }) {
-  const { beginExternalSignIn, login, register } = useSession();
+  const {
+    beginExternalSignIn,
+    completeMultiFactorSignIn,
+    login,
+    register,
+  } = useSession();
   const [mode, setMode] = useState<"login" | "register">(invitation ? "register" : "login");
   const [staffProfile, setStaffProfile] = useState<StaffProfileDraft>(() => defaultStaffProfile());
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +40,10 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     null,
   );
   const [error, setError] = useState("");
+  const [multiFactor, setMultiFactor] = useState<{
+    challenge: MultiFactorChallenge;
+    username: string;
+  } | null>(null);
   const providers = useQuery({
     queryKey: ["auth", "external-providers"],
     queryFn: () =>
@@ -94,11 +106,39 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
           username,
         );
       }
-      await (mode === "login" ? login(credentials) : register(credentials));
+      if (mode === "login") {
+        const challenge = await login(credentials);
+        if (challenge) {
+          setMultiFactor({ challenge, username });
+        }
+      } else {
+        await register(credentials);
+      }
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Authentication failed.",
       );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function completeMultiFactor(
+    codeType: MultiFactorCodeType,
+    code: string,
+  ) {
+    if (!multiFactor) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await completeMultiFactorSignIn(
+        multiFactor.challenge.challengeToken,
+        codeType,
+        code,
+        multiFactor.username,
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Verification failed.");
     } finally {
       setSubmitting(false);
     }
@@ -166,18 +206,35 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
             Staff workspace
           </p>
           <h2 className="font-display text-4xl font-semibold">
-            {mode === "login"
+            {multiFactor
+              ? "Verify sign-in"
+              : mode === "login"
               ? invitation ? "Sign in to join" : "Welcome back"
               : invitation ? "Join your team" : "Create your account"}
           </h2>
           <p className="mt-3 text-sm leading-6 text-base-content/55">
-            {mode === "login"
+            {multiFactor
+              ? "Enter a code from your authenticator or use one recovery code."
+              : mode === "login"
               ? "Sign in to continue managing your property."
               : invitation
                 ? "Create your account and staff profile. Your invitation stays ready after registration."
                 : "Register once, then create a workspace or join your team."}
           </p>
 
+          {multiFactor ? (
+            <MultiFactorChallengeForm
+              challenge={multiFactor.challenge}
+              error={error}
+              submitting={submitting}
+              onSubmit={completeMultiFactor}
+              onCancel={() => {
+                setMultiFactor(null);
+                setError("");
+              }}
+            />
+          ) : (
+            <>
           <form className="mt-8 space-y-5" onSubmit={submit}>
             <label className="form-control block">
               <span className="label-text mb-1.5 block text-sm font-semibold">
@@ -279,6 +336,8 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
             <p className="mt-6 text-center text-sm text-base-content/45">
               Need access? Ask a workspace administrator.
             </p>
+          )}
+            </>
           )}
           <p className="mt-10 text-center text-xs text-base-content/35">
             Connected to {resolveApiBaseUrl()}

@@ -3,9 +3,15 @@ import type { DataRightsCase } from "../src/api/types";
 import {
   availableDataRightsActions,
   dataRightsCaseNeedsLiveRefresh,
+  dataRightsExportNeedsLiveRefresh,
+  dataRightsExportStatusLabel,
+  dataRightsRequestLabel,
+  dataRightsRequesterLabel,
   dataRightsCaseStatusLabel,
   dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionNeedsLiveRefresh,
+  dataRightsCasesPath,
+  dataRightsScopeKey,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
 } from "../src/features/data-rights/dataRightsWorkflow";
@@ -17,6 +23,8 @@ const allCapabilities: DataRightsCapabilities = {
   review: true,
   decide: true,
   manage: true,
+  export: true,
+  downloadExport: true,
   erase: true,
 };
 
@@ -62,6 +70,17 @@ describe("privacy request workflow", () => {
       .toEqual(["execute"]);
   });
 
+  it("uses protected generation rather than destructive execution for an access export", () => {
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 5,
+      requestedOperations: 1,
+    }), allCapabilities)).toEqual(["generate-export"]);
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 5,
+      requestedOperations: 1,
+    }), { ...allCapabilities, export: false })).toEqual([]);
+  });
+
   it("stops polling terminal case and work item states", () => {
     expect(dataRightsCaseNeedsLiveRefresh(7)).toBe(true);
     expect(dataRightsCaseNeedsLiveRefresh(9)).toBe(false);
@@ -72,11 +91,31 @@ describe("privacy request workflow", () => {
     expect(dataRightsExecutionBatchNeedsLiveRefresh([{ status: 5 }, { status: 2 }])).toBe(true);
     expect(dataRightsExecutionBatchNeedsLiveRefresh([{ status: 5 }, { status: 6 }])).toBe(false);
     expect(dataRightsExecutionBatchNeedsLiveRefresh([])).toBe(false);
+    expect(dataRightsExportNeedsLiveRefresh(1)).toBe(true);
+    expect(dataRightsExportNeedsLiveRefresh(2)).toBe(true);
+    expect(dataRightsExportNeedsLiveRefresh(3)).toBe(false);
   });
 
   it("formats safe operator labels without exposing coordinates", () => {
     expect(dataRightsCaseStatusLabel(3)).toBe("Review required");
+    expect(dataRightsExportStatusLabel(3)).toBe("Available");
+    expect(dataRightsRequestLabel(dataRightsCase({ requestedOperations: 1, type: 1 })))
+      .toBe("Guest data export");
+    expect(dataRightsRequestLabel(dataRightsCase({ requestedOperations: 1, type: 3 })))
+      .toBe("Staff data export");
+    expect(dataRightsRequesterLabel(1, "guest")).toBe("Requested by the guest");
+    expect(dataRightsRequesterLabel(1, "staff"))
+      .toBe("Requested by the staff member");
     expect(shortDataRightsCaseId("91234567-89ab-cdef-0123-456789abcdef")).toBe("91234567");
+  });
+
+  it("keeps tenant staff and property guest routes explicit", () => {
+    expect(dataRightsScopeKey({ kind: "staff" })).toBe("staff");
+    expect(dataRightsCasesPath({ kind: "staff" })).toBe("/api/data-rights/tenant/cases");
+    expect(dataRightsScopeKey({ kind: "guest", propertyId: "property-1" }))
+      .toBe("guest:property-1");
+    expect(dataRightsCasesPath({ kind: "guest", propertyId: "property-1" }))
+      .toBe("/api/data-rights/properties/property-1/cases");
   });
 });
 

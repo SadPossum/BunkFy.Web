@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, FileLock2, Plus, ShieldCheck } from "lucide-react";
+import { ChevronRight, FileLock2, Plus, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
   DataRightsCase,
@@ -15,6 +15,7 @@ import {
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { PaginationBar } from "../../components/ui/PaginationBar";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
   EmptyState,
@@ -26,11 +27,18 @@ import {
   StatusBadge,
 } from "../../components/ui/primitives";
 import {
+  DATA_RIGHTS_ACCESS_EXPORT,
+  DATA_RIGHTS_ANONYMISATION,
   dataRightsCaseNeedsLiveRefresh,
   dataRightsCaseStatusKey,
   dataRightsCaseStatusLabel,
+  dataRightsCasesPath,
+  dataRightsRequestLabel,
+  dataRightsScopeKey,
+  isDataRightsAccessExport,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
+  type DataRightsRequestScope,
 } from "./dataRightsWorkflow";
 import { PrivacyRequestDetail } from "./PrivacyRequestDetail";
 
@@ -49,47 +57,81 @@ const statusOptions = [
   { value: "11", label: "Canceled" },
 ] as const;
 
+const permissionCodes = [
+  permissions.dataRightsRead,
+  permissions.dataRightsCreate,
+  permissions.dataRightsDiscover,
+  permissions.dataRightsReview,
+  permissions.dataRightsDecide,
+  permissions.dataRightsManage,
+  permissions.dataRightsExport,
+  permissions.dataRightsDownloadExport,
+] as const;
+
 export function PrivacyRequestsPage() {
   const { request, session } = useSession();
-  const { selectedProperty, selectedPropertyId } = useWorkspace();
+  const {
+    selectedProperty,
+    selectedPropertyId,
+    selectedWorkspace,
+  } = useWorkspace();
   const queryClient = useQueryClient();
+  const [scopeKind, setScopeKind] = useState<"guest" | "staff">(
+    selectedPropertyId ? "guest" : "staff",
+  );
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
   const propertyScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
     : "";
-  const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
-  const access = usePermissions(propertyScope && tenantScope ? [
-    { permission: permissions.dataRightsRead, scope: propertyScope },
-    { permission: permissions.dataRightsCreate, scope: propertyScope },
-    { permission: permissions.dataRightsDiscover, scope: propertyScope },
-    { permission: permissions.dataRightsReview, scope: propertyScope },
-    { permission: permissions.dataRightsDecide, scope: propertyScope },
-    { permission: permissions.dataRightsManage, scope: propertyScope },
-    { permission: permissions.dataRightsErase, scope: tenantScope },
-  ] : []);
+  const accessChecks = session
+    ? [
+      ...permissionCodes.map((permission) => ({ permission, scope: tenantScope })),
+      ...(propertyScope
+        ? permissionCodes.map((permission) => ({ permission, scope: propertyScope }))
+        : []),
+      { permission: permissions.dataRightsErase, scope: tenantScope },
+    ]
+    : [];
+  const access = usePermissions(accessChecks);
+  const activePermissionScope = scopeKind === "staff" ? tenantScope : propertyScope;
   const capabilities: DataRightsCapabilities = {
-    read: access.allows(permissions.dataRightsRead, propertyScope),
-    create: access.allows(permissions.dataRightsCreate, propertyScope),
-    discover: access.allows(permissions.dataRightsDiscover, propertyScope),
-    review: access.allows(permissions.dataRightsReview, propertyScope),
-    decide: access.allows(permissions.dataRightsDecide, propertyScope),
-    manage: access.allows(permissions.dataRightsManage, propertyScope),
-    erase: access.allows(permissions.dataRightsErase, tenantScope),
+    read: access.allows(permissions.dataRightsRead, activePermissionScope),
+    create: access.allows(permissions.dataRightsCreate, activePermissionScope),
+    discover: access.allows(permissions.dataRightsDiscover, activePermissionScope),
+    review: access.allows(permissions.dataRightsReview, activePermissionScope),
+    decide: access.allows(permissions.dataRightsDecide, activePermissionScope),
+    manage: access.allows(permissions.dataRightsManage, activePermissionScope),
+    export: access.allows(permissions.dataRightsExport, activePermissionScope),
+    downloadExport: access.allows(
+      permissions.dataRightsDownloadExport,
+      activePermissionScope,
+    ),
+    erase: scopeKind === "guest" &&
+      access.allows(permissions.dataRightsErase, tenantScope),
   };
+  const scope = useMemo<DataRightsRequestScope | null>(
+    () => scopeKind === "staff"
+      ? { kind: "staff" }
+      : selectedPropertyId
+        ? { kind: "guest", propertyId: selectedPropertyId }
+        : null,
+    [scopeKind, selectedPropertyId],
+  );
+  const scopeKey = scope ? dataRightsScopeKey(scope) : "guest:none";
+  const casesPath = scope ? dataRightsCasesPath(scope) : "";
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(PAGE_SIZE),
   });
   if (status !== "all") params.set("status", status);
   const cases = useQuery({
-    queryKey: ["data-rights-cases", selectedPropertyId, status, page],
-    queryFn: () => request<DataRightsCaseListResponse>(
-      `/api/data-rights/properties/${selectedPropertyId}/cases?${params}`,
-    ),
-    enabled: Boolean(selectedPropertyId && capabilities.read),
+    queryKey: ["data-rights-cases", scopeKey, status, page],
+    queryFn: () => request<DataRightsCaseListResponse>(`${casesPath}?${params}`),
+    enabled: Boolean(scope && capabilities.read),
     refetchInterval: (query) => query.state.data?.items.some((item) =>
       dataRightsCaseNeedsLiveRefresh(item.status))
       ? 5_000
@@ -99,10 +141,14 @@ export function PrivacyRequestsPage() {
   const items = useMemo(() => cases.data?.items ?? [], [cases.data]);
 
   useEffect(() => {
+    if (!selectedPropertyId && scopeKind === "guest") setScopeKind("staff");
+  }, [scopeKind, selectedPropertyId]);
+
+  useEffect(() => {
     setPage(1);
     setSelectedCaseId(null);
     setCreateOpen(false);
-  }, [selectedPropertyId]);
+  }, [scopeKey]);
 
   useEffect(() => {
     if (items.length === 0 && page > 1 && !cases.isFetching) {
@@ -110,23 +156,17 @@ export function PrivacyRequestsPage() {
     }
   }, [cases.isFetching, items.length, page]);
 
-  if (!selectedProperty) {
-    return (
-      <EmptyState
-        icon={<ShieldCheck />}
-        title="Choose a property first"
-        description="Privacy requests are handled within the property that owns the selected records."
-      />
-    );
-  }
-
   return (
     <>
       <PageHeader
-        eyebrow={selectedProperty.name}
+        eyebrow={scopeKind === "staff"
+          ? selectedWorkspace?.organization.name || "Workspace"
+          : selectedProperty?.name || "Property"}
         title="Privacy requests"
-        description="Review and separately approve removal of personal data from property records."
-        action={capabilities.create
+        description={scopeKind === "staff"
+          ? "Review tenant-wide staff access requests and release protected exports."
+          : "Coordinate guest access exports and separately approved data removal."}
+        action={scope && capabilities.create
           ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
               <Plus size={17} />
@@ -137,9 +177,22 @@ export function PrivacyRequestsPage() {
       />
 
       <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
+        <div className="border-b border-base-300 px-4 py-3 sm:px-6">
+          <SegmentedTabs
+            value={scopeKind}
+            ariaLabel="Privacy request scope"
+            onValueChange={(value) => setScopeKind(value)}
+            options={[
+              { value: "guest", label: "Guest requests", icon: <ShieldCheck size={15} /> },
+              { value: "staff", label: "Staff requests", icon: <UsersRound size={15} /> },
+            ]}
+          />
+        </div>
         <div className="flex flex-col items-stretch gap-4 border-b border-base-300 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <h2 className="font-display text-lg font-semibold">Request queue</h2>
+            <h2 className="font-display text-lg font-semibold">
+              {scopeKind === "staff" ? "Workspace request queue" : "Property request queue"}
+            </h2>
             <p className="mt-1 text-xs text-base-content/50">
               Sensitive record matching happens only inside an open request.
             </p>
@@ -157,87 +210,106 @@ export function PrivacyRequestsPage() {
           />
         </div>
 
-        {!capabilities.read && !access.isLoading
+        {scopeKind === "guest" && !selectedProperty
           ? (
             <div className="p-6">
               <EmptyState
-                icon={<FileLock2 />}
-                title="Privacy requests are restricted"
-                description="Ask a workspace administrator for permission to read privacy cases for this property."
+                icon={<ShieldCheck />}
+                title="Choose a property"
+                description="Guest requests stay within the property that owns the selected records."
               />
             </div>
           )
-          : cases.isLoading || access.isLoading
-            ? <LoadingState label="Loading privacy requests" />
-            : cases.error
-              ? <div className="p-6"><ErrorState error={cases.error} retry={() => void cases.refetch()} /></div>
-              : items.length === 0
-                ? (
-                  <div className="p-6">
-                    <EmptyState
-                      icon={<ShieldCheck />}
-                      title={status === "all" ? "No privacy requests yet" : "No requests have this status"}
-                      description={status === "all"
-                        ? "Create a request when a guest asks for personal data to be removed."
-                        : "Choose another status to review the rest of the queue."}
-                      action={capabilities.create && status === "all"
-                        ? (
-                          <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>
-                            Create request
-                          </button>
-                        )
-                        : undefined}
-                    />
-                  </div>
-                )
-                : (
-                  <>
-                    <div className="divide-y divide-base-300">
-                      {items.map((item) => (
-                        <PrivacyRequestRow
-                          key={item.id}
-                          item={item}
-                          onOpen={() => setSelectedCaseId(item.id)}
-                        />
-                      ))}
+          : !capabilities.read && !access.isLoading
+            ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<FileLock2 />}
+                  title="Privacy requests are restricted"
+                  description={scopeKind === "staff"
+                    ? "Ask a workspace administrator for tenant-wide data-rights access."
+                    : "Ask a workspace administrator for data-rights access at this property."}
+                />
+              </div>
+            )
+            : cases.isLoading || access.isLoading
+              ? <LoadingState label="Loading privacy requests" />
+              : cases.error
+                ? <div className="p-6"><ErrorState error={cases.error} retry={() => void cases.refetch()} /></div>
+                : items.length === 0
+                  ? (
+                    <div className="p-6">
+                      <EmptyState
+                        icon={<ShieldCheck />}
+                        title={status === "all" ? "No privacy requests yet" : "No requests have this status"}
+                        description={status === "all"
+                          ? scopeKind === "staff"
+                            ? "Create a request when a staff member asks for a copy of their workspace data."
+                            : "Create a request for a guest data export or data removal."
+                          : "Choose another status to review the rest of the queue."}
+                        action={scope && capabilities.create && status === "all"
+                          ? (
+                            <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>
+                              Create request
+                            </button>
+                          )
+                          : undefined}
+                      />
                     </div>
-                    <PaginationBar
-                      page={page}
-                      pageSize={PAGE_SIZE}
-                      itemCount={items.length}
-                      itemLabel="request"
-                      hasMore={items.length === PAGE_SIZE}
-                      disabled={cases.isFetching}
-                      onPageChange={setPage}
-                    />
-                  </>
-                )}
+                  )
+                  : (
+                    <>
+                      <div className="divide-y divide-base-300">
+                        {items.map((item) => (
+                          <PrivacyRequestRow
+                            key={item.id}
+                            item={item}
+                            onOpen={() => setSelectedCaseId(item.id)}
+                          />
+                        ))}
+                      </div>
+                      <PaginationBar
+                        page={page}
+                        pageSize={PAGE_SIZE}
+                        itemCount={items.length}
+                        itemLabel="request"
+                        hasMore={items.length === PAGE_SIZE}
+                        disabled={cases.isFetching}
+                        onPageChange={setPage}
+                      />
+                    </>
+                  )}
       </section>
 
-      <CreatePrivacyRequestModal
-        open={createOpen}
-        propertyId={selectedPropertyId}
-        onClose={() => setCreateOpen(false)}
-        onCreated={async (created) => {
-          queryClient.setQueryData(["data-rights-case", selectedPropertyId, created.id], created);
-          await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", selectedPropertyId] });
-          setCreateOpen(false);
-          setSelectedCaseId(created.id);
-        }}
-      />
+      {scope && (
+        <>
+          <CreatePrivacyRequestModal
+            open={createOpen}
+            scope={scope}
+            onClose={() => setCreateOpen(false)}
+            onCreated={async (created) => {
+              queryClient.setQueryData(["data-rights-case", scopeKey, created.id], created);
+              await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
+              setCreateOpen(false);
+              setSelectedCaseId(created.id);
+            }}
+          />
 
-      <PrivacyRequestDetail
-        propertyId={selectedPropertyId}
-        caseId={selectedCaseId}
-        capabilities={capabilities}
-        onClose={() => setSelectedCaseId(null)}
-      />
+          <PrivacyRequestDetail
+            scope={scope}
+            caseId={selectedCaseId}
+            capabilities={capabilities}
+            onClose={() => setSelectedCaseId(null)}
+          />
+        </>
+      )}
     </>
   );
 }
 
 function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () => void }) {
   const status = dataRightsCaseStatusKey(item.status);
+  const accessExport = isDataRightsAccessExport(item);
   return (
     <button
       type="button"
@@ -249,14 +321,16 @@ function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () 
           <FileLock2 size={18} />
         </span>
         <span className="min-w-0">
-          <span className="block font-semibold">Selected data removal</span>
+          <span className="block font-semibold">{dataRightsRequestLabel(item)}</span>
           <span className="mt-1 block text-xs text-base-content/45">
             Request {shortDataRightsCaseId(item.id)} - opened {formatDateTime(item.createdAtUtc)}
           </span>
         </span>
       </div>
       <span className="text-xs text-base-content/50 sm:text-right">
-        <span className="block font-semibold text-base-content/70">{stageDescription(status)}</span>
+        <span className="block font-semibold text-base-content/70">
+          {stageDescription(status, accessExport)}
+        </span>
         <span className="mt-1 block">
           {item.selectedSubjectCount} {item.selectedSubjectCount === 1 ? "record" : "records"} selected
         </span>
@@ -271,24 +345,28 @@ function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () 
 
 function CreatePrivacyRequestModal({
   open,
-  propertyId,
+  scope,
   onClose,
   onCreated,
 }: {
   open: boolean;
-  propertyId: string;
+  scope: DataRightsRequestScope;
   onClose: () => void;
   onCreated: (created: DataRightsCase) => Promise<void>;
 }) {
   const { request } = useSession();
+  const [purpose, setPurpose] = useState<"export" | "removal">("export");
   const [relationship, setRelationship] = useState("1");
+  const accessExport = scope.kind === "staff" || purpose === "export";
   const mutation = useMutation({
     mutationFn: () => request<DataRightsCase>(
-      `/api/data-rights/properties/${propertyId}/cases`,
+      dataRightsCasesPath(scope),
       {
         method: "POST",
         body: JSON.stringify({
-          requestedOperations: 16,
+          requestedOperations: accessExport
+            ? DATA_RIGHTS_ACCESS_EXPORT
+            : DATA_RIGHTS_ANONYMISATION,
           restrictionDirective: 0,
           requesterRelationship: Number(relationship) as DataRightsRequesterRelationship,
         }),
@@ -298,8 +376,11 @@ function CreatePrivacyRequestModal({
   });
 
   useEffect(() => {
-    if (open) setRelationship("1");
-  }, [open]);
+    if (!open) return;
+    setPurpose("export");
+    setRelationship("1");
+    mutation.reset();
+  }, [open, scope.kind]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -309,13 +390,30 @@ function CreatePrivacyRequestModal({
   return (
     <Modal
       open={open}
-      title="New privacy request"
-      description="Start a controlled workflow. Record selection, approval, and removal remain separate actions."
+      title={scope.kind === "staff" ? "New staff privacy request" : "New guest privacy request"}
+      description="Start a controlled workflow. Matching, approval and execution remain separate actions."
       onClose={onClose}
     >
       <form className="space-y-5" onSubmit={submit}>
+        {scope.kind === "guest" && (
+          <div>
+            <span className="mb-2 block text-sm font-semibold">Request type</span>
+            <SegmentedTabs
+              value={purpose}
+              ariaLabel="Privacy request type"
+              stretch
+              onValueChange={setPurpose}
+              options={[
+                { value: "export", label: "Data export" },
+                { value: "removal", label: "Data removal" },
+              ]}
+            />
+          </div>
+        )}
         <label className="form-control block">
-          <span className="label-text mb-1.5 block text-sm font-semibold">Who requested the change?</span>
+          <span className="label-text mb-1.5 block text-sm font-semibold">
+            Who requested this?
+          </span>
           <SelectPicker
             className="w-full"
             value={relationship}
@@ -324,7 +422,7 @@ function CreatePrivacyRequestModal({
             options={[
               {
                 value: "1",
-                label: "The guest",
+                label: scope.kind === "staff" ? "The staff member" : "The guest",
                 description: "Identity verification and controller routing are required.",
               },
               {
@@ -335,16 +433,27 @@ function CreatePrivacyRequestModal({
               {
                 value: "3",
                 label: "Workspace initiated",
-                description: "Use for an internally initiated removal review.",
+                description: accessExport
+                  ? "Use for an internally initiated access review."
+                  : "Use for an internally initiated removal review.",
               },
             ]}
           />
         </label>
-        <div className="rounded-lg border border-warning/25 bg-warning/8 p-4">
-          <p className="text-sm font-semibold">This workflow can permanently remove personal data.</p>
+        <div className={`rounded-lg border p-4 ${
+          accessExport
+            ? "border-info/25 bg-info/8"
+            : "border-warning/25 bg-warning/8"
+        }`}>
+          <p className="text-sm font-semibold">
+            {accessExport
+              ? "The export stays limited to explicitly selected records."
+              : "This workflow can permanently remove personal data."}
+          </p>
           <p className="mt-1 text-xs leading-5 text-base-content/55">
-            BunkFy will verify policy eligibility before approval and will require another authorized
-            staff member to execute an approved request.
+            {accessExport
+              ? "Generation and download require separate permissions. The encrypted artifact expires automatically."
+              : "BunkFy verifies policy eligibility before approval and requires another authorized staff member to execute it."}
           </p>
         </div>
         {mutation.error && <ErrorState error={mutation.error} />}
@@ -358,13 +467,13 @@ function CreatePrivacyRequestModal({
   );
 }
 
-function stageDescription(status: string): string {
+function stageDescription(status: string, accessExport: boolean): string {
   if (status === "draft") return "Intake";
   if (status === "discovery") return "Match records";
   if (status === "reviewRequired" || status === "decisionPending") return "Review";
-  if (status === "approved") return "Ready for another operator";
+  if (status === "approved") return accessExport ? "Ready to generate" : "Ready for another operator";
   if (status === "executing") return "Removal in progress";
-  if (status === "completed") return "Removal completed";
+  if (status === "completed") return accessExport ? "Export generated" : "Removal completed";
   if (status === "blocked") return "Needs attention";
   return "Closed";
 }

@@ -8,6 +8,7 @@ import {
   BadgeCheck,
   Building2,
   Clock3,
+  Copy,
   KeyRound,
   Link2,
   LogOut,
@@ -15,16 +16,21 @@ import {
   MonitorSmartphone,
   ShieldCheck,
   ShieldOff,
+  Smartphone,
   Unlink,
   UserRound,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type {
   AuthenticationMethods,
   AuthenticationSessions,
   ExternalAuthenticationProviderList,
   ExternalIdentity,
+  MultiFactorCodeType,
+  MultiFactorStatus,
   StaffMember,
+  TotpEnrollment,
 } from "../../api/types";
 import { useSession } from "../../app/session";
 import { emailVerificationEnabled } from "../../app/environment";
@@ -37,6 +43,7 @@ import {
   PageHeader,
   StatusBadge,
 } from "../../components/ui/primitives";
+import { SelectPicker } from "../../components/ui/SelectPicker";
 import { StaffProfileFields } from "../workspaces/StaffProfileFields";
 import type { StaffProfileDraft } from "../workspaces/staffOnboarding";
 
@@ -275,7 +282,10 @@ export function AccountPage() {
             ) : sessions.error ? (
               <div className="mt-5"><ErrorState error={sessions.error} retry={() => void sessions.refetch()} /></div>
             ) : (
-              <div className="mt-5 divide-y divide-base-300 rounded-lg border border-base-300">
+              <div
+                className="mt-5 max-h-80 divide-y divide-base-300 overflow-y-auto overscroll-contain rounded-lg border border-base-300"
+                aria-label="Active sessions list"
+              >
                 {(sessions.data?.sessions ?? []).map((item) => (
                   <div key={item.sessionId} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
@@ -386,6 +396,7 @@ export function AccountPage() {
               mutation={security}
               onAction={setPasswordAction}
             />
+            <MultiFactorPanel />
             <EmailPanel methods={authentication} mutation={security} />
             <ProviderPanel
               methods={authentication}
@@ -666,6 +677,269 @@ function PasswordPanel({
               </button>
             </div>
           </form>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MultiFactorPanel() {
+  const {
+    activateTotp,
+    disableTotp,
+    request,
+  } = useSession();
+  const queryClient = useQueryClient();
+  const [enrollment, setEnrollment] = useState<TotpEnrollment | null>(null);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [disabling, setDisabling] = useState(false);
+  const [disableCodeType, setDisableCodeType] =
+    useState<MultiFactorCodeType>("totp");
+  const status = useQuery({
+    queryKey: ["auth", "mfa"],
+    queryFn: () => request<MultiFactorStatus>("/api/auth/mfa"),
+  });
+  const beginEnrollment = useMutation({
+    mutationFn: () => request<TotpEnrollment>("/api/auth/mfa/totp/enrollment", {
+      method: "POST",
+    }),
+    onSuccess: (result) => {
+      setEnrollment(result);
+      setRecoveryCodes([]);
+    },
+  });
+  const activate = useMutation({
+    mutationFn: (code: string) => activateTotp(code),
+    onSuccess: async (codes) => {
+      setEnrollment(null);
+      setRecoveryCodes(codes);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["auth", "mfa"] }),
+        queryClient.invalidateQueries({ queryKey: ["auth", "sessions"] }),
+      ]);
+    },
+  });
+  const disable = useMutation({
+    mutationFn: ({ codeType, code }: { codeType: MultiFactorCodeType; code: string }) =>
+      disableTotp(codeType, code),
+  });
+
+  function activateEnrollment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
+    activate.mutate(code);
+  }
+
+  function disableAuthentication(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    disable.mutate({
+      codeType: disableCodeType,
+      code: String(data.get("code") ?? "").trim(),
+    });
+  }
+
+  const current = status.data;
+  return (
+    <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <div className="card-body p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Smartphone size={20} />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-semibold">Multi-factor authentication</h2>
+              <p className="mt-1 text-sm leading-6 text-base-content/55">
+                Protect sensitive actions with an authenticator or recovery code.
+              </p>
+            </div>
+          </div>
+          {current && (
+            <StatusBadge status={current.isActive ? "active" : "not configured"} />
+          )}
+        </div>
+
+        {status.isLoading ? (
+          <div className="mt-5"><LoadingState label="Loading multi-factor status" /></div>
+        ) : status.error ? (
+          <div className="mt-5">
+            <ErrorState error={status.error} retry={() => void status.refetch()} />
+          </div>
+        ) : current && !current.providerAvailable ? (
+          <p className="mt-5 text-sm text-base-content/55">
+            An authenticator provider is not available in this environment.
+          </p>
+        ) : current?.isActive && recoveryCodes.length === 0 ? (
+          <>
+            <div className="mt-5 rounded-lg bg-success/8 p-4">
+              <p className="text-sm font-semibold">Authenticator enabled</p>
+              <p className="mt-1 text-xs leading-5 text-base-content/55">
+                {current.unusedRecoveryCodeCount} recovery code{current.unusedRecoveryCodeCount === 1 ? "" : "s"} remain.
+                Sensitive downloads require a recent MFA sign-in.
+              </p>
+            </div>
+            {!disabling ? (
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error"
+                  onClick={() => setDisabling(true)}
+                >
+                  <ShieldOff size={15} />
+                  Disable MFA
+                </button>
+              </div>
+            ) : (
+              <form className="mt-5 space-y-4 border-t border-base-300 pt-5" onSubmit={disableAuthentication}>
+                <label className="form-control block">
+                  <span className="mb-1.5 block text-sm font-semibold">Verification method</span>
+                  <SelectPicker
+                    ariaLabel="Verification method"
+                    className="w-full"
+                    value={disableCodeType}
+                    onValueChange={(value) =>
+                      setDisableCodeType(value as MultiFactorCodeType)
+                    }
+                    options={[
+                      { value: "totp", label: "Authenticator code" },
+                      { value: "recovery-code", label: "Recovery code" },
+                    ]}
+                  />
+                </label>
+                <label className="form-control block">
+                  <span className="mb-1.5 block text-sm font-semibold">Verification code</span>
+                  <input
+                    name="code"
+                    className="input input-bordered w-full font-mono"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </label>
+                {disable.error && <ErrorState error={disable.error} />}
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setDisabling(false);
+                      setDisableCodeType("totp");
+                      disable.reset();
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-error btn-sm text-white"
+                    disabled={disable.isPending}
+                  >
+                    Disable and sign out
+                  </button>
+                </div>
+              </form>
+            )}
+          </>
+        ) : enrollment ? (
+          <form className="mt-5 space-y-5" onSubmit={activateEnrollment}>
+            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+              <div className="w-fit rounded-lg border border-base-300 bg-white p-3">
+                <QRCodeSVG value={enrollment.provisioningUri} size={152} level="M" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Scan with your authenticator</p>
+                <p className="mt-1 text-xs leading-5 text-base-content/55">
+                  Or enter this setup key manually:
+                </p>
+                <code className="mt-2 block break-all rounded-lg bg-base-200 px-3 py-2 text-xs">
+                  {enrollment.secret}
+                </code>
+                <p className="mt-2 text-xs text-base-content/45">
+                  Setup expires {new Date(enrollment.expiresAtUtc).toLocaleTimeString()}.
+                </p>
+              </div>
+            </div>
+            <label className="form-control block">
+              <span className="mb-1.5 block text-sm font-semibold">Six-digit code</span>
+              <input
+                name="code"
+                className="input input-bordered w-full font-mono"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+              />
+            </label>
+            {activate.error && <ErrorState error={activate.error} />}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setEnrollment(null);
+                  activate.reset();
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={activate.isPending}
+              >
+                Enable MFA
+              </button>
+            </div>
+          </form>
+        ) : recoveryCodes.length > 0 ? (
+          <div className="mt-5">
+            <div className="rounded-lg border border-warning/30 bg-warning/8 p-4">
+              <p className="text-sm font-semibold">Save these recovery codes now</p>
+              <p className="mt-1 text-xs leading-5 text-base-content/55">
+                Each code works once. They will not be shown again.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
+                {recoveryCodes.map((code) => (
+                  <code key={code} className="rounded bg-base-100 px-3 py-2">{code}</code>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => void navigator.clipboard.writeText(recoveryCodes.join("\n"))}
+                >
+                  <Copy size={15} />
+                  Copy codes
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setRecoveryCodes([])}
+                >
+                  I saved them
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 flex flex-col gap-4 rounded-lg bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-base-content/60">
+              Use any TOTP-compatible authenticator. You will receive one-time recovery codes.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm shrink-0"
+              disabled={beginEnrollment.isPending}
+              onClick={() => beginEnrollment.mutate()}
+            >
+              <KeyRound size={15} />
+              Set up MFA
+            </button>
+          </div>
+        )}
+
+        {beginEnrollment.error && (
+          <div className="mt-4"><ErrorState error={beginEnrollment.error} /></div>
         )}
       </div>
     </section>

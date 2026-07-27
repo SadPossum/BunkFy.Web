@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
+  FileOutput,
   FileLock2,
   Search,
   ShieldCheck,
   UserCheck,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   DataRightsCase,
   DataRightsExecution,
@@ -20,6 +21,7 @@ import {
   StatusBadge,
 } from "../../components/ui/primitives";
 import { PrivacyRequestDiscovery } from "./PrivacyRequestDiscovery";
+import { PrivacyRequestExport } from "./PrivacyRequestExport";
 import {
   PrivacyRequestActions,
   type PrivacyRequestConfirmation,
@@ -31,19 +33,25 @@ import {
   dataRightsCaseStatusLabel,
   dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionStatusLabel,
+  dataRightsCasesPath,
+  dataRightsRequestLabel,
+  dataRightsRequesterLabel,
+  dataRightsScopeKey,
+  isDataRightsAccessExport,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
+  type DataRightsRequestScope,
 } from "./dataRightsWorkflow";
 
 type CaseActionRequest = { suffix: string; body: Record<string, unknown> };
 
 export function PrivacyRequestDetail({
-  propertyId,
+  scope,
   caseId,
   capabilities,
   onClose,
 }: {
-  propertyId: string;
+  scope: DataRightsRequestScope;
   caseId: string | null;
   capabilities: DataRightsCapabilities;
   onClose: () => void;
@@ -55,9 +63,11 @@ export function PrivacyRequestDetail({
   const [destructiveConfirmation, setDestructiveConfirmation] = useState("");
   const executionAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
   const observedTerminalExecution = useRef<string | null>(null);
-  const basePath = `/api/data-rights/properties/${propertyId}/cases/${caseId}`;
+  const scopeKey = dataRightsScopeKey(scope);
+  const casesPath = dataRightsCasesPath(scope);
+  const basePath = `${casesPath}/${caseId}`;
   const caseQuery = useQuery({
-    queryKey: ["data-rights-case", propertyId, caseId],
+    queryKey: ["data-rights-case", scopeKey, caseId],
     queryFn: () => request<DataRightsCase>(basePath),
     enabled: Boolean(caseId && capabilities.read),
     refetchInterval: (query) => dataRightsCaseNeedsLiveRefresh(query.state.data?.status)
@@ -67,8 +77,9 @@ export function PrivacyRequestDetail({
   });
   const dataRightsCase = caseQuery.data;
   const status = dataRightsCase ? dataRightsCaseStatusKey(dataRightsCase.status) : "unknown";
+  const accessExport = dataRightsCase ? isDataRightsAccessExport(dataRightsCase) : false;
   const selected = useQuery({
-    queryKey: ["data-rights-subjects", propertyId, caseId],
+    queryKey: ["data-rights-subjects", scopeKey, caseId],
     queryFn: () => request<DataRightsSelectedSubjectsResponse>(`${basePath}/subjects`),
     enabled: Boolean(
       caseId &&
@@ -78,9 +89,14 @@ export function PrivacyRequestDetail({
     ),
   });
   const execution = useQuery({
-    queryKey: ["data-rights-execution", propertyId, caseId],
+    queryKey: ["data-rights-execution", scopeKey, caseId],
     queryFn: () => request<DataRightsExecution>(`${basePath}/execution`),
-    enabled: Boolean(caseId && ["executing", "blocked", "completed", "partiallyCompleted"].includes(status)),
+    enabled: Boolean(
+      caseId &&
+      scope.kind === "guest" &&
+      !accessExport &&
+      ["executing", "blocked", "completed", "partiallyCompleted"].includes(status),
+    ),
     refetchInterval: (query) => dataRightsExecutionBatchNeedsLiveRefresh(query.state.data?.workItems)
       ? 2_000
       : false,
@@ -91,10 +107,17 @@ export function PrivacyRequestDetail({
     [capabilities, dataRightsCase],
   );
 
-  async function updateCase(updated: DataRightsCase) {
-    queryClient.setQueryData(["data-rights-case", propertyId, updated.id], updated);
-    await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", propertyId] });
-  }
+  const updateCase = useCallback(async (updated: DataRightsCase) => {
+    queryClient.setQueryData(["data-rights-case", scopeKey, updated.id], updated);
+    await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
+  }, [queryClient, scopeKey]);
+
+  const refreshCaseState = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
+      queryClient.invalidateQueries({ queryKey: ["data-rights-case", scopeKey, caseId] }),
+    ]);
+  }, [caseId, queryClient, scopeKey]);
 
   const actionMutation = useMutation({
     mutationFn: ({ suffix, body }: CaseActionRequest) => request<DataRightsCase>(
@@ -135,7 +158,7 @@ export function PrivacyRequestDetail({
       executionAttempt.current = null;
       setConfirmation(null);
       setDestructiveConfirmation("");
-      queryClient.setQueryData(["data-rights-execution", propertyId, result.case.id], result);
+      queryClient.setQueryData(["data-rights-execution", scopeKey, result.case.id], result);
       await updateCase(result.case);
     },
     onError: async () => {
@@ -149,7 +172,7 @@ export function PrivacyRequestDetail({
     setDestructiveConfirmation("");
     executionAttempt.current = null;
     observedTerminalExecution.current = null;
-  }, [caseId, propertyId]);
+  }, [caseId, scopeKey]);
 
   useEffect(() => {
     const workItems = execution.data?.workItems;
@@ -160,9 +183,11 @@ export function PrivacyRequestDetail({
       .join("|");
     if (observedTerminalExecution.current === terminalKey) return;
     observedTerminalExecution.current = terminalKey;
+    if (scope.kind !== "guest") return;
+    const propertyId = scope.propertyId;
     void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["data-rights-case", propertyId, caseId] }),
+      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
+      queryClient.invalidateQueries({ queryKey: ["data-rights-case", scopeKey, caseId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
@@ -175,7 +200,7 @@ export function PrivacyRequestDetail({
       queryClient.invalidateQueries({ queryKey: ["ingestion-receipts", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["ingestion-runs", propertyId] }),
     ]);
-  }, [caseId, execution.data?.workItems, propertyId, queryClient]);
+  }, [caseId, execution.data?.workItems, queryClient, scope, scopeKey]);
 
   function perform(suffix: string, body: Record<string, unknown> = {}) {
     if (!dataRightsCase) return;
@@ -197,7 +222,7 @@ export function PrivacyRequestDetail({
     <Modal
       open={Boolean(caseId)}
       title={dataRightsCase ? `Privacy request ${shortDataRightsCaseId(dataRightsCase.id)}` : "Privacy request"}
-      description="Explicit records, one controlled decision, and separately authorized removal."
+      description="Explicit records, one controlled decision, and separately authorized execution."
       onClose={onClose}
       size="lg"
     >
@@ -207,12 +232,17 @@ export function PrivacyRequestDetail({
           ? <ErrorState error={caseQuery.error} retry={() => void caseQuery.refetch()} />
           : (
             <div className="space-y-5">
-              <RequestSummary dataRightsCase={dataRightsCase} execution={execution.data} />
-              <WorkflowProgress status={status} />
+              <RequestSummary
+                dataRightsCase={dataRightsCase}
+                execution={execution.data}
+                scopeKind={scope.kind}
+              />
+              <WorkflowProgress status={status} accessExport={accessExport} />
 
               {status === "discovery" && capabilities.discover && (
                 <PrivacyRequestDiscovery
-                  propertyId={propertyId}
+                  basePath={basePath}
+                  scopeKind={scope.kind}
                   dataRightsCase={dataRightsCase}
                   selected={selected.data}
                   selectedLoading={selected.isLoading}
@@ -251,8 +281,22 @@ export function PrivacyRequestDetail({
                 </section>
               )}
 
+              {accessExport &&
+                ["approved", "completed"].includes(status) &&
+                capabilities.export && (
+                <PrivacyRequestExport
+                  basePath={basePath}
+                  scopeKey={scopeKey}
+                  dataRightsCase={dataRightsCase}
+                  canGenerate={actions.includes("generate-export")}
+                  canDownload={capabilities.downloadExport}
+                  onTerminalState={refreshCaseState}
+                />
+              )}
+
               <PrivacyRequestActions
-                actions={actions}
+                actions={actions.filter((action) => action !== "generate-export")}
+                accessExport={accessExport}
                 confirmation={confirmation}
                 denialReason={denialReason}
                 destructiveConfirmation={destructiveConfirmation}
@@ -276,17 +320,24 @@ export function PrivacyRequestDetail({
 function RequestSummary({
   dataRightsCase,
   execution,
+  scopeKind,
 }: {
   dataRightsCase: DataRightsCase;
   execution: DataRightsExecution | undefined;
+  scopeKind: DataRightsRequestScope["kind"];
 }) {
   return (
     <section className="rounded-lg bg-base-200 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-base-content/45">Selected data removal</p>
+          <p className="text-xs font-semibold text-base-content/45">
+            {dataRightsRequestLabel(dataRightsCase)}
+          </p>
           <p className="mt-2 font-display text-xl font-semibold">
-            {requesterLabel(dataRightsCase.requesterRelationship)}
+            {dataRightsRequesterLabel(
+              dataRightsCase.requesterRelationship,
+              scopeKind,
+            )}
           </p>
           <p className="mt-1 text-sm text-base-content/55">
             Opened {formatDateTime(dataRightsCase.createdAtUtc)}
@@ -325,13 +376,23 @@ function RequestSummary({
   );
 }
 
-function WorkflowProgress({ status }: { status: string }) {
+function WorkflowProgress({
+  status,
+  accessExport,
+}: {
+  status: string;
+  accessExport: boolean;
+}) {
   const stages = [
     { key: "intake", label: "Intake", icon: UserCheck },
     { key: "match", label: "Match", icon: Search },
     { key: "review", label: "Review", icon: ShieldCheck },
     { key: "approval", label: "Approval", icon: CheckCircle2 },
-    { key: "removal", label: "Removal", icon: FileLock2 },
+    {
+      key: accessExport ? "export" : "removal",
+      label: accessExport ? "Export" : "Removal",
+      icon: accessExport ? FileOutput : FileLock2,
+    },
   ];
   const activeIndex = stageIndex(status);
   return (
@@ -367,18 +428,12 @@ function stageIndex(status: string): number {
   return 4;
 }
 
-function requesterLabel(relationship: number): string {
-  if (relationship === 1) return "Requested by the guest";
-  if (relationship === 2) return "Requested by an authorized representative";
-  if (relationship === 3) return "Workspace initiated";
-  return "Privacy request";
-}
-
 function shortRecordId(value: string): string {
   return value.replaceAll("-", "").slice(0, 8).toUpperCase();
 }
 
 function dataOwnerLabel(ownerKey: string): string {
+  if (ownerKey === "staff") return "Staff profile";
   if (ownerKey === "guests") return "Guest record";
   if (ownerKey === "reservations") return "Reservation";
   if (ownerKey === "ingestion") return "Source evidence";
