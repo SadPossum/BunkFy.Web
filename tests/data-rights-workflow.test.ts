@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { DataRightsCase } from "../src/api/types";
 import {
+  DATA_RIGHTS_RESTRICTION,
+  DATA_RIGHTS_RESTRICTION_APPLY,
+  DATA_RIGHTS_RESTRICTION_RELEASE,
   availableDataRightsActions,
   dataRightsCaseNeedsLiveRefresh,
   dataRightsExportNeedsLiveRefresh,
@@ -11,6 +14,7 @@ import {
   dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionNeedsLiveRefresh,
   dataRightsCasesPath,
+  dataRightsOperationKind,
   dataRightsScopeKey,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
@@ -25,6 +29,7 @@ const allCapabilities: DataRightsCapabilities = {
   manage: true,
   export: true,
   downloadExport: true,
+  restrict: true,
   erase: true,
 };
 
@@ -63,11 +68,32 @@ describe("privacy request workflow", () => {
     }), allCapabilities)).toEqual(["discover-subject", "review", "cancel"]);
   });
 
+  it("requires exactly one selected subject before restriction review", () => {
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_APPLY,
+      selectedSubjectCount: 0,
+    }), allCapabilities)).not.toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_APPLY,
+      selectedSubjectCount: 1,
+    }), allCapabilities)).toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_APPLY,
+      selectedSubjectCount: 2,
+    }), allCapabilities)).not.toContain("review");
+  });
+
   it("keeps approval and destructive execution as separate actions", () => {
     expect(availableDataRightsActions(dataRightsCase({ status: 4 }), allCapabilities))
       .toEqual(["approve", "deny", "cancel"]);
     expect(availableDataRightsActions(dataRightsCase({ status: 5 }), allCapabilities))
-      .toEqual(["execute"]);
+      .toEqual(["execute-removal"]);
   });
 
   it("uses protected generation rather than destructive execution for an access export", () => {
@@ -79,6 +105,22 @@ describe("privacy request workflow", () => {
       status: 5,
       requestedOperations: 1,
     }), { ...allCapabilities, export: false })).toEqual([]);
+  });
+
+  it("uses a dedicated capability and action for restriction execution", () => {
+    const approved = dataRightsCase({
+      status: 5,
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_APPLY,
+      selectedSubjectCount: 1,
+    });
+
+    expect(availableDataRightsActions(approved, allCapabilities))
+      .toEqual(["execute-restriction"]);
+    expect(availableDataRightsActions(approved, {
+      ...allCapabilities,
+      restrict: false,
+    })).toEqual([]);
   });
 
   it("stops polling terminal case and work item states", () => {
@@ -103,6 +145,19 @@ describe("privacy request workflow", () => {
       .toBe("Guest data export");
     expect(dataRightsRequestLabel(dataRightsCase({ requestedOperations: 1, type: 3 })))
       .toBe("Staff data export");
+    const applyRestriction = dataRightsCase({
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_APPLY,
+    });
+    const releaseRestriction = dataRightsCase({
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_RELEASE,
+    });
+    expect(dataRightsOperationKind(applyRestriction)).toBe("restriction-apply");
+    expect(dataRightsRequestLabel(applyRestriction)).toBe("Limit guest data processing");
+    expect(dataRightsOperationKind(releaseRestriction)).toBe("restriction-release");
+    expect(dataRightsRequestLabel(releaseRestriction))
+      .toBe("Release guest processing limit");
     expect(dataRightsRequesterLabel(1, "guest")).toBe("Requested by the guest");
     expect(dataRightsRequesterLabel(1, "staff"))
       .toBe("Requested by the staff member");

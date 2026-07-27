@@ -421,6 +421,7 @@ export type DataRightsDecisionReason = Schema<"DataRightsDecisionReason">;
 export type DataRightsExecutionWorkItemStatus = Schema<"DataRightsExecutionWorkItemStatus">;
 export type DataRightsExportArtifactStatus = Schema<"DataRightsExportArtifactStatus">;
 export type DataRightsOperation = Schema<"DataRightsOperation">;
+export type DataRightsRestrictionDirective = Schema<"DataRightsRestrictionDirective">;
 export type DataRightsRequesterRelationship = Schema<"DataRightsRequesterRelationship">;
 
 export type DataRightsCase = Omit<Schema<"DataRightsCaseDto">, "approvalEvidence"> & {
@@ -469,6 +470,15 @@ export type DataRightsExecution = Omit<
   workItems: DataRightsExecutionWorkItem[];
 };
 export type DataRightsExportArtifact = Schema<"DataRightsExportArtifactDto">;
+export type DataRightsRestrictionExecutionProof =
+  Schema<"DataRightsRestrictionExecutionProofDto">;
+export type DataRightsRestrictionExecution = Omit<
+  Schema<"DataRightsRestrictionExecutionDto">,
+  "case" | "proof"
+> & {
+  case: DataRightsCase;
+  proof: DataRightsRestrictionExecutionProof;
+};
 
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";
 

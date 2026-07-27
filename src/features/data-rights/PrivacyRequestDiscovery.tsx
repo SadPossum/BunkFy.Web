@@ -11,6 +11,7 @@ import type {
 import { useSession } from "../../app/session";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { ErrorState } from "../../components/ui/primitives";
+import { isDataRightsRestriction } from "./dataRightsWorkflow";
 
 type DataOwner = "guests" | "reservations" | "ingestion" | "staff";
 type LookupKind = "recordId" | "email" | "phone" | "accountSubjectId";
@@ -39,8 +40,9 @@ export function PrivacyRequestDiscovery({
   refreshSelected: () => Promise<unknown>;
 }) {
   const { request } = useSession();
+  const restriction = isDataRightsRestriction(dataRightsCase);
   const [ownerKey, setOwnerKey] = useState<DataOwner>(
-    scopeKind === "staff" ? "staff" : "reservations",
+    scopeKind === "staff" ? "staff" : restriction ? "guests" : "reservations",
   );
   const [lookupKind, setLookupKind] = useState<LookupKind>("recordId");
   const [lookup, setLookup] = useState("");
@@ -106,12 +108,12 @@ export function PrivacyRequestDiscovery({
   });
 
   useEffect(() => {
-    setOwnerKey(scopeKind === "staff" ? "staff" : "reservations");
+    setOwnerKey(scopeKind === "staff" ? "staff" : restriction ? "guests" : "reservations");
     setLookupKind("recordId");
     setLookup("");
     setName("");
     setCandidates([]);
-  }, [dataRightsCase.id, scopeKind]);
+  }, [dataRightsCase.id, restriction, scopeKind]);
 
   function changeOwner(nextOwner: DataOwner) {
     setOwnerKey(nextOwner);
@@ -136,7 +138,9 @@ export function PrivacyRequestDiscovery({
           <p className="mt-1 max-w-2xl text-sm text-base-content/55">
             {scopeKind === "staff"
               ? "Select one staff profile using its exact Staff ID or exact account subject ID. Contact details remain masked."
-              : "Select only records confirmed to belong to this request. Contact details stay masked, and source evidence is found only through an exact reservation ID."}
+              : restriction
+                ? "Select exactly one Guest Record. Processing limits stay owned and enforced by the Guests module."
+                : "Select only records confirmed to belong to this request. Contact details stay masked, and source evidence is found only through an exact reservation ID."}
           </p>
         </div>
         {dataRightsCase.selectedSubjectCount > 0 && (
@@ -183,8 +187,16 @@ export function PrivacyRequestDiscovery({
         </div>
       )}
 
-      <form className="mt-5 space-y-4" onSubmit={submit}>
-        {scopeKind === "guest" && (
+      {restriction && dataRightsCase.selectedSubjectCount === 1
+        ? (
+          <p className="mt-5 rounded-lg border border-success/20 bg-success/8 px-4 py-3 text-sm text-base-content/65">
+            The required Guest Record is selected. Remove it first if this request points to
+            the wrong guest.
+          </p>
+        )
+        : (
+          <form className="mt-5 space-y-4" onSubmit={submit}>
+        {scopeKind === "guest" && !restriction && (
           <div>
             <span className="mb-2 block text-sm font-semibold">Record owner</span>
             <SegmentedTabs
@@ -274,7 +286,8 @@ export function PrivacyRequestDiscovery({
             Search
           </button>
         </div>
-      </form>
+          </form>
+        )}
 
       {(discover.error || select.error || unselect.error) && (
         <div className="mt-4">
@@ -293,7 +306,11 @@ export function PrivacyRequestDiscovery({
                 subject.recordType === candidate.coordinate.recordType &&
                 subject.recordId === candidate.coordinate.recordId)}
               contactHintsVisible={ownerKey !== "ingestion"}
-              disabled={select.isPending || unselect.isPending}
+              disabled={
+                select.isPending ||
+                unselect.isPending ||
+                (restriction && dataRightsCase.selectedSubjectCount >= 1)
+              }
               onSelect={() => select.mutate(candidate)}
             />
           ))}

@@ -2676,6 +2676,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExecuteDataRightsRestrictionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsRestrictionExecutionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/export": {
         parameters: {
             query?: never;
@@ -10121,6 +10163,22 @@ export interface components {
          * @enum {integer}
          */
         DataRightsRestrictionDirective: 0 | 1 | 2;
+        DataRightsRestrictionExecutionDto: {
+            case: components["schemas"]["DataRightsCaseDto"];
+            proof: components["schemas"]["DataRightsRestrictionExecutionProofDto"];
+        };
+        DataRightsRestrictionExecutionProofDto: {
+            directive: components["schemas"]["DataRightsRestrictionDirective"];
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: int64 */
+            resultingOwnerRevision: number;
+            /** Format: int64 */
+            resultingProjectionRevision: number;
+            effectiveRestricted: boolean;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -10179,6 +10237,12 @@ export interface components {
             dateOfBirth: string | null;
             accountSubjectId: string | null;
             ownerKey: string | null;
+        };
+        ExecuteDataRightsRestrictionRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         ExternalAuthenticationChallengeRequest: {
             returnUrl: string | null;

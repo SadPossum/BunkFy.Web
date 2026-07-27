@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   DataRightsCase,
   DataRightsExecution,
+  DataRightsRestrictionExecution,
   DataRightsSelectedSubjectsResponse,
 } from "../../api/types";
 import { useSession } from "../../app/session";
@@ -34,12 +35,13 @@ import {
   dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionStatusLabel,
   dataRightsCasesPath,
+  dataRightsOperationKind,
   dataRightsRequestLabel,
   dataRightsRequesterLabel,
   dataRightsScopeKey,
-  isDataRightsAccessExport,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
+  type DataRightsOperationKind,
   type DataRightsRequestScope,
 } from "./dataRightsWorkflow";
 
@@ -61,7 +63,9 @@ export function PrivacyRequestDetail({
   const [confirmation, setConfirmation] = useState<PrivacyRequestConfirmation | null>(null);
   const [denialReason, setDenialReason] = useState("3");
   const [destructiveConfirmation, setDestructiveConfirmation] = useState("");
-  const executionAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
+  const [restrictionExecution, setRestrictionExecution] =
+    useState<DataRightsRestrictionExecution | null>(null);
+  const operationAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
   const observedTerminalExecution = useRef<string | null>(null);
   const scopeKey = dataRightsScopeKey(scope);
   const casesPath = dataRightsCasesPath(scope);
@@ -77,7 +81,9 @@ export function PrivacyRequestDetail({
   });
   const dataRightsCase = caseQuery.data;
   const status = dataRightsCase ? dataRightsCaseStatusKey(dataRightsCase.status) : "unknown";
-  const accessExport = dataRightsCase ? isDataRightsAccessExport(dataRightsCase) : false;
+  const operationKind = dataRightsCase
+    ? dataRightsOperationKind(dataRightsCase)
+    : "other";
   const selected = useQuery({
     queryKey: ["data-rights-subjects", scopeKey, caseId],
     queryFn: () => request<DataRightsSelectedSubjectsResponse>(`${basePath}/subjects`),
@@ -94,7 +100,7 @@ export function PrivacyRequestDetail({
     enabled: Boolean(
       caseId &&
       scope.kind === "guest" &&
-      !accessExport &&
+      operationKind === "removal" &&
       ["executing", "blocked", "completed", "partiallyCompleted"].includes(status),
     ),
     refetchInterval: (query) => dataRightsExecutionBatchNeedsLiveRefresh(query.state.data?.workItems)
@@ -119,6 +125,26 @@ export function PrivacyRequestDetail({
     ]);
   }, [caseId, queryClient, scopeKey]);
 
+  const refreshGuestProjectionState = useCallback(async () => {
+    if (scope.kind !== "guest") return;
+    const propertyId = scope.propertyId;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
+      queryClient.invalidateQueries({ queryKey: ["data-rights-case", scopeKey, caseId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["reservations", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["reservation", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["reservation-history", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["guest-stays", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["availability", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["ingestion-proposals", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["ingestion-receipts", propertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["ingestion-runs", propertyId] }),
+    ]);
+  }, [caseId, queryClient, scope, scopeKey]);
+
   const actionMutation = useMutation({
     mutationFn: ({ suffix, body }: CaseActionRequest) => request<DataRightsCase>(
       `${basePath}${suffix}`,
@@ -140,8 +166,8 @@ export function PrivacyRequestDetail({
       currentCase: DataRightsCase;
       fingerprint: string;
     }) => {
-      if (!executionAttempt.current || executionAttempt.current.fingerprint !== fingerprint) {
-        executionAttempt.current = {
+      if (!operationAttempt.current || operationAttempt.current.fingerprint !== fingerprint) {
+        operationAttempt.current = {
           fingerprint,
           idempotencyKey: crypto.randomUUID(),
         };
@@ -149,17 +175,50 @@ export function PrivacyRequestDetail({
       return request<DataRightsExecution>(`${basePath}/execution`, {
         method: "POST",
         body: JSON.stringify({
-          idempotencyKey: executionAttempt.current.idempotencyKey,
+          idempotencyKey: operationAttempt.current.idempotencyKey,
           expectedVersion: currentCase.version,
         }),
       });
     },
     onSuccess: async (result) => {
-      executionAttempt.current = null;
+      operationAttempt.current = null;
       setConfirmation(null);
       setDestructiveConfirmation("");
       queryClient.setQueryData(["data-rights-execution", scopeKey, result.case.id], result);
       await updateCase(result.case);
+    },
+    onError: async () => {
+      await caseQuery.refetch();
+    },
+  });
+  const restrictionMutation = useMutation({
+    mutationFn: ({
+      currentCase,
+      fingerprint,
+    }: {
+      currentCase: DataRightsCase;
+      fingerprint: string;
+    }) => {
+      if (!operationAttempt.current || operationAttempt.current.fingerprint !== fingerprint) {
+        operationAttempt.current = {
+          fingerprint,
+          idempotencyKey: crypto.randomUUID(),
+        };
+      }
+      return request<DataRightsRestrictionExecution>(`${basePath}/restriction`, {
+        method: "POST",
+        body: JSON.stringify({
+          idempotencyKey: operationAttempt.current.idempotencyKey,
+          expectedVersion: currentCase.version,
+        }),
+      });
+    },
+    onSuccess: async (result) => {
+      operationAttempt.current = null;
+      setConfirmation(null);
+      setRestrictionExecution(result);
+      await updateCase(result.case);
+      await refreshGuestProjectionState();
     },
     onError: async () => {
       await caseQuery.refetch();
@@ -170,7 +229,8 @@ export function PrivacyRequestDetail({
     setConfirmation(null);
     setDenialReason("3");
     setDestructiveConfirmation("");
-    executionAttempt.current = null;
+    setRestrictionExecution(null);
+    operationAttempt.current = null;
     observedTerminalExecution.current = null;
   }, [caseId, scopeKey]);
 
@@ -183,24 +243,8 @@ export function PrivacyRequestDetail({
       .join("|");
     if (observedTerminalExecution.current === terminalKey) return;
     observedTerminalExecution.current = terminalKey;
-    if (scope.kind !== "guest") return;
-    const propertyId = scope.propertyId;
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
-      queryClient.invalidateQueries({ queryKey: ["data-rights-case", scopeKey, caseId] }),
-      queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["reservations", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["reservation", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["reservation-history", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["guest-stays", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["availability", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["ingestion-proposals", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["ingestion-receipts", propertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["ingestion-runs", propertyId] }),
-    ]);
-  }, [caseId, execution.data?.workItems, queryClient, scope, scopeKey]);
+    void refreshGuestProjectionState();
+  }, [execution.data?.workItems, refreshGuestProjectionState]);
 
   function perform(suffix: string, body: Record<string, unknown> = {}) {
     if (!dataRightsCase) return;
@@ -210,11 +254,20 @@ export function PrivacyRequestDetail({
     });
   }
 
-  function execute() {
+  function execute(selectedOperation: DataRightsOperationKind) {
     if (!dataRightsCase) return;
+    const fingerprint =
+      `${selectedOperation}:${dataRightsCase.id}:${dataRightsCase.version}`;
+    if (selectedOperation.startsWith("restriction")) {
+      restrictionMutation.mutate({
+        currentCase: dataRightsCase,
+        fingerprint,
+      });
+      return;
+    }
     executeMutation.mutate({
       currentCase: dataRightsCase,
-      fingerprint: `${dataRightsCase.id}:${dataRightsCase.version}`,
+      fingerprint,
     });
   }
 
@@ -235,9 +288,10 @@ export function PrivacyRequestDetail({
               <RequestSummary
                 dataRightsCase={dataRightsCase}
                 execution={execution.data}
+                restrictionExecution={restrictionExecution}
                 scopeKind={scope.kind}
               />
-              <WorkflowProgress status={status} accessExport={accessExport} />
+              <WorkflowProgress status={status} operationKind={operationKind} />
 
               {status === "discovery" && capabilities.discover && (
                 <PrivacyRequestDiscovery
@@ -281,7 +335,7 @@ export function PrivacyRequestDetail({
                 </section>
               )}
 
-              {accessExport &&
+              {operationKind === "export" &&
                 ["approved", "completed"].includes(status) &&
                 capabilities.export && (
                 <PrivacyRequestExport
@@ -296,11 +350,15 @@ export function PrivacyRequestDetail({
 
               <PrivacyRequestActions
                 actions={actions.filter((action) => action !== "generate-export")}
-                accessExport={accessExport}
+                operationKind={operationKind}
                 confirmation={confirmation}
                 denialReason={denialReason}
                 destructiveConfirmation={destructiveConfirmation}
-                pending={actionMutation.isPending || executeMutation.isPending}
+                pending={
+                  actionMutation.isPending ||
+                  executeMutation.isPending ||
+                  restrictionMutation.isPending
+                }
                 onConfirmationChange={setConfirmation}
                 onDenialReasonChange={setDenialReason}
                 onDestructiveConfirmationChange={setDestructiveConfirmation}
@@ -308,8 +366,18 @@ export function PrivacyRequestDetail({
                 onExecute={execute}
               />
 
-              {(actionMutation.error || executeMutation.error || execution.error) && (
-                <ErrorState error={actionMutation.error ?? executeMutation.error ?? execution.error} />
+              {(actionMutation.error ||
+                executeMutation.error ||
+                restrictionMutation.error ||
+                execution.error) && (
+                <ErrorState
+                  error={
+                    actionMutation.error ??
+                    executeMutation.error ??
+                    restrictionMutation.error ??
+                    execution.error
+                  }
+                />
               )}
             </div>
           )}
@@ -320,10 +388,12 @@ export function PrivacyRequestDetail({
 function RequestSummary({
   dataRightsCase,
   execution,
+  restrictionExecution,
   scopeKind,
 }: {
   dataRightsCase: DataRightsCase;
   execution: DataRightsExecution | undefined;
+  restrictionExecution: DataRightsRestrictionExecution | null;
   scopeKind: DataRightsRequestScope["kind"];
 }) {
   return (
@@ -372,27 +442,42 @@ function RequestSummary({
           </div>
         </div>
       )}
+      {restrictionExecution && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-4 text-sm">
+          <div>
+            <p className="font-semibold">Processing limit receipt</p>
+            <p className="mt-1 text-xs text-base-content/50">
+              Owner revision {restrictionExecution.proof.resultingOwnerRevision} -
+              projection revision {restrictionExecution.proof.resultingProjectionRevision}
+            </p>
+          </div>
+          <StatusBadge
+            status={restrictionExecution.proof.effectiveRestricted ? "Applied" : "Released"}
+          />
+        </div>
+      )}
     </section>
   );
 }
 
 function WorkflowProgress({
   status,
-  accessExport,
+  operationKind,
 }: {
   status: string;
-  accessExport: boolean;
+  operationKind: DataRightsOperationKind;
 }) {
+  const terminalStage = operationKind === "export"
+    ? { key: "export", label: "Export", icon: FileOutput }
+    : operationKind.startsWith("restriction")
+      ? { key: "restriction", label: "Processing limit", icon: ShieldCheck }
+      : { key: "removal", label: "Removal", icon: FileLock2 };
   const stages = [
     { key: "intake", label: "Intake", icon: UserCheck },
     { key: "match", label: "Match", icon: Search },
     { key: "review", label: "Review", icon: ShieldCheck },
     { key: "approval", label: "Approval", icon: CheckCircle2 },
-    {
-      key: accessExport ? "export" : "removal",
-      label: accessExport ? "Export" : "Removal",
-      icon: accessExport ? FileOutput : FileLock2,
-    },
+    terminalStage,
   ];
   const activeIndex = stageIndex(status);
   return (

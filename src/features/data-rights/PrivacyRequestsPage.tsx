@@ -29,15 +29,19 @@ import {
 import {
   DATA_RIGHTS_ACCESS_EXPORT,
   DATA_RIGHTS_ANONYMISATION,
+  DATA_RIGHTS_RESTRICTION,
+  DATA_RIGHTS_RESTRICTION_APPLY,
+  DATA_RIGHTS_RESTRICTION_RELEASE,
   dataRightsCaseNeedsLiveRefresh,
   dataRightsCaseStatusKey,
   dataRightsCaseStatusLabel,
   dataRightsCasesPath,
+  dataRightsOperationKind,
   dataRightsRequestLabel,
   dataRightsScopeKey,
-  isDataRightsAccessExport,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
+  type DataRightsOperationKind,
   type DataRightsRequestScope,
 } from "./dataRightsWorkflow";
 import { PrivacyRequestDetail } from "./PrivacyRequestDetail";
@@ -94,6 +98,9 @@ export function PrivacyRequestsPage() {
         ? permissionCodes.map((permission) => ({ permission, scope: propertyScope }))
         : []),
       { permission: permissions.dataRightsErase, scope: tenantScope },
+      ...(propertyScope
+        ? [{ permission: permissions.dataRightsRestrict, scope: propertyScope }]
+        : []),
     ]
     : [];
   const access = usePermissions(accessChecks);
@@ -110,6 +117,8 @@ export function PrivacyRequestsPage() {
       permissions.dataRightsDownloadExport,
       activePermissionScope,
     ),
+    restrict: scopeKind === "guest" &&
+      access.allows(permissions.dataRightsRestrict, propertyScope),
     erase: scopeKind === "guest" &&
       access.allows(permissions.dataRightsErase, tenantScope),
   };
@@ -165,7 +174,7 @@ export function PrivacyRequestsPage() {
         title="Privacy requests"
         description={scopeKind === "staff"
           ? "Review tenant-wide staff access requests and release protected exports."
-          : "Coordinate guest access exports and separately approved data removal."}
+          : "Coordinate guest exports, processing limits and separately approved data removal."}
         action={scope && capabilities.create
           ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -245,7 +254,7 @@ export function PrivacyRequestsPage() {
                         description={status === "all"
                           ? scopeKind === "staff"
                             ? "Create a request when a staff member asks for a copy of their workspace data."
-                            : "Create a request for a guest data export or data removal."
+                            : "Create a request for a guest export, processing limit or data removal."
                           : "Choose another status to review the rest of the queue."}
                         action={scope && capabilities.create && status === "all"
                           ? (
@@ -309,7 +318,7 @@ export function PrivacyRequestsPage() {
 
 function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () => void }) {
   const status = dataRightsCaseStatusKey(item.status);
-  const accessExport = isDataRightsAccessExport(item);
+  const operationKind = dataRightsOperationKind(item);
   return (
     <button
       type="button"
@@ -329,7 +338,7 @@ function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () 
       </div>
       <span className="text-xs text-base-content/50 sm:text-right">
         <span className="block font-semibold text-base-content/70">
-          {stageDescription(status, accessExport)}
+          {stageDescription(status, operationKind)}
         </span>
         <span className="mt-1 block">
           {item.selectedSubjectCount} {item.selectedSubjectCount === 1 ? "record" : "records"} selected
@@ -355,19 +364,28 @@ function CreatePrivacyRequestModal({
   onCreated: (created: DataRightsCase) => Promise<void>;
 }) {
   const { request } = useSession();
-  const [purpose, setPurpose] = useState<"export" | "removal">("export");
+  const [purpose, setPurpose] = useState<DataRightsOperationKind>("export");
   const [relationship, setRelationship] = useState("1");
-  const accessExport = scope.kind === "staff" || purpose === "export";
+  const operationKind: DataRightsOperationKind =
+    scope.kind === "staff" ? "export" : purpose;
+  const requestedOperations = operationKind === "export"
+    ? DATA_RIGHTS_ACCESS_EXPORT
+    : operationKind === "removal"
+      ? DATA_RIGHTS_ANONYMISATION
+      : DATA_RIGHTS_RESTRICTION;
+  const restrictionDirective = operationKind === "restriction-apply"
+    ? DATA_RIGHTS_RESTRICTION_APPLY
+    : operationKind === "restriction-release"
+      ? DATA_RIGHTS_RESTRICTION_RELEASE
+      : 0;
   const mutation = useMutation({
     mutationFn: () => request<DataRightsCase>(
       dataRightsCasesPath(scope),
       {
         method: "POST",
         body: JSON.stringify({
-          requestedOperations: accessExport
-            ? DATA_RIGHTS_ACCESS_EXPORT
-            : DATA_RIGHTS_ANONYMISATION,
-          restrictionDirective: 0,
+          requestedOperations,
+          restrictionDirective,
           requesterRelationship: Number(relationship) as DataRightsRequesterRelationship,
         }),
       },
@@ -396,19 +414,39 @@ function CreatePrivacyRequestModal({
     >
       <form className="space-y-5" onSubmit={submit}>
         {scope.kind === "guest" && (
-          <div>
-            <span className="mb-2 block text-sm font-semibold">Request type</span>
-            <SegmentedTabs
+          <label className="form-control block">
+            <span className="label-text mb-1.5 block text-sm font-semibold">
+              Request type
+            </span>
+            <SelectPicker
+              className="w-full"
               value={purpose}
               ariaLabel="Privacy request type"
-              stretch
-              onValueChange={setPurpose}
+              onValueChange={(value) => setPurpose(value as DataRightsOperationKind)}
               options={[
-                { value: "export", label: "Data export" },
-                { value: "removal", label: "Data removal" },
+                {
+                  value: "export",
+                  label: "Data export",
+                  description: "Prepare an encrypted copy of selected guest records.",
+                },
+                {
+                  value: "restriction-apply",
+                  label: "Limit data processing",
+                  description: "Add a reversible processing limit to one Guest Record.",
+                },
+                {
+                  value: "restriction-release",
+                  label: "Release processing limit",
+                  description: "Release one unambiguous active processing limit.",
+                },
+                {
+                  value: "removal",
+                  label: "Data removal",
+                  description: "Permanently remove eligible data from selected records.",
+                },
               ]}
             />
-          </div>
+          </label>
         )}
         <label className="form-control block">
           <span className="label-text mb-1.5 block text-sm font-semibold">
@@ -433,27 +471,23 @@ function CreatePrivacyRequestModal({
               {
                 value: "3",
                 label: "Workspace initiated",
-                description: accessExport
-                  ? "Use for an internally initiated access review."
-                  : "Use for an internally initiated removal review.",
+                description: workspaceInitiatedDescription(operationKind),
               },
             ]}
           />
         </label>
         <div className={`rounded-lg border p-4 ${
-          accessExport
-            ? "border-info/25 bg-info/8"
-            : "border-warning/25 bg-warning/8"
+          operationKind === "removal"
+            ? "border-warning/25 bg-warning/8"
+            : operationKind.startsWith("restriction")
+              ? "border-primary/25 bg-primary/8"
+              : "border-info/25 bg-info/8"
         }`}>
           <p className="text-sm font-semibold">
-            {accessExport
-              ? "The export stays limited to explicitly selected records."
-              : "This workflow can permanently remove personal data."}
+            {requestPurposeTitle(operationKind)}
           </p>
           <p className="mt-1 text-xs leading-5 text-base-content/55">
-            {accessExport
-              ? "Generation and download require separate permissions. The encrypted artifact expires automatically."
-              : "BunkFy verifies policy eligibility before approval and requires another authorized staff member to execute it."}
+            {requestPurposeDescription(operationKind)}
           </p>
         </div>
         {mutation.error && <ErrorState error={mutation.error} />}
@@ -467,15 +501,61 @@ function CreatePrivacyRequestModal({
   );
 }
 
-function stageDescription(status: string, accessExport: boolean): string {
+function stageDescription(status: string, operationKind: DataRightsOperationKind): string {
   if (status === "draft") return "Intake";
   if (status === "discovery") return "Match records";
   if (status === "reviewRequired" || status === "decisionPending") return "Review";
-  if (status === "approved") return accessExport ? "Ready to generate" : "Ready for another operator";
+  if (status === "approved") {
+    if (operationKind === "export") return "Ready to generate";
+    if (operationKind.startsWith("restriction")) return "Ready to apply";
+    return "Ready for another operator";
+  }
   if (status === "executing") return "Removal in progress";
-  if (status === "completed") return accessExport ? "Export generated" : "Removal completed";
+  if (status === "completed") {
+    if (operationKind === "export") return "Export generated";
+    if (operationKind === "restriction-apply") return "Processing limit applied";
+    if (operationKind === "restriction-release") return "Processing limit released";
+    return "Removal completed";
+  }
   if (status === "blocked") return "Needs attention";
   return "Closed";
+}
+
+function workspaceInitiatedDescription(operationKind: DataRightsOperationKind): string {
+  if (operationKind === "export") return "Use for an internally initiated access review.";
+  if (operationKind === "restriction-apply") {
+    return "Use when the workspace must limit processing for an identified guest.";
+  }
+  if (operationKind === "restriction-release") {
+    return "Use when the workspace has confirmed a processing limit can be released.";
+  }
+  return "Use for an internally initiated removal review.";
+}
+
+function requestPurposeTitle(operationKind: DataRightsOperationKind): string {
+  if (operationKind === "export") {
+    return "The export stays limited to explicitly selected records.";
+  }
+  if (operationKind === "restriction-apply") {
+    return "This adds a reversible processing obligation.";
+  }
+  if (operationKind === "restriction-release") {
+    return "A release fails closed if the active obligation is ambiguous.";
+  }
+  return "This workflow can permanently remove personal data.";
+}
+
+function requestPurposeDescription(operationKind: DataRightsOperationKind): string {
+  if (operationKind === "export") {
+    return "Generation and download require separate permissions. The encrypted artifact expires automatically.";
+  }
+  if (operationKind === "restriction-apply") {
+    return "Select exactly one Guest Record. Existing restrictions remain independently effective.";
+  }
+  if (operationKind === "restriction-release") {
+    return "Select exactly one Guest Record. Release proceeds only when exactly one active restriction exists.";
+  }
+  return "BunkFy verifies policy eligibility before approval and requires another authorized staff member to execute it.";
 }
 
 function formatDateTime(value: string): string {

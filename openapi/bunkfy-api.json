@@ -2382,6 +2382,55 @@
         }
       }
     },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteDataRightsRestrictionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRestrictionExecutionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/export": {
       "get": {
         "tags": [
@@ -11474,6 +11523,46 @@
         "type": "integer",
         "format": "int32"
       },
+      "DataRightsRestrictionExecutionDto": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/DataRightsCaseDto"
+          },
+          "proof": {
+            "$ref": "#/components/schemas/DataRightsRestrictionExecutionProofDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsRestrictionExecutionProofDto": {
+        "type": "object",
+        "properties": {
+          "directive": {
+            "$ref": "#/components/schemas/DataRightsRestrictionDirective"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resultingOwnerRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resultingProjectionRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "effectiveRestricted": {
+            "type": "boolean"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "DataRightsRoutingStatus": {
         "enum": [
           0,
@@ -11644,6 +11733,20 @@
           "ownerKey": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExecuteDataRightsRestrictionRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false

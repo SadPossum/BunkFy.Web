@@ -4,18 +4,20 @@ import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
   dataRightsDecisionReasonLabel,
   type DataRightsAction,
+  type DataRightsOperationKind,
 } from "./dataRightsWorkflow";
 
 export type PrivacyRequestConfirmation =
   | "reject-verification"
   | "approve"
   | "deny"
-  | "execute"
+  | "execute-restriction"
+  | "execute-removal"
   | "cancel";
 
 export function PrivacyRequestActions({
   actions,
-  accessExport,
+  operationKind,
   confirmation,
   denialReason,
   destructiveConfirmation,
@@ -27,7 +29,7 @@ export function PrivacyRequestActions({
   onExecute,
 }: {
   actions: DataRightsAction[];
-  accessExport: boolean;
+  operationKind: DataRightsOperationKind;
   confirmation: PrivacyRequestConfirmation | null;
   denialReason: string;
   destructiveConfirmation: string;
@@ -36,7 +38,7 @@ export function PrivacyRequestActions({
   onDenialReasonChange: (value: string) => void;
   onDestructiveConfirmationChange: (value: string) => void;
   onPerform: (suffix: string, body?: Record<string, unknown>) => void;
-  onExecute: () => void;
+  onExecute: (operationKind: DataRightsOperationKind) => void;
 }) {
   if (actions.length === 0) return null;
 
@@ -121,7 +123,7 @@ export function PrivacyRequestActions({
               disabled={pending}
               onClick={() => onConfirmationChange("approve")}
             >
-              {accessExport ? "Approve export" : "Approve removal"}
+              {approvalLabel(operationKind)}
             </button>
           )}
           {actions.includes("deny") && (
@@ -134,12 +136,25 @@ export function PrivacyRequestActions({
               Deny request
             </button>
           )}
-          {actions.includes("execute") && (
+          {actions.includes("execute-restriction") && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              disabled={pending}
+              onClick={() => onConfirmationChange("execute-restriction")}
+            >
+              <ShieldCheck size={15} />
+              {operationKind === "restriction-release"
+                ? "Release processing limit"
+                : "Apply processing limit"}
+            </button>
+          )}
+          {actions.includes("execute-removal") && (
             <button
               type="button"
               className="btn btn-sm btn-error text-white"
               disabled={pending}
-              onClick={() => onConfirmationChange("execute")}
+              onClick={() => onConfirmationChange("execute-removal")}
             >
               Remove personal data
             </button>
@@ -158,10 +173,14 @@ export function PrivacyRequestActions({
       </div>
 
       {confirmation && (
-        <div className="mt-4 rounded-lg border border-warning/30 bg-warning/8 p-4">
+        <div className={`mt-4 rounded-lg border p-4 ${
+          confirmation === "execute-restriction"
+            ? "border-primary/30 bg-primary/8"
+            : "border-warning/30 bg-warning/8"
+        }`}>
           <ConfirmationPanel
             confirmation={confirmation}
-            accessExport={accessExport}
+            operationKind={operationKind}
             denialReason={denialReason}
             destructiveConfirmation={destructiveConfirmation}
             pending={pending}
@@ -181,7 +200,7 @@ export function PrivacyRequestActions({
               } else if (confirmation === "cancel") {
                 onPerform("/cancel");
               } else {
-                onExecute();
+                onExecute(operationKind);
               }
             }}
           />
@@ -193,7 +212,7 @@ export function PrivacyRequestActions({
 
 function ConfirmationPanel({
   confirmation,
-  accessExport,
+  operationKind,
   denialReason,
   destructiveConfirmation,
   pending,
@@ -203,7 +222,7 @@ function ConfirmationPanel({
   onConfirm,
 }: {
   confirmation: PrivacyRequestConfirmation;
-  accessExport: boolean;
+  operationKind: DataRightsOperationKind;
   denialReason: string;
   destructiveConfirmation: string;
   pending: boolean;
@@ -212,17 +231,17 @@ function ConfirmationPanel({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const destructive = confirmation === "execute";
+  const destructive = confirmation === "execute-removal";
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning-content" />
         <div>
           <p className="text-sm font-semibold">
-            {confirmationTitle(confirmation, accessExport)}
+            {confirmationTitle(confirmation, operationKind)}
           </p>
           <p className="mt-1 text-xs leading-5 text-base-content/55">
-            {confirmationDescription(confirmation, accessExport)}
+            {confirmationDescription(confirmation, operationKind)}
           </p>
         </div>
       </div>
@@ -274,28 +293,43 @@ function ConfirmationPanel({
 
 function confirmationTitle(
   confirmation: PrivacyRequestConfirmation,
-  accessExport: boolean,
+  operationKind: DataRightsOperationKind,
 ): string {
   if (confirmation === "reject-verification") return "Record failed identity verification?";
   if (confirmation === "approve") {
-    return accessExport ? "Approve this protected data export?" : "Approve permanent data removal?";
+    if (operationKind === "export") return "Approve this protected data export?";
+    if (operationKind === "restriction-apply") return "Approve a processing limit?";
+    if (operationKind === "restriction-release") return "Approve releasing the processing limit?";
+    return "Approve permanent data removal?";
   }
   if (confirmation === "deny") return "Deny this privacy request?";
   if (confirmation === "cancel") return "Cancel this privacy request?";
+  if (confirmation === "execute-restriction") {
+    return operationKind === "restriction-release"
+      ? "Release the active processing limit?"
+      : "Apply a processing limit to this guest?";
+  }
   return "Permanently remove the selected personal data?";
 }
 
 function confirmationDescription(
   confirmation: PrivacyRequestConfirmation,
-  accessExport: boolean,
+  operationKind: DataRightsOperationKind,
 ): string {
   if (confirmation === "reject-verification") {
     return "The request cannot continue after verification is recorded as failed.";
   }
   if (confirmation === "approve") {
-    return accessExport
-      ? "Generation stays limited to the selected records. A separate permission and recent authentication are required before the export can be created."
-      : "Policy eligibility is checked by the server. A different authorized staff member must execute the approved request.";
+    if (operationKind === "export") {
+      return "Generation stays limited to the selected records. A separate permission and recent authentication are required before the export can be created.";
+    }
+    if (operationKind === "restriction-apply") {
+      return "The approval is pinned to one Guest Record and one record revision. Existing processing limits remain independently effective.";
+    }
+    if (operationKind === "restriction-release") {
+      return "The approval is pinned to one Guest Record. Execution fails closed unless exactly one active processing limit can be released.";
+    }
+    return "Policy eligibility is checked by the server. A different authorized staff member must execute the approved request.";
   }
   if (confirmation === "deny") {
     return "The reason becomes part of the durable privacy case record.";
@@ -303,5 +337,17 @@ function confirmationDescription(
   if (confirmation === "cancel") {
     return "The case remains in the audit history but no further processing can occur.";
   }
+  if (confirmation === "execute-restriction") {
+    return operationKind === "restriction-release"
+      ? "BunkFy releases only one unambiguous active obligation and records a durable owner receipt."
+      : "BunkFy adds a reversible obligation in the Guests module and records a durable owner receipt.";
+  }
   return "This is irreversible on ordinary product surfaces. Recent authentication and a different executor are enforced by the server.";
+}
+
+function approvalLabel(operationKind: DataRightsOperationKind): string {
+  if (operationKind === "export") return "Approve export";
+  if (operationKind === "restriction-apply") return "Approve processing limit";
+  if (operationKind === "restriction-release") return "Approve release";
+  return "Approve removal";
 }
