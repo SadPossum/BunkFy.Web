@@ -8326,6 +8326,25 @@
         }
       }
     },
+    "/api/retention/schedules": {
+      "get": {
+        "tags": [
+          "Retention"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionScheduleHealthListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/staff/me": {
       "get": {
         "tags": [
@@ -14567,6 +14586,114 @@
         },
         "additionalProperties": false
       },
+      "RetentionExecutionStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "RetentionScheduleHealthDto": {
+        "type": "object",
+        "properties": {
+          "ownerKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "dataClassKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetScopeKind": {
+            "$ref": "#/components/schemas/RetentionTargetScopeKind"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "executionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RetentionExecutionStatus"
+          },
+          "lastStartedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCompletedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextDueAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "consecutiveFailures": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastScannedCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lastAffectedCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lastRemainingCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "outcomeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "holdReviewDueAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetentionScheduleHealthListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetentionScheduleHealthDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetentionTargetScopeKind": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "RetireBedRequest": {
         "type": "object",
         "properties": {
@@ -16292,6 +16419,9 @@
     },
     {
       "name": "Reservations"
+    },
+    {
+      "name": "Retention"
     },
     {
       "name": "Staff"

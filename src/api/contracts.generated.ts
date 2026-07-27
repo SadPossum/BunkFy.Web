@@ -8285,6 +8285,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retention/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RetentionScheduleHealthListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/staff/me": {
         parameters: {
             query?: never;
@@ -11358,6 +11393,47 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RetentionExecutionStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        RetentionScheduleHealthDto: {
+            ownerKey: string | null;
+            dataClassKey: string | null;
+            targetScopeKind: components["schemas"]["RetentionTargetScopeKind"];
+            /** Format: uuid */
+            propertyId: string | null;
+            /** Format: int32 */
+            executionPolicyVersion: number;
+            status: components["schemas"]["RetentionExecutionStatus"];
+            /** Format: date-time */
+            lastStartedAtUtc: string | null;
+            /** Format: date-time */
+            lastCompletedAtUtc: string | null;
+            /** Format: date-time */
+            nextDueAtUtc: string;
+            overdue: boolean;
+            /** Format: int32 */
+            consecutiveFailures: number;
+            /** Format: int32 */
+            lastScannedCount: number | null;
+            /** Format: int32 */
+            lastAffectedCount: number | null;
+            /** Format: int32 */
+            lastRemainingCount: number | null;
+            outcomeCode: string | null;
+            /** Format: date-time */
+            holdReviewDueAtUtc: string | null;
+        };
+        RetentionScheduleHealthListResponse: {
+            items: components["schemas"]["RetentionScheduleHealthDto"][] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RetentionTargetScopeKind: 0 | 1 | 2;
         RetireBedRequest: {
             confirmed: boolean;
             /** Format: int64 */

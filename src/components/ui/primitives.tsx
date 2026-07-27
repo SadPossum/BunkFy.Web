@@ -201,7 +201,7 @@ export function StatusBadge({ status, surface = "light" }: { status: string | nu
   const normalized = String(status).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
   const tone = normalized.includes("confirmed") || normalized === "active" || normalized === "available" || normalized === "checked in" || normalized === "configured" || normalized === "verified" || normalized === "success" || normalized === "succeeded" || normalized === "unread"
     ? surface === "dark" ? "bg-success text-white" : "bg-primary text-white"
-    : normalized.includes("pending") || normalized.includes("unconfigured") || normalized === "suspended" || normalized === "warning"
+    : normalized.includes("pending") || normalized.includes("unconfigured") || normalized === "suspended" || normalized === "warning" || normalized === "blocked" || normalized === "overdue"
       ? "bg-warning-content text-white"
       : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected") || normalized.includes("archived") || normalized.includes("failed") || normalized === "error" || normalized === "no-show" || normalized === "checked out" || normalized === "released" || normalized === "read"
         ? "badge-ghost"

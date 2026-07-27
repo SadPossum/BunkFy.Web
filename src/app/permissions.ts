@@ -45,6 +45,7 @@ export const permissions = {
   dataRightsRestrict: "data-rights.restrict",
   dataRightsErase: "data-rights.erase",
   dataRightsManage: "data-rights.manage",
+  retentionRead: "retention.read",
 } as const;
 
 export function tenantAccessScope(tenantId: string): string {

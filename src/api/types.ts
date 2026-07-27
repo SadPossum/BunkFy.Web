@@ -195,6 +195,21 @@ export type WorkspaceStaffJoinSourceReplacement = Omit<
   replacement: WorkspaceStaffJoinSourceIssuance;
 };
 
+export type RetentionExecutionStatus = Schema<"RetentionExecutionStatus">;
+export type RetentionTargetScopeKind = Schema<"RetentionTargetScopeKind">;
+
+export type RetentionScheduleHealth = NonNullableFields<
+  Schema<"RetentionScheduleHealthDto">,
+  "ownerKey" | "dataClassKey"
+>;
+
+export type RetentionScheduleHealthListResponse = Omit<
+  Schema<"RetentionScheduleHealthListResponse">,
+  "items"
+> & {
+  items: RetentionScheduleHealth[];
+};
+
 export type PropertyProcessingStatus = Schema<"PropertyProcessingStatus">;
 export type PropertyProcessingEffectiveStatus = Schema<"PropertyProcessingEffectiveStatus">;
 
