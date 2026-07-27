@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   FileOutput,
   FileLock2,
+  PencilLine,
   Search,
   ShieldCheck,
   UserCheck,
@@ -22,6 +23,7 @@ import {
   StatusBadge,
 } from "../../components/ui/primitives";
 import { PrivacyRequestDiscovery } from "./PrivacyRequestDiscovery";
+import { PrivacyRequestCorrection } from "./PrivacyRequestCorrection";
 import { PrivacyRequestExport } from "./PrivacyRequestExport";
 import {
   PrivacyRequestActions,
@@ -348,8 +350,24 @@ export function PrivacyRequestDetail({
                 />
               )}
 
+              {operationKind === "correction" &&
+                scope.kind === "guest" &&
+                ["approved", "executing", "completed"].includes(status) && (
+                <PrivacyRequestCorrection
+                  basePath={basePath}
+                  scopeKey={scopeKey}
+                  propertyId={scope.propertyId}
+                  dataRightsCase={dataRightsCase}
+                  selectedSubject={selected.data?.subjects[0]}
+                  canStart={actions.includes("execute-correction")}
+                  canExecute={capabilities.execute}
+                  onCaseUpdated={updateCase}
+                />
+              )}
+
               <PrivacyRequestActions
-                actions={actions.filter((action) => action !== "generate-export")}
+                actions={actions.filter((action) =>
+                  action !== "generate-export" && action !== "execute-correction")}
                 operationKind={operationKind}
                 confirmation={confirmation}
                 denialReason={denialReason}
@@ -469,6 +487,8 @@ function WorkflowProgress({
 }) {
   const terminalStage = operationKind === "export"
     ? { key: "export", label: "Export", icon: FileOutput }
+    : operationKind === "correction"
+      ? { key: "correction", label: "Correction", icon: PencilLine }
     : operationKind.startsWith("restriction")
       ? { key: "restriction", label: "Processing limit", icon: ShieldCheck }
       : { key: "removal", label: "Removal", icon: FileLock2 };

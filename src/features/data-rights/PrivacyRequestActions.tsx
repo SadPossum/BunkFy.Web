@@ -298,6 +298,7 @@ function confirmationTitle(
   if (confirmation === "reject-verification") return "Record failed identity verification?";
   if (confirmation === "approve") {
     if (operationKind === "export") return "Approve this protected data export?";
+    if (operationKind === "correction") return "Approve correction of the selected record?";
     if (operationKind === "restriction-apply") return "Approve a processing limit?";
     if (operationKind === "restriction-release") return "Approve releasing the processing limit?";
     return "Approve permanent data removal?";
@@ -323,6 +324,9 @@ function confirmationDescription(
     if (operationKind === "export") {
       return "Generation stays limited to the selected records. A separate permission and recent authentication are required before the export can be created.";
     }
+    if (operationKind === "correction") {
+      return "Approval is pinned to one selected record and revision. An authorized operator must then enter the corrected values through the owning module.";
+    }
     if (operationKind === "restriction-apply") {
       return "The approval is pinned to one Guest Record and one record revision. Existing processing limits remain independently effective.";
     }
@@ -347,6 +351,7 @@ function confirmationDescription(
 
 function approvalLabel(operationKind: DataRightsOperationKind): string {
   if (operationKind === "export") return "Approve export";
+  if (operationKind === "correction") return "Approve correction";
   if (operationKind === "restriction-apply") return "Approve processing limit";
   if (operationKind === "restriction-release") return "Approve release";
   return "Approve removal";

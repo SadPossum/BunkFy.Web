@@ -2718,6 +2718,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCorrectionExecutionDetailsDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartDataRightsCorrectionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCorrectionExecutionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/export": {
         parameters: {
             query?: never;
@@ -7822,6 +7886,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reservations/properties/{propertyId}/data-rights-corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReservationDataRightsCorrectionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationDataRightsCorrectionReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations/properties/{propertyId}/{reservationId}": {
         parameters: {
             query?: never;
@@ -10022,6 +10127,51 @@ export interface components {
          * @enum {integer}
          */
         DataRightsCaseType: 0 | 1 | 2 | 3;
+        DataRightsCorrectionExecutionDetailsDto: {
+            /** Format: uuid */
+            executionId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int64 */
+            selectedCaseVersion: number;
+            /** Format: int64 */
+            executionRevision: number;
+            /** Format: int64 */
+            approvalRevision: number;
+            subject: components["schemas"]["DataRightsSubjectCoordinate"];
+            fieldPolicyKey: string | null;
+            executedBy: string | null;
+            /** Format: date-time */
+            startedAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            status: components["schemas"]["DataRightsCorrectionExecutionStatus"];
+            /** Format: int32 */
+            receiptContractVersion: number | null;
+            /** Format: uuid */
+            receiptId: string | null;
+            /** Format: int64 */
+            currentRecordVersion: number | null;
+            /** Format: int32 */
+            changedFieldCount: number | null;
+            changedFieldsSha256: string | null;
+            receiptSha256: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+        };
+        DataRightsCorrectionExecutionDto: {
+            case: components["schemas"]["DataRightsCaseDto"];
+            execution: components["schemas"]["DataRightsCorrectionExecutionDetailsDto"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsCorrectionExecutionStatus: 0 | 1 | 2;
         /**
          * Format: int32
          * @enum {integer}
@@ -11051,6 +11201,57 @@ export interface components {
         RequestRoomRetirementRequest: {
             reason: string | null;
         };
+        ReservationDataRightsCorrectionReceiptDto: {
+            /** Format: int32 */
+            contractVersion: number;
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            previousVersion: number;
+            /** Format: int64 */
+            currentVersion: number;
+            /** Format: int64 */
+            previousDetailsRevision: number;
+            /** Format: int64 */
+            currentDetailsRevision: number;
+            changedFields: string[] | null;
+            /** Format: uuid */
+            detailsChangeEventId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        ReservationDataRightsCorrectionRequest: {
+            /** Format: uuid */
+            executionId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: int64 */
+            expectedDetailsRevision: number;
+            primaryGuestName: string | null;
+            email: string | null;
+            phone: string | null;
+            /** Format: int32 */
+            guestCount: number;
+            notes: string | null;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -11432,6 +11633,12 @@ export interface components {
             /** Format: date */
             effectiveTo: string;
             reason: string | null;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        StartDataRightsCorrectionRequest: {
+            /** Format: uuid */
+            executionId: string;
             /** Format: int64 */
             expectedVersion: number;
         };

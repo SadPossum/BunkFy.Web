@@ -39,6 +39,7 @@ export const permissions = {
   dataRightsDiscover: "data-rights.discover",
   dataRightsReview: "data-rights.review",
   dataRightsDecide: "data-rights.decide",
+  dataRightsExecute: "data-rights.execute",
   dataRightsExport: "data-rights.export",
   dataRightsDownloadExport: "data-rights.export.download",
   dataRightsRestrict: "data-rights.restrict",

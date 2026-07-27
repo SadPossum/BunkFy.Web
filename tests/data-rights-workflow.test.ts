@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DataRightsCase } from "../src/api/types";
 import {
+  DATA_RIGHTS_CORRECTION,
   DATA_RIGHTS_RESTRICTION,
   DATA_RIGHTS_RESTRICTION_APPLY,
   DATA_RIGHTS_RESTRICTION_RELEASE,
@@ -26,6 +27,7 @@ const allCapabilities: DataRightsCapabilities = {
   discover: true,
   review: true,
   decide: true,
+  execute: true,
   manage: true,
   export: true,
   downloadExport: true,
@@ -89,6 +91,24 @@ describe("privacy request workflow", () => {
     }), allCapabilities)).not.toContain("review");
   });
 
+  it("requires exactly one selected subject before correction review", () => {
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      requestedOperations: DATA_RIGHTS_CORRECTION,
+      selectedSubjectCount: 0,
+    }), allCapabilities)).not.toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      requestedOperations: DATA_RIGHTS_CORRECTION,
+      selectedSubjectCount: 1,
+    }), allCapabilities)).toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      requestedOperations: DATA_RIGHTS_CORRECTION,
+      selectedSubjectCount: 2,
+    }), allCapabilities)).not.toContain("review");
+  });
+
   it("keeps approval and destructive execution as separate actions", () => {
     expect(availableDataRightsActions(dataRightsCase({ status: 4 }), allCapabilities))
       .toEqual(["approve", "deny", "cancel"]);
@@ -121,6 +141,23 @@ describe("privacy request workflow", () => {
       ...allCapabilities,
       restrict: false,
     })).toEqual([]);
+  });
+
+  it("uses a dedicated capability and action for correction execution", () => {
+    const approved = dataRightsCase({
+      status: 5,
+      requestedOperations: DATA_RIGHTS_CORRECTION,
+      selectedSubjectCount: 1,
+    });
+
+    expect(availableDataRightsActions(approved, allCapabilities))
+      .toEqual(["execute-correction"]);
+    expect(availableDataRightsActions(approved, {
+      ...allCapabilities,
+      execute: false,
+    })).toEqual([]);
+    expect(dataRightsOperationKind(approved)).toBe("correction");
+    expect(dataRightsRequestLabel(approved)).toBe("Correct guest data");
   });
 
   it("stops polling terminal case and work item states", () => {

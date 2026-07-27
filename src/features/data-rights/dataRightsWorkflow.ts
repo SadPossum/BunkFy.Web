@@ -18,6 +18,7 @@ export type DataRightsCapabilities = {
   review: boolean;
   decide: boolean;
   manage: boolean;
+  execute: boolean;
   export: boolean;
   downloadExport: boolean;
   restrict: boolean;
@@ -35,11 +36,13 @@ export type DataRightsAction =
   | "approve"
   | "deny"
   | "generate-export"
+  | "execute-correction"
   | "execute-restriction"
   | "execute-removal"
   | "cancel";
 
 export const DATA_RIGHTS_ACCESS_EXPORT = 1;
+export const DATA_RIGHTS_CORRECTION = 2;
 export const DATA_RIGHTS_RESTRICTION = 4;
 export const DATA_RIGHTS_ANONYMISATION = 16;
 export const DATA_RIGHTS_RESTRICTION_APPLY = 1;
@@ -47,6 +50,7 @@ export const DATA_RIGHTS_RESTRICTION_RELEASE = 2;
 
 export type DataRightsOperationKind =
   | "export"
+  | "correction"
   | "restriction-apply"
   | "restriction-release"
   | "removal"
@@ -187,10 +191,17 @@ export function isDataRightsRestriction(
   return Number(dataRightsCase.requestedOperations) === DATA_RIGHTS_RESTRICTION;
 }
 
+export function isDataRightsCorrection(
+  dataRightsCase: Pick<DataRightsCase, "requestedOperations">,
+): boolean {
+  return Number(dataRightsCase.requestedOperations) === DATA_RIGHTS_CORRECTION;
+}
+
 export function dataRightsOperationKind(
   dataRightsCase: Pick<DataRightsCase, "requestedOperations" | "restrictionDirective">,
 ): DataRightsOperationKind {
   if (isDataRightsAccessExport(dataRightsCase)) return "export";
+  if (isDataRightsCorrection(dataRightsCase)) return "correction";
   if (isDataRightsRestriction(dataRightsCase)) {
     if (Number(dataRightsCase.restrictionDirective) === DATA_RIGHTS_RESTRICTION_APPLY) {
       return "restriction-apply";
@@ -216,6 +227,7 @@ export function dataRightsRequestLabel(
   if (operationKind === "export") {
     return Number(dataRightsCase.type) === 3 ? "Staff data export" : "Guest data export";
   }
+  if (operationKind === "correction") return "Correct guest data";
   if (operationKind === "restriction-apply") return "Limit guest data processing";
   if (operationKind === "restriction-release") return "Release guest processing limit";
   if (operationKind === "removal") return "Selected data removal";
@@ -276,7 +288,8 @@ export function availableDataRightsActions(
 
   if (status === "discovery" && capabilities.discover) {
     actions.push("discover-subject");
-    const selectionReady = isDataRightsRestriction(dataRightsCase)
+    const selectionReady =
+      isDataRightsRestriction(dataRightsCase) || isDataRightsCorrection(dataRightsCase)
       ? dataRightsCase.selectedSubjectCount === 1
       : dataRightsCase.selectedSubjectCount > 0;
     if (selectionReady && capabilities.review) {
@@ -295,6 +308,8 @@ export function availableDataRightsActions(
   if (status === "approved") {
     if (isDataRightsAccessExport(dataRightsCase)) {
       if (capabilities.export) actions.push("generate-export");
+    } else if (isDataRightsCorrection(dataRightsCase)) {
+      if (capabilities.execute) actions.push("execute-correction");
     } else if (isDataRightsRestriction(dataRightsCase)) {
       if (capabilities.restrict) actions.push("execute-restriction");
     } else if (capabilities.erase) {

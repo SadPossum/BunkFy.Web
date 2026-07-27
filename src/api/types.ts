@@ -418,6 +418,8 @@ export type DataRightsCaseStatus = Schema<"DataRightsCaseStatus">;
 export type DataRightsCaseType = Schema<"DataRightsCaseType">;
 export type DataRightsDecisionOutcome = Schema<"DataRightsDecisionOutcome">;
 export type DataRightsDecisionReason = Schema<"DataRightsDecisionReason">;
+export type DataRightsCorrectionExecutionStatus =
+  Schema<"DataRightsCorrectionExecutionStatus">;
 export type DataRightsExecutionWorkItemStatus = Schema<"DataRightsExecutionWorkItemStatus">;
 export type DataRightsExportArtifactStatus = Schema<"DataRightsExportArtifactStatus">;
 export type DataRightsOperation = Schema<"DataRightsOperation">;
@@ -479,6 +481,27 @@ export type DataRightsRestrictionExecution = Omit<
   case: DataRightsCase;
   proof: DataRightsRestrictionExecutionProof;
 };
+export type DataRightsCorrectionExecutionDetails = Omit<
+  Schema<"DataRightsCorrectionExecutionDetailsDto">,
+  "subject"
+> & {
+  subject: DataRightsSubjectCoordinate;
+};
+export type DataRightsCorrectionExecution = Omit<
+  Schema<"DataRightsCorrectionExecutionDto">,
+  "case" | "execution"
+> & {
+  case: DataRightsCase;
+  execution: DataRightsCorrectionExecutionDetails;
+};
+export type GuestDataRightsCorrectionRequest =
+  Schema<"GuestDataRightsCorrectionRequest">;
+export type GuestDataRightsCorrectionReceipt =
+  Schema<"GuestDataRightsCorrectionReceiptDto">;
+export type ReservationDataRightsCorrectionRequest =
+  Schema<"ReservationDataRightsCorrectionRequest">;
+export type ReservationDataRightsCorrectionReceipt =
+  Schema<"ReservationDataRightsCorrectionReceiptDto">;
 
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";
 

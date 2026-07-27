@@ -29,6 +29,7 @@ import {
 import {
   DATA_RIGHTS_ACCESS_EXPORT,
   DATA_RIGHTS_ANONYMISATION,
+  DATA_RIGHTS_CORRECTION,
   DATA_RIGHTS_RESTRICTION,
   DATA_RIGHTS_RESTRICTION_APPLY,
   DATA_RIGHTS_RESTRICTION_RELEASE,
@@ -67,6 +68,7 @@ const permissionCodes = [
   permissions.dataRightsDiscover,
   permissions.dataRightsReview,
   permissions.dataRightsDecide,
+  permissions.dataRightsExecute,
   permissions.dataRightsManage,
   permissions.dataRightsExport,
   permissions.dataRightsDownloadExport,
@@ -111,6 +113,8 @@ export function PrivacyRequestsPage() {
     discover: access.allows(permissions.dataRightsDiscover, activePermissionScope),
     review: access.allows(permissions.dataRightsReview, activePermissionScope),
     decide: access.allows(permissions.dataRightsDecide, activePermissionScope),
+    execute: scopeKind === "guest" &&
+      access.allows(permissions.dataRightsExecute, propertyScope),
     manage: access.allows(permissions.dataRightsManage, activePermissionScope),
     export: access.allows(permissions.dataRightsExport, activePermissionScope),
     downloadExport: access.allows(
@@ -174,7 +178,7 @@ export function PrivacyRequestsPage() {
         title="Privacy requests"
         description={scopeKind === "staff"
           ? "Review tenant-wide staff access requests and release protected exports."
-          : "Coordinate guest exports, processing limits and separately approved data removal."}
+          : "Coordinate guest corrections, exports, processing limits and separately approved data removal."}
         action={scope && capabilities.create
           ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -254,7 +258,7 @@ export function PrivacyRequestsPage() {
                         description={status === "all"
                           ? scopeKind === "staff"
                             ? "Create a request when a staff member asks for a copy of their workspace data."
-                            : "Create a request for a guest export, processing limit or data removal."
+                            : "Create a request for a guest correction, export, processing limit or data removal."
                           : "Choose another status to review the rest of the queue."}
                         action={scope && capabilities.create && status === "all"
                           ? (
@@ -370,6 +374,8 @@ function CreatePrivacyRequestModal({
     scope.kind === "staff" ? "export" : purpose;
   const requestedOperations = operationKind === "export"
     ? DATA_RIGHTS_ACCESS_EXPORT
+    : operationKind === "correction"
+      ? DATA_RIGHTS_CORRECTION
     : operationKind === "removal"
       ? DATA_RIGHTS_ANONYMISATION
       : DATA_RIGHTS_RESTRICTION;
@@ -430,6 +436,11 @@ function CreatePrivacyRequestModal({
                   description: "Prepare an encrypted copy of selected guest records.",
                 },
                 {
+                  value: "correction",
+                  label: "Correct guest data",
+                  description: "Correct one selected Guest Record or reservation.",
+                },
+                {
                   value: "restriction-apply",
                   label: "Limit data processing",
                   description: "Add a reversible processing limit to one Guest Record.",
@@ -479,6 +490,8 @@ function CreatePrivacyRequestModal({
         <div className={`rounded-lg border p-4 ${
           operationKind === "removal"
             ? "border-warning/25 bg-warning/8"
+            : operationKind === "correction"
+              ? "border-success/25 bg-success/8"
             : operationKind.startsWith("restriction")
               ? "border-primary/25 bg-primary/8"
               : "border-info/25 bg-info/8"
@@ -507,12 +520,16 @@ function stageDescription(status: string, operationKind: DataRightsOperationKind
   if (status === "reviewRequired" || status === "decisionPending") return "Review";
   if (status === "approved") {
     if (operationKind === "export") return "Ready to generate";
+    if (operationKind === "correction") return "Ready to correct";
     if (operationKind.startsWith("restriction")) return "Ready to apply";
     return "Ready for another operator";
   }
-  if (status === "executing") return "Removal in progress";
+  if (status === "executing") {
+    return operationKind === "correction" ? "Correction in progress" : "Removal in progress";
+  }
   if (status === "completed") {
     if (operationKind === "export") return "Export generated";
+    if (operationKind === "correction") return "Correction completed";
     if (operationKind === "restriction-apply") return "Processing limit applied";
     if (operationKind === "restriction-release") return "Processing limit released";
     return "Removal completed";
@@ -523,6 +540,9 @@ function stageDescription(status: string, operationKind: DataRightsOperationKind
 
 function workspaceInitiatedDescription(operationKind: DataRightsOperationKind): string {
   if (operationKind === "export") return "Use for an internally initiated access review.";
+  if (operationKind === "correction") {
+    return "Use when the workspace identifies incorrect guest or reservation data.";
+  }
   if (operationKind === "restriction-apply") {
     return "Use when the workspace must limit processing for an identified guest.";
   }
@@ -536,6 +556,9 @@ function requestPurposeTitle(operationKind: DataRightsOperationKind): string {
   if (operationKind === "export") {
     return "The export stays limited to explicitly selected records.";
   }
+  if (operationKind === "correction") {
+    return "The correction stays owned by the module that stores the selected record.";
+  }
   if (operationKind === "restriction-apply") {
     return "This adds a reversible processing obligation.";
   }
@@ -548,6 +571,9 @@ function requestPurposeTitle(operationKind: DataRightsOperationKind): string {
 function requestPurposeDescription(operationKind: DataRightsOperationKind): string {
   if (operationKind === "export") {
     return "Generation and download require separate permissions. The encrypted artifact expires automatically.";
+  }
+  if (operationKind === "correction") {
+    return "Select exactly one Guest Record or reservation. Approval freezes that record revision before any values can change.";
   }
   if (operationKind === "restriction-apply") {
     return "Select exactly one Guest Record. Existing restrictions remain independently effective.";

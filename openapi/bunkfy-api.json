@@ -2431,6 +2431,92 @@
         }
       }
     },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/correction": {
+      "get": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCorrectionExecutionDetailsDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartDataRightsCorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCorrectionExecutionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/export": {
       "get": {
         "tags": [
@@ -7821,6 +7907,46 @@
         }
       }
     },
+    "/api/reservations/properties/{propertyId}/data-rights-corrections": {
+      "post": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservationDataRightsCorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDataRightsCorrectionReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reservations/properties/{propertyId}/{reservationId}": {
       "get": {
         "tags": [
@@ -11182,6 +11308,116 @@
         "type": "integer",
         "format": "int32"
       },
+      "DataRightsCorrectionExecutionDetailsDto": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "selectedCaseVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "executionRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/DataRightsSubjectCoordinate"
+          },
+          "fieldPolicyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "executedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DataRightsCorrectionExecutionStatus"
+          },
+          "receiptContractVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "currentRecordVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "changedFieldCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "changedFieldsSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiptSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsCorrectionExecutionDto": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/DataRightsCaseDto"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/DataRightsCorrectionExecutionDetailsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsCorrectionExecutionStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DataRightsDecisionOutcome": {
         "enum": [
           0,
@@ -13928,6 +14164,127 @@
         },
         "additionalProperties": false
       },
+      "ReservationDataRightsCorrectionReceiptDto": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "previousDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "changedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "detailsChangeEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationDataRightsCorrectionRequest": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "primaryGuestName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "guestCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ReservationDetailsChangeOriginKind": {
         "enum": [
           0,
@@ -14987,6 +15344,20 @@
           "reason": {
             "type": "string",
             "nullable": true
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartDataRightsCorrectionRequest": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
           },
           "expectedVersion": {
             "type": "integer",
