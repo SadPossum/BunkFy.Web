@@ -10972,12 +10972,14 @@ export interface components {
             createdAtUtc: string;
             /** Format: date-time */
             lastChangedAtUtc: string;
+            /** Format: date-time */
+            decisionExpiresAtUtc: string | null;
         };
         /**
          * Format: int32
          * @enum {integer}
          */
-        OrganizationEnrollmentClaimStatus: 0 | 1 | 2 | 3;
+        OrganizationEnrollmentClaimStatus: 0 | 1 | 2 | 3 | 4;
         OrganizationEnrollmentLinkDto: {
             /** Format: uuid */
             enrollmentLinkId: string;
@@ -12028,7 +12030,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        WorkspaceStaffAccessPlanStatus: 0 | 1 | 2 | 3;
+        WorkspaceStaffAccessPlanStatus: 0 | 1 | 2 | 3 | 4;
         WorkspaceStaffJoinSourceDto: {
             /** Format: uuid */
             sourceId: string;
@@ -12123,7 +12125,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+        WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
     };
     responses: never;
     parameters: never;
