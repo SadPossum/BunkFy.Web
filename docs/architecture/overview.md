@@ -44,3 +44,15 @@ src/
 
 The operational product slice covers staff auth and account-security methods, Properties, Inventory, Reservations, property-scoped Guest Records, tenant-wide Staff Profiles with property assignments, and operator-facing Ingestion integrations. Reservations include grouped availability selection, canonical Guest Record linking, editable booking details with history, and the complete stay lifecycle. Integrations expose staff controls and audit trails while keeping adapter-ingress machine endpoints outside the UI. Generic framework capabilities and copied Catalog/Ordering examples are intentionally not presented as hostel product features.
 
+## Deployment Edge
+
+The production container serves the SPA and same-origin API/SignalR proxy
+through Nginx. Its checked-in policy keeps scripts, connections, forms, fonts,
+and framing on the application origin; inline styles remain allowed because
+React components use bounded style attributes. It also emits HSTS,
+Permissions-Policy, type, framing, referrer, and opener controls.
+
+TLS termination and external verification belong to the deployment. HSTS is
+ignored by browsers over the HTTP-only local preview and must be verified
+through the real HTTPS edge before launch.
+

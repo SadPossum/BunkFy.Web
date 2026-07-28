@@ -40,6 +40,23 @@ describe("frontend repository foundation", () => {
     }
   });
 
+  it("serves the production image with a restrictive browser security policy", () => {
+    const nginx = readFileSync(join(repositoryRoot, "nginx.conf"), "utf8");
+
+    expect(nginx).toContain("add_header Content-Security-Policy");
+    expect(nginx).toContain("script-src 'self'");
+    expect(nginx).toContain("style-src 'self' 'unsafe-inline'");
+    expect(nginx).toContain("connect-src 'self'");
+    expect(nginx).toContain("object-src 'none'");
+    expect(nginx).toContain("frame-ancestors 'none'");
+    expect(nginx).not.toContain("script-src 'self' 'unsafe-inline'");
+    expect(nginx).toContain("add_header Permissions-Policy");
+    expect(nginx).toContain("add_header Strict-Transport-Security \"max-age=31536000\" always;");
+    expect(nginx).toContain("add_header X-Content-Type-Options nosniff always;");
+    expect(nginx).toContain("add_header X-Frame-Options DENY always;");
+    expect(nginx).toContain("add_header Referrer-Policy strict-origin-when-cross-origin always;");
+  });
+
   it("keeps tenant-aware auth and API boundaries explicit", () => {
     const session = readFileSync(join(repositoryRoot, "src", "app", "session.tsx"), "utf8");
     const client = readFileSync(join(repositoryRoot, "src", "api", "client.ts"), "utf8");
