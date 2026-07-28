@@ -4021,6 +4021,62 @@
         }
       }
     },
+    "/api/ingestion/adapter-ingress-control": {
+      "get": {
+        "tags": [
+          "Ingestion Adapter Ingress Control"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ingestion/adapter-ingress-control/suspend": {
+      "post": {
+        "tags": [
+          "Ingestion Adapter Ingress Control"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdapterIngressControlDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ingestion/adapter-ingress-control/resume": {
+      "post": {
+        "tags": [
+          "Ingestion Adapter Ingress Control"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdapterIngressControlDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/ingestion/properties/{propertyId}/adapter-types": {
       "get": {
         "tags": [
@@ -9993,6 +10049,20 @@
         "type": "integer",
         "format": "int32"
       },
+      "AdapterIngressControlDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AdapterIngressObservationRequest": {
         "type": "object",
         "properties": {
@@ -10935,6 +11005,10 @@
           "expiresAtUtc": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "sourceSystem": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -16377,6 +16451,9 @@
     },
     {
       "name": "Ingestion Adapter Ingress"
+    },
+    {
+      "name": "Ingestion Adapter Ingress Control"
     },
     {
       "name": "Ingestion Adapter Types"

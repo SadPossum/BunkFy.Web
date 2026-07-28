@@ -4197,6 +4197,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ingestion/adapter-ingress-control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingestion/adapter-ingress-control/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdapterIngressControlDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingestion/adapter-ingress-control/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdapterIngressControlDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ingestion/properties/{propertyId}/adapter-types": {
         parameters: {
             query?: never;
@@ -9703,6 +9810,11 @@ export interface components {
          * @enum {integer}
          */
         AdapterExecutionMode: 0 | 1 | 2 | 3 | 4;
+        AdapterIngressControlDecisionRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+            reasonCode: string | null;
+        };
         AdapterIngressObservationRequest: {
             /** Format: uuid */
             operationId: string;
@@ -10024,6 +10136,7 @@ export interface components {
             label: string | null;
             /** Format: date-time */
             expiresAtUtc: string | null;
+            sourceSystem: string | null;
         };
         CreateManualBlockGroupRequest: {
             target: components["schemas"]["InventoryBlockTarget"];
