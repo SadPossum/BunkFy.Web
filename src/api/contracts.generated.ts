@@ -10950,11 +10950,8 @@ export interface components {
             /** Format: date-time */
             lastChangedAtUtc: string;
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationEnrollmentApprovalMode: 0 | 1 | 2;
+        /** @enum {string} */
+        OrganizationEnrollmentApprovalMode: "automatic" | "requires-approval";
         OrganizationEnrollmentClaimDto: {
             /** Format: uuid */
             claimId: string;
@@ -10975,11 +10972,8 @@ export interface components {
             /** Format: date-time */
             decisionExpiresAtUtc: string | null;
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationEnrollmentClaimStatus: 0 | 1 | 2 | 3 | 4;
+        /** @enum {string} */
+        OrganizationEnrollmentClaimStatus: "pending" | "accepted" | "rejected" | "expired";
         OrganizationEnrollmentLinkDto: {
             /** Format: uuid */
             enrollmentLinkId: string;
@@ -11016,11 +11010,8 @@ export interface components {
             enrollmentLink: components["schemas"]["OrganizationEnrollmentLinkDto"];
             replacementToken: string | null;
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationEnrollmentLinkStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        /** @enum {string} */
+        OrganizationEnrollmentLinkStatus: "active" | "disabled" | "rotated" | "expired" | "capacity-reached";
         OrganizationEnrollmentOutcomeDto: {
             claim: components["schemas"]["OrganizationEnrollmentClaimDto"];
             membership: components["schemas"]["OrganizationMembershipSummaryDto"];
@@ -11086,11 +11077,8 @@ export interface components {
             expiresAtUtc: string;
             status: components["schemas"]["OrganizationInvitationStatus"];
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationInvitationStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        /** @enum {string} */
+        OrganizationInvitationStatus: "pending" | "accepted" | "revoked" | "superseded" | "expired";
         OrganizationJoinRequestListResponse: {
             items: components["schemas"]["OrganizationEnrollmentClaimDto"][] | null;
             /** Format: int32 */
@@ -11138,25 +11126,16 @@ export interface components {
             /** Format: int64 */
             expectedMembershipVersion: number;
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationMembershipRole: 0 | 1 | 2;
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationMembershipStatus: 0 | 1 | 2 | 3;
+        /** @enum {string} */
+        OrganizationMembershipRole: "member" | "owner";
+        /** @enum {string} */
+        OrganizationMembershipStatus: "active" | "suspended" | "removed";
         OrganizationMembershipSummaryDto: {
             organization: components["schemas"]["OrganizationDto"];
             membership: components["schemas"]["OrganizationMembershipDto"];
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        OrganizationStatus: 0 | 1 | 2 | 3;
+        /** @enum {string} */
+        OrganizationStatus: "active" | "suspended" | "archived";
         PasswordRecoveryRequest: {
             email: string | null;
         };

@@ -13183,12 +13183,10 @@
       },
       "OrganizationEnrollmentApprovalMode": {
         "enum": [
-          0,
-          1,
-          2
+          "automatic",
+          "requires-approval"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "OrganizationEnrollmentClaimDto": {
         "type": "object",
@@ -13239,14 +13237,12 @@
       },
       "OrganizationEnrollmentClaimStatus": {
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
+          "pending",
+          "accepted",
+          "rejected",
+          "expired"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "OrganizationEnrollmentLinkDto": {
         "type": "object",
@@ -13345,15 +13341,13 @@
       },
       "OrganizationEnrollmentLinkStatus": {
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "active",
+          "disabled",
+          "rotated",
+          "expired",
+          "capacity-reached"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "OrganizationEnrollmentOutcomeDto": {
         "type": "object",
@@ -13533,15 +13527,13 @@
       },
       "OrganizationInvitationStatus": {
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "pending",
+          "accepted",
+          "revoked",
+          "superseded",
+          "expired"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "OrganizationJoinRequestListResponse": {
         "type": "object",
@@ -13672,22 +13664,18 @@
       },
       "OrganizationMembershipRole": {
         "enum": [
-          0,
-          1,
-          2
+          "member",
+          "owner"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "OrganizationMembershipStatus": {
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "active",
+          "suspended",
+          "removed"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "OrganizationMembershipSummaryDto": {
         "type": "object",
@@ -13703,13 +13691,11 @@
       },
       "OrganizationStatus": {
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "active",
+          "suspended",
+          "archived"
         ],
-        "type": "integer",
-        "format": "int32"
+        "type": "string"
       },
       "PasswordRecoveryRequest": {
         "type": "object",

@@ -257,15 +257,15 @@ function SettingsError({ error }: { error: unknown }) {
 }
 
 function isOwner(role: OrganizationMembership["role"] | undefined): boolean {
-  return role === 2 || String(role).toLowerCase() === "owner";
+  return role === "owner";
 }
 
 function isActive(status: OrganizationMembership["status"]): boolean {
-  return status === 1 || String(status).toLowerCase() === "active";
+  return status === "active";
 }
 
 function statusLabel(status: OrganizationMembership["status"]): string {
-  return status === 2 || String(status).toLowerCase() === "suspended" ? "Suspended" : "Removed";
+  return status === "suspended" ? "Suspended" : "Removed";
 }
 
 function shortSubject(subjectId: string): string {

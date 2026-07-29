@@ -206,5 +206,5 @@ function SettingsError({ error }: { error: unknown }) {
 }
 
 function isOwner(role: OrganizationMembership["role"] | undefined): boolean {
-  return role === 2 || String(role).toLowerCase() === "owner";
+  return role === "owner";
 }
