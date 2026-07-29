@@ -9117,6 +9117,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/staff/{staffMemberId}/employment-governance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffMemberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffEmploymentGovernanceDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffMemberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConfigureStaffEmploymentGovernanceRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffEmploymentGovernanceChangeReceiptDto"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/{staffMemberId}/data-holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["StaffDataHoldStatus"];
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    staffMemberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffDataHoldListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffMemberId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PlaceStaffDataHoldRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffDataHoldReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/{staffMemberId}/data-holds/{holdId}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffMemberId: string;
+                    holdId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReleaseStaffDataHoldRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffDataHoldReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tenants/current": {
         parameters: {
             query?: never;
@@ -10223,6 +10393,24 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        ConfigureStaffEmploymentGovernanceRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedStaffVersion: number;
+            /** Format: int64 */
+            expectedGovernanceVersion: number;
+            operatingCountryCode: string | null;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            dataRegionId: string | null;
+            transferProfileId: string | null;
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
+            acceptedAcknowledgements: components["schemas"]["StaffEmploymentGovernanceAcknowledgementDto"][] | null;
+        };
         ConfirmEmailVerificationRequest: {
             code: string | null;
         };
@@ -11293,6 +11481,13 @@ export interface components {
             expectedGuestVersion: number;
             reasonCode: string | null;
         };
+        PlaceStaffDataHoldRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedStaffVersion: number;
+            reasonCode: string | null;
+        };
         PreviewOrganizationEnrollmentLinkRequest: {
             token: string | null;
         };
@@ -11444,6 +11639,15 @@ export interface components {
         ReleaseManualBlockRequest: {
             /** Format: int64 */
             expectedVersion: number;
+        };
+        ReleaseStaffDataHoldRequest: {
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: int64 */
+            expectedStaffVersion: number;
+            /** Format: int64 */
+            expectedHoldVersion: number;
+            confirmed: boolean;
         };
         RemovePasswordRequest: {
             currentPassword: string | null;
@@ -11831,6 +12035,60 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        StaffDataHoldActionDto: 0 | 1 | 2;
+        StaffDataHoldDto: {
+            /** Format: uuid */
+            holdId: string;
+            /** Format: uuid */
+            staffMemberId: string;
+            reasonCode: string | null;
+            status: components["schemas"]["StaffDataHoldStatus"];
+            placedBy: string | null;
+            /** Format: date-time */
+            placedAtUtc: string;
+            releasedBy: string | null;
+            /** Format: date-time */
+            releasedAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+        };
+        StaffDataHoldListResponse: {
+            holds: components["schemas"]["StaffDataHoldDto"][] | null;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+        };
+        StaffDataHoldReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: uuid */
+            holdId: string;
+            action: components["schemas"]["StaffDataHoldActionDto"];
+            /** Format: uuid */
+            staffMemberId: string;
+            reasonCode: string | null;
+            /** Format: int64 */
+            selectedStaffVersion: number;
+            /** Format: int64 */
+            resultingHoldVersion: number;
+            actorId: string | null;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        StaffDataHoldStatus: 0 | 1 | 2;
         StaffDataRightsCorrectionReceiptDto: {
             /** Format: uuid */
             receiptId: string;
@@ -11903,6 +12161,63 @@ export interface components {
             /** Format: int64 */
             version: number;
             assignments: components["schemas"]["StaffDirectoryAssignmentDto"][] | null;
+        };
+        StaffEmploymentGovernanceAcknowledgementDto: {
+            acknowledgementId: string | null;
+            /** Format: int32 */
+            acknowledgementVersion: number;
+        };
+        StaffEmploymentGovernanceChangeReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** Format: uuid */
+            staffMemberId: string;
+            /** Format: int32 */
+            contractVersion: number;
+            /** Format: int64 */
+            selectedStaffVersion: number;
+            /** Format: int64 */
+            previousGovernanceVersion: number;
+            /** Format: int64 */
+            resultingGovernanceVersion: number;
+            policyContentSha256: string | null;
+            acknowledgementsSha256: string | null;
+            receiptSha256: string | null;
+            actorId: string | null;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        StaffEmploymentGovernanceDto: {
+            /** Format: int32 */
+            contractVersion: number;
+            /** Format: uuid */
+            staffMemberId: string;
+            /** Format: int64 */
+            selectedStaffVersion: number;
+            operatingCountryCode: string | null;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            dataRegionId: string | null;
+            transferProfileId: string | null;
+            retentionPolicyId: string | null;
+            /** Format: int32 */
+            retentionPolicyVersion: number;
+            policyContentSha256: string | null;
+            /** Format: date-time */
+            policyEffectiveAtUtc: string;
+            /** Format: date-time */
+            policyExpiresAtUtc: string;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+            acceptedAcknowledgements: components["schemas"]["StaffEmploymentGovernanceAcknowledgementDto"][] | null;
+            configuredBy: string | null;
+            /** Format: date-time */
+            configuredAtUtc: string;
+            /** Format: int64 */
+            version: number;
         };
         StaffLifecycleRequest: {
             reason: string | null;

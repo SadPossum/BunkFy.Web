@@ -9117,6 +9117,214 @@
         }
       }
     },
+    "/api/staff/{staffMemberId}/employment-governance": {
+      "get": {
+        "tags": [
+          "Staff Governance"
+        ],
+        "parameters": [
+          {
+            "name": "staffMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffEmploymentGovernanceDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Staff Governance"
+        ],
+        "parameters": [
+          {
+            "name": "staffMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureStaffEmploymentGovernanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffEmploymentGovernanceChangeReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/staff/{staffMemberId}/data-holds": {
+      "get": {
+        "tags": [
+          "Staff Governance"
+        ],
+        "parameters": [
+          {
+            "name": "staffMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StaffDataHoldStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffDataHoldListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Staff Governance"
+        ],
+        "parameters": [
+          {
+            "name": "staffMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceStaffDataHoldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffDataHoldReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/staff/{staffMemberId}/data-holds/{holdId}/release": {
+      "post": {
+        "tags": [
+          "Staff Governance"
+        ],
+        "parameters": [
+          {
+            "name": "staffMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "holdId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseStaffDataHoldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffDataHoldReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tenants/current": {
       "get": {
         "tags": [
@@ -10940,6 +11148,59 @@
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConfigureStaffEmploymentGovernanceRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedStaffVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedGovernanceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dataRegionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedAcknowledgements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffEmploymentGovernanceAcknowledgementDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -13880,6 +14141,24 @@
         },
         "additionalProperties": false
       },
+      "PlaceStaffDataHoldRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedStaffVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PreviewOrganizationEnrollmentLinkRequest": {
         "type": "object",
         "properties": {
@@ -14309,6 +14588,27 @@
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReleaseStaffDataHoldRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedStaffVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedHoldVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -15343,6 +15643,136 @@
         },
         "additionalProperties": false
       },
+      "StaffDataHoldActionDto": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "StaffDataHoldDto": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/StaffDataHoldStatus"
+          },
+          "placedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "placedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "releasedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "releasedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffDataHoldListResponse": {
+        "type": "object",
+        "properties": {
+          "holds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffDataHoldDto"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffDataHoldReceiptDto": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "$ref": "#/components/schemas/StaffDataHoldActionDto"
+          },
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "selectedStaffVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resultingHoldVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffDataHoldStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "StaffDataRightsCorrectionReceiptDto": {
         "type": "object",
         "properties": {
@@ -15538,6 +15968,155 @@
               "$ref": "#/components/schemas/StaffDirectoryAssignmentDto"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffEmploymentGovernanceAcknowledgementDto": {
+        "type": "object",
+        "properties": {
+          "acknowledgementId": {
+            "type": "string",
+            "nullable": true
+          },
+          "acknowledgementVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffEmploymentGovernanceChangeReceiptDto": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contractVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "selectedStaffVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "previousGovernanceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resultingGovernanceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "policyContentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "acknowledgementsSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiptSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffEmploymentGovernanceDto": {
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "selectedStaffVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dataRegionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "transferProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyContentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyEffectiveAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policyExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acceptedAcknowledgements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffEmploymentGovernanceAcknowledgementDto"
+            },
+            "nullable": true
+          },
+          "configuredBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "configuredAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -16736,6 +17315,9 @@
     },
     {
       "name": "Staff"
+    },
+    {
+      "name": "Staff Governance"
     },
     {
       "name": "Tenancy"
