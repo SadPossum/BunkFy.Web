@@ -3175,6 +3175,46 @@
         }
       }
     },
+    "/api/data-rights/tenant/cases/{caseId}/restriction": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteDataRightsRestrictionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRestrictionExecutionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/tenant/cases/{caseId}/correction": {
       "get": {
         "tags": [
