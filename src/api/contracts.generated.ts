@@ -3429,6 +3429,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/tenant/cases/{caseId}/correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCorrectionExecutionDetailsDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartDataRightsCorrectionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCorrectionExecutionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/tenant/cases/{caseId}/export": {
         parameters: {
             query?: never;
@@ -8975,6 +9037,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/staff/data-rights-corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StaffDataRightsCorrectionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffDataRightsCorrectionReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tenants/current": {
         parameters: {
             query?: never;
@@ -10280,8 +10381,9 @@ export interface components {
             executionId: string;
             /** Format: uuid */
             caseId: string;
+            caseType: components["schemas"]["DataRightsCaseType"];
             /** Format: uuid */
-            propertyId: string;
+            propertyId: string | null;
             /** Format: int64 */
             selectedCaseVersion: number;
             /** Format: int64 */
@@ -11687,6 +11789,44 @@ export interface components {
             authSubjectId: string | null;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        StaffDataRightsCorrectionReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            executionId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            staffMemberId: string;
+            /** Format: int64 */
+            selectedRecordVersion: number;
+            /** Format: int64 */
+            currentRecordVersion: number;
+            changedFieldKeys: string[] | null;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        StaffDataRightsCorrectionRequest: {
+            /** Format: uuid */
+            executionId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            staffMemberId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            employeeNumber: string | null;
+            jobTitle: string | null;
+            department: string | null;
         };
         StaffDepartureRequest: {
             /** Format: date */
