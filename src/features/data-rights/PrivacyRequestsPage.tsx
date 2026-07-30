@@ -123,8 +123,7 @@ export function PrivacyRequestsPage() {
     ),
     restrict: scopeKind === "guest" &&
       access.allows(permissions.dataRightsRestrict, propertyScope),
-    erase: scopeKind === "guest" &&
-      access.allows(permissions.dataRightsErase, tenantScope),
+    erase: access.allows(permissions.dataRightsErase, tenantScope),
   };
   const scope = useMemo<DataRightsRequestScope | null>(
     () => scopeKind === "staff"
@@ -177,7 +176,7 @@ export function PrivacyRequestsPage() {
           : selectedProperty?.name || "Property"}
         title="Privacy requests"
         description={scopeKind === "staff"
-          ? "Review tenant-wide staff access requests and release protected exports."
+          ? "Coordinate staff exports and separately approved removal of eligible departed profiles."
           : "Coordinate guest corrections, exports, processing limits and separately approved data removal."}
         action={scope && capabilities.create
           ? (
@@ -257,7 +256,7 @@ export function PrivacyRequestsPage() {
                         title={status === "all" ? "No privacy requests yet" : "No requests have this status"}
                         description={status === "all"
                           ? scopeKind === "staff"
-                            ? "Create a request when a staff member asks for a copy of their workspace data."
+                            ? "Create a request for a staff data export or governed profile removal."
                             : "Create a request for a guest correction, export, processing limit or data removal."
                           : "Choose another status to review the rest of the queue."}
                         action={scope && capabilities.create && status === "all"
@@ -370,8 +369,7 @@ function CreatePrivacyRequestModal({
   const { request } = useSession();
   const [purpose, setPurpose] = useState<DataRightsOperationKind>("export");
   const [relationship, setRelationship] = useState("1");
-  const operationKind: DataRightsOperationKind =
-    scope.kind === "staff" ? "export" : purpose;
+  const operationKind = purpose;
   const requestedOperations = operationKind === "export"
     ? DATA_RIGHTS_ACCESS_EXPORT
     : operationKind === "correction"
@@ -419,17 +417,29 @@ function CreatePrivacyRequestModal({
       onClose={onClose}
     >
       <form className="space-y-5" onSubmit={submit}>
-        {scope.kind === "guest" && (
-          <label className="form-control block">
-            <span className="label-text mb-1.5 block text-sm font-semibold">
-              Request type
-            </span>
-            <SelectPicker
-              className="w-full"
-              value={purpose}
-              ariaLabel="Privacy request type"
-              onValueChange={(value) => setPurpose(value as DataRightsOperationKind)}
-              options={[
+        <label className="form-control block">
+          <span className="label-text mb-1.5 block text-sm font-semibold">
+            Request type
+          </span>
+          <SelectPicker
+            className="w-full"
+            value={purpose}
+            ariaLabel="Privacy request type"
+            onValueChange={(value) => setPurpose(value as DataRightsOperationKind)}
+            options={scope.kind === "staff"
+              ? [
+                {
+                  value: "export",
+                  label: "Data export",
+                  description: "Prepare an encrypted copy of selected Staff records.",
+                },
+                {
+                  value: "removal",
+                  label: "Staff data removal",
+                  description: "Remove one eligible departed Staff profile after approval.",
+                },
+              ]
+              : [
                 {
                   value: "export",
                   label: "Data export",
@@ -456,9 +466,8 @@ function CreatePrivacyRequestModal({
                   description: "Permanently remove eligible data from selected records.",
                 },
               ]}
-            />
-          </label>
-        )}
+          />
+        </label>
         <label className="form-control block">
           <span className="label-text mb-1.5 block text-sm font-semibold">
             Who requested this?

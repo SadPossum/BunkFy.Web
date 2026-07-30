@@ -230,7 +230,11 @@ export function dataRightsRequestLabel(
   if (operationKind === "correction") return "Correct guest data";
   if (operationKind === "restriction-apply") return "Limit guest data processing";
   if (operationKind === "restriction-release") return "Release guest processing limit";
-  if (operationKind === "removal") return "Selected data removal";
+  if (operationKind === "removal") {
+    return Number(dataRightsCase.type) === 3
+      ? "Staff data removal"
+      : "Guest data removal";
+  }
   return "Privacy request";
 }
 
@@ -289,7 +293,9 @@ export function availableDataRightsActions(
   if (status === "discovery" && capabilities.discover) {
     actions.push("discover-subject");
     const selectionReady =
-      isDataRightsRestriction(dataRightsCase) || isDataRightsCorrection(dataRightsCase)
+      Number(dataRightsCase.type) === 3 ||
+      isDataRightsRestriction(dataRightsCase) ||
+      isDataRightsCorrection(dataRightsCase)
       ? dataRightsCase.selectedSubjectCount === 1
       : dataRightsCase.selectedSubjectCount > 0;
     if (selectionReady && capabilities.review) {

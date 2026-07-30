@@ -3175,6 +3175,74 @@
         }
       }
     },
+    "/api/data-rights/tenant/cases/{caseId}/execution": {
+      "get": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsExecutionDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartDataRightsExecutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsExecutionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/tenant/cases/{caseId}/restriction": {
       "post": {
         "tags": [
@@ -11612,7 +11680,8 @@
           },
           "propertyId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "propertyVersion": {
             "type": "integer",
@@ -11660,6 +11729,59 @@
           },
           "requiresDistinctExecutor": {
             "type": "boolean"
+          },
+          "caseType": {
+            "$ref": "#/components/schemas/DataRightsCaseType"
+          },
+          "scopeKind": {
+            "$ref": "#/components/schemas/DataRightsExecutionScopeKind"
+          },
+          "retentionDataClass": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionTrigger": {
+            "type": "string",
+            "nullable": true
+          },
+          "retentionTriggeredAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "retentionDeadlineUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "stateBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRightsApprovalEvidenceBinding"
+            },
+            "nullable": true
+          },
+          "stateBindingsSha256": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsApprovalEvidenceBinding": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -11948,7 +12070,8 @@
           },
           "propertyId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "approvalRevision": {
             "type": "integer",
@@ -11969,6 +12092,12 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "caseType": {
+            "$ref": "#/components/schemas/DataRightsCaseType"
+          },
+          "scopeKind": {
+            "$ref": "#/components/schemas/DataRightsExecutionScopeKind"
           }
         },
         "additionalProperties": false
@@ -11992,6 +12121,15 @@
         },
         "additionalProperties": false
       },
+      "DataRightsExecutionScopeKind": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DataRightsExecutionWorkItemDto": {
         "type": "object",
         "properties": {
@@ -12009,7 +12147,8 @@
           },
           "propertyId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "approvalRevision": {
             "type": "integer",
@@ -12135,6 +12274,64 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "caseType": {
+            "$ref": "#/components/schemas/DataRightsCaseType"
+          },
+          "scopeKind": {
+            "$ref": "#/components/schemas/DataRightsExecutionScopeKind"
+          },
+          "policyPurposeCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policySurface": {
+            "type": "string",
+            "nullable": true
+          },
+          "policySourceProvenance": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyRetentionDataClass": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyRetentionTrigger": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyRetentionTriggeredAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "policyRetentionDeadlineUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "policyEvaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "policyStateBindingsSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyPropertyVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "policyOperatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyRequiresDistinctExecutor": {
+            "type": "boolean",
+            "nullable": true
           }
         },
         "additionalProperties": false

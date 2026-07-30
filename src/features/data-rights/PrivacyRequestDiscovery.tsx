@@ -41,6 +41,7 @@ export function PrivacyRequestDiscovery({
 }) {
   const { request } = useSession();
   const restriction = isDataRightsRestriction(dataRightsCase);
+  const singleSubject = scopeKind === "staff" || restriction;
   const [ownerKey, setOwnerKey] = useState<DataOwner>(
     scopeKind === "staff" ? "staff" : restriction ? "guests" : "reservations",
   );
@@ -187,11 +188,12 @@ export function PrivacyRequestDiscovery({
         </div>
       )}
 
-      {restriction && dataRightsCase.selectedSubjectCount === 1
+      {singleSubject && dataRightsCase.selectedSubjectCount === 1
         ? (
           <p className="mt-5 rounded-lg border border-success/20 bg-success/8 px-4 py-3 text-sm text-base-content/65">
-            The required Guest Record is selected. Remove it first if this request points to
-            the wrong guest.
+            {scopeKind === "staff"
+              ? "The required Staff profile is selected. Remove it first if this request points to the wrong person."
+              : "The required Guest Record is selected. Remove it first if this request points to the wrong guest."}
           </p>
         )
         : (
@@ -309,7 +311,7 @@ export function PrivacyRequestDiscovery({
               disabled={
                 select.isPending ||
                 unselect.isPending ||
-                (restriction && dataRightsCase.selectedSubjectCount >= 1)
+                (singleSubject && dataRightsCase.selectedSubjectCount >= 1)
               }
               onSelect={() => select.mutate(candidate)}
             />

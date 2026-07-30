@@ -3429,6 +3429,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/tenant/cases/{caseId}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExecutionDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StartDataRightsExecutionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExecutionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/tenant/cases/{caseId}/restriction": {
         parameters: {
             query?: never;
@@ -10536,7 +10598,7 @@ export interface components {
             /** Format: int32 */
             schemaVersion: number;
             /** Format: uuid */
-            propertyId: string;
+            propertyId: string | null;
             /** Format: int64 */
             propertyVersion: number;
             operatingCountryCode: string | null;
@@ -10553,6 +10615,22 @@ export interface components {
             /** Format: date-time */
             evaluatedAtUtc: string;
             requiresDistinctExecutor: boolean;
+            caseType: components["schemas"]["DataRightsCaseType"];
+            scopeKind: components["schemas"]["DataRightsExecutionScopeKind"];
+            retentionDataClass: string | null;
+            retentionTrigger: string | null;
+            /** Format: date-time */
+            retentionTriggeredAtUtc: string | null;
+            /** Format: date-time */
+            retentionDeadlineUtc: string | null;
+            stateBindings: components["schemas"]["DataRightsApprovalEvidenceBinding"][] | null;
+            stateBindingsSha256: string | null;
+        };
+        DataRightsApprovalEvidenceBinding: {
+            key: string | null;
+            /** Format: int64 */
+            version: number;
+            sha256: string | null;
         };
         DataRightsCaseDto: {
             /** Format: uuid */
@@ -10667,7 +10745,7 @@ export interface components {
             /** Format: uuid */
             caseId: string;
             /** Format: uuid */
-            propertyId: string;
+            propertyId: string | null;
             /** Format: int64 */
             approvalRevision: number;
             /** Format: int64 */
@@ -10678,12 +10756,19 @@ export interface components {
             createdAtUtc: string;
             /** Format: int64 */
             version: number;
+            caseType: components["schemas"]["DataRightsCaseType"];
+            scopeKind: components["schemas"]["DataRightsExecutionScopeKind"];
         };
         DataRightsExecutionDto: {
             case: components["schemas"]["DataRightsCaseDto"];
             batch: components["schemas"]["DataRightsExecutionBatchDto"];
             workItems: components["schemas"]["DataRightsExecutionWorkItemDto"][] | null;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsExecutionScopeKind: 0 | 1 | 2;
         DataRightsExecutionWorkItemDto: {
             /** Format: uuid */
             id: string;
@@ -10692,7 +10777,7 @@ export interface components {
             /** Format: uuid */
             caseId: string;
             /** Format: uuid */
-            propertyId: string;
+            propertyId: string | null;
             /** Format: int64 */
             approvalRevision: number;
             /** Format: int64 */
@@ -10742,6 +10827,24 @@ export interface components {
             createdAtUtc: string;
             /** Format: int64 */
             version: number;
+            caseType: components["schemas"]["DataRightsCaseType"];
+            scopeKind: components["schemas"]["DataRightsExecutionScopeKind"];
+            policyPurposeCode: string | null;
+            policySurface: string | null;
+            policySourceProvenance: string | null;
+            policyRetentionDataClass: string | null;
+            policyRetentionTrigger: string | null;
+            /** Format: date-time */
+            policyRetentionTriggeredAtUtc: string | null;
+            /** Format: date-time */
+            policyRetentionDeadlineUtc: string | null;
+            /** Format: date-time */
+            policyEvaluatedAtUtc: string | null;
+            policyStateBindingsSha256: string | null;
+            /** Format: int64 */
+            policyPropertyVersion: number | null;
+            policyOperatingCountryCode: string | null;
+            policyRequiresDistinctExecutor: boolean | null;
         };
         /**
          * Format: int32

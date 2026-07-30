@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DataRightsCase } from "../src/api/types";
 import {
+  DATA_RIGHTS_ANONYMISATION,
   DATA_RIGHTS_CORRECTION,
   DATA_RIGHTS_RESTRICTION,
   DATA_RIGHTS_RESTRICTION_APPLY,
@@ -116,6 +117,45 @@ describe("privacy request workflow", () => {
       .toEqual(["execute-removal"]);
   });
 
+  it("offers approved Staff removal only to tenant erasers", () => {
+    const approvedStaffRemoval = dataRightsCase({
+      type: 3,
+      propertyId: null,
+      status: 5,
+      requestedOperations: DATA_RIGHTS_ANONYMISATION,
+    });
+
+    expect(availableDataRightsActions(approvedStaffRemoval, allCapabilities))
+      .toEqual(["execute-removal"]);
+    expect(availableDataRightsActions(approvedStaffRemoval, {
+      ...allCapabilities,
+      erase: false,
+    })).toEqual([]);
+    expect(dataRightsRequestLabel(approvedStaffRemoval)).toBe("Staff data removal");
+  });
+
+  it("requires exactly one Staff profile before review", () => {
+    const staffRemoval: Partial<DataRightsCase> = {
+      type: 3,
+      propertyId: null,
+      status: 2,
+      requestedOperations: DATA_RIGHTS_ANONYMISATION,
+    };
+
+    expect(availableDataRightsActions(dataRightsCase({
+      ...staffRemoval,
+      selectedSubjectCount: 0,
+    }), allCapabilities)).not.toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      ...staffRemoval,
+      selectedSubjectCount: 1,
+    }), allCapabilities)).toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      ...staffRemoval,
+      selectedSubjectCount: 2,
+    }), allCapabilities)).not.toContain("review");
+  });
+
   it("uses protected generation rather than destructive execution for an access export", () => {
     expect(availableDataRightsActions(dataRightsCase({
       status: 5,
@@ -182,6 +222,10 @@ describe("privacy request workflow", () => {
       .toBe("Guest data export");
     expect(dataRightsRequestLabel(dataRightsCase({ requestedOperations: 1, type: 3 })))
       .toBe("Staff data export");
+    expect(dataRightsRequestLabel(dataRightsCase({
+      requestedOperations: DATA_RIGHTS_ANONYMISATION,
+      type: 1,
+    }))).toBe("Guest data removal");
     const applyRestriction = dataRightsCase({
       requestedOperations: DATA_RIGHTS_RESTRICTION,
       restrictionDirective: DATA_RIGHTS_RESTRICTION_APPLY,

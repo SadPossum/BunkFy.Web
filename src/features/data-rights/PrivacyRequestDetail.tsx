@@ -101,7 +101,6 @@ export function PrivacyRequestDetail({
     queryFn: () => request<DataRightsExecution>(`${basePath}/execution`),
     enabled: Boolean(
       caseId &&
-      scope.kind === "guest" &&
       operationKind === "removal" &&
       ["executing", "blocked", "completed", "partiallyCompleted"].includes(status),
     ),
@@ -127,12 +126,23 @@ export function PrivacyRequestDetail({
     ]);
   }, [caseId, queryClient, scopeKey]);
 
-  const refreshGuestProjectionState = useCallback(async () => {
-    if (scope.kind !== "guest") return;
-    const propertyId = scope.propertyId;
-    await Promise.all([
+  const refreshAffectedProjectionState = useCallback(async () => {
+    const privacyQueries = [
       queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
       queryClient.invalidateQueries({ queryKey: ["data-rights-case", scopeKey, caseId] }),
+    ];
+    if (scope.kind === "staff") {
+      await Promise.all([
+        ...privacyQueries,
+        queryClient.invalidateQueries({ queryKey: ["staff-members"] }),
+        queryClient.invalidateQueries({ queryKey: ["staff-member"] }),
+      ]);
+      return;
+    }
+
+    const propertyId = scope.propertyId;
+    await Promise.all([
+      ...privacyQueries,
       queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
@@ -220,7 +230,7 @@ export function PrivacyRequestDetail({
       setConfirmation(null);
       setRestrictionExecution(result);
       await updateCase(result.case);
-      await refreshGuestProjectionState();
+      await refreshAffectedProjectionState();
     },
     onError: async () => {
       await caseQuery.refetch();
@@ -245,8 +255,8 @@ export function PrivacyRequestDetail({
       .join("|");
     if (observedTerminalExecution.current === terminalKey) return;
     observedTerminalExecution.current = terminalKey;
-    void refreshGuestProjectionState();
-  }, [execution.data?.workItems, refreshGuestProjectionState]);
+    void refreshAffectedProjectionState();
+  }, [execution.data?.workItems, refreshAffectedProjectionState]);
 
   function perform(suffix: string, body: Record<string, unknown> = {}) {
     if (!dataRightsCase) return;
