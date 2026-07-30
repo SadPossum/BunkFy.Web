@@ -10042,6 +10042,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspace-staff-enrollment/data-rights-corrections/{applicationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    executionId: string;
+                    caseId: string;
+                    approvalRevision: number;
+                    expectedVersion: number;
+                };
+                header?: never;
+                path: {
+                    applicationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingDataRightsCorrectionTargetDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/data-rights-corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WorkspaceStaffOnboardingDataRightsCorrectionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingDataRightsCorrectionReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12655,6 +12736,57 @@ export interface components {
          * @enum {integer}
          */
         WorkspaceStaffJoinSourceStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        WorkspaceStaffOnboardingDataRightsCorrectionReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            executionId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            applicationId: string;
+            /** Format: int64 */
+            selectedRecordVersion: number;
+            /** Format: int64 */
+            currentRecordVersion: number;
+            changedFieldKeys: string[] | null;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        WorkspaceStaffOnboardingDataRightsCorrectionRequest: {
+            /** Format: uuid */
+            executionId: string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: int64 */
+            approvalRevision: number;
+            /** Format: uuid */
+            applicationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            employeeNumber: string | null;
+            jobTitle: string | null;
+            department: string | null;
+        };
+        WorkspaceStaffOnboardingDataRightsCorrectionTargetDto: {
+            /** Format: uuid */
+            applicationId: string;
+            /** Format: int64 */
+            version: number;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            employeeNumber: string | null;
+            jobTitle: string | null;
+            department: string | null;
+        };
         WorkspaceStaffOnboardingDto: {
             /** Format: uuid */
             applicationId: string;

@@ -517,6 +517,23 @@ export type ReservationDataRightsCorrectionRequest =
   Schema<"ReservationDataRightsCorrectionRequest">;
 export type ReservationDataRightsCorrectionReceipt =
   Schema<"ReservationDataRightsCorrectionReceiptDto">;
+export type WorkspaceStaffOnboardingDataRightsCorrectionTarget =
+  NonNullableFields<
+    Schema<"WorkspaceStaffOnboardingDataRightsCorrectionTargetDto">,
+    "displayName"
+  >;
+export type WorkspaceStaffOnboardingDataRightsCorrectionRequest = Omit<
+  Schema<"WorkspaceStaffOnboardingDataRightsCorrectionRequest">,
+  "displayName"
+> & {
+  displayName: string;
+};
+export type WorkspaceStaffOnboardingDataRightsCorrectionReceipt = Omit<
+  Schema<"WorkspaceStaffOnboardingDataRightsCorrectionReceiptDto">,
+  "changedFieldKeys"
+> & {
+  changedFieldKeys: string[];
+};
 
 export type GuestStatus = Schema<"GuestStatus"> | "active" | "archived";
 

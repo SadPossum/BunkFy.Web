@@ -12,22 +12,28 @@ import type {
   Reservation,
   ReservationDataRightsCorrectionReceipt,
   ReservationDataRightsCorrectionRequest,
+  WorkspaceStaffOnboardingDataRightsCorrectionReceipt,
+  WorkspaceStaffOnboardingDataRightsCorrectionRequest,
+  WorkspaceStaffOnboardingDataRightsCorrectionTarget,
 } from "../../api/types";
 import { useSession } from "../../app/session";
 import { LoadingState, StatusBadge } from "../../components/ui/primitives";
 import { CorrectionError } from "./CorrectionFormFields";
 import { GuestCorrectionForm } from "./GuestCorrectionForm";
 import { ReservationCorrectionForm } from "./ReservationCorrectionForm";
+import { WorkspaceStaffOnboardingCorrectionForm } from "./WorkspaceStaffOnboardingCorrectionForm";
 import {
   correctionCaseStatus,
   correctionClaimExpired,
   correctionExecutionStatus,
   isSelectedCorrectionRevisionCurrent,
+  workspaceStaffOnboardingCorrectionTargetPath,
 } from "./dataRightsCorrectionWorkflow";
 
 type AppliedReceipt =
   | GuestDataRightsCorrectionReceipt
-  | ReservationDataRightsCorrectionReceipt;
+  | ReservationDataRightsCorrectionReceipt
+  | WorkspaceStaffOnboardingDataRightsCorrectionReceipt;
 
 export function PrivacyRequestCorrection({
   basePath,
@@ -41,7 +47,7 @@ export function PrivacyRequestCorrection({
 }: {
   basePath: string;
   scopeKey: string;
-  propertyId: string;
+  propertyId?: string;
   dataRightsCase: DataRightsCase;
   selectedSubject: DataRightsSelectedSubject | undefined;
   canStart: boolean;
@@ -98,11 +104,27 @@ export function PrivacyRequestCorrection({
 
   async function ownerApplied(receipt: AppliedReceipt) {
     setAppliedReceipt(receipt);
-    await Promise.all([
+    const privacyInvalidations = [
       queryClient.invalidateQueries({
         queryKey: ["data-rights-case", scopeKey, dataRightsCase.id],
       }),
       queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
+    ];
+    if (execution?.subject.ownerKey === "workspaces") {
+      await Promise.all([
+        ...privacyInvalidations,
+        queryClient.invalidateQueries({
+          queryKey: ["workspace-staff-onboarding"],
+        }),
+      ]);
+      return;
+    }
+    if (!propertyId) {
+      await Promise.all(privacyInvalidations);
+      return;
+    }
+    await Promise.all([
+      ...privacyInvalidations,
       queryClient.invalidateQueries({ queryKey: ["guest-detail", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-picker", propertyId] }),
@@ -272,7 +294,7 @@ function CorrectionOwnerEditor({
   disabled,
   onApplied,
 }: {
-  propertyId: string;
+  propertyId?: string;
   execution: DataRightsCorrectionExecutionDetails;
   disabled: boolean;
   onApplied: (receipt: AppliedReceipt) => Promise<void>;
@@ -283,14 +305,30 @@ function CorrectionOwnerEditor({
   const guest = useQuery({
     queryKey: ["guest-detail", propertyId, recordId],
     queryFn: () => request<GuestProfile>(`/api/guests/properties/${propertyId}/${recordId}`),
-    enabled: ownerKey === "guests",
+    enabled: ownerKey === "guests" && Boolean(propertyId),
   });
   const reservation = useQuery({
     queryKey: ["reservation", propertyId, recordId],
     queryFn: () => request<Reservation>(
       `/api/reservations/properties/${propertyId}/${recordId}`,
     ),
-    enabled: ownerKey === "reservations",
+    enabled: ownerKey === "reservations" && Boolean(propertyId),
+  });
+  const workspaceStaffOnboarding = useQuery({
+    queryKey: [
+      "workspace-staff-onboarding",
+      "data-rights-correction",
+      execution.executionId,
+      recordId,
+      execution.subject.recordVersion,
+    ],
+    queryFn: () =>
+      request<WorkspaceStaffOnboardingDataRightsCorrectionTarget>(
+        workspaceStaffOnboardingCorrectionTargetPath(execution),
+      ),
+    enabled:
+      ownerKey === "workspaces" &&
+      execution.subject.recordType === "staff-onboarding",
   });
   const guestCorrection = useMutation({
     mutationFn: (body: GuestDataRightsCorrectionRequest) =>
@@ -304,6 +342,16 @@ function CorrectionOwnerEditor({
     mutationFn: (body: ReservationDataRightsCorrectionRequest) =>
       request<ReservationDataRightsCorrectionReceipt>(
         `/api/reservations/properties/${propertyId}/data-rights-corrections`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: onApplied,
+  });
+  const workspaceStaffOnboardingCorrection = useMutation({
+    mutationFn: (
+      body: WorkspaceStaffOnboardingDataRightsCorrectionRequest,
+    ) =>
+      request<WorkspaceStaffOnboardingDataRightsCorrectionReceipt>(
+        "/api/workspace-staff-enrollment/data-rights-corrections",
         { method: "POST", body: JSON.stringify(body) },
       ),
     onSuccess: onApplied,
@@ -356,6 +404,48 @@ function CorrectionOwnerEditor({
     );
   }
 
+  if (
+    ownerKey === "workspaces" &&
+    execution.subject.recordType === "staff-onboarding"
+  ) {
+    if (workspaceStaffOnboarding.isLoading) {
+      return <LoadingState label="Loading Staff enrollment profile" />;
+    }
+    if (
+      workspaceStaffOnboarding.error ||
+      !workspaceStaffOnboarding.data
+    ) {
+      return (
+        <CorrectionError
+          error={workspaceStaffOnboarding.error}
+          retry={() => void workspaceStaffOnboarding.refetch()}
+        />
+      );
+    }
+    if (
+      !isSelectedCorrectionRevisionCurrent(
+        workspaceStaffOnboarding.data.version,
+        execution,
+      )
+    ) {
+      return <StaleRecord />;
+    }
+    return (
+      <WorkspaceStaffOnboardingCorrectionForm
+        key={`${workspaceStaffOnboarding.data.applicationId}:${
+          workspaceStaffOnboarding.data.version
+        }`}
+        target={workspaceStaffOnboarding.data}
+        execution={execution}
+        disabled={disabled}
+        pending={workspaceStaffOnboardingCorrection.isPending}
+        error={workspaceStaffOnboardingCorrection.error}
+        onSubmit={(body) =>
+          workspaceStaffOnboardingCorrection.mutate(body)}
+      />
+    );
+  }
+
   return (
     <div className="rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm">
       The selected record owner does not provide an operator correction editor.
@@ -364,13 +454,16 @@ function CorrectionOwnerEditor({
 }
 
 function CompletionPending({ receipt }: { receipt: AppliedReceipt }) {
+  const changedFieldCount = "changedFieldKeys" in receipt
+    ? receipt.changedFieldKeys.length
+    : receipt.changedFields?.length ?? 0;
   return (
     <div className="flex items-start gap-3 rounded-lg border border-info/25 bg-info/8 p-4">
       <span className="loading loading-spinner loading-sm mt-0.5 shrink-0 text-info" />
       <div>
         <p className="text-sm font-semibold">Correction applied</p>
         <p className="mt-1 text-xs leading-5 text-base-content/55">
-          The owner changed {receipt.changedFields?.length ?? 0} fields. BunkFy is
+          The owner changed {changedFieldCount} fields. BunkFy is
           recording the case completion proof.
         </p>
       </div>
@@ -415,6 +508,7 @@ function StaleRecord() {
 function ownerLabel(ownerKey: string): string {
   if (ownerKey === "guests") return "Guest Record";
   if (ownerKey === "reservations") return "Reservation";
+  if (ownerKey === "workspaces") return "Staff enrollment profile";
   return "selected record";
 }
 

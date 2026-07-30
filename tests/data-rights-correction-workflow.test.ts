@@ -4,10 +4,12 @@ import type {
   DataRightsCorrectionExecutionDetails,
   GuestProfile,
   Reservation,
+  WorkspaceStaffOnboardingDataRightsCorrectionTarget,
 } from "../src/api/types";
 import {
   buildGuestCorrectionRequest,
   buildReservationCorrectionRequest,
+  buildWorkspaceStaffOnboardingCorrectionRequest,
   correctionCaseStatus,
   correctionClaimExpired,
   correctionErrorMessage,
@@ -17,6 +19,9 @@ import {
   isSelectedCorrectionRevisionCurrent,
   reservationCorrectionChanged,
   reservationCorrectionValues,
+  workspaceStaffOnboardingCorrectionChanged,
+  workspaceStaffOnboardingCorrectionTargetPath,
+  workspaceStaffOnboardingCorrectionValues,
 } from "../src/features/data-rights/dataRightsCorrectionWorkflow";
 
 describe("data-rights correction operator workflow", () => {
@@ -70,6 +75,48 @@ describe("data-rights correction operator workflow", () => {
       expectedArrivalTime: null,
       expectedDepartureTime: "11:00:00",
     });
+  });
+
+  it("builds a Workspaces owner request bound to the exact tenant claim", () => {
+    const values = {
+      ...workspaceStaffOnboardingCorrectionValues(workspaceTarget),
+      displayName: "  Ada Corrected  ",
+      workEmail: "",
+      department: " Guest operations ",
+    };
+
+    expect(
+      workspaceStaffOnboardingCorrectionChanged(workspaceTarget, values),
+    ).toBe(true);
+    expect(
+      buildWorkspaceStaffOnboardingCorrectionRequest(
+        workspaceTarget,
+        workspaceExecution,
+        values,
+      ),
+    ).toEqual({
+      executionId: "44444444-4444-4444-4444-444444444444",
+      caseId: "22222222-2222-2222-2222-222222222222",
+      approvalRevision: 7,
+      applicationId: workspaceTarget.applicationId,
+      expectedVersion: 3,
+      displayName: "Ada Corrected",
+      legalName: "Ada Lovelace",
+      workEmail: null,
+      workPhone: "+44 20 5555 0100",
+      employeeNumber: "EMP-100",
+      jobTitle: "Manager",
+      department: "Guest operations",
+    });
+    expect(
+      workspaceStaffOnboardingCorrectionTargetPath(workspaceExecution),
+    ).toBe(
+      "/api/workspace-staff-enrollment/data-rights-corrections/" +
+      `${workspaceTarget.applicationId}?` +
+      "executionId=44444444-4444-4444-4444-444444444444&" +
+      "caseId=22222222-2222-2222-2222-222222222222&" +
+      "approvalRevision=7&expectedVersion=3",
+    );
   });
 
   it("fails the editor closed when the owner record no longer matches selection", () => {
@@ -179,4 +226,31 @@ const reservationExecution: DataRightsCorrectionExecutionDetails = {
     recordVersion: 21,
   },
   fieldPolicyKey: "reservations.guest-details.correction.v1",
+};
+
+const workspaceTarget: WorkspaceStaffOnboardingDataRightsCorrectionTarget = {
+  applicationId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+  version: 3,
+  displayName: "Ada Operator",
+  legalName: "Ada Lovelace",
+  workEmail: "ada@example.test",
+  workPhone: "+44 20 5555 0100",
+  employeeNumber: "EMP-100",
+  jobTitle: "Manager",
+  department: "Operations",
+};
+
+const workspaceExecution: DataRightsCorrectionExecutionDetails = {
+  ...guestExecution,
+  executionId: "44444444-4444-4444-4444-444444444444",
+  caseType: 3,
+  propertyId: null,
+  subject: {
+    ownerKey: "workspaces",
+    recordType: "staff-onboarding",
+    recordId: workspaceTarget.applicationId,
+    recordVersion: 3,
+  },
+  fieldPolicyKey:
+    "workspaces.staff-onboarding.applicant-correction.v1",
 };

@@ -227,7 +227,11 @@ export function dataRightsRequestLabel(
   if (operationKind === "export") {
     return Number(dataRightsCase.type) === 3 ? "Staff data export" : "Guest data export";
   }
-  if (operationKind === "correction") return "Correct guest data";
+  if (operationKind === "correction") {
+    return Number(dataRightsCase.type) === 3
+      ? "Correct staff data"
+      : "Correct guest data";
+  }
   if (operationKind === "restriction-apply") return "Limit guest data processing";
   if (operationKind === "restriction-release") return "Release guest processing limit";
   if (operationKind === "removal") {

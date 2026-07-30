@@ -361,12 +361,15 @@ export function PrivacyRequestDetail({
               )}
 
               {operationKind === "correction" &&
-                scope.kind === "guest" &&
                 ["approved", "executing", "completed"].includes(status) && (
                 <PrivacyRequestCorrection
                   basePath={basePath}
                   scopeKey={scopeKey}
-                  propertyId={scope.propertyId}
+                  propertyId={
+                    scope.kind === "guest"
+                      ? scope.propertyId
+                      : undefined
+                  }
                   dataRightsCase={dataRightsCase}
                   selectedSubject={selected.data?.subjects[0]}
                   canStart={actions.includes("execute-correction")}

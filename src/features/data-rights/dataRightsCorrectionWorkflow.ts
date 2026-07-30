@@ -4,6 +4,8 @@ import type {
   GuestProfile,
   Reservation,
   ReservationDataRightsCorrectionRequest,
+  WorkspaceStaffOnboardingDataRightsCorrectionRequest,
+  WorkspaceStaffOnboardingDataRightsCorrectionTarget,
 } from "../../api/types";
 import { ApiError } from "../../api/client";
 
@@ -26,6 +28,16 @@ export type ReservationCorrectionValues = {
   notes: string;
   expectedArrivalTime: string;
   expectedDepartureTime: string;
+};
+
+export type WorkspaceStaffOnboardingCorrectionValues = {
+  displayName: string;
+  legalName: string;
+  workEmail: string;
+  workPhone: string;
+  employeeNumber: string;
+  jobTitle: string;
+  department: string;
 };
 
 export function guestCorrectionValues(profile: GuestProfile): GuestCorrectionValues {
@@ -52,6 +64,20 @@ export function reservationCorrectionValues(
     notes: reservation.notes ?? "",
     expectedArrivalTime: reservation.expectedArrivalTime ?? "",
     expectedDepartureTime: reservation.expectedDepartureTime ?? "",
+  };
+}
+
+export function workspaceStaffOnboardingCorrectionValues(
+  target: WorkspaceStaffOnboardingDataRightsCorrectionTarget,
+): WorkspaceStaffOnboardingCorrectionValues {
+  return {
+    displayName: target.displayName,
+    legalName: target.legalName ?? "",
+    workEmail: target.workEmail ?? "",
+    workPhone: target.workPhone ?? "",
+    employeeNumber: target.employeeNumber ?? "",
+    jobTitle: target.jobTitle ?? "",
+    department: target.department ?? "",
   };
 }
 
@@ -86,6 +112,35 @@ export function buildReservationCorrectionRequest(
   };
 }
 
+export function buildWorkspaceStaffOnboardingCorrectionRequest(
+  target: WorkspaceStaffOnboardingDataRightsCorrectionTarget,
+  execution: DataRightsCorrectionExecutionDetails,
+  values: WorkspaceStaffOnboardingCorrectionValues,
+): WorkspaceStaffOnboardingDataRightsCorrectionRequest {
+  return {
+    executionId: execution.executionId,
+    caseId: execution.caseId,
+    approvalRevision: execution.approvalRevision,
+    applicationId: target.applicationId,
+    expectedVersion: execution.subject.recordVersion,
+    ...normalizeWorkspaceStaffOnboardingCorrectionValues(values),
+  };
+}
+
+export function workspaceStaffOnboardingCorrectionTargetPath(
+  execution: DataRightsCorrectionExecutionDetails,
+): string {
+  const query = new URLSearchParams({
+    executionId: execution.executionId,
+    caseId: execution.caseId,
+    approvalRevision: String(execution.approvalRevision),
+    expectedVersion: String(execution.subject.recordVersion),
+  });
+  return `/api/workspace-staff-enrollment/data-rights-corrections/${
+    encodeURIComponent(execution.subject.recordId)
+  }?${query.toString()}`;
+}
+
 export function guestCorrectionChanged(
   profile: GuestProfile,
   values: GuestCorrectionValues,
@@ -101,7 +156,20 @@ export function reservationCorrectionChanged(
   return JSON.stringify(normalizeReservationCorrectionValues(values)) !==
     JSON.stringify(normalizeReservationCorrectionValues(
       reservationCorrectionValues(reservation),
-    ));
+  ));
+}
+
+export function workspaceStaffOnboardingCorrectionChanged(
+  target: WorkspaceStaffOnboardingDataRightsCorrectionTarget,
+  values: WorkspaceStaffOnboardingCorrectionValues,
+): boolean {
+  return JSON.stringify(
+    normalizeWorkspaceStaffOnboardingCorrectionValues(values),
+  ) !== JSON.stringify(
+    normalizeWorkspaceStaffOnboardingCorrectionValues(
+      workspaceStaffOnboardingCorrectionValues(target),
+    ),
+  );
 }
 
 export function isSelectedCorrectionRevisionCurrent(
@@ -192,6 +260,20 @@ function normalizeReservationCorrectionValues(values: ReservationCorrectionValue
     notes: optional(values.notes),
     expectedArrivalTime: optional(values.expectedArrivalTime),
     expectedDepartureTime: optional(values.expectedDepartureTime),
+  };
+}
+
+function normalizeWorkspaceStaffOnboardingCorrectionValues(
+  values: WorkspaceStaffOnboardingCorrectionValues,
+) {
+  return {
+    displayName: values.displayName.trim(),
+    legalName: optional(values.legalName),
+    workEmail: optional(values.workEmail),
+    workPhone: optional(values.workPhone),
+    employeeNumber: optional(values.employeeNumber),
+    jobTitle: optional(values.jobTitle),
+    department: optional(values.department),
   };
 }
 
