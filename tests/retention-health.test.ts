@@ -18,6 +18,7 @@ function schedule(
     propertyId: null,
     executionPolicyVersion: 1,
     status,
+    lastRunId: null,
     lastStartedAtUtc: null,
     lastCompletedAtUtc: null,
     nextDueAtUtc: "2026-07-27T12:00:00Z",
@@ -49,7 +50,7 @@ describe("retention health", () => {
       total: 4,
       healthy: 1,
       running: 1,
-      attention: 1,
+      needsAttention: 1,
     });
   });
 

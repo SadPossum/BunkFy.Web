@@ -9,6 +9,10 @@ import type {
 
 export const LIVE_DETAIL_REFRESH_INTERVAL_MS = 2_000;
 export const LIVE_LIST_REFRESH_INTERVAL_MS = 5_000;
+const dataRightsDeadlineNotificationNames = new Set([
+  "data-rights-response-deadline-due-soon",
+  "data-rights-response-deadline-overdue",
+]);
 
 export function reservationStatusKey(status: ReservationStatus | number | string): string {
   if (typeof status === "string") return normalizeStatus(status);
@@ -69,7 +73,16 @@ export function operationalNotificationQueryKeys(
   const reservationId = payloadValue(payload, "reservationId");
   const staffMemberId = payloadValue(payload, "staffMemberId");
   const connectionId = payloadValue(payload, "connectionId");
+  const dataRightsCaseId = payloadValue(payload, "caseId");
   const keys: (readonly unknown[])[] = [];
+
+  if (dataRightsDeadlineNotificationNames.has(item.name) && propertyId) {
+    const scopeKey = `guest:${propertyId}`;
+    keys.push(["data-rights-cases", scopeKey]);
+    if (dataRightsCaseId) {
+      keys.push(["data-rights-case", scopeKey, dataRightsCaseId]);
+    }
+  }
 
   if (item.name.startsWith("reservation-") || item.name === "provider-reservation-operation-needs-attention") {
     addPropertyKey(keys, ["reservations"], propertyId);

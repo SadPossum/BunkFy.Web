@@ -60,3 +60,27 @@ test("staff notifications open the recipient's accessible workspace profile", ()
 
   expect(result?.path).toBe("/account?focus=workspace-profile");
 });
+
+test.each([
+  "data-rights-response-deadline-due-soon",
+  "data-rights-response-deadline-overdue",
+])("%s opens the exact guest privacy request", (name) => {
+  const result = notificationDestination({
+    name,
+    payload: { PropertyId: "property-a", CaseId: "case-a" },
+  });
+
+  expect(result).toEqual({
+    path: "/privacy-requests?property=property-a&scope=guest&case=case-a&focus=case-a",
+    actionLabel: "Open privacy request",
+    contextLabel: "Opens the affected privacy request",
+    resourceLabel: "Request CASE-A",
+  });
+});
+
+test("deadline notifications without an exact case remain non-navigable", () => {
+  expect(notificationDestination({
+    name: "data-rights-response-deadline-overdue",
+    payload: { propertyId: "property-a" },
+  })).toBeNull();
+});

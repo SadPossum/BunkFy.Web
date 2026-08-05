@@ -132,6 +132,7 @@ export function WorkspaceJoinRequestSettings({
             pageSize={PAGE_SIZE}
             itemCount={joinRequests.data?.items.length ?? 0}
             itemLabel="request"
+            hasMore={joinRequests.data?.hasMore}
             disabled={joinRequests.isFetching || resolution.isPending}
             onPageChange={setPage}
           />

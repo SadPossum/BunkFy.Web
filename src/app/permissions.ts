@@ -3,6 +3,9 @@ import type { AccessPermissionCheck, AccessPermissionEvaluationResponse } from "
 import { useSession } from "./session";
 
 export const permissions = {
+  accessProfilesRead: "access-control.profiles.read",
+  accessProfilesManage: "access-control.profiles.manage",
+  accessProfilesAssign: "access-control.profiles.assign",
   propertiesRead: "properties.read",
   propertiesManage: "properties.properties.manage",
   roomsManage: "properties.rooms.manage",

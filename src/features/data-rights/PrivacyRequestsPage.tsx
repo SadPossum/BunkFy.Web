@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, FileLock2, Plus, ShieldCheck, UsersRound } from "lucide-react";
+import {
+  ChevronRight,
+  Clock3,
+  FileLock2,
+  Plus,
+  ShieldCheck,
+  TriangleAlert,
+  UsersRound,
+} from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import type {
   DataRightsCase,
   DataRightsCaseListResponse,
+  DataRightsCaseSummary,
   DataRightsRequesterRelationship,
 } from "../../api/types";
 import {
@@ -12,6 +22,11 @@ import {
   tenantAccessScope,
   usePermissions,
 } from "../../app/permissions";
+import {
+  focusedResourceClass,
+  useTargetProperty,
+  useTransientResourceFocus,
+} from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { PaginationBar } from "../../components/ui/PaginationBar";
@@ -39,6 +54,7 @@ import {
   dataRightsCasesPath,
   dataRightsOperationKind,
   dataRightsRequestLabel,
+  dataRightsResponseDeadlineState,
   dataRightsScopeKey,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
@@ -82,13 +98,19 @@ export function PrivacyRequestsPage() {
     selectedWorkspace,
   } = useWorkspace();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetPropertyId = searchParams.get("property");
+  const targetScopeKind = searchParams.get("scope");
+  useTargetProperty(targetPropertyId);
   const [scopeKind, setScopeKind] = useState<"guest" | "staff">(
-    selectedPropertyId ? "guest" : "staff",
+    targetScopeKind === "guest" || targetScopeKind === "staff"
+      ? targetScopeKind
+      : selectedPropertyId ? "guest" : "staff",
   );
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const selectedCaseId = searchParams.get("case");
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
   const propertyScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -151,14 +173,23 @@ export function PrivacyRequestsPage() {
     refetchIntervalInBackground: false,
   });
   const items = useMemo(() => cases.data?.items ?? [], [cases.data]);
+  const focusedCaseId = useTransientResourceFocus(Boolean(cases.data));
 
   useEffect(() => {
-    if (!selectedPropertyId && scopeKind === "guest") setScopeKind("staff");
-  }, [scopeKind, selectedPropertyId]);
+    if ((targetScopeKind === "guest" || targetScopeKind === "staff") &&
+      targetScopeKind !== scopeKind) {
+      setScopeKind(targetScopeKind);
+    }
+  }, [scopeKind, targetScopeKind]);
+
+  useEffect(() => {
+    if (!selectedPropertyId && scopeKind === "guest" && targetScopeKind !== "guest") {
+      setScopeKind("staff");
+    }
+  }, [scopeKind, selectedPropertyId, targetScopeKind]);
 
   useEffect(() => {
     setPage(1);
-    setSelectedCaseId(null);
     setCreateOpen(false);
   }, [scopeKey]);
 
@@ -167,6 +198,25 @@ export function PrivacyRequestsPage() {
       setPage((current) => Math.max(1, current - 1));
     }
   }, [cases.isFetching, items.length, page]);
+
+  function selectScope(value: "guest" | "staff") {
+    setScopeKind(value);
+    setPage(1);
+    setCreateOpen(false);
+    const next = new URLSearchParams(searchParams);
+    next.set("scope", value);
+    next.delete("case");
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }
+
+  function selectCase(caseId: string | null) {
+    const next = new URLSearchParams(searchParams);
+    if (caseId) next.set("case", caseId);
+    else next.delete("case");
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }
 
   return (
     <>
@@ -193,7 +243,7 @@ export function PrivacyRequestsPage() {
           <SegmentedTabs
             value={scopeKind}
             ariaLabel="Privacy request scope"
-            onValueChange={(value) => setScopeKind(value)}
+            onValueChange={selectScope}
             options={[
               { value: "guest", label: "Guest requests", icon: <ShieldCheck size={15} /> },
               { value: "staff", label: "Staff requests", icon: <UsersRound size={15} /> },
@@ -276,7 +326,8 @@ export function PrivacyRequestsPage() {
                           <PrivacyRequestRow
                             key={item.id}
                             item={item}
-                            onOpen={() => setSelectedCaseId(item.id)}
+                            focused={item.id === focusedCaseId}
+                            onOpen={() => selectCase(item.id)}
                           />
                         ))}
                       </div>
@@ -285,7 +336,7 @@ export function PrivacyRequestsPage() {
                         pageSize={PAGE_SIZE}
                         itemCount={items.length}
                         itemLabel="request"
-                        hasMore={items.length === PAGE_SIZE}
+                        hasMore={cases.data?.hasMore}
                         disabled={cases.isFetching}
                         onPageChange={setPage}
                       />
@@ -303,7 +354,7 @@ export function PrivacyRequestsPage() {
               queryClient.setQueryData(["data-rights-case", scopeKey, created.id], created);
               await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
               setCreateOpen(false);
-              setSelectedCaseId(created.id);
+              selectCase(created.id);
             }}
           />
 
@@ -311,7 +362,7 @@ export function PrivacyRequestsPage() {
             scope={scope}
             caseId={selectedCaseId}
             capabilities={capabilities}
-            onClose={() => setSelectedCaseId(null)}
+            onClose={() => selectCase(null)}
           />
         </>
       )}
@@ -319,13 +370,21 @@ export function PrivacyRequestsPage() {
   );
 }
 
-function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () => void }) {
+function PrivacyRequestRow({
+  item,
+  focused,
+  onOpen,
+}: {
+  item: DataRightsCaseSummary;
+  focused: boolean;
+  onOpen: () => void;
+}) {
   const status = dataRightsCaseStatusKey(item.status);
   const operationKind = dataRightsOperationKind(item);
   return (
     <button
       type="button"
-      className="grid w-full gap-3 px-4 py-4 text-left transition hover:bg-base-200/65 focus-visible:bg-base-200/65 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6"
+      className={`grid w-full gap-3 px-4 py-4 text-left transition hover:bg-base-200/65 focus-visible:bg-base-200/65 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6 ${focused ? focusedResourceClass : ""}`}
       onClick={onOpen}
     >
       <div className="flex min-w-0 items-start gap-3">
@@ -346,12 +405,42 @@ function PrivacyRequestRow({ item, onOpen }: { item: DataRightsCase; onOpen: () 
         <span className="mt-1 block">
           {item.selectedSubjectCount} {item.selectedSubjectCount === 1 ? "record" : "records"} selected
         </span>
+        <ResponseDeadlineIndicator item={item} />
       </span>
       <span className="flex items-center justify-between gap-3 sm:justify-end">
         <StatusBadge status={dataRightsCaseStatusLabel(item.status)} />
         <ChevronRight size={17} className="text-base-content/35" />
       </span>
     </button>
+  );
+}
+
+function ResponseDeadlineIndicator({ item }: { item: DataRightsCaseSummary }) {
+  const state = dataRightsResponseDeadlineState(item);
+  if (state === "not-applicable") return null;
+
+  const dueAt = item.dueAtUtc ? formatDateTime(item.dueAtUtc) : null;
+  const label = state === "pending"
+    ? "Deadline policy pending"
+    : state === "due-soon"
+      ? `Due soon - ${dueAt}`
+      : state === "overdue"
+        ? `Overdue - ${dueAt}`
+        : state === "closed"
+          ? `Deadline ${dueAt}`
+          : `Due ${dueAt}`;
+  const className = state === "overdue"
+    ? "bg-error/10 text-error"
+    : state === "pending" || state === "due-soon"
+      ? "bg-warning/15 text-warning-content"
+      : "bg-base-200 text-base-content/60";
+  const Icon = state === "pending" || state === "overdue" ? TriangleAlert : Clock3;
+
+  return (
+    <span className={`mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium ${className}`}>
+      <Icon size={13} />
+      {label}
+    </span>
   );
 }
 

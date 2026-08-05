@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, UserPlus } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
-import type { GuestProfile, InventoryAvailabilityResponse, Reservation, RoomInventoryListResponse } from "../../api/types";
+import type { GuestListItem, InventoryAvailabilityResponse, ReservationMutationReceipt } from "../../api/types";
 import { reservationSourceValue } from "../../api/labels";
 import { useSession } from "../../app/session";
 import { DatePicker } from "../../components/ui/DatePicker";
@@ -16,6 +16,7 @@ import {
 } from "./guestRecordWorkflow";
 import { groupAvailabilityByRoom } from "./inventoryGrouping";
 import { ReservationInventoryPicker } from "./ReservationInventoryPicker";
+import { loadAllRoomInventory } from "../inventory/inventoryApi";
 
 type ReservationStep = "reservation" | "guest";
 
@@ -32,7 +33,7 @@ export function CreateReservationModal({
   canCreateGuests: boolean;
   canManageGuests: boolean;
   onClose: () => void;
-  onCreated: (reservation: Reservation, warning: string | null) => Promise<void>;
+  onCreated: (reservation: ReservationMutationReceipt, warning: string | null) => Promise<void>;
 }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
@@ -42,7 +43,7 @@ export function CreateReservationModal({
   const [sourceKind, setSourceKind] = useState<"direct" | "external">("direct");
   const [sourceSystem, setSourceSystem] = useState("");
   const [sourceReference, setSourceReference] = useState("");
-  const [selectedGuest, setSelectedGuest] = useState<GuestProfile | null>(null);
+  const [selectedGuest, setSelectedGuest] = useState<GuestListItem | null>(null);
   const [guestName, setGuestName] = useState("");
   const [guestCount, setGuestCount] = useState("1");
   const [email, setEmail] = useState("");
@@ -64,7 +65,7 @@ export function CreateReservationModal({
   });
   const roomInventory = useQuery({
     queryKey: ["inventory-rooms", propertyId],
-    queryFn: () => request<RoomInventoryListResponse>(`/api/inventory/properties/${propertyId}/rooms?page=1&pageSize=100`),
+    queryFn: ({ signal }) => loadAllRoomInventory(request, propertyId, signal),
   });
   const units = availability.data?.units ?? [];
   const groups = useMemo(
@@ -82,7 +83,7 @@ export function CreateReservationModal({
       profileDetails: GuestRecordProfileDetails | null;
       selectedGuestId: string | null;
     }) => {
-      const created = await request<Reservation>(`/api/reservations/properties/${propertyId}`, {
+      const created = await request<ReservationMutationReceipt>(`/api/reservations/properties/${propertyId}`, {
         method: "POST",
         body: JSON.stringify({
           arrival: range.arrival,
@@ -172,7 +173,7 @@ export function CreateReservationModal({
     });
   }
 
-  function chooseGuest(guest: GuestProfile | null) {
+  function chooseGuest(guest: GuestListItem | null) {
     setSelectedGuest(guest);
     if (!guest) return;
     setSaveGuestRecord(false);

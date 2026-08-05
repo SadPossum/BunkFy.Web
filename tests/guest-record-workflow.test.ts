@@ -72,6 +72,7 @@ describe("guest record reservation workflow", () => {
       .mockResolvedValueOnce(linkedReservation);
 
     const result = await createAndLinkGuestRecord(request, "property-1", reservation, {
+      profile: guestRecordPayloadFromBooking(reservation),
       timeoutMs: 100,
       retryDelayMs: 0,
     });
@@ -97,7 +98,9 @@ describe("guest record reservation workflow", () => {
       .mockResolvedValueOnce(guest)
       .mockRejectedValueOnce(new ApiError("Link denied", 403));
 
-    await expect(createAndLinkGuestRecord(request, "property-1", reservation))
+    await expect(createAndLinkGuestRecord(request, "property-1", reservation, {
+      profile: guestRecordPayloadFromBooking(reservation),
+    }))
       .rejects.toBeInstanceOf(GuestRecordLinkError);
   });
 

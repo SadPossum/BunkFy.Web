@@ -2,7 +2,7 @@ import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BedDouble, CalendarDays, ChevronRight, Plus, Search, X } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import type { Reservation, ReservationListResponse, ReservationStatus } from "../../api/types";
+import type { Reservation, ReservationListItem, ReservationListResponse, ReservationStatus } from "../../api/types";
 import { reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
 import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh } from "../../app/liveUpdates";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
@@ -101,16 +101,17 @@ export function ReservationsPage() {
 
   useEffect(() => setPage(1), [selectedPropertyId]);
   useEffect(() => {
-    if (reservations.data && page > Math.max(1, Math.ceil(reservations.data.totalCount / PAGE_SIZE))) {
-      setPage(Math.max(1, Math.ceil(reservations.data.totalCount / PAGE_SIZE)));
+    if (!reservations.isFetching && reservations.data && page > 1 && reservations.data.reservations.length === 0) {
+      setPage((current) => Math.max(1, current - 1));
     }
-  }, [page, reservations.data]);
+  }, [page, reservations.data, reservations.isFetching]);
 
   const visible = useMemo(() => {
     if (affectedReservationIds.length > 0) {
       return affectedReservations
         .map((query) => query.data)
-        .filter((reservation): reservation is Reservation => Boolean(reservation));
+        .filter((reservation): reservation is Reservation => Boolean(reservation))
+        .map(toReservationListItem);
     }
     return reservations.data?.reservations ?? [];
   }, [affectedReservationIds.length, affectedReservations, reservations.data]);
@@ -154,13 +155,13 @@ export function ReservationsPage() {
           <div className="hidden overflow-x-auto lg:block">
             <table className="table">
               <thead><tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40"><th className="pl-6">Guest</th><th>Stay</th><th>Units</th><th>Status</th><th>Source</th><th className="pr-6" /></tr></thead>
-              <tbody>{visible.map((reservation) => <tr key={reservation.reservationId} className={`cursor-pointer border-base-300 transition hover:bg-base-200/70 ${reservation.reservationId === focusedReservationId ? focusedResourceClass : ""}`} onClick={() => setParam("reservation", reservation.reservationId)}><td className="pl-6"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/40">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"}</p></div></div></td><td><p className="font-medium">{formatStayEndpoint(reservation.arrival, reservation.expectedArrivalTime)} → {formatStayEndpoint(reservation.departure, reservation.expectedDepartureTime)}</p><p className="mt-1 text-xs text-base-content/40">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></td><td><span className="inline-flex items-center gap-1.5 text-sm"><BedDouble size={15} className="text-base-content/35" />{reservation.inventoryUnitIds.length}</span></td><td><StatusBadge status={reservationStatusLabel(reservation.status)} /></td><td className="text-sm capitalize text-base-content/55">{reservationSourceLabel(reservation.sourceKind)}</td><td className="pr-6 text-right"><button type="button" className="btn btn-circle btn-ghost btn-xs" aria-label={`View reservation for ${reservation.primaryGuestName}`} onClick={(event) => { event.stopPropagation(); setParam("reservation", reservation.reservationId); }}><ChevronRight size={17} /></button></td></tr>)}</tbody>
+              <tbody>{visible.map((reservation) => <tr key={reservation.reservationId} className={`cursor-pointer border-base-300 transition hover:bg-base-200/70 ${reservation.reservationId === focusedReservationId ? focusedResourceClass : ""}`} onClick={() => setParam("reservation", reservation.reservationId)}><td className="pl-6"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/40">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"}</p></div></div></td><td><p className="font-medium">{formatStayEndpoint(reservation.arrival, reservation.expectedArrivalTime)} → {formatStayEndpoint(reservation.departure, reservation.expectedDepartureTime)}</p><p className="mt-1 text-xs text-base-content/40">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></td><td><span className="inline-flex items-center gap-1.5 text-sm"><BedDouble size={15} className="text-base-content/35" />{reservation.inventoryUnitCount}</span></td><td><StatusBadge status={reservationStatusLabel(reservation.status)} /></td><td className="text-sm capitalize text-base-content/55">{reservationSourceLabel(reservation.sourceKind)}</td><td className="pr-6 text-right"><button type="button" className="btn btn-circle btn-ghost btn-xs" aria-label={`View reservation for ${reservation.primaryGuestName}`} onClick={(event) => { event.stopPropagation(); setParam("reservation", reservation.reservationId); }}><ChevronRight size={17} /></button></td></tr>)}</tbody>
             </table>
           </div>
           <div className="divide-y divide-base-300 lg:hidden">
-            {visible.map((reservation) => <button key={reservation.reservationId} type="button" className={`block w-full p-5 text-left transition hover:bg-base-200/70 focus-visible:bg-base-200/70 ${reservation.reservationId === focusedReservationId ? focusedResourceClass : ""}`} onClick={() => setParam("reservation", reservation.reservationId)}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} /><div className="min-w-0"><p className="truncate font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"}</p></div></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></div><div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-base-content/40">Stay</p><p className="mt-1 text-sm font-medium">{formatStayEndpoint(reservation.arrival, reservation.expectedArrivalTime)} → {formatStayEndpoint(reservation.departure, reservation.expectedDepartureTime)}</p><p className="mt-1 text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights · {reservation.inventoryUnitIds.length} {reservation.inventoryUnitIds.length === 1 ? "unit" : "units"}</p></div><span className="inline-flex items-center gap-1 text-sm capitalize text-base-content/55">{reservationSourceLabel(reservation.sourceKind)}<ChevronRight size={17} /></span></div></button>)}
+            {visible.map((reservation) => <button key={reservation.reservationId} type="button" className={`block w-full p-5 text-left transition hover:bg-base-200/70 focus-visible:bg-base-200/70 ${reservation.reservationId === focusedReservationId ? focusedResourceClass : ""}`} onClick={() => setParam("reservation", reservation.reservationId)}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} /><div className="min-w-0"><p className="truncate font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"}</p></div></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></div><div className="mt-4 grid grid-cols-[1fr_auto] items-end gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-base-content/40">Stay</p><p className="mt-1 text-sm font-medium">{formatStayEndpoint(reservation.arrival, reservation.expectedArrivalTime)} → {formatStayEndpoint(reservation.departure, reservation.expectedDepartureTime)}</p><p className="mt-1 text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights · {reservation.inventoryUnitCount} {reservation.inventoryUnitCount === 1 ? "unit" : "units"}</p></div><span className="inline-flex items-center gap-1 text-sm capitalize text-base-content/55">{reservationSourceLabel(reservation.sourceKind)}<ChevronRight size={17} /></span></div></button>)}
           </div>
-          {affectedReservationIds.length === 0 && <PaginationBar page={page} pageSize={PAGE_SIZE} itemCount={visible.length} totalCount={reservations.data?.totalCount} itemLabel="reservation" disabled={reservations.isFetching} onPageChange={setPage} />}
+          {affectedReservationIds.length === 0 && <PaginationBar page={page} pageSize={PAGE_SIZE} itemCount={visible.length} hasMore={reservations.data?.hasMore} itemLabel="reservation" disabled={reservations.isFetching} onPageChange={setPage} />}
         </>)}
       </section>
 
@@ -188,6 +189,7 @@ export function ReservationsPage() {
 }
 
 function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`)); }
+function toReservationListItem(reservation: Reservation): ReservationListItem { return { reservationId: reservation.reservationId, propertyId: reservation.propertyId, arrival: reservation.arrival, departure: reservation.departure, expectedArrivalTime: reservation.expectedArrivalTime, expectedDepartureTime: reservation.expectedDepartureTime, primaryGuestName: reservation.primaryGuestName, guestCount: reservation.guestCount, inventoryUnitCount: reservation.inventoryUnitIds.length, sourceKind: reservation.sourceKind, status: reservation.status }; }
 function formatStayEndpoint(date: string, time?: string | null) { return time ? `${formatDate(date)}, ${formatTime(time)}` : formatDate(date); }
 function formatTime(value: string) { const [hours, minutes] = value.split(":").map(Number); return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(2000, 0, 1, hours, minutes)); }
 function nightsBetween(arrival: string, departure: string) { return Math.max(0, Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000)); }

@@ -12,8 +12,8 @@ import type {
   OrganizationListResponse,
   OrganizationMembershipSummary,
   Property,
-  PropertyListResponse,
 } from "../api/types";
+import { loadAllProperties } from "../features/properties/propertiesApi";
 import { useSession } from "./session";
 
 const WORKSPACE_STORAGE_KEY = "bunkfy.workspace.current.v1";
@@ -79,7 +79,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
   const propertiesQuery = useQuery({
     queryKey: ["properties", selectedWorkspaceId],
-    queryFn: () => request<PropertyListResponse>("/api/properties?page=1&pageSize=100"),
+    queryFn: (context) => loadAllProperties(request, context.signal),
     enabled: workspaceScopeReady,
   });
   const properties = propertiesQuery.data?.properties ?? [];

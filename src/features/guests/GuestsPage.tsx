@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   CalendarDays,
-  ChevronLeft,
   ChevronRight,
   Edit3,
   Globe2,
@@ -16,12 +15,13 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { GuestListResponse, GuestProfile, GuestStayHistoryItem } from "../../api/types";
+import type { GuestListItem, GuestListResponse, GuestMutationReceipt, GuestProfile, GuestStayHistoryItem, GuestStayHistoryListResponse } from "../../api/types";
 import { guestStatusLabel, guestStatusValue, guestStayRoleLabel, guestStayStatusLabel } from "../../api/labels";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import {
   EmptyState,
@@ -36,6 +36,7 @@ import {
 } from "../../components/ui/primitives";
 
 const PAGE_SIZE = 30;
+const STAY_PAGE_SIZE = 8;
 const statusFilters = ["active", "all", "archived"] as const;
 type StatusFilter = (typeof statusFilters)[number];
 type GuestFormState = GuestProfile | null | undefined;
@@ -65,6 +66,7 @@ export function GuestsPage() {
   const debouncedSearch = useDebouncedValue(search, 300);
   const [page, setPage] = useState(1);
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
+  const [stayPage, setStayPage] = useState(1);
   const [formState, setFormState] = useState<GuestFormState>(undefined);
   const [archiveTarget, setArchiveTarget] = useState<GuestProfile | null>(null);
 
@@ -102,13 +104,13 @@ export function GuestsPage() {
     enabled: Boolean(selectedPropertyId && selectedGuestId && canRead),
   });
   const stays = useQuery({
-    queryKey: ["guest-stays", selectedPropertyId, selectedGuestId],
-    queryFn: () => request<GuestStayHistoryItem[]>(`/api/guests/properties/${selectedPropertyId}/${selectedGuestId}/stays`),
+    queryKey: ["guest-stays", selectedPropertyId, selectedGuestId, stayPage],
+    queryFn: () => request<GuestStayHistoryListResponse>(`/api/guests/properties/${selectedPropertyId}/${selectedGuestId}/stays?page=${stayPage}&pageSize=${STAY_PAGE_SIZE}`),
     enabled: Boolean(selectedPropertyId && selectedGuestId && canRead),
   });
 
-  const guestMutation = useMutation<GuestProfile, Error, GuestFormSubmission>({
-    mutationFn: ({ guest, values }) => request<GuestProfile>(
+  const guestMutation = useMutation<GuestMutationReceipt, Error, GuestFormSubmission>({
+    mutationFn: ({ guest, values }) => request<GuestMutationReceipt>(
       guest
         ? `/api/guests/properties/${selectedPropertyId}/${guest.guestId}`
         : `/api/guests/properties/${selectedPropertyId}`,
@@ -123,12 +125,12 @@ export function GuestsPage() {
         queryClient.invalidateQueries({ queryKey: ["guest-detail", selectedPropertyId, saved.guestId] }),
       ]);
       setFormState(undefined);
-      setSelectedGuestId(saved.guestId);
+      selectGuest(saved.guestId);
     },
   });
 
-  const archiveMutation = useMutation<GuestProfile, Error, GuestProfile>({
-    mutationFn: (guest) => request<GuestProfile>(
+  const archiveMutation = useMutation<GuestMutationReceipt, Error, GuestProfile>({
+    mutationFn: (guest) => request<GuestMutationReceipt>(
       `/api/guests/properties/${selectedPropertyId}/${guest.guestId}/archive`,
       { method: "POST", body: JSON.stringify({ expectedVersion: guest.version, confirmed: true }) },
     ),
@@ -138,22 +140,40 @@ export function GuestsPage() {
         queryClient.invalidateQueries({ queryKey: ["guest-detail", selectedPropertyId, archived.guestId] }),
       ]);
       setArchiveTarget(null);
-      setSelectedGuestId(null);
+      selectGuest(null);
     },
   });
 
   useEffect(() => {
     setPage(1);
+    setStayPage(1);
     setSelectedGuestId(null);
   }, [selectedPropertyId]);
+
+  useEffect(() => {
+    if (!guests.isFetching && guests.data && page > 1 && guests.data.guests.length === 0) {
+      setPage((current) => Math.max(1, current - 1));
+    }
+  }, [guests.data, guests.isFetching, page]);
+
+  useEffect(() => {
+    if (!stays.isFetching && stays.data && stayPage > 1 && stays.data.stays.length === 0) {
+      setStayPage((current) => Math.max(1, current - 1));
+    }
+  }, [stayPage, stays.data, stays.isFetching]);
 
   const guestItems = guests.data?.guests ?? [];
   const selectedSummary = guestItems.find((guest) => guest.guestId === selectedGuestId);
   const detailOpen = Boolean(selectedGuestId && formState === undefined && !archiveTarget);
 
+  function selectGuest(guestId: string | null) {
+    setStayPage(1);
+    setSelectedGuestId(guestId);
+  }
+
   function openCreate() {
     guestMutation.reset();
-    setSelectedGuestId(null);
+    selectGuest(null);
     setFormState(null);
   }
 
@@ -222,18 +242,18 @@ export function GuestsPage() {
               />
             </div>
           ) : (
-            <GuestList guests={guestItems} onSelect={setSelectedGuestId} />
+            <GuestList guests={guestItems} onSelect={selectGuest} />
           )}
 
-          {(page > 1 || guestItems.length === PAGE_SIZE) && (
-            <div className="flex items-center justify-between border-t border-base-300 px-4 py-4 sm:px-6">
-              <p className="text-xs font-medium text-base-content/45">Page {page} · {guestItems.length} guest{guestItems.length === 1 ? "" : "s"}</p>
-              <div className="join">
-                <button type="button" className="btn join-item btn-sm" disabled={page === 1 || guests.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronLeft size={16} />Previous</button>
-                <button type="button" className="btn join-item btn-sm" disabled={guestItems.length < PAGE_SIZE || guests.isFetching} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={16} /></button>
-              </div>
-            </div>
-          )}
+          <PaginationBar
+            page={page}
+            pageSize={PAGE_SIZE}
+            itemCount={guestItems.length}
+            itemLabel="guest"
+            hasMore={guests.data?.hasMore}
+            disabled={guests.isFetching}
+            onPageChange={setPage}
+          />
         </section>
       )}
 
@@ -241,14 +261,19 @@ export function GuestsPage() {
         open={detailOpen}
         title={detail.data?.displayName ?? selectedSummary?.displayName ?? "Guest profile"}
         description="Profile details and recorded stay history"
-        onClose={() => setSelectedGuestId(null)}
+        onClose={() => selectGuest(null)}
       >
         {detail.isLoading ? <LoadingState label="Loading guest profile" /> : detail.error ? <ErrorState error={detail.error} retry={() => void detail.refetch()} /> : detail.data ? (
           <GuestDetail
             guest={detail.data}
-            stays={stays.data ?? []}
+            stays={stays.data?.stays ?? []}
             staysLoading={stays.isLoading}
             staysError={stays.error}
+            staysFetching={stays.isFetching}
+            stayPage={stayPage}
+            stayPageSize={STAY_PAGE_SIZE}
+            staysHasMore={stays.data?.hasMore ?? false}
+            onStayPageChange={setStayPage}
             canManage={canManage}
             canArchive={canArchive}
             onEdit={() => openEdit(detail.data)}
@@ -276,7 +301,7 @@ export function GuestsPage() {
   );
 }
 
-function GuestList({ guests, onSelect }: { guests: GuestProfile[]; onSelect: (guestId: string) => void }) {
+function GuestList({ guests, onSelect }: { guests: GuestListItem[]; onSelect: (guestId: string) => void }) {
   return (
     <>
       <div className="hidden overflow-x-auto lg:block">
@@ -316,16 +341,35 @@ function GuestList({ guests, onSelect }: { guests: GuestProfile[]; onSelect: (gu
   );
 }
 
-function ContactSummary({ guest }: { guest: GuestProfile }) {
+function ContactSummary({ guest }: { guest: GuestListItem }) {
   if (!guest.email && !guest.phone) return <span className="text-sm text-base-content/35">No contact details</span>;
   return <div className="space-y-1 text-sm">{guest.email && <p className="flex items-center gap-2"><Mail size={14} className="text-base-content/35" /><span className="max-w-56 truncate">{guest.email}</span></p>}{guest.phone && <p className="flex items-center gap-2"><Phone size={14} className="text-base-content/35" />{guest.phone}</p>}</div>;
 }
 
-function GuestDetail({ guest, stays, staysLoading, staysError, canManage, canArchive, onEdit, onArchive }: {
+function GuestDetail({
+  guest,
+  stays,
+  staysLoading,
+  staysError,
+  staysFetching,
+  stayPage,
+  stayPageSize,
+  staysHasMore,
+  onStayPageChange,
+  canManage,
+  canArchive,
+  onEdit,
+  onArchive,
+}: {
   guest: GuestProfile;
   stays: GuestStayHistoryItem[];
   staysLoading: boolean;
   staysError: unknown;
+  staysFetching: boolean;
+  stayPage: number;
+  stayPageSize: number;
+  staysHasMore: boolean;
+  onStayPageChange: (page: number) => void;
   canManage: boolean;
   canArchive: boolean;
   onEdit: () => void;
@@ -353,10 +397,10 @@ function GuestDetail({ guest, stays, staysLoading, staysError, canManage, canArc
       </section>
 
       <section aria-labelledby="guest-stay-history">
-        <div className="mb-3 flex items-center justify-between"><h3 id="guest-stay-history" className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Stay history</h3>{stays.length > 0 && <span className="text-xs font-medium text-base-content/40">{stays.length} recorded</span>}</div>
+        <div className="mb-3 flex items-center justify-between"><h3 id="guest-stay-history" className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Stay history</h3>{stays.length > 0 && <span className="text-xs font-medium text-base-content/40">Page {stayPage}</span>}</div>
         {staysLoading ? <LoadingState label="Loading stay history" /> : staysError ? <ErrorState error={staysError} /> : !stays.length ? (
           <div className="rounded-2xl border border-dashed border-base-300 p-6 text-center"><History className="mx-auto text-base-content/25" size={26} /><p className="mt-3 text-sm font-semibold">No stays recorded yet</p><p className="mt-1 text-xs text-base-content/45">Reservation participation will appear here automatically.</p></div>
-        ) : <div className="space-y-3">{stays.map((stay) => <StayHistoryCard key={`${stay.reservationId}-${stay.reservationVersion}`} stay={stay} />)}</div>}
+        ) : <><div className="space-y-3">{stays.map((stay) => <StayHistoryCard key={`${stay.reservationId}-${stay.reservationVersion}`} stay={stay} />)}</div><PaginationBar page={stayPage} pageSize={stayPageSize} itemCount={stays.length} itemLabel="stay" hasMore={staysHasMore} disabled={staysFetching} onPageChange={onStayPageChange} /></>}
       </section>
 
       <p className="border-t border-base-300 pt-4 text-xs leading-5 text-base-content/40">Last updated {formatDateTime(guest.lastChangedAtUtc)} by {formatActor(guest.lastChangedBy)} · Profile version {guest.version}</p>

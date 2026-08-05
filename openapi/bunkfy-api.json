@@ -3499,7 +3499,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -3530,7 +3537,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -3562,7 +3576,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestProfileDto"
+                }
+              }
+            }
           }
         }
       },
@@ -3602,7 +3623,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -3630,11 +3658,34 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestStayHistoryListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4027,7 +4078,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4271,7 +4329,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterTypeCapabilityListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4317,7 +4382,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -4348,7 +4420,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4380,7 +4459,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionDto"
+                }
+              }
+            }
           }
         }
       },
@@ -4420,7 +4506,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4452,7 +4545,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionHealthDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4494,7 +4594,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4536,7 +4643,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4578,7 +4692,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4620,7 +4741,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4662,7 +4790,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterConnectionMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4710,7 +4845,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterIngressCredentialListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -4750,7 +4892,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAdapterIngressCredentialResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4801,7 +4950,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterIngressCredentialMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4813,7 +4969,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationParserCapabilityListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4859,7 +5022,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeProposalListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4891,7 +5061,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeProposalDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4933,7 +5110,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeProposalMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -4975,7 +5159,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeProposalMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -5037,7 +5228,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationReceiptListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5069,7 +5267,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -5155,7 +5360,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationReprocessingAttemptListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5187,7 +5399,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservationReprocessingAttemptDetailsDto"
+                }
+              }
+            }
           }
         }
       }
@@ -5241,7 +5460,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionRunListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5273,7 +5499,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionRunDto"
+                }
+              }
+            }
           }
         }
       }
@@ -5365,7 +5598,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoomInventoryDto"
+                  "$ref": "#/components/schemas/RoomInventoryMutationReceiptDto"
                 }
               }
             }
@@ -5551,7 +5784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ManualInventoryBlockDto"
+                  "$ref": "#/components/schemas/ManualInventoryBlockMutationReceiptDto"
                 }
               }
             }
@@ -5591,7 +5824,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ManualInventoryBlockGroupDto"
+                  "$ref": "#/components/schemas/ManualInventoryBlockGroupMutationReceiptDto"
                 }
               }
             }
@@ -5640,7 +5873,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ManualInventoryBlockDto"
+                  "$ref": "#/components/schemas/ManualInventoryBlockMutationReceiptDto"
                 }
               }
             }
@@ -5679,7 +5912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ManualInventoryBlockGroupDto"
+                  "$ref": "#/components/schemas/ManualInventoryBlockGroupMutationReceiptDto"
                 }
               }
             }
@@ -7366,7 +7599,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PropertyDto"
+                  "$ref": "#/components/schemas/PropertyMutationReceiptDto"
                 }
               }
             }
@@ -7464,7 +7697,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PropertyDto"
+                  "$ref": "#/components/schemas/PropertyMutationReceiptDto"
                 }
               }
             }
@@ -7529,8 +7762,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -7567,7 +7800,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PropertyDto"
+                  "$ref": "#/components/schemas/PropertyMutationReceiptDto"
                 }
               }
             }
@@ -7602,8 +7835,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -7684,7 +7917,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoomDto"
+                  "$ref": "#/components/schemas/RoomMutationReceiptDto"
                 }
               }
             }
@@ -7770,7 +8003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoomDto"
+                  "$ref": "#/components/schemas/RoomMutationReceiptDto"
                 }
               }
             }
@@ -7814,8 +8047,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -7914,7 +8147,56 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BedDto"
+                  "$ref": "#/components/schemas/BedMutationReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/properties/{propertyId}/rooms/{roomId}/beds/batch": {
+      "post": {
+        "tags": [
+          "Properties"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BedBatchWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedBatchMutationReceiptDto"
                 }
               }
             }
@@ -7972,7 +8254,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BedDto"
+                  "$ref": "#/components/schemas/BedMutationReceiptDto"
                 }
               }
             }
@@ -8025,8 +8307,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -8063,7 +8345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReservationDto"
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
                 }
               }
             }
@@ -8241,11 +8523,34 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetailsHistoryListResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -8287,7 +8592,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -8333,7 +8645,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReservationDto"
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
                 }
               }
             }
@@ -8378,7 +8690,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -8424,7 +8743,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ReservationDto"
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
                 }
               }
             }
@@ -8469,7 +8788,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -8511,7 +8837,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -8553,7 +8886,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -8562,6 +8902,24 @@
       "get": {
         "tags": [
           "Retention"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -8693,7 +9051,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffMemberDto"
+                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
                 }
               }
             }
@@ -8761,7 +9119,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffMemberDto"
+                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
                 }
               }
             }
@@ -8831,7 +9189,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffMemberDto"
+                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
                 }
               }
             }
@@ -9011,7 +9369,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryListResponse"
+                  "$ref": "#/components/schemas/StaffPropertyDirectoryListResponse"
                 }
               }
             }
@@ -10528,11 +10886,310 @@
         },
         "additionalProperties": false
       },
+      "AdapterCapabilityStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "AdapterConflictPolicy": {
         "enum": [
           0,
           1,
           2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "AdapterConnectionDto": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adapterType": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/AdapterExecutionMode"
+          },
+          "pollingIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pollingScheduleMaxAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pollingScheduleConfiguredAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "conflictPolicy": {
+            "$ref": "#/components/schemas/AdapterConflictPolicy"
+          },
+          "configurationReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasSecretReference": {
+            "type": "boolean"
+          },
+          "checkpoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AdapterConnectionStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterConnectionHealthDto": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adapterType": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectionStatus": {
+            "$ref": "#/components/schemas/AdapterConnectionStatus"
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/AdapterExecutionMode"
+          },
+          "capabilityStatus": {
+            "$ref": "#/components/schemas/AdapterCapabilityStatus"
+          },
+          "protocolVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "configurationSchemaVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pollingIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pollingScheduleMaxAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pollingScheduleConfiguredAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextRunExpectedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "runExpected": {
+            "type": "boolean"
+          },
+          "operationalState": {
+            "$ref": "#/components/schemas/AdapterConnectionOperationalState"
+          },
+          "latestRunId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "latestRunStatus": {
+            "$ref": "#/components/schemas/IngestionRunStatus"
+          },
+          "latestRunStartedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "latestRunCompletedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "latestRunErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSuccessfulRunAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastObservationReceivedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pendingReceiptCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejectedReceiptCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiredRawPayloadCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "protectedRawPayloadCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "heldExpiredRawPayloadCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "purgingRawPayloadCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "dueSensitiveHistoryCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "heldDueSensitiveHistoryCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "redactedSensitiveHistoryCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "activeLegalHoldCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterConnectionListItemDto": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adapterType": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionMode": {
+            "$ref": "#/components/schemas/AdapterExecutionMode"
+          },
+          "pollingIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "conflictPolicy": {
+            "$ref": "#/components/schemas/AdapterConflictPolicy"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AdapterConnectionStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterConnectionListResponse": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterConnectionListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterConnectionMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AdapterConnectionStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterConnectionOperationalState": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
         ],
         "type": "integer",
         "format": "int32"
@@ -10570,6 +11227,166 @@
           }
         },
         "additionalProperties": false
+      },
+      "AdapterIngressCredentialDto": {
+        "type": "object",
+        "properties": {
+          "credentialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slot": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AdapterIngressCredentialStatus"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastAuthenticatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "adapterType": {
+            "type": "string",
+            "nullable": true
+          },
+          "adapterProtocolVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "configurationSchemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceSystem": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterIngressCredentialListItemDto": {
+        "type": "object",
+        "properties": {
+          "credentialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slot": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AdapterIngressCredentialStatus"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastAuthenticatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterIngressCredentialListResponse": {
+        "type": "object",
+        "properties": {
+          "credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterIngressCredentialListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterIngressCredentialMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "credentialId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AdapterIngressCredentialStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterIngressCredentialStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "AdapterIngressObservationRequest": {
         "type": "object",
@@ -10756,6 +11573,54 @@
         "type": "integer",
         "format": "int32"
       },
+      "AdapterTypeCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "adapterType": {
+            "type": "string",
+            "nullable": true
+          },
+          "protocolVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "configurationSchemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "executionModes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterExecutionMode"
+            },
+            "nullable": true
+          },
+          "minimumPollingIntervalSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "recommendedPollingIntervalSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdapterTypeCapabilityListResponse": {
+        "type": "object",
+        "properties": {
+          "adapterTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdapterTypeCapabilityDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ApplyGuestProcessingRestrictionRequest": {
         "type": "object",
         "properties": {
@@ -10935,7 +11800,46 @@
         },
         "additionalProperties": false
       },
-      "BedDto": {
+      "BedBatchMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "affectedBedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roomVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BedBatchWriteRequest": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "expectedRoomVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BedListItemDto": {
         "type": "object",
         "properties": {
           "bedId": {
@@ -10964,20 +11868,6 @@
           "roomVersion": {
             "type": "integer",
             "format": "int64"
-          },
-          "createdAtUtc": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAtUtc": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "retiredAtUtc": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10988,7 +11878,7 @@
           "beds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/BedDto"
+              "$ref": "#/components/schemas/BedListItemDto"
             },
             "nullable": true
           },
@@ -10999,6 +11889,38 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BedMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bedId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BedStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "roomVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -11243,6 +12165,166 @@
         },
         "additionalProperties": false
       },
+      "ChangeProposalDto": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "baseReservationDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "diff": {
+            "type": "string",
+            "nullable": true
+          },
+          "sensitiveHistoryStatus": {
+            "$ref": "#/components/schemas/SensitiveHistoryStatus"
+          },
+          "sensitiveDataRetainUntilUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sensitiveDataRedactedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChangeProposalStatus"
+          },
+          "decisionActor": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "productOperationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeProposalListItemDto": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "baseReservationDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChangeProposalStatus"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeProposalListResponse": {
+        "type": "object",
+        "properties": {
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeProposalListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeProposalMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChangeProposalStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productOperationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ChangeProposalStatus": {
         "enum": [
           0,
@@ -11448,6 +12530,9 @@
             },
             "nullable": true
           },
+          "supportsRightsResponseDeadlines": {
+            "type": "boolean"
+          },
           "retentionPolicies": {
             "type": "array",
             "items": {
@@ -11512,6 +12597,19 @@
             "items": {
               "type": "string"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAdapterIngressCredentialResponse": {
+        "type": "object",
+        "properties": {
+          "credential": {
+            "$ref": "#/components/schemas/AdapterIngressCredentialDto"
+          },
+          "token": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -11963,6 +13061,9 @@
           },
           "approvalEvidence": {
             "$ref": "#/components/schemas/DataRightsApprovalEvidence"
+          },
+          "responseDeadlineEvidence": {
+            "$ref": "#/components/schemas/DataRightsResponseDeadlineEvidence"
           }
         },
         "additionalProperties": false
@@ -11973,7 +13074,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DataRightsCaseDto"
+              "$ref": "#/components/schemas/DataRightsCaseSummaryDto"
             },
             "nullable": true
           },
@@ -11984,6 +13085,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -12005,6 +13109,57 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "DataRightsCaseSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/DataRightsCaseType"
+          },
+          "requesterRelationship": {
+            "$ref": "#/components/schemas/DataRightsRequesterRelationship"
+          },
+          "requestedOperations": {
+            "$ref": "#/components/schemas/DataRightsOperation"
+          },
+          "restrictionDirective": {
+            "$ref": "#/components/schemas/DataRightsRestrictionDirective"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DataRightsCaseStatus"
+          },
+          "selectedSubjectCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dueAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
       },
       "DataRightsCaseType": {
         "enum": [
@@ -12537,6 +13692,98 @@
         "type": "integer",
         "format": "int32"
       },
+      "DataRightsResponseDeadlineEvidence": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyTopologySourceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "propertyPolicySourceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operatingCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contentSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "controllingRight": {
+            "$ref": "#/components/schemas/DataRightsResponseDeadlineRight"
+          },
+          "ruleReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "periodYears": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "periodMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "periodDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyEffectiveAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policyExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receivedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dueAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsResponseDeadlineRight": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DataRightsRestrictionDirective": {
         "enum": [
           0,
@@ -12709,6 +13956,9 @@
               "$ref": "#/components/schemas/DataRightsSubjectCandidate"
             },
             "nullable": true
+          },
+          "limitReached": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -13115,6 +14365,96 @@
         },
         "additionalProperties": false
       },
+      "GuestListItemDto": {
+        "type": "object",
+        "properties": {
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "nationalityCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "preferredLanguageTag": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/GuestStatus"
+          },
+          "lastChangedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestListResponse": {
+        "type": "object",
+        "properties": {
+          "guests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GuestStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "GuestProcessingRestrictionActionDto": {
         "enum": [
           0,
@@ -13243,6 +14583,81 @@
         },
         "additionalProperties": false
       },
+      "GuestProfileDto": {
+        "type": "object",
+        "properties": {
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originPropertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "nationalityCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "preferredLanguageTag": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/GuestStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastChangedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archivedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "GuestProfileUpdateRequest": {
         "type": "object",
         "properties": {
@@ -13333,6 +14748,276 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "GuestStayHistoryItem": {
+        "type": "object",
+        "properties": {
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/GuestStayRole"
+          },
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GuestStayStatus"
+          },
+          "checkedInBusinessDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "noShowBusinessDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "checkedOutBusinessDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "isCurrentParticipant": {
+            "type": "boolean"
+          },
+          "reservationVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestStayHistoryListResponse": {
+        "type": "object",
+        "properties": {
+          "stays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestStayHistoryItem"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GuestStayRole": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "GuestStayStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "IngestionRunDto": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "executionKind": {
+            "$ref": "#/components/schemas/IngestionRunExecutionKindDto"
+          },
+          "taskRunId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "taskAttempt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "remoteLeaseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "remoteClaimId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "remoteLeaseEpoch": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "remoteWorkerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "remoteLeaseExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "startingCheckpoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptedCheckpoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/IngestionRunStatus"
+          },
+          "observedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejectedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestionRunExecutionKindDto": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "IngestionRunListItemDto": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IngestionRunStatus"
+          },
+          "observedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejectedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IngestionRunListResponse": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestionRunListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "IngestionRunStatus": {
         "enum": [
@@ -13680,19 +15365,20 @@
         },
         "additionalProperties": false
       },
-      "ManualInventoryBlockGroupDto": {
+      "ManualInventoryBlockGroupMutationReceiptDto": {
         "type": "object",
         "properties": {
           "blockGroupId": {
             "type": "string",
             "format": "uuid"
           },
-          "blocks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ManualInventoryBlockDto"
-            },
-            "nullable": true
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "affectedBlockCount": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -13714,6 +15400,34 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ManualInventoryBlockMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "blockId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blockGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ManualInventoryBlockStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -13810,7 +15524,500 @@
         },
         "additionalProperties": false
       },
+      "ObservationParserCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "parserType": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "supportedAdapterTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "supportedSourceRecordTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "outputRecordTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationParserCapabilityListResponse": {
+        "type": "object",
+        "properties": {
+          "parsers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationParserCapabilityDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceRecordType": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceRevision": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "rawPayloadFileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rawPayloadStatus": {
+            "$ref": "#/components/schemas/RawPayloadRetentionStatus"
+          },
+          "rawPayloadRetainUntilUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rawPayloadPurgedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "activeReprocessingAttemptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reprocessingReservationExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sourceReceiptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reprocessingAttemptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "parserType": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "parserOutputIndex": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "sourceUpdatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "observedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ObservationReceiptStatus"
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "receivedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ingressCredentialId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "adapterType": {
+            "type": "string",
+            "nullable": true
+          },
+          "adapterProtocolVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "configurationSchemaVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "sourceSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerOwner": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReceiptListItemDto": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceRecordType": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalId": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserType": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ObservationReceiptStatus"
+          },
+          "receivedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReceiptListResponse": {
+        "type": "object",
+        "properties": {
+          "receipts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationReceiptListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ObservationReceiptStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ObservationReprocessingAttemptDetailsDto": {
+        "type": "object",
+        "properties": {
+          "attempt": {
+            "$ref": "#/components/schemas/ObservationReprocessingAttemptDto"
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationReprocessingOutputDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReprocessingAttemptDto": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceReceiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskRunId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parserType": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ObservationReprocessingStatus"
+          },
+          "lastTaskAttempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parsedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicateCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejectedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reservationExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReprocessingAttemptListItemDto": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parserType": {
+            "type": "string",
+            "nullable": true
+          },
+          "parserVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ObservationReprocessingStatus"
+          },
+          "parsedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicateCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejectedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReprocessingAttemptListResponse": {
+        "type": "object",
+        "properties": {
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservationReprocessingAttemptListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReprocessingOutputDto": {
+        "type": "object",
+        "properties": {
+          "outputIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ObservationReprocessingOutputStatus"
+          },
+          "recordType": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceRevision": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObservationReprocessingOutputStatus": {
         "enum": [
           0,
           1,
@@ -14609,13 +16816,45 @@
         },
         "additionalProperties": false
       },
+      "PropertyListItemDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/PropertyStatus"
+          },
+          "processingStatus": {
+            "$ref": "#/components/schemas/PropertyProcessingStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "PropertyListResponse": {
         "type": "object",
         "properties": {
           "properties": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PropertyDto"
+              "$ref": "#/components/schemas/PropertyListItemDto"
             },
             "nullable": true
           },
@@ -14626,6 +16865,29 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PropertyMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PropertyStatus"
+          },
+          "processingStatus": {
+            "$ref": "#/components/schemas/PropertyProcessingStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -14707,6 +16969,16 @@
           }
         },
         "additionalProperties": false
+      },
+      "RawPayloadRetentionStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "ReassignReservationInventoryRequest": {
         "type": "object",
@@ -15116,6 +17388,146 @@
         "type": "integer",
         "format": "int32"
       },
+      "ReservationDetailsHistoryItem": {
+        "type": "object",
+        "properties": {
+          "changeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "toRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ReservationDetailsChangeOriginKind"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "adapterConnectionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "externalOperationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "before": {
+            "$ref": "#/components/schemas/ReservationDetailsSnapshotDto"
+          },
+          "after": {
+            "$ref": "#/components/schemas/ReservationDetailsSnapshotDto"
+          },
+          "occurredAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationDetailsHistoryListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReservationDetailsHistoryItem"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationDetailsSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "inventoryUnitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "primaryGuestName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "guestCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ReservationDto": {
         "type": "object",
         "properties": {
@@ -15314,6 +17726,56 @@
         "type": "integer",
         "format": "int32"
       },
+      "ReservationListItemDto": {
+        "type": "object",
+        "properties": {
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "primaryGuestName": {
+            "type": "string",
+            "nullable": true
+          },
+          "guestCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inventoryUnitCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceKind": {
+            "$ref": "#/components/schemas/ReservationSourceKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReservationStatus"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReservationListOrder": {
         "enum": [
           0,
@@ -15330,7 +17792,7 @@
           "reservations": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ReservationDto"
+              "$ref": "#/components/schemas/ReservationListItemDto"
             },
             "nullable": true
           },
@@ -15342,9 +17804,33 @@
             "type": "integer",
             "format": "int32"
           },
-          "totalCount": {
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReservationStatus"
+          },
+          "detailsRevision": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -15423,6 +17909,11 @@
           "status": {
             "$ref": "#/components/schemas/RetentionExecutionStatus"
           },
+          "lastRunId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "lastStartedAtUtc": {
             "type": "string",
             "format": "date-time",
@@ -15480,6 +17971,42 @@
               "$ref": "#/components/schemas/RetentionScheduleHealthDto"
             },
             "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RetentionScheduleHealthSummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetentionScheduleHealthSummaryDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "healthy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "running": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "needsAttention": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -15715,6 +18242,63 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoomInventoryMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "salesMode": {
+            "$ref": "#/components/schemas/InventorySalesMode"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoomListItemDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "buildingLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "floorLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoomStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -15725,7 +18309,7 @@
           "rooms": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RoomDto"
+              "$ref": "#/components/schemas/RoomListItemDto"
             },
             "nullable": true
           },
@@ -15736,6 +18320,30 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoomMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoomStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -15862,6 +18470,15 @@
           }
         },
         "additionalProperties": false
+      },
+      "SensitiveHistoryStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "SetNotificationPreferenceRequest": {
         "type": "object",
@@ -16207,13 +18824,46 @@
         },
         "additionalProperties": false
       },
+      "StaffDirectoryListItemDto": {
+        "type": "object",
+        "properties": {
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/StaffStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentPropertyCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "StaffDirectoryListResponse": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+              "$ref": "#/components/schemas/StaffDirectoryListItemDto"
             },
             "nullable": true
           },
@@ -16224,6 +18874,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -16624,6 +19277,62 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffPropertyDirectoryListItemDto": {
+        "type": "object",
+        "properties": {
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/StaffStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/StaffDirectoryAssignmentDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffPropertyDirectoryListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffPropertyDirectoryListItemDto"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -17645,6 +20354,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

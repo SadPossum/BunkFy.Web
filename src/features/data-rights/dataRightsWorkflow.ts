@@ -56,6 +56,16 @@ export type DataRightsOperationKind =
   | "removal"
   | "other";
 
+export type DataRightsResponseDeadlineState =
+  | "not-applicable"
+  | "pending"
+  | "scheduled"
+  | "due-soon"
+  | "overdue"
+  | "closed";
+
+const RESPONSE_DEADLINE_DUE_SOON_MS = 48 * 60 * 60 * 1_000;
+
 const caseStatusNames: Record<number, string> = {
   0: "unknown",
   1: "draft",
@@ -135,6 +145,39 @@ export function dataRightsCaseNeedsLiveRefresh(
   status: DataRightsCaseStatus | string | undefined,
 ): boolean {
   return status !== undefined && dataRightsCaseStatusKey(status) === "executing";
+}
+
+export function dataRightsResponseDeadlineState(
+  dataRightsCase: Pick<
+    DataRightsCase,
+    "type" | "requesterRelationship" | "status" | "dueAtUtc"
+  >,
+  now = new Date(),
+): DataRightsResponseDeadlineState {
+  const isExternalGuestRequest = Number(dataRightsCase.type) === 1 &&
+    [1, 2].includes(Number(dataRightsCase.requesterRelationship));
+  if (!isExternalGuestRequest) return "not-applicable";
+  if (!dataRightsCase.dueAtUtc) return "pending";
+
+  const status = dataRightsCaseStatusKey(dataRightsCase.status);
+  if (["denied", "completed", "partiallyCompleted", "canceled"].includes(status)) {
+    return "closed";
+  }
+
+  const dueAt = Date.parse(dataRightsCase.dueAtUtc);
+  if (!Number.isFinite(dueAt)) return "pending";
+  const remaining = dueAt - now.getTime();
+  if (remaining <= 0) return "overdue";
+  if (remaining <= RESPONSE_DEADLINE_DUE_SOON_MS) return "due-soon";
+  return "scheduled";
+}
+
+export function dataRightsResponseDeadlineRightLabel(right: number): string {
+  if (right === 1) return "Access and export";
+  if (right === 2) return "Correction";
+  if (right === 3) return "Processing restriction";
+  if (right === 4) return "Erasure";
+  return "Guest rights response";
 }
 
 export function dataRightsExecutionNeedsLiveRefresh(

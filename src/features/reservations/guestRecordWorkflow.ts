@@ -1,5 +1,5 @@
 import { ApiError } from "../../api/client";
-import type { GuestProfile, Reservation } from "../../api/types";
+import type { GuestProfile, Reservation, ReservationMutationReceipt } from "../../api/types";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -23,10 +23,12 @@ export type GuestRecordProfileDetails = {
 };
 
 type CreateAndLinkGuestRecordOptions = {
-  profile?: GuestRecordWritePayload;
+  profile: GuestRecordWritePayload;
   timeoutMs?: number;
   retryDelayMs?: number;
 };
+
+type ReservationMutationTarget = Pick<ReservationMutationReceipt, "reservationId" | "version">;
 
 export class GuestRecordLinkError extends Error {
   constructor(
@@ -61,12 +63,12 @@ export function guestRecordPayloadFromBooking(
 export async function createAndLinkGuestRecord(
   request: ApiRequest,
   propertyId: string,
-  reservation: Reservation,
-  options: CreateAndLinkGuestRecordOptions = {},
-): Promise<{ guest: GuestProfile; reservation: Reservation }> {
+  reservation: ReservationMutationTarget,
+  options: CreateAndLinkGuestRecordOptions,
+): Promise<{ guest: GuestProfile; reservation: ReservationMutationReceipt }> {
   const guest = await request<GuestProfile>(`/api/guests/properties/${propertyId}`, {
     method: "POST",
-    body: JSON.stringify(options.profile ?? guestRecordPayloadFromBooking(reservation)),
+    body: JSON.stringify(options.profile),
   });
 
   try {
@@ -86,17 +88,17 @@ export async function createAndLinkGuestRecord(
 export async function linkGuestRecord(
   request: ApiRequest,
   propertyId: string,
-  initialReservation: Reservation,
+  initialReservation: ReservationMutationTarget,
   guestId: string,
   options: Pick<CreateAndLinkGuestRecordOptions, "timeoutMs" | "retryDelayMs"> = {},
-): Promise<Reservation> {
+): Promise<ReservationMutationReceipt> {
   const deadline = Date.now() + (options.timeoutMs ?? 12_000);
   const retryDelayMs = options.retryDelayMs ?? 300;
   let reservation = initialReservation;
 
   while (true) {
     try {
-      return await request<Reservation>(
+      return await request<ReservationMutationReceipt>(
         `/api/reservations/properties/${propertyId}/${reservation.reservationId}/guests`,
         {
           method: "PUT",

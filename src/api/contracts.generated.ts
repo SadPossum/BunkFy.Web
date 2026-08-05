@@ -3720,7 +3720,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GuestListResponse"];
+                    };
                 };
             };
         };
@@ -3745,7 +3747,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GuestMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -3779,7 +3783,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GuestProfileDto"];
+                    };
                 };
             };
         };
@@ -3804,7 +3810,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GuestMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -3824,7 +3832,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
                 header?: never;
                 path: {
                     propertyId: string;
@@ -3839,7 +3850,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GuestStayHistoryListResponse"];
+                    };
                 };
             };
         };
@@ -4157,7 +4170,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["GuestMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4492,7 +4507,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterTypeCapabilityListResponse"];
+                    };
                 };
             };
         };
@@ -4531,7 +4548,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionListResponse"];
+                    };
                 };
             };
         };
@@ -4556,7 +4575,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4590,7 +4611,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionDto"];
+                    };
                 };
             };
         };
@@ -4615,7 +4638,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4650,7 +4675,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionHealthDto"];
+                    };
                 };
             };
         };
@@ -4691,7 +4718,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4732,7 +4761,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4772,7 +4803,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4812,7 +4845,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4852,7 +4887,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterConnectionMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4889,7 +4926,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterIngressCredentialListResponse"];
+                    };
                 };
             };
         };
@@ -4915,7 +4954,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["CreateAdapterIngressCredentialResponse"];
+                    };
                 };
             };
         };
@@ -4956,7 +4997,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AdapterIngressCredentialMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -4987,7 +5030,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ObservationParserCapabilityListResponse"];
+                    };
                 };
             };
         };
@@ -5026,7 +5071,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ChangeProposalListResponse"];
+                    };
                 };
             };
         };
@@ -5062,7 +5109,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ChangeProposalDto"];
+                    };
                 };
             };
         };
@@ -5104,7 +5153,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ChangeProposalMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -5144,7 +5195,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ChangeProposalMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -5183,7 +5236,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ObservationReceiptListResponse"];
+                    };
                 };
             };
         };
@@ -5219,7 +5274,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ObservationReceiptDto"];
+                    };
                 };
             };
         };
@@ -5295,7 +5352,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ObservationReprocessingAttemptListResponse"];
+                    };
                 };
             };
         };
@@ -5331,7 +5390,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ObservationReprocessingAttemptDetailsDto"];
+                    };
                 };
             };
         };
@@ -5371,7 +5432,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["IngestionRunListResponse"];
+                    };
                 };
             };
         };
@@ -5407,7 +5470,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["IngestionRunDto"];
+                    };
                 };
             };
         };
@@ -5489,7 +5554,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RoomInventoryDto"];
+                        "application/json": components["schemas"]["RoomInventoryMutationReceiptDto"];
                     };
                 };
             };
@@ -5635,7 +5700,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ManualInventoryBlockDto"];
+                        "application/json": components["schemas"]["ManualInventoryBlockMutationReceiptDto"];
                     };
                 };
             };
@@ -5676,7 +5741,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ManualInventoryBlockGroupDto"];
+                        "application/json": components["schemas"]["ManualInventoryBlockGroupMutationReceiptDto"];
                     };
                 };
             };
@@ -5718,7 +5783,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ManualInventoryBlockDto"];
+                        "application/json": components["schemas"]["ManualInventoryBlockMutationReceiptDto"];
                     };
                 };
             };
@@ -5756,7 +5821,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ManualInventoryBlockGroupDto"];
+                        "application/json": components["schemas"]["ManualInventoryBlockGroupMutationReceiptDto"];
                     };
                 };
             };
@@ -7504,7 +7569,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PropertyDto"];
+                        "application/json": components["schemas"]["PropertyMutationReceiptDto"];
                     };
                 };
             };
@@ -7602,7 +7667,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PropertyDto"];
+                        "application/json": components["schemas"]["PropertyMutationReceiptDto"];
                     };
                 };
             };
@@ -7675,8 +7740,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7720,7 +7785,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PropertyDto"];
+                        "application/json": components["schemas"]["PropertyMutationReceiptDto"];
                     };
                 };
             };
@@ -7755,8 +7820,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7824,7 +7889,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RoomDto"];
+                        "application/json": components["schemas"]["RoomMutationReceiptDto"];
                     };
                 };
             };
@@ -7887,7 +7952,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RoomDto"];
+                        "application/json": components["schemas"]["RoomMutationReceiptDto"];
                     };
                 };
             };
@@ -7924,8 +7989,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7995,7 +8060,49 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["BedDto"];
+                        "application/json": components["schemas"]["BedMutationReceiptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{propertyId}/rooms/{roomId}/beds/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BedBatchWriteRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BedBatchMutationReceiptDto"];
                     };
                 };
             };
@@ -8037,7 +8144,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["BedDto"];
+                        "application/json": components["schemas"]["BedMutationReceiptDto"];
                     };
                 };
             };
@@ -8075,8 +8182,8 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description No Content */
+                204: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -8147,7 +8254,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ReservationDto"];
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
                     };
                 };
             };
@@ -8246,7 +8353,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
                 header?: never;
                 path: {
                     propertyId: string;
@@ -8261,7 +8371,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReservationDetailsHistoryListResponse"];
+                    };
                 };
             };
         };
@@ -8302,7 +8414,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -8343,7 +8457,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ReservationDto"];
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
                     };
                 };
             };
@@ -8384,7 +8498,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -8426,7 +8542,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ReservationDto"];
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
                     };
                 };
             };
@@ -8467,7 +8583,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -8507,7 +8625,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -8547,7 +8667,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ReservationMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -8566,7 +8688,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -8702,7 +8827,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffMemberDto"];
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
                     };
                 };
             };
@@ -8763,7 +8888,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffMemberDto"];
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
                     };
                 };
             };
@@ -8841,7 +8966,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffMemberDto"];
+                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
                     };
                 };
             };
@@ -9005,7 +9130,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryListResponse"];
+                        "application/json": components["schemas"]["StaffPropertyDirectoryListResponse"];
                     };
                 };
             };
@@ -10254,7 +10379,125 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
+        AdapterCapabilityStatus: 0 | 1 | 2 | 3;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
         AdapterConflictPolicy: 0 | 1 | 2;
+        AdapterConnectionDto: {
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            propertyId: string;
+            adapterType: string | null;
+            executionMode: components["schemas"]["AdapterExecutionMode"];
+            /** Format: int32 */
+            pollingIntervalSeconds: number | null;
+            /** Format: int32 */
+            pollingScheduleMaxAttempts: number | null;
+            /** Format: date-time */
+            pollingScheduleConfiguredAtUtc: string | null;
+            conflictPolicy: components["schemas"]["AdapterConflictPolicy"];
+            configurationReference: string | null;
+            hasSecretReference: boolean;
+            checkpoint: string | null;
+            status: components["schemas"]["AdapterConnectionStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string | null;
+        };
+        AdapterConnectionHealthDto: {
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            propertyId: string;
+            adapterType: string | null;
+            connectionStatus: components["schemas"]["AdapterConnectionStatus"];
+            executionMode: components["schemas"]["AdapterExecutionMode"];
+            capabilityStatus: components["schemas"]["AdapterCapabilityStatus"];
+            /** Format: int32 */
+            protocolVersion: number | null;
+            /** Format: int32 */
+            configurationSchemaVersion: number | null;
+            /** Format: int32 */
+            pollingIntervalSeconds: number | null;
+            /** Format: int32 */
+            pollingScheduleMaxAttempts: number | null;
+            /** Format: date-time */
+            pollingScheduleConfiguredAtUtc: string | null;
+            /** Format: date-time */
+            nextRunExpectedAtUtc: string | null;
+            runExpected: boolean;
+            operationalState: components["schemas"]["AdapterConnectionOperationalState"];
+            /** Format: uuid */
+            latestRunId: string | null;
+            latestRunStatus: components["schemas"]["IngestionRunStatus"];
+            /** Format: date-time */
+            latestRunStartedAtUtc: string | null;
+            /** Format: date-time */
+            latestRunCompletedAtUtc: string | null;
+            latestRunErrorCode: string | null;
+            /** Format: date-time */
+            lastSuccessfulRunAtUtc: string | null;
+            /** Format: date-time */
+            lastObservationReceivedAtUtc: string | null;
+            /** Format: int64 */
+            pendingReceiptCount: number;
+            /** Format: int64 */
+            rejectedReceiptCount: number;
+            /** Format: int64 */
+            expiredRawPayloadCount: number;
+            /** Format: int64 */
+            protectedRawPayloadCount: number;
+            /** Format: int64 */
+            heldExpiredRawPayloadCount: number;
+            /** Format: int64 */
+            purgingRawPayloadCount: number;
+            /** Format: int64 */
+            dueSensitiveHistoryCount: number;
+            /** Format: int64 */
+            heldDueSensitiveHistoryCount: number;
+            /** Format: int64 */
+            redactedSensitiveHistoryCount: number;
+            /** Format: int64 */
+            activeLegalHoldCount: number;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+        };
+        AdapterConnectionListItemDto: {
+            /** Format: uuid */
+            connectionId: string;
+            adapterType: string | null;
+            executionMode: components["schemas"]["AdapterExecutionMode"];
+            /** Format: int32 */
+            pollingIntervalSeconds: number | null;
+            conflictPolicy: components["schemas"]["AdapterConflictPolicy"];
+            status: components["schemas"]["AdapterConnectionStatus"];
+        };
+        AdapterConnectionListResponse: {
+            connections: components["schemas"]["AdapterConnectionListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        AdapterConnectionMutationReceiptDto: {
+            /** Format: uuid */
+            connectionId: string;
+            status: components["schemas"]["AdapterConnectionStatus"];
+            /** Format: int64 */
+            version: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AdapterConnectionOperationalState: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
         /**
          * Format: int32
          * @enum {integer}
@@ -10270,6 +10513,70 @@ export interface components {
             expectedVersion: number;
             reasonCode: string | null;
         };
+        AdapterIngressCredentialDto: {
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: int32 */
+            slot: number;
+            label: string | null;
+            status: components["schemas"]["AdapterIngressCredentialStatus"];
+            /** Format: date-time */
+            expiresAtUtc: string;
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            revokedBy: string | null;
+            /** Format: date-time */
+            revokedAtUtc: string | null;
+            /** Format: date-time */
+            lastAuthenticatedAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+            adapterType: string | null;
+            /** Format: int32 */
+            adapterProtocolVersion: number;
+            /** Format: int32 */
+            configurationSchemaVersion: number;
+            sourceSystem: string | null;
+        };
+        AdapterIngressCredentialListItemDto: {
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: int32 */
+            slot: number;
+            label: string | null;
+            status: components["schemas"]["AdapterIngressCredentialStatus"];
+            /** Format: date-time */
+            expiresAtUtc: string;
+            /** Format: date-time */
+            lastAuthenticatedAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+        };
+        AdapterIngressCredentialListResponse: {
+            credentials: components["schemas"]["AdapterIngressCredentialListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        AdapterIngressCredentialMutationReceiptDto: {
+            /** Format: uuid */
+            credentialId: string;
+            /** Format: uuid */
+            connectionId: string;
+            status: components["schemas"]["AdapterIngressCredentialStatus"];
+            /** Format: int64 */
+            version: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AdapterIngressCredentialStatus: 0 | 1 | 2 | 3;
         AdapterIngressObservationRequest: {
             /** Format: uuid */
             operationId: string;
@@ -10338,6 +10645,21 @@ export interface components {
          * @enum {integer}
          */
         AdapterRunOutcome: 0 | 1 | 2 | 3 | 4;
+        AdapterTypeCapabilityDto: {
+            adapterType: string | null;
+            /** Format: int32 */
+            protocolVersion: number;
+            /** Format: int32 */
+            configurationSchemaVersion: number;
+            executionModes: components["schemas"]["AdapterExecutionMode"][] | null;
+            /** Format: int64 */
+            minimumPollingIntervalSeconds: number | null;
+            /** Format: int64 */
+            recommendedPollingIntervalSeconds: number | null;
+        };
+        AdapterTypeCapabilityListResponse: {
+            adapterTypes: components["schemas"]["AdapterTypeCapabilityDto"][] | null;
+        };
         ApplyGuestProcessingRestrictionRequest: {
             /** Format: uuid */
             idempotencyKey: string;
@@ -10402,7 +10724,22 @@ export interface components {
         AuthenticationSessionsResponse: {
             sessions: components["schemas"]["AuthenticationSessionResponse"][] | null;
         };
-        BedDto: {
+        BedBatchMutationReceiptDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            /** Format: int32 */
+            affectedBedCount: number;
+            /** Format: int64 */
+            roomVersion: number;
+        };
+        BedBatchWriteRequest: {
+            labels: string[] | null;
+            /** Format: int64 */
+            expectedRoomVersion: number;
+        };
+        BedListItemDto: {
             /** Format: uuid */
             bedId: string;
             /** Format: uuid */
@@ -10415,19 +10752,27 @@ export interface components {
             version: number;
             /** Format: int64 */
             roomVersion: number;
-            /** Format: date-time */
-            createdAtUtc: string;
-            /** Format: date-time */
-            updatedAtUtc: string | null;
-            /** Format: date-time */
-            retiredAtUtc: string | null;
         };
         BedListResponse: {
-            beds: components["schemas"]["BedDto"][] | null;
+            beds: components["schemas"]["BedListItemDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
+        };
+        BedMutationReceiptDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            /** Format: uuid */
+            bedId: string;
+            status: components["schemas"]["BedStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            roomVersion: number;
         };
         BedRetirementDto: {
             /** Format: uuid */
@@ -10510,6 +10855,69 @@ export interface components {
             /** Format: int32 */
             replacementLifetimeHours: number | null;
         };
+        ChangeProposalDto: {
+            /** Format: uuid */
+            proposalId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            baseReservationDetailsRevision: number;
+            reasonCode: string | null;
+            diff: string | null;
+            sensitiveHistoryStatus: components["schemas"]["SensitiveHistoryStatus"];
+            /** Format: date-time */
+            sensitiveDataRetainUntilUtc: string | null;
+            /** Format: date-time */
+            sensitiveDataRedactedAtUtc: string | null;
+            status: components["schemas"]["ChangeProposalStatus"];
+            decisionActor: string | null;
+            decisionReason: string | null;
+            /** Format: uuid */
+            productOperationId: string | null;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            decidedAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+        };
+        ChangeProposalListItemDto: {
+            /** Format: uuid */
+            proposalId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            baseReservationDetailsRevision: number;
+            reasonCode: string | null;
+            status: components["schemas"]["ChangeProposalStatus"];
+            /** Format: date-time */
+            createdAtUtc: string;
+        };
+        ChangeProposalListResponse: {
+            proposals: components["schemas"]["ChangeProposalListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        ChangeProposalMutationReceiptDto: {
+            /** Format: uuid */
+            proposalId: string;
+            status: components["schemas"]["ChangeProposalStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            productOperationId: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -10576,6 +10984,7 @@ export interface components {
             accommodationTypes: string[] | null;
             permittedDataRegions: string[] | null;
             permittedTransferProfiles: string[] | null;
+            supportsRightsResponseDeadlines: boolean;
             retentionPolicies: components["schemas"]["CountryPolicyRetentionDescriptorDto"][] | null;
             requiredAcknowledgements: components["schemas"]["PropertyGovernanceAcknowledgementDto"][] | null;
         };
@@ -10592,6 +11001,10 @@ export interface components {
             displayName: string | null;
             description: string | null;
             permissions: string[] | null;
+        };
+        CreateAdapterIngressCredentialResponse: {
+            credential: components["schemas"]["AdapterIngressCredentialDto"];
+            token: string | null;
         };
         CreateConnectionRequest: {
             adapterType: string | null;
@@ -10746,19 +11159,42 @@ export interface components {
             /** Format: date-time */
             lastChangedAtUtc: string;
             approvalEvidence: components["schemas"]["DataRightsApprovalEvidence"];
+            responseDeadlineEvidence: components["schemas"]["DataRightsResponseDeadlineEvidence"];
         };
         DataRightsCaseListResponse: {
-            items: components["schemas"]["DataRightsCaseDto"][] | null;
+            items: components["schemas"]["DataRightsCaseSummaryDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         /**
          * Format: int32
          * @enum {integer}
          */
         DataRightsCaseStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+        DataRightsCaseSummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            propertyId: string | null;
+            type: components["schemas"]["DataRightsCaseType"];
+            requesterRelationship: components["schemas"]["DataRightsRequesterRelationship"];
+            requestedOperations: components["schemas"]["DataRightsOperation"];
+            restrictionDirective: components["schemas"]["DataRightsRestrictionDirective"];
+            status: components["schemas"]["DataRightsCaseStatus"];
+            /** Format: int32 */
+            selectedSubjectCount: number;
+            /** Format: date-time */
+            dueAtUtc: string | null;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -10971,6 +11407,45 @@ export interface components {
          * @enum {integer}
          */
         DataRightsRequesterRelationship: 0 | 1 | 2 | 3 | 4;
+        DataRightsResponseDeadlineEvidence: {
+            /** Format: int32 */
+            schemaVersion: number;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int64 */
+            propertyTopologySourceVersion: number;
+            /** Format: int64 */
+            propertyPolicySourceVersion: number;
+            operatingCountryCode: string | null;
+            policyId: string | null;
+            /** Format: int32 */
+            policyVersion: number;
+            contentSha256: string | null;
+            controllingRight: components["schemas"]["DataRightsResponseDeadlineRight"];
+            ruleReference: string | null;
+            /** Format: int32 */
+            periodYears: number;
+            /** Format: int32 */
+            periodMonths: number;
+            /** Format: int32 */
+            periodDays: number;
+            timeZoneId: string | null;
+            /** Format: date-time */
+            policyEffectiveAtUtc: string;
+            /** Format: date-time */
+            policyExpiresAtUtc: string;
+            /** Format: date-time */
+            receivedAtUtc: string;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+            /** Format: date-time */
+            dueAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        DataRightsResponseDeadlineRight: 0 | 1 | 2 | 3 | 4;
         /**
          * Format: int32
          * @enum {integer}
@@ -11034,6 +11509,7 @@ export interface components {
         };
         DataRightsSubjectDiscoveryResponse: {
             candidates: components["schemas"]["DataRightsSubjectCandidate"][] | null;
+            limitReached: boolean;
         };
         /**
          * Format: int32
@@ -11185,6 +11661,37 @@ export interface components {
             preferredLanguageTag: string | null;
             notes: string | null;
         };
+        GuestListItemDto: {
+            /** Format: uuid */
+            guestId: string;
+            displayName: string | null;
+            legalName: string | null;
+            email: string | null;
+            phone: string | null;
+            nationalityCountryCode: string | null;
+            preferredLanguageTag: string | null;
+            status: components["schemas"]["GuestStatus"];
+            lastChangedBy: string | null;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
+        GuestListResponse: {
+            guests: components["schemas"]["GuestListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        GuestMutationReceiptDto: {
+            /** Format: uuid */
+            guestId: string;
+            status: components["schemas"]["GuestStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -11241,6 +11748,32 @@ export interface components {
             /** Format: date-time */
             completedAtUtc: string;
         };
+        GuestProfileDto: {
+            /** Format: uuid */
+            guestId: string;
+            /** Format: uuid */
+            originPropertyId: string;
+            displayName: string | null;
+            legalName: string | null;
+            email: string | null;
+            phone: string | null;
+            /** Format: date */
+            dateOfBirth: string | null;
+            nationalityCountryCode: string | null;
+            preferredLanguageTag: string | null;
+            notes: string | null;
+            status: components["schemas"]["GuestStatus"];
+            /** Format: int64 */
+            version: number;
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            lastChangedBy: string | null;
+            /** Format: date-time */
+            lastChangedAtUtc: string;
+            /** Format: date-time */
+            archivedAtUtc: string | null;
+        };
         GuestProfileUpdateRequest: {
             displayName: string | null;
             legalName: string | null;
@@ -11270,6 +11803,115 @@ export interface components {
          * @enum {integer}
          */
         GuestStatus: 0 | 1 | 2;
+        GuestStayHistoryItem: {
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            role: components["schemas"]["GuestStayRole"];
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            status: components["schemas"]["GuestStayStatus"];
+            /** Format: date */
+            checkedInBusinessDate: string | null;
+            /** Format: date */
+            noShowBusinessDate: string | null;
+            /** Format: date */
+            checkedOutBusinessDate: string | null;
+            isCurrentParticipant: boolean;
+            /** Format: int64 */
+            reservationVersion: number;
+        };
+        GuestStayHistoryListResponse: {
+            stays: components["schemas"]["GuestStayHistoryItem"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        GuestStayRole: 0 | 1;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        GuestStayStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        IngestionRunDto: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            propertyId: string;
+            executionKind: components["schemas"]["IngestionRunExecutionKindDto"];
+            /** Format: uuid */
+            taskRunId: string | null;
+            /** Format: int32 */
+            taskAttempt: number | null;
+            /** Format: uuid */
+            remoteLeaseId: string | null;
+            /** Format: uuid */
+            remoteClaimId: string | null;
+            /** Format: int64 */
+            remoteLeaseEpoch: number | null;
+            /** Format: uuid */
+            remoteWorkerId: string | null;
+            /** Format: date-time */
+            remoteLeaseExpiresAtUtc: string | null;
+            startingCheckpoint: string | null;
+            acceptedCheckpoint: string | null;
+            status: components["schemas"]["IngestionRunStatus"];
+            /** Format: int32 */
+            observedCount: number;
+            /** Format: int32 */
+            acceptedCount: number;
+            /** Format: int32 */
+            rejectedCount: number;
+            errorCode: string | null;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            startedAtUtc: string;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        IngestionRunExecutionKindDto: 0 | 1 | 2;
+        IngestionRunListItemDto: {
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            connectionId: string;
+            status: components["schemas"]["IngestionRunStatus"];
+            /** Format: int32 */
+            observedCount: number;
+            /** Format: int32 */
+            acceptedCount: number;
+            /** Format: int32 */
+            rejectedCount: number;
+            errorCode: string | null;
+            /** Format: date-time */
+            startedAtUtc: string;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+        };
+        IngestionRunListResponse: {
+            runs: components["schemas"]["IngestionRunListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -11396,10 +12038,13 @@ export interface components {
             /** Format: date-time */
             releasedAtUtc: string | null;
         };
-        ManualInventoryBlockGroupDto: {
+        ManualInventoryBlockGroupMutationReceiptDto: {
             /** Format: uuid */
             blockGroupId: string;
-            blocks: components["schemas"]["ManualInventoryBlockDto"][] | null;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int32 */
+            affectedBlockCount: number;
         };
         ManualInventoryBlockListResponse: {
             blocks: components["schemas"]["ManualInventoryBlockDto"][] | null;
@@ -11407,6 +12052,18 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
+        };
+        ManualInventoryBlockMutationReceiptDto: {
+            /** Format: uuid */
+            blockId: string;
+            /** Format: uuid */
+            blockGroupId: string;
+            /** Format: uuid */
+            propertyId: string;
+            status: components["schemas"]["ManualInventoryBlockStatus"];
+            /** Format: int64 */
+            version: number;
         };
         /**
          * Format: int32
@@ -11439,11 +12096,193 @@ export interface components {
             /** Format: date-time */
             recoveryCodesRegeneratedAtUtc: string | null;
         };
+        ObservationParserCapabilityDto: {
+            parserType: string | null;
+            /** Format: int32 */
+            parserVersion: number;
+            supportedAdapterTypes: string[] | null;
+            supportedSourceRecordTypes: string[] | null;
+            outputRecordTypes: string[] | null;
+        };
+        ObservationParserCapabilityListResponse: {
+            parsers: components["schemas"]["ObservationParserCapabilityDto"][] | null;
+        };
+        ObservationReceiptDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            runId: string | null;
+            /** Format: uuid */
+            operationId: string;
+            sourceRecordType: string | null;
+            externalId: string | null;
+            sourceRevision: string | null;
+            contentHash: string | null;
+            /** Format: uuid */
+            rawPayloadFileId: string;
+            rawPayloadStatus: components["schemas"]["RawPayloadRetentionStatus"];
+            /** Format: date-time */
+            rawPayloadRetainUntilUtc: string;
+            /** Format: date-time */
+            rawPayloadPurgedAtUtc: string | null;
+            /** Format: uuid */
+            activeReprocessingAttemptId: string | null;
+            /** Format: date-time */
+            reprocessingReservationExpiresAtUtc: string | null;
+            /** Format: uuid */
+            sourceReceiptId: string | null;
+            /** Format: uuid */
+            reprocessingAttemptId: string | null;
+            parserType: string | null;
+            /** Format: int32 */
+            parserVersion: number | null;
+            /** Format: int32 */
+            parserOutputIndex: number | null;
+            /** Format: date-time */
+            sourceUpdatedAtUtc: string | null;
+            /** Format: date-time */
+            observedAtUtc: string;
+            status: components["schemas"]["ObservationReceiptStatus"];
+            rejectionReason: string | null;
+            /** Format: date-time */
+            receivedAtUtc: string;
+            /** Format: date-time */
+            processedAtUtc: string | null;
+            /** Format: uuid */
+            ingressCredentialId: string | null;
+            adapterType: string | null;
+            /** Format: int32 */
+            adapterProtocolVersion: number | null;
+            /** Format: int32 */
+            configurationSchemaVersion: number | null;
+            sourceSystem: string | null;
+            customerOwner: string | null;
+        };
+        ObservationReceiptListItemDto: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            connectionId: string;
+            sourceRecordType: string | null;
+            externalId: string | null;
+            parserType: string | null;
+            /** Format: int32 */
+            parserVersion: number | null;
+            status: components["schemas"]["ObservationReceiptStatus"];
+            /** Format: date-time */
+            receivedAtUtc: string;
+        };
+        ObservationReceiptListResponse: {
+            receipts: components["schemas"]["ObservationReceiptListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
         /**
          * Format: int32
          * @enum {integer}
          */
         ObservationReceiptStatus: 0 | 1 | 2 | 3;
+        ObservationReprocessingAttemptDetailsDto: {
+            attempt: components["schemas"]["ObservationReprocessingAttemptDto"];
+            outputs: components["schemas"]["ObservationReprocessingOutputDto"][] | null;
+        };
+        ObservationReprocessingAttemptDto: {
+            /** Format: uuid */
+            attemptId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            sourceReceiptId: string;
+            /** Format: uuid */
+            taskRunId: string;
+            parserType: string | null;
+            /** Format: int32 */
+            parserVersion: number;
+            requestedBy: string | null;
+            status: components["schemas"]["ObservationReprocessingStatus"];
+            /** Format: int32 */
+            lastTaskAttempt: number;
+            /** Format: int32 */
+            parsedCount: number;
+            /** Format: int32 */
+            acceptedCount: number;
+            /** Format: int32 */
+            duplicateCount: number;
+            /** Format: int32 */
+            rejectedCount: number;
+            lastErrorCode: string | null;
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            startedAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+            /** Format: date-time */
+            reservationExpiresAtUtc: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ObservationReprocessingAttemptListItemDto: {
+            /** Format: uuid */
+            attemptId: string;
+            parserType: string | null;
+            /** Format: int32 */
+            parserVersion: number;
+            status: components["schemas"]["ObservationReprocessingStatus"];
+            /** Format: int32 */
+            parsedCount: number;
+            /** Format: int32 */
+            acceptedCount: number;
+            /** Format: int32 */
+            duplicateCount: number;
+            /** Format: int32 */
+            rejectedCount: number;
+            lastErrorCode: string | null;
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            startedAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+        };
+        ObservationReprocessingAttemptListResponse: {
+            attempts: components["schemas"]["ObservationReprocessingAttemptListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        ObservationReprocessingOutputDto: {
+            /** Format: int32 */
+            outputIndex: number;
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            receiptId: string | null;
+            status: components["schemas"]["ObservationReprocessingOutputStatus"];
+            recordType: string | null;
+            externalId: string | null;
+            sourceRevision: string | null;
+            contentHash: string | null;
+            errorCode: string | null;
+            /** Format: date-time */
+            recordedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ObservationReprocessingOutputStatus: 0 | 1 | 2 | 3;
         /**
          * Format: int32
          * @enum {integer}
@@ -11725,12 +12564,32 @@ export interface components {
             activatedAtUtc: string;
             acknowledgements: components["schemas"]["PropertyGovernanceAcknowledgementDto"][] | null;
         };
+        PropertyListItemDto: {
+            /** Format: uuid */
+            propertyId: string;
+            name: string | null;
+            code: string | null;
+            timeZoneId: string | null;
+            status: components["schemas"]["PropertyStatus"];
+            processingStatus: components["schemas"]["PropertyProcessingStatus"];
+            /** Format: int64 */
+            version: number;
+        };
         PropertyListResponse: {
-            properties: components["schemas"]["PropertyDto"][] | null;
+            properties: components["schemas"]["PropertyListItemDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
+        };
+        PropertyMutationReceiptDto: {
+            /** Format: uuid */
+            propertyId: string;
+            status: components["schemas"]["PropertyStatus"];
+            processingStatus: components["schemas"]["PropertyProcessingStatus"];
+            /** Format: int64 */
+            version: number;
         };
         /** @enum {string} */
         PropertyProcessingEffectiveStatus: "unconfigured" | "enabled" | "suspended" | "expired" | "revoked";
@@ -11757,6 +12616,11 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RawPayloadRetentionStatus: 0 | 1 | 2 | 3;
         ReassignReservationInventoryRequest: {
             /** Format: uuid */
             amendmentRequestId: string;
@@ -11917,6 +12781,56 @@ export interface components {
          * @enum {integer}
          */
         ReservationDetailsChangeOriginKind: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        ReservationDetailsHistoryItem: {
+            /** Format: uuid */
+            changeId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: int64 */
+            fromRevision: number;
+            /** Format: int64 */
+            toRevision: number;
+            origin: components["schemas"]["ReservationDetailsChangeOriginKind"];
+            actorId: string | null;
+            /** Format: uuid */
+            adapterConnectionId: string | null;
+            /** Format: uuid */
+            externalOperationId: string | null;
+            /** Format: uuid */
+            correlationId: string;
+            changedFields: string[] | null;
+            before: components["schemas"]["ReservationDetailsSnapshotDto"];
+            after: components["schemas"]["ReservationDetailsSnapshotDto"];
+            /** Format: date-time */
+            occurredAtUtc: string;
+        };
+        ReservationDetailsHistoryListResponse: {
+            items: components["schemas"]["ReservationDetailsHistoryItem"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+        };
+        ReservationDetailsSnapshotDto: {
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
+            inventoryUnitIds: string[] | null;
+            primaryGuestName: string | null;
+            email: string | null;
+            phone: string | null;
+            /** Format: int32 */
+            guestCount: number;
+            notes: string | null;
+        };
         ReservationDto: {
             /** Format: uuid */
             reservationId: string;
@@ -11990,19 +12904,50 @@ export interface components {
          * @enum {integer}
          */
         ReservationGuestRoleKind: 0 | 1;
+        ReservationListItemDto: {
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
+            primaryGuestName: string | null;
+            /** Format: int32 */
+            guestCount: number;
+            /** Format: int32 */
+            inventoryUnitCount: number;
+            sourceKind: components["schemas"]["ReservationSourceKind"];
+            status: components["schemas"]["ReservationStatus"];
+        };
         /**
          * Format: int32
          * @enum {integer}
          */
         ReservationListOrder: 0 | 1 | 2 | 3;
         ReservationListResponse: {
-            reservations: components["schemas"]["ReservationDto"][] | null;
+            reservations: components["schemas"]["ReservationListItemDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
-            /** Format: int32 */
-            totalCount: number;
+            hasMore: boolean;
+        };
+        ReservationMutationReceiptDto: {
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            status: components["schemas"]["ReservationStatus"];
+            /** Format: int64 */
+            detailsRevision: number;
+            /** Format: int64 */
+            version: number;
         };
         /**
          * Format: int32
@@ -12032,6 +12977,8 @@ export interface components {
             /** Format: int32 */
             executionPolicyVersion: number;
             status: components["schemas"]["RetentionExecutionStatus"];
+            /** Format: uuid */
+            lastRunId: string | null;
             /** Format: date-time */
             lastStartedAtUtc: string | null;
             /** Format: date-time */
@@ -12053,6 +13000,22 @@ export interface components {
         };
         RetentionScheduleHealthListResponse: {
             items: components["schemas"]["RetentionScheduleHealthDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
+            summary: components["schemas"]["RetentionScheduleHealthSummaryDto"];
+        };
+        RetentionScheduleHealthSummaryDto: {
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            healthy: number;
+            /** Format: int32 */
+            running: number;
+            /** Format: int32 */
+            needsAttention: number;
         };
         /**
          * Format: int32
@@ -12140,13 +13103,45 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
+        };
+        RoomInventoryMutationReceiptDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            salesMode: components["schemas"]["InventorySalesMode"];
+            /** Format: int64 */
+            version: number;
+        };
+        RoomListItemDto: {
+            /** Format: uuid */
+            roomId: string;
+            /** Format: uuid */
+            propertyId: string;
+            name: string | null;
+            buildingLabel: string | null;
+            floorLabel: string | null;
+            status: components["schemas"]["RoomStatus"];
+            /** Format: int64 */
+            version: number;
         };
         RoomListResponse: {
-            rooms: components["schemas"]["RoomDto"][] | null;
+            rooms: components["schemas"]["RoomListItemDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
+        };
+        RoomMutationReceiptDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            status: components["schemas"]["RoomStatus"];
+            /** Format: int64 */
+            version: number;
         };
         RoomRetirementDto: {
             /** Format: uuid */
@@ -12195,6 +13190,11 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        SensitiveHistoryStatus: 0 | 1 | 2;
         SetNotificationPreferenceRequest: {
             enabled: boolean;
         };
@@ -12328,12 +13328,25 @@ export interface components {
             /** Format: date */
             effectiveFrom: string;
         };
+        StaffDirectoryListItemDto: {
+            /** Format: uuid */
+            staffMemberId: string;
+            displayName: string | null;
+            jobTitle: string | null;
+            department: string | null;
+            status: components["schemas"]["StaffStatus"];
+            /** Format: int64 */
+            version: number;
+            /** Format: int32 */
+            currentPropertyCount: number;
+        };
         StaffDirectoryListResponse: {
-            items: components["schemas"]["StaffDirectoryMemberDto"][] | null;
+            items: components["schemas"]["StaffDirectoryListItemDto"][] | null;
             /** Format: int32 */
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         StaffDirectoryMemberDto: {
             /** Format: uuid */
@@ -12473,6 +13486,25 @@ export interface components {
             assignedAtVersion: number;
             /** Format: int64 */
             unassignedAtVersion: number | null;
+        };
+        StaffPropertyDirectoryListItemDto: {
+            /** Format: uuid */
+            staffMemberId: string;
+            displayName: string | null;
+            jobTitle: string | null;
+            department: string | null;
+            status: components["schemas"]["StaffStatus"];
+            /** Format: int64 */
+            version: number;
+            assignment: components["schemas"]["StaffDirectoryAssignmentDto"];
+        };
+        StaffPropertyDirectoryListResponse: {
+            items: components["schemas"]["StaffPropertyDirectoryListItemDto"][] | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            hasMore: boolean;
         };
         /**
          * Format: int32
@@ -12825,6 +13857,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         /**
          * Format: int32

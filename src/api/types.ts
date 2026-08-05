@@ -203,11 +203,15 @@ export type RetentionScheduleHealth = NonNullableFields<
   "ownerKey" | "dataClassKey"
 >;
 
+export type RetentionScheduleHealthSummary =
+  Schema<"RetentionScheduleHealthSummaryDto">;
+
 export type RetentionScheduleHealthListResponse = Omit<
   Schema<"RetentionScheduleHealthListResponse">,
-  "items"
+  "items" | "summary"
 > & {
   items: RetentionScheduleHealth[];
+  summary: RetentionScheduleHealthSummary;
 };
 
 export type PropertyProcessingStatus = Schema<"PropertyProcessingStatus">;
@@ -233,7 +237,7 @@ export type PropertyGovernancePolicyBinding = Omit<
   acknowledgements: PropertyGovernanceAcknowledgement[];
 };
 
-export type Property = Omit<
+export type PropertyDetail = Omit<
   NonNullableFields<
     Schema<"PropertyDto">,
     "name" | "code" | "timeZoneId" | "status" | "processingStatus"
@@ -242,6 +246,13 @@ export type Property = Omit<
 > & {
   governancePolicy: PropertyGovernancePolicyBinding | null;
 };
+
+export type Property = NonNullableFields<
+  Schema<"PropertyListItemDto">,
+  "name" | "code" | "timeZoneId" | "status" | "processingStatus"
+>;
+
+export type PropertyMutationReceipt = Schema<"PropertyMutationReceiptDto">;
 
 export type PropertyProcessingState = Omit<
   NonNullableFields<Schema<"PropertyProcessingStateDto">, "reasonCode">,
@@ -285,13 +296,20 @@ export type PropertyListResponse = Omit<Schema<"PropertyListResponse">, "propert
   properties: Property[];
 };
 
-export type Room = NonNullableFields<Schema<"RoomDto">, "name" | "status">;
+export type RoomDetail = NonNullableFields<Schema<"RoomDto">, "name" | "status">;
+
+export type Room = NonNullableFields<Schema<"RoomListItemDto">, "name" | "status">;
+
+export type RoomMutationReceipt = Schema<"RoomMutationReceiptDto">;
 
 export type RoomListResponse = Omit<Schema<"RoomListResponse">, "rooms"> & {
   rooms: Room[];
 };
 
-export type Bed = NonNullableFields<Schema<"BedDto">, "label" | "status">;
+export type Bed = NonNullableFields<Schema<"BedListItemDto">, "label" | "status">;
+
+export type BedMutationReceipt = Schema<"BedMutationReceiptDto">;
+export type BedBatchMutationReceipt = Schema<"BedBatchMutationReceiptDto">;
 
 export type BedListResponse = Omit<Schema<"BedListResponse">, "beds"> & {
   beds: Bed[];
@@ -318,6 +336,8 @@ export type RoomInventory = Omit<
 export type RoomInventoryListResponse = Omit<Schema<"RoomInventoryListResponse">, "rooms"> & {
   rooms: RoomInventory[];
 };
+
+export type RoomInventoryMutationReceipt = Schema<"RoomInventoryMutationReceiptDto">;
 
 export type RoomInventoryChangeImpact = Omit<
   Schema<"RoomInventoryChangeImpactDto">,
@@ -357,9 +377,13 @@ export type ManualBlockListResponse = Omit<Schema<"ManualInventoryBlockListRespo
   blocks: ManualBlock[];
 };
 
-export type ManualBlockGroup = Omit<Schema<"ManualInventoryBlockGroupDto">, "blocks"> & {
+export type ManualBlockGroup = {
+  blockGroupId: string;
   blocks: ManualBlock[];
 };
+
+export type ManualBlockMutationReceipt = Schema<"ManualInventoryBlockMutationReceiptDto">;
+export type ManualBlockGroupMutationReceipt = Schema<"ManualInventoryBlockGroupMutationReceiptDto">;
 
 export type ReservationStatus = Schema<"ReservationStatus">
   | "pendingAllocation"
@@ -395,8 +419,20 @@ export type Reservation = Omit<
   guests: ReservationGuest[];
 };
 
+export type ReservationListItem = Omit<
+  NonNullableFields<Schema<"ReservationListItemDto">, "primaryGuestName">,
+  "status" | "sourceKind"
+> & {
+  status: ReservationStatus;
+  sourceKind: ReservationSourceKind;
+};
+
 export type ReservationListResponse = Omit<Schema<"ReservationListResponse">, "reservations"> & {
-  reservations: Reservation[];
+  reservations: ReservationListItem[];
+};
+
+export type ReservationMutationReceipt = Omit<Schema<"ReservationMutationReceiptDto">, "status"> & {
+  status: ReservationStatus;
 };
 
 export type ReservationDetailsSnapshot = {
@@ -429,6 +465,13 @@ export type ReservationDetailsHistoryItem = {
   occurredAtUtc: string;
 };
 
+export type ReservationDetailsHistoryListResponse = Omit<
+  Schema<"ReservationDetailsHistoryListResponse">,
+  "items"
+> & {
+  items: ReservationDetailsHistoryItem[];
+};
+
 export type DataRightsCaseStatus = Schema<"DataRightsCaseStatus">;
 export type DataRightsCaseType = Schema<"DataRightsCaseType">;
 export type DataRightsDecisionOutcome = Schema<"DataRightsDecisionOutcome">;
@@ -440,12 +483,25 @@ export type DataRightsExportArtifactStatus = Schema<"DataRightsExportArtifactSta
 export type DataRightsOperation = Schema<"DataRightsOperation">;
 export type DataRightsRestrictionDirective = Schema<"DataRightsRestrictionDirective">;
 export type DataRightsRequesterRelationship = Schema<"DataRightsRequesterRelationship">;
+export type DataRightsResponseDeadlineEvidence = NonNullableFields<
+  Schema<"DataRightsResponseDeadlineEvidence">,
+  | "operatingCountryCode"
+  | "policyId"
+  | "contentSha256"
+  | "ruleReference"
+  | "timeZoneId"
+>;
 
-export type DataRightsCase = Omit<Schema<"DataRightsCaseDto">, "approvalEvidence"> & {
+export type DataRightsCase = Omit<
+  Schema<"DataRightsCaseDto">,
+  "approvalEvidence" | "responseDeadlineEvidence"
+> & {
   approvalEvidence: Schema<"DataRightsApprovalEvidence"> | null;
+  responseDeadlineEvidence: DataRightsResponseDeadlineEvidence | null;
 };
+export type DataRightsCaseSummary = Schema<"DataRightsCaseSummaryDto">;
 export type DataRightsCaseListResponse = Omit<Schema<"DataRightsCaseListResponse">, "items"> & {
-  items: DataRightsCase[];
+  items: DataRightsCaseSummary[];
 };
 export type DataRightsSubjectCoordinate = NonNullableFields<
   Schema<"DataRightsSubjectCoordinate">,
@@ -557,11 +613,31 @@ export type GuestProfile = {
   archivedAtUtc?: string | null;
 };
 
+export type GuestListItem = Pick<
+  GuestProfile,
+  | "guestId"
+  | "displayName"
+  | "legalName"
+  | "email"
+  | "phone"
+  | "nationalityCountryCode"
+  | "preferredLanguageTag"
+  | "status"
+  | "lastChangedBy"
+  | "lastChangedAtUtc"
+>;
+
 export type GuestListResponse = {
-  guests: GuestProfile[];
+  guests: GuestListItem[];
   page: number;
   pageSize: number;
+  hasMore: boolean;
 };
+
+export type GuestMutationReceipt = Pick<
+  GuestProfile,
+  "guestId" | "status" | "version" | "lastChangedAtUtc"
+>;
 
 export type GuestStayRole = 0 | 1 | "unknown" | "primary" | string;
 export type GuestStayStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | string;
@@ -578,6 +654,13 @@ export type GuestStayHistoryItem = {
   checkedOutBusinessDate?: string | null;
   isCurrentParticipant: boolean;
   reservationVersion: number;
+};
+
+export type GuestStayHistoryListResponse = {
+  stays: GuestStayHistoryItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 };
 
 export type StaffStatus = Schema<"StaffStatus"> | "active" | "suspended" | "departed";
@@ -614,6 +697,26 @@ export type StaffDirectoryMember = {
   assignments: StaffDirectoryAssignment[];
 };
 
+export type StaffDirectoryListItem = {
+  staffMemberId: string;
+  displayName: string;
+  jobTitle?: string | null;
+  department?: string | null;
+  status: StaffStatus;
+  version: number;
+  currentPropertyCount: number;
+};
+
+export type StaffPropertyDirectoryListItem = {
+  staffMemberId: string;
+  displayName: string;
+  jobTitle?: string | null;
+  department?: string | null;
+  status: StaffStatus;
+  version: number;
+  assignment: StaffDirectoryAssignment;
+};
+
 export type StaffMember = {
   staffMemberId: string;
   displayName: string;
@@ -634,9 +737,17 @@ export type StaffMember = {
 };
 
 export type StaffDirectoryListResponse = {
-  items: StaffDirectoryMember[];
+  items: StaffDirectoryListItem[];
   page: number;
   pageSize: number;
+  hasMore: boolean;
+};
+
+export type StaffPropertyDirectoryListResponse = {
+  items: StaffPropertyDirectoryListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 };
 
 export type AdapterExecutionMode = Schema<"AdapterExecutionMode"> | "polling" | "continuous" | "push" | "remotePolling";
@@ -661,7 +772,17 @@ export type AdapterConnection = {
   updatedAtUtc?: string | null;
 };
 
-export type AdapterConnectionListResponse = { connections: AdapterConnection[]; page: number; pageSize: number; totalCount: number };
+export type AdapterConnectionListItem = Pick<
+  AdapterConnection,
+  "connectionId" | "adapterType" | "executionMode" | "pollingIntervalSeconds" | "conflictPolicy" | "status"
+>;
+export type AdapterConnectionListResponse = {
+  connections: AdapterConnectionListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+export type AdapterConnectionMutationReceipt = Pick<AdapterConnection, "connectionId" | "status" | "version">;
 
 export type AdapterTypeCapability = {
   adapterType: string;
@@ -722,11 +843,24 @@ export type AdapterIngressCredential = {
   lastAuthenticatedAtUtc?: string | null;
   version: number;
 };
-export type AdapterIngressCredentialListResponse = { credentials: AdapterIngressCredential[]; page: number; pageSize: number; totalCount: number };
+export type AdapterIngressCredentialListItem = Pick<
+  AdapterIngressCredential,
+  "credentialId" | "slot" | "label" | "status" | "expiresAtUtc" | "lastAuthenticatedAtUtc" | "version"
+>;
+export type AdapterIngressCredentialListResponse = {
+  credentials: AdapterIngressCredentialListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+export type AdapterIngressCredentialMutationReceipt = Pick<
+  AdapterIngressCredential,
+  "credentialId" | "connectionId" | "status" | "version"
+>;
 export type CreateAdapterIngressCredentialResponse = { credential: AdapterIngressCredential; token: string };
 
 export type ChangeProposalStatus = Schema<"ChangeProposalStatus"> | "pending" | "applying" | "applied" | "rejected" | "superseded" | "stale" | "failed";
-export type ChangeProposalSummary = {
+export type ChangeProposal = {
   proposalId: string;
   propertyId: string;
   connectionId: string;
@@ -745,9 +879,22 @@ export type ChangeProposalSummary = {
   createdAtUtc: string;
   decidedAtUtc?: string | null;
   completedAtUtc?: string | null;
+  diff?: string | null;
 };
-export type ChangeProposal = ChangeProposalSummary & { diff?: string | null };
-export type ChangeProposalListResponse = { proposals: ChangeProposalSummary[]; page: number; pageSize: number; totalCount: number };
+export type ChangeProposalListItem = Pick<
+  ChangeProposal,
+  "proposalId" | "reservationId" | "baseReservationDetailsRevision" | "reasonCode" | "status" | "createdAtUtc"
+>;
+export type ChangeProposalListResponse = {
+  proposals: ChangeProposalListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+export type ChangeProposalMutationReceipt = Pick<
+  ChangeProposal,
+  "proposalId" | "status" | "version" | "productOperationId"
+>;
 
 export type IngestionRunStatus = Schema<"IngestionRunStatus"> | "running" | "succeeded" | "partiallySucceeded" | "failed" | "cancelled";
 export type IngestionRun = {
@@ -773,7 +920,16 @@ export type IngestionRun = {
   startedAtUtc: string;
   completedAtUtc?: string | null;
 };
-export type IngestionRunListResponse = { runs: IngestionRun[]; page: number; pageSize: number; totalCount: number };
+export type IngestionRunListItem = Pick<
+  IngestionRun,
+  "runId" | "connectionId" | "status" | "observedCount" | "acceptedCount" | "rejectedCount" | "errorCode" | "startedAtUtc" | "completedAtUtc"
+>;
+export type IngestionRunListResponse = {
+  runs: IngestionRunListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
 
 export type ObservationReceiptStatus = Schema<"ObservationReceiptStatus"> | "pending" | "processed" | "rejected";
 export type ObservationReceipt = {
@@ -804,7 +960,16 @@ export type ObservationReceipt = {
   receivedAtUtc: string;
   processedAtUtc?: string | null;
 };
-export type ObservationReceiptListResponse = { receipts: ObservationReceipt[]; page: number; pageSize: number; totalCount: number };
+export type ObservationReceiptListItem = Pick<
+  ObservationReceipt,
+  "receiptId" | "connectionId" | "sourceRecordType" | "externalId" | "parserType" | "parserVersion" | "status" | "receivedAtUtc"
+>;
+export type ObservationReceiptListResponse = {
+  receipts: ObservationReceiptListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
 
 export type ObservationParserCapability = { parserType: string; parserVersion: number; supportedAdapterTypes: string[]; supportedSourceRecordTypes: string[]; outputRecordTypes: string[] };
 export type ObservationParserCapabilityListResponse = { parsers: ObservationParserCapability[] };
@@ -834,7 +999,16 @@ export type ObservationReprocessingAttempt = {
 };
 export type ObservationReprocessingOutput = { outputIndex: number; operationId: string; receiptId?: string | null; status: number | string; recordType: string; externalId: string; sourceRevision?: string | null; contentHash: string; errorCode?: string | null; recordedAtUtc: string };
 export type ObservationReprocessingAttemptDetails = { attempt: ObservationReprocessingAttempt; outputs: ObservationReprocessingOutput[] };
-export type ObservationReprocessingAttemptListResponse = { attempts: ObservationReprocessingAttempt[]; page: number; pageSize: number; totalCount: number };
+export type ObservationReprocessingAttemptListItem = Pick<
+  ObservationReprocessingAttempt,
+  "attemptId" | "parserType" | "parserVersion" | "status" | "parsedCount" | "acceptedCount" | "duplicateCount" | "rejectedCount" | "lastErrorCode" | "requestedAtUtc" | "startedAtUtc" | "completedAtUtc"
+>;
+export type ObservationReprocessingAttemptListResponse = {
+  attempts: ObservationReprocessingAttemptListItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
 
 export type NotificationSeverity = 0 | 1 | 2 | 3 | 4 | "info" | "success" | "warning" | "error" | string;
 export type NotificationHistoryItem = {

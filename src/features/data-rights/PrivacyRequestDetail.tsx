@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
+  Clock3,
   FileOutput,
   FileLock2,
   PencilLine,
   Search,
   ShieldCheck,
+  TriangleAlert,
   UserCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +41,8 @@ import {
   dataRightsCasesPath,
   dataRightsOperationKind,
   dataRightsRequestLabel,
+  dataRightsResponseDeadlineRightLabel,
+  dataRightsResponseDeadlineState,
   dataRightsRequesterLabel,
   dataRightsScopeKey,
   shortDataRightsCaseId,
@@ -450,6 +454,7 @@ function RequestSummary({
           <p className="mt-2 text-xs text-base-content/45">Case version {dataRightsCase.version}</p>
         </div>
       </div>
+      <ResponseDeadlineSummary dataRightsCase={dataRightsCase} />
       {execution && (
         <div className="mt-4 border-t border-base-300 pt-4 text-sm">
           <div className="flex items-center justify-between gap-4">
@@ -489,6 +494,127 @@ function RequestSummary({
       )}
     </section>
   );
+}
+
+function ResponseDeadlineSummary({ dataRightsCase }: { dataRightsCase: DataRightsCase }) {
+  const state = dataRightsResponseDeadlineState(dataRightsCase);
+  if (state === "not-applicable") return null;
+
+  const evidence = dataRightsCase.responseDeadlineEvidence;
+  if (state === "pending") {
+    return (
+      <div className="mt-4 flex items-start gap-3 border-t border-warning/30 pt-4 text-sm">
+        <TriangleAlert size={18} className="mt-0.5 shrink-0 text-warning-content" />
+        <div>
+          <p className="font-semibold">Response deadline policy pending</p>
+          <p className="mt-1 text-base-content/60">
+            Routing stays paused until this property has a deadline-ready country policy binding.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const dueAtUtc = dataRightsCase.dueAtUtc;
+  if (!dueAtUtc) return null;
+
+  const stateLabel = state === "overdue"
+    ? "Overdue"
+    : state === "due-soon"
+      ? "Due soon"
+      : state === "closed"
+        ? "Deadline recorded"
+        : "On schedule";
+  const stateClassName = state === "overdue"
+    ? "bg-error/10 text-error"
+    : state === "due-soon"
+      ? "bg-warning/15 text-warning-content"
+      : "bg-success/10 text-success";
+
+  return (
+    <div className="mt-4 border-t border-base-300 pt-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <Clock3 size={18} className="mt-0.5 shrink-0 text-primary" />
+          <div>
+            <p className="font-semibold">Response deadline</p>
+            <p className="mt-1 text-base-content/60">
+              {formatDeadlineDateTime(
+                dueAtUtc,
+                evidence?.timeZoneId,
+              )}
+            </p>
+          </div>
+        </div>
+        <span className={`rounded-md px-2 py-1 text-xs font-semibold ${stateClassName}`}>
+          {stateLabel}
+        </span>
+      </div>
+
+      {evidence && (
+        <>
+          <dl className="mt-4 grid gap-x-5 gap-y-3 border-t border-base-300 pt-4 sm:grid-cols-2">
+            <DeadlineCoordinate
+              label="Controlling right"
+              value={dataRightsResponseDeadlineRightLabel(Number(evidence.controllingRight))}
+            />
+            <DeadlineCoordinate
+              label="Response period"
+              value={responsePeriodLabel(evidence.periodYears, evidence.periodMonths, evidence.periodDays)}
+            />
+            <DeadlineCoordinate
+              label="Country policy"
+              value={`${evidence.operatingCountryCode} - ${evidence.policyId} v${evidence.policyVersion}`}
+            />
+            <DeadlineCoordinate label="Policy time zone" value={evidence.timeZoneId} />
+          </dl>
+          <details className="mt-3 border-t border-base-300 pt-3 text-xs text-base-content/55">
+            <summary className="cursor-pointer font-semibold text-base-content/70">
+              Deadline evidence
+            </summary>
+            <p className="mt-2 leading-5">
+              Rule {evidence.ruleReference}. Evaluated {formatDateTime(evidence.evaluatedAtUtc)}
+              {` from property topology revision ${evidence.propertyTopologySourceVersion} and policy revision ${evidence.propertyPolicySourceVersion}.`}
+            </p>
+          </details>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DeadlineCoordinate({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold text-base-content/45">{label}</dt>
+      <dd className="mt-1 font-medium text-base-content/75">{value}</dd>
+    </div>
+  );
+}
+
+function responsePeriodLabel(years: number, months: number, days: number): string {
+  const parts = [
+    years > 0 ? `${years} ${years === 1 ? "year" : "years"}` : null,
+    months > 0 ? `${months} ${months === 1 ? "month" : "months"}` : null,
+    days > 0 ? `${days} ${days === 1 ? "day" : "days"}` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.join(", ");
+}
+
+function formatDeadlineDateTime(value: string, timeZoneId?: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: timeZoneId,
+      timeZoneName: "short",
+    }).format(new Date(value));
+  } catch {
+    return formatDateTime(value);
+  }
 }
 
 function WorkflowProgress({

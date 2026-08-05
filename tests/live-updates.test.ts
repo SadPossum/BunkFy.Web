@@ -70,4 +70,17 @@ describe("operational notification invalidation", () => {
       ["beds", "property-2"],
     ]);
   });
+
+  it.each([
+    "data-rights-response-deadline-due-soon",
+    "data-rights-response-deadline-overdue",
+  ])("targets only the affected privacy-request queue and case for %s", (name) => {
+    expect(operationalNotificationQueryKeys({
+      name,
+      payload: { propertyId: "property-3", caseId: "case-3" },
+    })).toEqual([
+      ["data-rights-cases", "guest:property-3"],
+      ["data-rights-case", "guest:property-3", "case-3"],
+    ]);
+  });
 });

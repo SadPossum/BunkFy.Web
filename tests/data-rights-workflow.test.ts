@@ -17,6 +17,8 @@ import {
   dataRightsExecutionNeedsLiveRefresh,
   dataRightsCasesPath,
   dataRightsOperationKind,
+  dataRightsResponseDeadlineRightLabel,
+  dataRightsResponseDeadlineState,
   dataRightsScopeKey,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
@@ -215,6 +217,47 @@ describe("privacy request workflow", () => {
     expect(dataRightsExportNeedsLiveRefresh(3)).toBe(false);
   });
 
+  it("classifies only external guest response deadlines and closes urgency with the case", () => {
+    const now = new Date("2026-07-25T10:00:00Z");
+
+    expect(dataRightsResponseDeadlineState(dataRightsCase({
+      type: 1,
+      requesterRelationship: 1,
+      dueAtUtc: null,
+    }), now)).toBe("pending");
+    expect(dataRightsResponseDeadlineState(dataRightsCase({
+      type: 1,
+      requesterRelationship: 2,
+      dueAtUtc: "2026-07-26T09:00:00Z",
+    }), now)).toBe("due-soon");
+    expect(dataRightsResponseDeadlineState(dataRightsCase({
+      type: 1,
+      requesterRelationship: 1,
+      dueAtUtc: "2026-07-25T09:00:00Z",
+    }), now)).toBe("overdue");
+    expect(dataRightsResponseDeadlineState(dataRightsCase({
+      type: 1,
+      requesterRelationship: 1,
+      status: 9,
+      dueAtUtc: "2026-07-25T09:00:00Z",
+    }), now)).toBe("closed");
+    expect(dataRightsResponseDeadlineState(dataRightsCase({
+      type: 1,
+      requesterRelationship: 3,
+      dueAtUtc: null,
+    }), now)).toBe("not-applicable");
+    expect(dataRightsResponseDeadlineState(dataRightsCase({
+      type: 3,
+      requesterRelationship: 1,
+      dueAtUtc: null,
+    }), now)).toBe("not-applicable");
+  });
+
+  it("labels the immutable controlling response right", () => {
+    expect(dataRightsResponseDeadlineRightLabel(1)).toBe("Access and export");
+    expect(dataRightsResponseDeadlineRightLabel(4)).toBe("Erasure");
+  });
+
   it("formats safe operator labels without exposing coordinates", () => {
     expect(dataRightsCaseStatusLabel(3)).toBe("Review required");
     expect(dataRightsExportStatusLabel(3)).toBe("Available");
@@ -278,6 +321,7 @@ function dataRightsCase(overrides: Partial<DataRightsCase>): DataRightsCase {
     createdAtUtc: "2026-07-25T10:00:00Z",
     lastChangedAtUtc: "2026-07-25T10:00:00Z",
     approvalEvidence: null,
+    responseDeadlineEvidence: null,
     ...overrides,
   };
 }

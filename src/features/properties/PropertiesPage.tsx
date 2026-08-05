@@ -2,7 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BedDouble, Building2, Edit3, Layers3, MapPin, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
-import type { Bed, BedListResponse, BedRetirement, Property, Room, RoomListResponse, RoomRetirement, TopologyRetirement } from "../../api/types";
+import type {
+  Bed,
+  BedBatchMutationReceipt,
+  BedMutationReceipt,
+  BedRetirement,
+  Property,
+  PropertyMutationReceipt,
+  Room,
+  RoomMutationReceipt,
+  RoomRetirement,
+  TopologyRetirement,
+} from "../../api/types";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, topologyRetirementNeedsLiveRefresh } from "../../app/liveUpdates";
 import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
@@ -17,6 +28,7 @@ import {
   timeZoneDescription,
   timeZoneLabel,
 } from "./propertyFormOptions";
+import { loadAllBeds, loadAllRooms } from "./propertiesApi";
 import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
 import { TopologyRetirementModal, type RetirementTarget } from "./TopologyRetirementModal";
 
@@ -24,6 +36,7 @@ type PropertyFormState = { property?: Property } | null;
 type RoomFormState = { room?: Room } | null;
 type BedFormState = { bed?: Bed } | null;
 type BedMutationInput = { bed?: Bed; labels: string[] };
+type BedMutationResult = BedMutationReceipt | BedBatchMutationReceipt;
 type RetirementMutationInput = { target: RetirementTarget; reason: string };
 const emptyBeds: Bed[] = [];
 
@@ -63,14 +76,14 @@ export function PropertiesPage() {
 
   const rooms = useQuery({
     queryKey: ["rooms", selectedPropertyId],
-    queryFn: () => request<RoomListResponse>(`/api/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`),
+    queryFn: (context) => loadAllRooms(request, selectedPropertyId, context.signal),
     enabled: Boolean(selectedPropertyId),
   });
   const roomItems = rooms.data?.rooms ?? [];
   const selectedRoom = roomItems.find((room) => room.roomId === selectedRoomId) ?? roomItems[0] ?? null;
   const beds = useQuery({
     queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId],
-    queryFn: () => request<BedListResponse>(`/api/properties/${selectedPropertyId}/rooms/${selectedRoom?.roomId}/beds?page=1&pageSize=100`),
+    queryFn: (context) => loadAllBeds(request, selectedPropertyId, selectedRoom!.roomId, context.signal),
     enabled: Boolean(selectedPropertyId && selectedRoom),
   });
   const bedItems = beds.data?.beds ?? emptyBeds;
@@ -123,14 +136,14 @@ export function PropertiesPage() {
   };
 
   const propertyMutation = useMutation({
-    mutationFn: async (input: { property?: Property; name: string; code: string; timeZoneId: string }) => request<Property>(input.property ? `/api/properties/${input.property.propertyId}` : "/api/properties/", {
+    mutationFn: async (input: { property?: Property; name: string; code: string; timeZoneId: string }) => request<PropertyMutationReceipt>(input.property ? `/api/properties/${input.property.propertyId}` : "/api/properties/", {
       method: input.property ? "PUT" : "POST",
       body: JSON.stringify({ name: input.name, code: input.code, timeZoneId: input.timeZoneId, ...(input.property ? { expectedVersion: input.property.version } : {}) }),
     }),
     onSuccess: async (property) => { await invalidateProperty(); workspace.setSelectedPropertyId(property.propertyId); setPropertyForm(null); },
   });
   const roomMutation = useMutation({
-    mutationFn: async (input: { room?: Room; name: string; buildingLabel: string; floorLabel: string }) => request<Room>(input.room ? `/api/properties/${selectedPropertyId}/rooms/${input.room.roomId}` : `/api/properties/${selectedPropertyId}/rooms`, {
+    mutationFn: async (input: { room?: Room; name: string; buildingLabel: string; floorLabel: string }) => request<RoomMutationReceipt>(input.room ? `/api/properties/${selectedPropertyId}/rooms/${input.room.roomId}` : `/api/properties/${selectedPropertyId}/rooms`, {
       method: input.room ? "PUT" : "POST",
       body: JSON.stringify({ name: input.name, buildingLabel: input.buildingLabel || null, floorLabel: input.floorLabel || null, ...(input.room ? { expectedVersion: input.room.version } : { expectedPropertyVersion: selectedProperty?.version ?? 0 }) }),
     }),
@@ -140,33 +153,24 @@ export function PropertiesPage() {
     mutationFn: async (input: BedMutationInput) => {
       if (!selectedRoom) throw new Error("Choose a room before adding beds.");
       if (input.bed) {
-        return [await request<Bed>(`/api/properties/${selectedPropertyId}/rooms/${selectedRoom.roomId}/beds/${input.bed.bedId}`, {
+        return request<BedMutationReceipt>(`/api/properties/${selectedPropertyId}/rooms/${selectedRoom.roomId}/beds/${input.bed.bedId}`, {
           method: "PUT",
           body: JSON.stringify({ label: input.labels[0], expectedRoomVersion: input.bed.roomVersion }),
-        })];
+        });
       }
 
-      const createdBeds: Bed[] = [];
-      let expectedRoomVersion = selectedRoom.version;
-      for (const label of input.labels) {
-        try {
-          const createdBed = await request<Bed>(`/api/properties/${selectedPropertyId}/rooms/${selectedRoom.roomId}/beds`, {
-            method: "POST",
-            body: JSON.stringify({ label, expectedRoomVersion }),
-          });
-          createdBeds.push(createdBed);
-          expectedRoomVersion = createdBed.roomVersion;
-        } catch (error) {
-          if (createdBeds.length > 0) {
-            throw new Error(`${createdBeds.length} ${createdBeds.length === 1 ? "bed was" : "beds were"} added before the remaining request failed. Refresh the list and try the remaining labels.`, { cause: error });
-          }
-          throw error;
-        }
-      }
-      return createdBeds;
+      return request<BedBatchMutationReceipt>(
+        `/api/properties/${selectedPropertyId}/rooms/${selectedRoom.roomId}/beds/batch`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            labels: input.labels,
+            expectedRoomVersion: selectedRoom.version,
+          }),
+        },
+      );
     },
     onSuccess: async () => { await Promise.all([invalidateProperty(), queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId] })]); setBedForm(null); },
-    onError: async () => { await Promise.all([invalidateProperty(), queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId] })]); },
   });
   const retireMutation = useMutation<TopologyRetirement | void, Error, RetirementMutationInput>({
     mutationFn: async ({ target, reason }) => {
@@ -261,22 +265,22 @@ export function PropertiesPage() {
   );
 }
 
-function PropertyForm({ state, mutation, onClose }: { state: PropertyFormState; mutation: ReturnType<typeof useMutation<Property, Error, { property?: Property; name: string; code: string; timeZoneId: string }>>; onClose: () => void }) {
+function PropertyForm({ state, mutation, onClose }: { state: PropertyFormState; mutation: ReturnType<typeof useMutation<PropertyMutationReceipt, Error, { property?: Property; name: string; code: string; timeZoneId: string }>>; onClose: () => void }) {
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ property: state?.property, name: String(data.get("name")), code: String(data.get("code")).toUpperCase(), timeZoneId: String(data.get("timeZoneId")) }); }
   return <Modal open={Boolean(state)} title={state?.property ? "Edit property" : "New property"} description="Property details are shared across topology, inventory and reservations." onClose={onClose}><form onSubmit={submit} className="space-y-4"><Input label="Property name" name="name" defaultValue={state?.property?.name} placeholder="Harbour House Hostel" /><div className="grid gap-4 sm:grid-cols-2"><Input label="Short code" name="code" defaultValue={state?.property?.code} placeholder="HBR" maxLength={16} /><TimeZoneSelect defaultValue={state?.property?.timeZoneId} /></div>{mutation.error && <ErrorState error={mutation.error} title="Couldn't save the property" />}<FormActions submitting={mutation.isPending} submitLabel={state?.property ? "Save changes" : "Create property"} onCancel={onClose} /></form></Modal>;
 }
 
-function RoomForm({ state, mutation, onClose }: { state: RoomFormState; mutation: ReturnType<typeof useMutation<Room, Error, { room?: Room; name: string; buildingLabel: string; floorLabel: string }>>; onClose: () => void }) {
+function RoomForm({ state, mutation, onClose }: { state: RoomFormState; mutation: ReturnType<typeof useMutation<RoomMutationReceipt, Error, { room?: Room; name: string; buildingLabel: string; floorLabel: string }>>; onClose: () => void }) {
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ room: state?.room, name: String(data.get("name")), buildingLabel: String(data.get("buildingLabel")), floorLabel: String(data.get("floorLabel")) }); }
   return <Modal open={Boolean(state)} title={state?.room ? "Edit room" : "Add room"} description="Use labels your staff will recognize at a glance." onClose={onClose}><form onSubmit={submit} className="space-y-4"><Input label="Room name or number" name="name" defaultValue={state?.room?.name} placeholder="Room 204" /><div className="grid gap-4 sm:grid-cols-2"><Input label="Building (optional)" name="buildingLabel" defaultValue={state?.room?.buildingLabel ?? ""} placeholder="Main building" required={false} /><Input label="Floor (optional)" name="floorLabel" defaultValue={state?.room?.floorLabel ?? ""} placeholder="Second floor" required={false} /></div>{mutation.error && <ErrorState error={mutation.error} />}<FormActions submitting={mutation.isPending} submitLabel={state?.room ? "Save room" : "Add room"} onCancel={onClose} /></form></Modal>;
 }
 
-function BedForm({ state, existingBeds, mutation, onClose }: { state: BedFormState; existingBeds: Bed[]; mutation: ReturnType<typeof useMutation<Bed[], Error, BedMutationInput>>; onClose: () => void }) {
+function BedForm({ state, existingBeds, mutation, onClose }: { state: BedFormState; existingBeds: Bed[]; mutation: ReturnType<typeof useMutation<BedMutationResult, Error, BedMutationInput>>; onClose: () => void }) {
   const editing = Boolean(state?.bed);
   return <Modal open={Boolean(state)} title={editing ? "Edit bed" : "Add beds"} description={editing ? "Keep the label short and easy to find in the room." : "Choose how many beds the room has, then customize any labels you need."} onClose={onClose}>{state && <BedFormFields state={state} existingBeds={existingBeds} mutation={mutation} onClose={onClose} />}</Modal>;
 }
 
-function BedFormFields({ state, existingBeds, mutation, onClose }: { state: NonNullable<BedFormState>; existingBeds: Bed[]; mutation: ReturnType<typeof useMutation<Bed[], Error, BedMutationInput>>; onClose: () => void }) {
+function BedFormFields({ state, existingBeds, mutation, onClose }: { state: NonNullable<BedFormState>; existingBeds: Bed[]; mutation: ReturnType<typeof useMutation<BedMutationResult, Error, BedMutationInput>>; onClose: () => void }) {
   const existingLabels = useMemo(
     () => existingBeds.filter((bed) => bed.bedId !== state?.bed?.bedId).map((bed) => bed.label),
     [existingBeds, state?.bed?.bedId],

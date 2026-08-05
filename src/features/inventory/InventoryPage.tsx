@@ -15,10 +15,10 @@ import { useSearchParams } from "react-router";
 import type {
   InventoryAvailabilityResponse,
   ManualBlockGroup,
-  ManualBlockListResponse,
+  ManualBlockGroupMutationReceipt,
   RoomInventory,
   RoomInventoryChangeImpact,
-  RoomInventoryListResponse,
+  RoomInventoryMutationReceipt,
 } from "../../api/types";
 import { inventorySalesModeValue, manualBlockStatusLabel } from "../../api/labels";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
@@ -36,10 +36,9 @@ import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { BlockInventoryModal, type CreateBlockGroupPayload } from "./BlockInventoryModal";
 import { buildBlockTargetOptions, groupActiveBlocks } from "./inventoryBlocking";
+import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "./inventoryApi";
 import { sellableInventorySummary } from "./inventorySummary";
 import { SalesModeChangeModal, type PendingSalesModeChange } from "./SalesModeChangeModal";
-
-const pageSize = 100;
 
 export function InventoryPage() {
   const { request, session } = useSession();
@@ -66,18 +65,7 @@ export function InventoryPage() {
 
   const inventory = useQuery({
     queryKey: ["inventory-rooms", selectedPropertyId],
-    queryFn: async ({ signal }) => {
-      const rooms: RoomInventory[] = [];
-      for (let page = 1; ; page += 1) {
-        const response = await request<RoomInventoryListResponse>(
-          `/api/inventory/properties/${selectedPropertyId}/rooms?page=${page}&pageSize=${pageSize}`,
-          { signal },
-        );
-        rooms.push(...response.rooms);
-        if (response.rooms.length < pageSize) break;
-      }
-      return { rooms, page: 1, pageSize: rooms.length } satisfies RoomInventoryListResponse;
-    },
+    queryFn: ({ signal }) => loadAllRoomInventory(request, selectedPropertyId!, signal),
     enabled,
   });
   const availability = useQuery({
@@ -89,18 +77,12 @@ export function InventoryPage() {
   });
   const blocks = useQuery({
     queryKey: ["blocks", selectedPropertyId, blockView],
-    queryFn: async ({ signal }) => {
-      const activeBlocks: ManualBlockListResponse["blocks"] = [];
-      for (let page = 1; ; page += 1) {
-        const response = await request<ManualBlockListResponse>(
-          `/api/inventory/properties/${selectedPropertyId}/blocks?includeReleased=${blockView === "all"}&page=${page}&pageSize=${pageSize}`,
-          { signal },
-        );
-        activeBlocks.push(...response.blocks);
-        if (response.blocks.length < pageSize) break;
-      }
-      return { blocks: activeBlocks, page: 1, pageSize: activeBlocks.length } satisfies ManualBlockListResponse;
-    },
+    queryFn: ({ signal }) => loadAllManualInventoryBlocks(
+      request,
+      selectedPropertyId!,
+      blockView === "all",
+      signal,
+    ),
     enabled,
   });
   const salesModeImpact = useQuery({
@@ -151,7 +133,7 @@ export function InventoryPage() {
 
   const salesModeMutation = useMutation({
     mutationFn: ({ room, salesMode }: { room: RoomInventory; salesMode: "roomLevel" | "bedLevel" }) =>
-      request(`/api/inventory/properties/${selectedPropertyId}/rooms/${room.roomId}/sales-mode`, {
+      request<RoomInventoryMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/rooms/${room.roomId}/sales-mode`, {
         method: "PUT",
         body: JSON.stringify({
           salesMode: inventorySalesModeValue(salesMode),
@@ -168,7 +150,7 @@ export function InventoryPage() {
   });
   const createBlockGroup = useMutation({
     mutationFn: (payload: CreateBlockGroupPayload) =>
-      request<ManualBlockGroup>(`/api/inventory/properties/${selectedPropertyId}/block-groups`, {
+      request<ManualBlockGroupMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/block-groups`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
@@ -182,7 +164,7 @@ export function InventoryPage() {
   });
   const releaseBlockGroup = useMutation({
     mutationFn: (blockGroupId: string) =>
-      request<ManualBlockGroup>(
+      request<ManualBlockGroupMutationReceipt>(
         `/api/inventory/properties/${selectedPropertyId}/block-groups/${blockGroupId}/release`,
         { method: "POST" },
       ),

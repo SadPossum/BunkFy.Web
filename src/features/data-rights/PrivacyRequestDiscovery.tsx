@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Search, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type {
   DataRightsCase,
@@ -83,6 +83,7 @@ export function PrivacyRequestDiscovery({
     ),
     onSuccess: async (updated) => {
       setCandidates([]);
+      discover.reset();
       await onCaseUpdated(updated);
       await refreshSelected();
     },
@@ -294,6 +295,15 @@ export function PrivacyRequestDiscovery({
       {(discover.error || select.error || unselect.error) && (
         <div className="mt-4">
           <ErrorState error={discover.error ?? select.error ?? unselect.error} />
+        </div>
+      )}
+
+      {discover.data?.limitReached && candidates.length > 0 && (
+        <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning/25 bg-warning/8 px-4 py-3 text-sm text-base-content/65">
+          <AlertTriangle size={17} className="mt-0.5 shrink-0 text-warning" />
+          <p>
+            The result limit was reached. Refine the exact identifier if the expected record is not shown.
+          </p>
         </div>
       )}
 

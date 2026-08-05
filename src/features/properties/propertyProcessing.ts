@@ -24,15 +24,23 @@ export function countryPolicyKey(policy: Pick<CountryPolicy, "policyId" | "polic
 
 export function availableCountryPolicies(policies: CountryPolicy[], now = new Date()): CountryPolicy[] {
   const timestamp = now.getTime();
-  return policies.filter((policy) =>
-    policy.launchStatus !== "disabled" &&
-    Date.parse(policy.effectiveAtUtc) <= timestamp &&
-    timestamp < Date.parse(policy.expiresAtUtc) &&
-    policy.accommodationTypes.includes("hostel") &&
-    policy.permittedDataRegions.length > 0 &&
-    policy.permittedTransferProfiles.length > 0 &&
-    policy.retentionPolicies.length > 0
-  );
+  return policies
+    .filter((policy) =>
+      policy.launchStatus !== "disabled" &&
+      Date.parse(policy.effectiveAtUtc) <= timestamp &&
+      timestamp < Date.parse(policy.expiresAtUtc) &&
+      policy.accommodationTypes.includes("hostel") &&
+      policy.permittedDataRegions.length > 0 &&
+      policy.permittedTransferProfiles.length > 0 &&
+      policy.retentionPolicies.length > 0
+    )
+    .sort((left, right) =>
+      Number(right.supportsRightsResponseDeadlines) -
+        Number(left.supportsRightsResponseDeadlines) ||
+      left.operatingCountryCode.localeCompare(right.operatingCountryCode) ||
+      left.policyId.localeCompare(right.policyId) ||
+      right.policyVersion - left.policyVersion
+    );
 }
 
 export function matchingBoundPolicy(

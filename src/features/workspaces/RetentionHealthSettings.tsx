@@ -7,12 +7,13 @@ import {
   DatabaseZap,
   PauseCircle,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type {
   RetentionScheduleHealth,
   RetentionScheduleHealthListResponse,
 } from "../../api/types";
 import { useSession } from "../../app/session";
+import { PaginationBar } from "../../components/ui/PaginationBar";
 import {
   EmptyState,
   ErrorState,
@@ -28,23 +29,29 @@ import {
 
 const RUNNING_REFRESH_MS = 10_000;
 const IDLE_REFRESH_MS = 300_000;
+const PAGE_SIZE = 25;
 
 export function RetentionHealthSettings() {
   const { request } = useSession();
+  const [page, setPage] = useState(1);
   const schedules = useQuery({
-    queryKey: ["retention", "schedules"],
+    queryKey: ["retention", "schedules", page],
     queryFn: () => request<RetentionScheduleHealthListResponse>(
-      "/api/retention/schedules",
+      `/api/retention/schedules?page=${page}&pageSize=${PAGE_SIZE}`,
     ),
-    refetchInterval: (query) => query.state.data?.items.some(
-      (item) => retentionStatusLabel(item.status) === "running",
-    )
+    refetchInterval: (query) => (query.state.data?.summary.running ?? 0) > 0
       ? RUNNING_REFRESH_MS
       : IDLE_REFRESH_MS,
     refetchIntervalInBackground: false,
   });
   const items = schedules.data?.items ?? [];
-  const summary = summarizeRetentionHealth(items);
+  const summary = schedules.data?.summary ?? summarizeRetentionHealth(items);
+
+  useEffect(() => {
+    if (!schedules.isFetching && page > 1 && schedules.data?.items.length === 0) {
+      setPage((currentPage) => Math.max(1, currentPage - 1));
+    }
+  }, [page, schedules.data?.items.length, schedules.isFetching]);
 
   return (
     <section>
@@ -102,23 +109,34 @@ export function RetentionHealthSettings() {
             <HealthMetric
               icon={<AlertTriangle size={18} />}
               label="Needs attention"
-              value={summary.attention}
-              tone={summary.attention > 0 ? "warning" : "neutral"}
+              value={summary.needsAttention}
+              tone={summary.needsAttention > 0 ? "warning" : "neutral"}
             />
           </div>
 
-          <div className="mt-6 divide-y divide-base-300 border-y border-base-300">
-            {items.map((item) => (
-              <ScheduleRow
-                key={[
-                  item.ownerKey,
-                  item.dataClassKey,
-                  item.propertyId ?? "tenant",
-                  item.executionPolicyVersion,
-                ].join(":")}
-                item={item}
-              />
-            ))}
+          <div className="mt-6 border-y border-base-300">
+            <div className="divide-y divide-base-300">
+              {items.map((item) => (
+                <ScheduleRow
+                  key={[
+                    item.ownerKey,
+                    item.dataClassKey,
+                    item.propertyId ?? "tenant",
+                    item.executionPolicyVersion,
+                  ].join(":")}
+                  item={item}
+                />
+              ))}
+            </div>
+            <PaginationBar
+              page={page}
+              pageSize={PAGE_SIZE}
+              itemCount={items.length}
+              itemLabel="schedule"
+              hasMore={schedules.data?.hasMore}
+              disabled={schedules.isFetching}
+              onPageChange={setPage}
+            />
           </div>
         </>
       )}

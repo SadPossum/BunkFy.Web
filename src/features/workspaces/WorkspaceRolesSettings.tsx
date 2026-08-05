@@ -13,7 +13,13 @@ import { groupPermissions, updatePermissionSelection } from "./workspaceAccessPe
 
 const PROFILE_PAGE_SIZE = 25;
 
-export function WorkspaceRolesSettings({ workspaceId }: { workspaceId: string }) {
+export function WorkspaceRolesSettings({
+  workspaceId,
+  canManage,
+}: {
+  workspaceId: string;
+  canManage: boolean;
+}) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -43,6 +49,12 @@ export function WorkspaceRolesSettings({ workspaceId }: { workspaceId: string })
 
   useEffect(() => setPage(1), [includeArchived, workspaceId]);
   useEffect(() => {
+    if (!canManage) {
+      setEditing(null);
+      setArchiveTarget(null);
+    }
+  }, [canManage]);
+  useEffect(() => {
     if (!profiles.isFetching && page > 1 && profiles.data?.items.length === 0) {
       setPage((current) => Math.max(1, current - 1));
     }
@@ -62,9 +74,11 @@ export function WorkspaceRolesSettings({ workspaceId }: { workspaceId: string })
             </p>
           </div>
         </div>
-        <button className="btn btn-primary btn-sm shrink-0 text-white" onClick={() => setEditing("new")}>
-          <Plus size={16} />New role
-        </button>
+        {canManage && (
+          <button className="btn btn-primary btn-sm shrink-0 text-white" onClick={() => setEditing("new")}>
+            <Plus size={16} />New role
+          </button>
+        )}
       </div>
 
       <label className="mt-5 flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
@@ -102,7 +116,7 @@ export function WorkspaceRolesSettings({ workspaceId }: { workspaceId: string })
                     <span className="inline-flex items-center gap-1"><UsersRound size={13} />{profile.assignmentCount} assignment{profile.assignmentCount === 1 ? "" : "s"}</span>
                   </div>
                 </div>
-                {profile.status === 1 && (
+                {canManage && profile.status === 1 && (
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <button className="btn btn-ghost btn-sm" onClick={() => setEditing(profile)}>
                       <Pencil size={15} />Edit
@@ -134,7 +148,7 @@ export function WorkspaceRolesSettings({ workspaceId }: { workspaceId: string })
         </>
       )}
 
-      {editing && catalogue.data && (
+      {canManage && editing && catalogue.data && (
         <ProfileEditor
           key={editing === "new" ? "new" : `${editing.profileId}-${editing.version}`}
           profile={editing === "new" ? null : editing}
@@ -148,7 +162,7 @@ export function WorkspaceRolesSettings({ workspaceId }: { workspaceId: string })
         />
       )}
 
-      {archiveTarget && (
+      {canManage && archiveTarget && (
         <Modal
           open
           title={`Archive ${archiveTarget.displayName}?`}

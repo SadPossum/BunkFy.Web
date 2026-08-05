@@ -27,6 +27,18 @@ describe("property processing policy selection", () => {
     expect(availableCountryPolicies(policies, now)).toEqual([current]);
   });
 
+  it("prefers deadline-ready policy revisions without hiding valid legacy packs", () => {
+    const legacy = policy({ policyVersion: 1, supportsRightsResponseDeadlines: false });
+    const deadlineReady = policy({
+      policyVersion: 2,
+      contentSha256: "b".repeat(64),
+      supportsRightsResponseDeadlines: true,
+    });
+
+    expect(availableCountryPolicies([legacy, deadlineReady], now))
+      .toEqual([deadlineReady, legacy]);
+  });
+
   it("matches a persisted binding only when country, identity, version and digest agree", () => {
     const current = policy();
     const binding = governanceBinding();
@@ -95,6 +107,7 @@ function policy(overrides: Partial<CountryPolicy> = {}): CountryPolicy {
     accommodationTypes: ["hostel"],
     permittedDataRegions: ["eu-west-2"],
     permittedTransferProfiles: ["uk-no-transfer"],
+    supportsRightsResponseDeadlines: false,
     retentionPolicies: [{ retentionPolicyId: "guest-operational", retentionPolicyVersion: 1 }],
     requiredAcknowledgements: [{ acknowledgementId: "operator-notice", acknowledgementVersion: 1 }],
     ...overrides,

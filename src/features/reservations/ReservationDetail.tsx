@@ -2,15 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BedDouble, CalendarDays, CheckCircle2, ChevronRight, Clock3, Edit3, History, Link2, LogIn, LogOut, Mail, Phone, Save, StickyNote, UserPlus, UserRound, UsersRound, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { reservationDetailsOriginLabel, reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
-import type { GuestProfile, Reservation, ReservationDetailsHistoryItem, RoomInventoryListResponse } from "../../api/types";
+import type { GuestListItem, GuestProfile, Reservation, ReservationDetailsHistoryItem, ReservationDetailsHistoryListResponse, ReservationMutationReceipt } from "../../api/types";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
 import { ErrorState, InitialAvatar, InlineFormActions, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
-import { createAndLinkGuestRecord, hasPrimaryGuestRecord } from "./guestRecordWorkflow";
+import { createAndLinkGuestRecord, guestRecordPayloadFromBooking, hasPrimaryGuestRecord } from "./guestRecordWorkflow";
+import { loadAllRoomInventory } from "../inventory/inventoryApi";
 
 export type ReservationCapabilities = {
   manage: boolean;
@@ -25,6 +27,7 @@ export type ReservationCapabilities = {
 
 type DetailTab = "overview" | "guest" | "history";
 type ReservationAction = "cancel" | "check-in" | "no-show" | "check-out";
+const HISTORY_PAGE_SIZE = 20;
 
 export function ReservationDetail({ propertyId, reservationId, initialTab, capabilities, notice, onDismissNotice, onClose }: {
   propertyId: string;
@@ -41,12 +44,14 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   const [pendingAction, setPendingAction] = useState<ReservationAction | null>(null);
   const [businessDate, setBusinessDate] = useState("");
   const [editingDetails, setEditingDetails] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
   const observedVersion = useRef<{ reservationId: string; version: number } | null>(null);
 
   useEffect(() => {
     setTab(initialTab ?? "overview");
     setPendingAction(null);
     setEditingDetails(false);
+    setHistoryPage(1);
   }, [initialTab, reservationId]);
 
   const reservation = useQuery({
@@ -59,23 +64,29 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
     refetchIntervalInBackground: false,
   });
   const history = useQuery({
-    queryKey: ["reservation-history", propertyId, reservationId],
-    queryFn: () => request<ReservationDetailsHistoryItem[]>(`/api/reservations/properties/${propertyId}/${reservationId}/details-history`),
+    queryKey: ["reservation-history", propertyId, reservationId, historyPage],
+    queryFn: () => request<ReservationDetailsHistoryListResponse>(`/api/reservations/properties/${propertyId}/${reservationId}/details-history?page=${historyPage}&pageSize=${HISTORY_PAGE_SIZE}`),
     enabled: Boolean(reservationId) && tab === "history",
   });
+
+  useEffect(() => {
+    if (!history.isFetching && history.data && historyPage > 1 && history.data.items.length === 0) {
+      setHistoryPage((current) => Math.max(1, current - 1));
+    }
+  }, [history.data, history.isFetching, historyPage]);
   const inventory = useQuery({
     queryKey: ["inventory-rooms", propertyId],
-    queryFn: () => request<RoomInventoryListResponse>(`/api/inventory/properties/${propertyId}/rooms?page=1&pageSize=100`),
+    queryFn: ({ signal }) => loadAllRoomInventory(request, propertyId, signal),
     enabled: Boolean(reservationId),
     staleTime: 30_000,
   });
 
-  async function refresh(updated?: Reservation) {
+  async function refresh(updated?: ReservationMutationReceipt) {
     if (updated && reservationId) {
       observedVersion.current = { reservationId: updated.reservationId, version: updated.version };
-      queryClient.setQueryData(["reservation", propertyId, reservationId], updated);
     }
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["reservation", propertyId, reservationId], exact: true }),
       queryClient.invalidateQueries({ queryKey: ["reservations", propertyId] }),
       queryClient.invalidateQueries({ queryKey: ["reservation-history", propertyId, reservationId] }),
       queryClient.invalidateQueries({ queryKey: ["guest-stays", propertyId] }),
@@ -105,7 +116,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   }, [propertyId, queryClient, reservation.data]);
 
   const actionMutation = useMutation({
-    mutationFn: ({ action, date, current }: { action: ReservationAction; date: string; current: Reservation }) => request<Reservation>(
+    mutationFn: ({ action, date, current }: { action: ReservationAction; date: string; current: Reservation }) => request<ReservationMutationReceipt>(
       `/api/reservations/properties/${propertyId}/${current.reservationId}/${action}`,
       {
         method: "POST",
@@ -121,7 +132,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   });
 
   const detailsMutation = useMutation({
-    mutationFn: ({ current, payload }: { current: Reservation; payload: Record<string, unknown> }) => request<Reservation>(
+    mutationFn: ({ current, payload }: { current: Reservation; payload: Record<string, unknown> }) => request<ReservationMutationReceipt>(
       `/api/reservations/properties/${propertyId}/${current.reservationId}/guest-details`,
       { method: "PUT", body: JSON.stringify(payload) },
     ),
@@ -189,7 +200,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
               <LinkedGuestRecord propertyId={propertyId} reservation={item} canRead={capabilities.readGuests} canCreate={capabilities.createGuests} canManage={capabilities.manageGuests} onUpdated={refresh} />
             </div>
           )}
-          {tab === "history" && <ReservationHistory query={history} />}
+          {tab === "history" && <ReservationHistory query={history} page={historyPage} onPageChange={setHistoryPage} />}
 
           <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
         </div>
@@ -283,12 +294,12 @@ function GuestDetailsForm({ reservation, submitting, error, onSubmit, onCancel }
   return <form key={reservation.detailsRevision} className="space-y-4" onSubmit={submit}><div className="grid gap-4 sm:grid-cols-2"><TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} /><TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} /></div><div className="grid gap-4 sm:grid-cols-[1fr_140px]"><TextField label="Primary guest" name="primaryGuestName" defaultValue={reservation.primaryGuestName} /><TextField label="Guests" name="guestCount" type="number" min="1" defaultValue={String(reservation.guestCount)} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Email" name="email" type="email" required={false} defaultValue={reservation.email || ""} /><TextField label="Phone" name="phone" type="tel" required={false} defaultValue={reservation.phone || ""} /></div><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-20 w-full" name="notes" defaultValue={reservation.notes || ""} /></label>{Boolean(error) && <ErrorState error={error} />}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>{submitting ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}Save details</button></InlineFormActions></form>;
 }
 
-function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canManage, onUpdated }: { propertyId: string; reservation: Reservation; canRead: boolean; canCreate: boolean; canManage: boolean; onUpdated: (updated?: Reservation) => Promise<void> }) {
+function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canManage, onUpdated }: { propertyId: string; reservation: Reservation; canRead: boolean; canCreate: boolean; canManage: boolean; onUpdated: (updated?: ReservationMutationReceipt) => Promise<void> }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const currentLink = reservation.guests.find((guest) => guest.role === 1 || String(guest.role).toLowerCase() === "primary");
   const [choosing, setChoosing] = useState(!currentLink);
-  const [candidate, setCandidate] = useState<GuestProfile | null>(null);
+  const [candidate, setCandidate] = useState<GuestListItem | null>(null);
   useEffect(() => { setChoosing(!currentLink); setCandidate(null); }, [reservation.reservationId, currentLink?.guestId]);
   const currentGuest = useQuery({
     queryKey: ["guest", propertyId, currentLink?.guestId],
@@ -296,11 +307,11 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
     enabled: canRead && Boolean(currentLink?.guestId),
   });
   const linkMutation = useMutation({
-    mutationFn: (guest: GuestProfile) => request<Reservation>(`/api/reservations/properties/${propertyId}/${reservation.reservationId}/guests`, { method: "PUT", body: JSON.stringify({ guestId: guest.guestId, role: 1, replaceExistingRole: Boolean(currentLink), expectedVersion: reservation.version }) }),
+    mutationFn: (guest: GuestListItem) => request<ReservationMutationReceipt>(`/api/reservations/properties/${propertyId}/${reservation.reservationId}/guests`, { method: "PUT", body: JSON.stringify({ guestId: guest.guestId, role: 1, replaceExistingRole: Boolean(currentLink), expectedVersion: reservation.version }) }),
     onSuccess: async (updated) => { setChoosing(false); setCandidate(null); await queryClient.invalidateQueries({ queryKey: ["guest", propertyId] }); await onUpdated(updated); },
   });
   const createMutation = useMutation({
-    mutationFn: () => createAndLinkGuestRecord(request, propertyId, reservation),
+    mutationFn: () => createAndLinkGuestRecord(request, propertyId, reservation, { profile: guestRecordPayloadFromBooking(reservation) }),
     onSuccess: async (created) => {
       setChoosing(false);
       setCandidate(null);
@@ -324,11 +335,11 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
 }
 
 
-function ReservationHistory({ query }: { query: { isLoading: boolean; error: unknown; data?: ReservationDetailsHistoryItem[]; refetch: () => Promise<unknown> } }) {
+function ReservationHistory({ query, page, onPageChange }: { query: { isLoading: boolean; isFetching: boolean; error: unknown; data?: ReservationDetailsHistoryListResponse; refetch: () => Promise<unknown> }; page: number; onPageChange: (page: number) => void }) {
   if (query.isLoading) return <LoadingState label="Loading change history" />;
   if (query.error) return <ErrorState error={query.error} retry={() => void query.refetch()} />;
-  if (!query.data?.length) return <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><History className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No detail changes yet</h3><p className="mt-1 text-sm text-base-content/50">Edits to expected times, booking contact and notes will appear here.</p></div>;
-  return <div className="space-y-3">{query.data.map((item) => <article key={item.changeId} className="rounded-2xl border border-base-300 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{formatChangedFields(item.changedFields)}</p><p className="mt-1 text-xs text-base-content/50">Revision {item.fromRevision} → {item.toRevision} · {reservationDetailsOriginLabel(item.origin)}</p></div><time className="text-xs text-base-content/45" dateTime={item.occurredAtUtc}>{formatDateTime(item.occurredAtUtc)}</time></div><p className="mt-3 text-sm text-base-content/60">Changed by {formatActor(item.actorId, item.origin)}.</p><HistoryValues item={item} /></article>)}</div>;
+  if (!query.data?.items.length) return <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><History className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No detail changes yet</h3><p className="mt-1 text-sm text-base-content/50">Edits to expected times, booking contact and notes will appear here.</p></div>;
+  return <div><div className="space-y-3">{query.data.items.map((item) => <article key={item.changeId} className="rounded-2xl border border-base-300 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{formatChangedFields(item.changedFields)}</p><p className="mt-1 text-xs text-base-content/50">Revision {item.fromRevision} → {item.toRevision} · {reservationDetailsOriginLabel(item.origin)}</p></div><time className="text-xs text-base-content/45" dateTime={item.occurredAtUtc}>{formatDateTime(item.occurredAtUtc)}</time></div><p className="mt-3 text-sm text-base-content/60">Changed by {formatActor(item.actorId, item.origin)}.</p><HistoryValues item={item} /></article>)}</div><PaginationBar page={page} pageSize={HISTORY_PAGE_SIZE} itemCount={query.data.items.length} itemLabel="change" hasMore={query.data.hasMore} disabled={query.isFetching} onPageChange={onPageChange} /></div>;
 }
 
 function HistoryValues({ item }: { item: ReservationDetailsHistoryItem }) {

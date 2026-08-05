@@ -7,12 +7,27 @@ export type NotificationDestination = {
   resourceLabel: string;
 };
 
+const dataRightsDeadlineNotificationNames = new Set([
+  "data-rights-response-deadline-due-soon",
+  "data-rights-response-deadline-overdue",
+]);
+
 export function notificationDestination(
   item: Pick<NotificationHistoryItem, "name" | "payload">,
 ): NotificationDestination | null {
   const payload = payloadRecord(item.payload);
   const propertyId = payloadValue(payload, "propertyId");
   const reservationId = payloadValue(payload, "reservationId");
+
+  if (dataRightsDeadlineNotificationNames.has(item.name) && propertyId) {
+    const caseId = payloadValue(payload, "caseId");
+    return caseId ? destination("/privacy-requests", {
+      property: propertyId,
+      scope: "guest",
+      case: caseId,
+      focus: caseId,
+    }, "Open privacy request", "Opens the affected privacy request", `Request ${shortId(caseId)}`) : null;
+  }
 
   if (item.name.startsWith("reservation-") && propertyId && reservationId) {
     return destination("/reservations", {

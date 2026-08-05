@@ -136,16 +136,32 @@ describe("frontend repository foundation", () => {
       join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
       "utf8",
     );
+    const joinRequests = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceJoinRequestSettings.tsx"),
+      "utf8",
+    );
     const connection = readFileSync(
       join(repositoryRoot, "src", "features", "integrations", "ConnectionDetail.tsx"),
       "utf8",
     );
+    const privacyRequests = readFileSync(
+      join(repositoryRoot, "src", "features", "data-rights", "PrivacyRequestsPage.tsx"),
+      "utf8",
+    );
+    const privacyDiscovery = readFileSync(
+      join(repositoryRoot, "src", "features", "data-rights", "PrivacyRequestDiscovery.tsx"),
+      "utf8",
+    );
 
     expect(reservations).toContain('reservationParams.append("status"');
-    expect(reservations).toContain('totalCount={reservations.data?.totalCount}');
+    expect(reservations).toContain('hasMore={reservations.data?.hasMore}');
+    expect(reservations).not.toContain('totalCount={reservations.data?.totalCount}');
     expect(reservations).not.toContain("Load more reservations");
     expect(workspace).toContain("page=${memberPage}&pageSize=${MEMBERS_PAGE_SIZE}");
+    expect(joinRequests).toContain("hasMore={joinRequests.data?.hasMore}");
     expect(connection).toContain("page=${page}&pageSize=${CREDENTIALS_PAGE_SIZE}");
+    expect(privacyRequests).toContain("hasMore={cases.data?.hasMore}");
+    expect(privacyDiscovery).toContain("discover.data?.limitReached");
   });
 
   it("keeps modal backdrops out of the accessibility tree without creating an unnamed button", () => {

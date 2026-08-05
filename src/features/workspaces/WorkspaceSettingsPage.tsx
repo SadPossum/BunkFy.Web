@@ -19,6 +19,11 @@ import { WorkspaceInvitesSettings } from "./WorkspaceInvitesSettings";
 import { WorkspaceMembersSettings } from "./WorkspaceMembersSettings";
 import { RetentionHealthSettings } from "./RetentionHealthSettings";
 import { WorkspaceRolesSettings } from "./WorkspaceRolesSettings";
+import {
+  canOpenWorkspaceSettingsTab,
+  resolveWorkspaceSettingsCapabilities,
+  type WorkspaceSettingsTab,
+} from "./workspaceSettingsAccess";
 
 const MEMBERS_PAGE_SIZE = 25;
 
@@ -29,20 +34,27 @@ export function WorkspaceSettingsPage() {
     properties,
     refetchWorkspaces,
   } = useWorkspace();
-  const [tab, setTab] = useState<
-    "general" | "members" | "roles" | "invites" | "retention"
-  >("general");
+  const [tab, setTab] = useState<WorkspaceSettingsTab>("general");
   const [memberPage, setMemberPage] = useState(1);
   const workspace = selectedWorkspace?.organization;
   const owner = isOwner(selectedWorkspace?.membership.role);
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
-  const retentionAccess = usePermissions(session
-    ? [{ permission: permissions.retentionRead, scope: tenantScope }]
+  const permissionAccess = usePermissions(session && !owner
+    ? [
+      { permission: permissions.accessProfilesRead, scope: tenantScope },
+      { permission: permissions.accessProfilesManage, scope: tenantScope },
+      { permission: permissions.staffManage, scope: tenantScope },
+      { permission: permissions.retentionRead, scope: tenantScope },
+    ]
     : []);
-  const canReadRetention = retentionAccess.allows(
-    permissions.retentionRead,
-    tenantScope,
-  );
+  const permissionsLoading = !owner && permissionAccess.isLoading;
+  const capabilities = resolveWorkspaceSettingsCapabilities({
+    owner,
+    profilesRead: permissionAccess.allows(permissions.accessProfilesRead, tenantScope),
+    profilesManage: permissionAccess.allows(permissions.accessProfilesManage, tenantScope),
+    staffManage: permissionAccess.allows(permissions.staffManage, tenantScope),
+    retentionRead: permissionAccess.allows(permissions.retentionRead, tenantScope),
+  });
   const members = useQuery({
     queryKey: ["organizations", workspace?.organizationId, "members", memberPage],
     queryFn: () => request<OrganizationMemberListResponse>(
@@ -53,10 +65,10 @@ export function WorkspaceSettingsPage() {
 
   useEffect(() => setMemberPage(1), [workspace?.organizationId]);
   useEffect(() => {
-    if (tab === "retention" && !retentionAccess.isLoading && !canReadRetention) {
+    if (!permissionsLoading && !canOpenWorkspaceSettingsTab(tab, capabilities)) {
       setTab("general");
     }
-  }, [canReadRetention, retentionAccess.isLoading, tab]);
+  }, [capabilities, permissionsLoading, tab]);
   useEffect(() => {
     if (!members.isFetching && memberPage > 1 && members.data?.items.length === 0) {
       setMemberPage((current) => Math.max(1, current - 1));
@@ -66,7 +78,12 @@ export function WorkspaceSettingsPage() {
   if (!workspace || !selectedWorkspace) return null;
 
   async function refreshWorkspace() {
-    await Promise.all([refetchWorkspaces(), members.refetch()]);
+    if (owner) {
+      await Promise.all([refetchWorkspaces(), members.refetch()]);
+      return;
+    }
+
+    await refetchWorkspaces();
   }
 
   return (
@@ -91,14 +108,14 @@ export function WorkspaceSettingsPage() {
             onValueChange={setTab}
             options={[
               { value: "general", label: "General", icon: <Settings2 size={15} /> },
-              { value: "members", label: "Members", icon: <UsersRound size={15} />, disabled: !owner },
-              { value: "roles", label: "Roles", icon: <ShieldCheck size={15} />, disabled: !owner },
-              { value: "invites", label: "Invites", icon: <MailPlus size={15} />, disabled: !owner },
+              { value: "members", label: "Members", icon: <UsersRound size={15} />, disabled: !capabilities.canReadMembers },
+              { value: "roles", label: "Roles", icon: <ShieldCheck size={15} />, disabled: permissionsLoading || !capabilities.canReadRoles },
+              { value: "invites", label: "Invites", icon: <MailPlus size={15} />, disabled: permissionsLoading || !capabilities.canManageInvites },
               {
                 value: "retention",
                 label: "Retention",
                 icon: <DatabaseZap size={15} />,
-                disabled: retentionAccess.isLoading || !canReadRetention,
+                disabled: permissionsLoading || !capabilities.canReadRetention,
               },
             ]}
           />
@@ -113,7 +130,7 @@ export function WorkspaceSettingsPage() {
               onSaved={refetchWorkspaces}
             />
           )}
-          {tab === "members" && owner && (
+          {tab === "members" && capabilities.canReadMembers && (
             <WorkspaceMembersSettings
               workspace={workspace}
               currentMembership={selectedWorkspace.membership}
@@ -129,15 +146,20 @@ export function WorkspaceSettingsPage() {
               onPageChange={setMemberPage}
             />
           )}
-          {tab === "roles" && owner && <WorkspaceRolesSettings workspaceId={workspace.organizationId} />}
-          {tab === "invites" && owner && (
+          {tab === "roles" && capabilities.canReadRoles && (
+            <WorkspaceRolesSettings
+              workspaceId={workspace.organizationId}
+              canManage={capabilities.canManageRoles}
+            />
+          )}
+          {tab === "invites" && capabilities.canManageInvites && (
             <WorkspaceInvitesSettings
               workspaceId={workspace.organizationId}
               properties={properties}
               onMembershipChanged={refreshWorkspace}
             />
           )}
-          {tab === "retention" && canReadRetention && <RetentionHealthSettings />}
+          {tab === "retention" && capabilities.canReadRetention && <RetentionHealthSettings />}
         </div>
       </section>
     </div>

@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Check, Search, UserRound, X } from "lucide-react";
 import { useDeferredValue, useState } from "react";
-import type { GuestListResponse, GuestProfile } from "../../api/types";
+import type { GuestListItem, GuestListResponse } from "../../api/types";
 import { useSession } from "../../app/session";
 import { ErrorState, InitialAvatar } from "../../components/ui/primitives";
 
 export function GuestRecordPicker({ propertyId, selectedGuest, onSelect, label = "Guest record", disabled = false }: {
   propertyId: string;
-  selectedGuest: GuestProfile | null;
-  onSelect: (guest: GuestProfile | null) => void;
+  selectedGuest: GuestListItem | null;
+  onSelect: (guest: GuestListItem | null) => void;
   label?: string;
   disabled?: boolean;
 }) {

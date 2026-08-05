@@ -2,13 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BedDouble, Blocks, Building2, CalendarCheck2, CalendarClock, Plus, Users } from "lucide-react";
 import { Link } from "react-router";
 import { Navigate } from "react-router";
-import type { ManualBlockListResponse, ReservationListResponse, RoomInventoryListResponse, RoomListResponse } from "../../api/types";
+import type { ReservationListResponse } from "../../api/types";
 import { reservationStatusLabel } from "../../api/labels";
 import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
 import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { EmptyState, ErrorState, InitialAvatar, LoadingState, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "../inventory/inventoryApi";
+import { loadAllRooms } from "../properties/propertiesApi";
 
 export function DashboardPage() {
   const { request } = useSession();
@@ -20,8 +22,8 @@ export function DashboardPage() {
     { permission: permissions.reservationsRead, scope: tenantScope },
   ] : []);
   const enabled = Boolean(selectedPropertyId);
-  const rooms = useQuery({ queryKey: ["rooms", selectedPropertyId], queryFn: () => request<RoomListResponse>(`/api/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
-  const inventory = useQuery({ queryKey: ["inventory-rooms", selectedPropertyId], queryFn: () => request<RoomInventoryListResponse>(`/api/inventory/properties/${selectedPropertyId}/rooms?page=1&pageSize=100`), enabled });
+  const rooms = useQuery({ queryKey: ["rooms", selectedPropertyId], queryFn: (context) => loadAllRooms(request, selectedPropertyId, context.signal), enabled });
+  const inventory = useQuery({ queryKey: ["inventory-rooms", selectedPropertyId], queryFn: (context) => loadAllRoomInventory(request, selectedPropertyId!, context.signal), enabled });
   const reservations = useQuery({
     queryKey: ["reservations", selectedPropertyId, "all"],
     queryFn: () => request<ReservationListResponse>(`/api/reservations/properties/${selectedPropertyId}?page=1&pageSize=100`),
@@ -31,7 +33,7 @@ export function DashboardPage() {
       : false,
     refetchIntervalInBackground: false,
   });
-  const blocks = useQuery({ queryKey: ["blocks", selectedPropertyId, false], queryFn: () => request<ManualBlockListResponse>(`/api/inventory/properties/${selectedPropertyId}/blocks?includeReleased=false&page=1&pageSize=100`), enabled });
+  const blocks = useQuery({ queryKey: ["blocks", selectedPropertyId, false], queryFn: (context) => loadAllManualInventoryBlocks(request, selectedPropertyId!, false, context.signal), enabled });
 
   if (propertiesLoading || access.isLoading) return <LoadingState />;
   if (access.error) return <ErrorState error={access.error} />;
@@ -74,7 +76,7 @@ export function DashboardPage() {
         <div className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="card-body p-0">
             <div className="flex items-center justify-between px-6 pb-4 pt-6"><div><h2 className="font-display text-xl font-semibold">Upcoming stays</h2><p className="mt-1 text-sm text-base-content/50">The next reservations needing attention.</p></div><Link to="/reservations" className="btn btn-ghost btn-sm text-primary">View all <ArrowRight size={16} /></Link></div>
-            {upcoming.length ? <div className="divide-y divide-base-300">{upcoming.map((reservation) => <Link to={`/reservations?reservation=${reservation.reservationId}`} key={reservation.reservationId} className="grid gap-3 px-6 py-4 transition hover:bg-base-200 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"} · {reservation.inventoryUnitIds.length} {reservation.inventoryUnitIds.length === 1 ? "unit" : "units"}</p></div></div><div className="text-sm"><p className="font-semibold">{formatShortDate(reservation.arrival)} → {formatShortDate(reservation.departure)}</p><p className="mt-1 text-right text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></Link>)}</div> : <div className="px-6 pb-7"><EmptyState icon={<CalendarCheck2 />} title="No upcoming stays" description="New reservations will appear here as soon as they are created." action={<Link className="btn btn-sm btn-primary" to="/reservations?new=1">Add reservation</Link>} /></div>}
+            {upcoming.length ? <div className="divide-y divide-base-300">{upcoming.map((reservation) => <Link to={`/reservations?reservation=${reservation.reservationId}`} key={reservation.reservationId} className="grid gap-3 px-6 py-4 transition hover:bg-base-200 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"} · {reservation.inventoryUnitCount} {reservation.inventoryUnitCount === 1 ? "unit" : "units"}</p></div></div><div className="text-sm"><p className="font-semibold">{formatShortDate(reservation.arrival)} → {formatShortDate(reservation.departure)}</p><p className="mt-1 text-right text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></Link>)}</div> : <div className="px-6 pb-7"><EmptyState icon={<CalendarCheck2 />} title="No upcoming stays" description="New reservations will appear here as soon as they are created." action={<Link className="btn btn-sm btn-primary" to="/reservations?new=1">Add reservation</Link>} /></div>}
           </div>
         </div>
 

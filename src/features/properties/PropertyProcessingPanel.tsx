@@ -6,6 +6,7 @@ import type {
   CountryPolicyListResponse,
   Property,
   PropertyGovernancePolicyBinding,
+  PropertyMutationReceipt,
   PropertyProcessingState,
 } from "../../api/types";
 import { useSession } from "../../app/session";
@@ -58,7 +59,7 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
   }
 
   const activation = useMutation({
-    mutationFn: (input: PropertyProcessingActivationInput) => request<Property>(
+    mutationFn: (input: PropertyProcessingActivationInput) => request<PropertyMutationReceipt>(
       `/api/properties/${property.propertyId}/processing/activate`,
       { method: "POST", body: JSON.stringify(input) },
     ),
@@ -279,7 +280,9 @@ function PolicyActivationModal({ open, property, processing, policies, pending, 
               options={policies.map((policy) => ({
                 value: countryPolicyKey(policy),
                 label: `${countryLabel(policy.operatingCountryCode)} · ${policy.policyId} v${policy.policyVersion}`,
-                description: `Effective ${formatDate(policy.effectiveAtUtc)} to ${formatDate(policy.expiresAtUtc)}`,
+                description: `${policy.supportsRightsResponseDeadlines
+                  ? "Guest rights deadlines included"
+                  : "Legacy policy - guest rights deadlines unavailable"} · Effective ${formatDate(policy.effectiveAtUtc)} to ${formatDate(policy.expiresAtUtc)}`,
               }))}
             />
           </PickerField>
