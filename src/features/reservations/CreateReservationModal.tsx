@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, UserPlus } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import type { GuestListItem, InventoryAvailabilityResponse, ReservationMutationReceipt } from "../../api/types";
 import { reservationSourceValue } from "../../api/labels";
 import { useSession } from "../../app/session";
@@ -16,6 +16,11 @@ import {
 } from "./guestRecordWorkflow";
 import { groupAvailabilityByRoom } from "./inventoryGrouping";
 import { ReservationInventoryPicker } from "./ReservationInventoryPicker";
+import {
+  resolveReservationCreateAttempt,
+  type ReservationCreateAttempt,
+  type ReservationCreatePayload,
+} from "./reservationCreateAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
 
 type ReservationStep = "reservation" | "guest";
@@ -57,6 +62,7 @@ export function CreateReservationModal({
   const [nationalityCountryCode, setNationalityCountryCode] = useState("");
   const [preferredLanguageTag, setPreferredLanguageTag] = useState("");
   const [guestNotes, setGuestNotes] = useState("");
+  const createAttempt = useRef<ReservationCreateAttempt | null>(null);
 
   const availability = useQuery({
     queryKey: ["availability", propertyId, range.arrival, range.departure],
@@ -83,22 +89,30 @@ export function CreateReservationModal({
       profileDetails: GuestRecordProfileDetails | null;
       selectedGuestId: string | null;
     }) => {
+      const payload: ReservationCreatePayload = {
+        arrival: range.arrival,
+        departure: range.departure,
+        expectedArrivalTime: emptyToNull(expectedArrivalTime),
+        expectedDepartureTime: emptyToNull(expectedDepartureTime),
+        inventoryUnitIds: selectedUnits,
+        primaryGuestName: guestName.trim(),
+        email: emptyToNull(email),
+        phone: emptyToNull(phone),
+        guestCount: Number(guestCount),
+        sourceKind: reservationSourceValue(sourceKind),
+        sourceSystem: sourceKind === "external" ? emptyToNull(sourceSystem) : null,
+        sourceReference: sourceKind === "external" ? emptyToNull(sourceReference) : null,
+        notes: emptyToNull(reservationNotes),
+      };
+      createAttempt.current = resolveReservationCreateAttempt(
+        createAttempt.current,
+        payload,
+      );
       const created = await request<ReservationMutationReceipt>(`/api/reservations/properties/${propertyId}`, {
         method: "POST",
         body: JSON.stringify({
-          arrival: range.arrival,
-          departure: range.departure,
-          expectedArrivalTime: emptyToNull(expectedArrivalTime),
-          expectedDepartureTime: emptyToNull(expectedDepartureTime),
-          inventoryUnitIds: selectedUnits,
-          primaryGuestName: guestName.trim(),
-          email: emptyToNull(email),
-          phone: emptyToNull(phone),
-          guestCount: Number(guestCount),
-          sourceKind: reservationSourceValue(sourceKind),
-          sourceSystem: sourceKind === "external" ? emptyToNull(sourceSystem) : null,
-          sourceReference: sourceKind === "external" ? emptyToNull(sourceReference) : null,
-          notes: emptyToNull(reservationNotes),
+          ...payload,
+          operationId: createAttempt.current.operationId,
         }),
       });
 
@@ -144,6 +158,7 @@ export function CreateReservationModal({
       return { reservation: created, warning: null, guestCreated: false };
     },
     onSuccess: async ({ reservation, warning, guestCreated }) => {
+      createAttempt.current = null;
       if (guestCreated) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),

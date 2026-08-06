@@ -12766,6 +12766,10 @@
       "CreateReservationRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "arrival": {
             "type": "string",
             "format": "date"

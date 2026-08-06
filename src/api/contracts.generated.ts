@@ -11058,6 +11058,8 @@ export interface components {
             slug: string | null;
         };
         CreateReservationRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: date */
             arrival: string;
             /** Format: date */
