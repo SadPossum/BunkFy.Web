@@ -41,8 +41,13 @@ describe("frontend repository foundation", () => {
   });
 
   it("serves the production image with a restrictive browser security policy", () => {
+    const dockerfile = readFileSync(join(repositoryRoot, "Dockerfile"), "utf8");
     const nginx = readFileSync(join(repositoryRoot, "nginx.conf"), "utf8");
 
+    expect(dockerfile).toContain("NGINX_ENVSUBST_FILTER=^BUNKFY_RELEASE_ID$");
+    expect(dockerfile).toContain("BUNKFY_RELEASE_ID=local-unversioned");
+    expect(dockerfile).toContain("/etc/nginx/templates/default.conf.template");
+    expect(nginx).toContain('add_header X-BunkFy-Release-Id "${BUNKFY_RELEASE_ID}" always;');
     expect(nginx).toContain("add_header Content-Security-Policy");
     expect(nginx).toContain("script-src 'self'");
     expect(nginx).toContain("style-src 'self' 'unsafe-inline'");

@@ -12,12 +12,16 @@ ENV VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED=$VITE_BUNKFY_EMAIL_VERIFICATION_ENABL
 RUN pnpm build
 
 FROM nginx:1.30-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46 AS web
+ENV NGINX_ENVSUBST_FILTER=^BUNKFY_RELEASE_ID$ \
+    BUNKFY_RELEASE_ID=local-unversioned
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 RUN apk upgrade --no-cache \
     && sed -i '/^user  nginx;/d' /etc/nginx/nginx.conf \
+    && rm -f /etc/nginx/conf.d/default.conf \
     && touch /run/nginx.pid \
     && chown nginx:nginx /run/nginx.pid \
+    && chown -R nginx:nginx /etc/nginx/conf.d \
     && chown -R nginx:nginx /var/cache/nginx
 USER nginx
 EXPOSE 8080
