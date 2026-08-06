@@ -12143,6 +12143,10 @@
       "CancelReservationRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
@@ -19400,6 +19404,10 @@
       "StayLifecycleRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "businessDate": {
             "type": "string",
             "format": "date"

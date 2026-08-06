@@ -10846,6 +10846,8 @@ export interface components {
             code: string | null;
         };
         CancelReservationRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: int64 */
             expectedVersion: number;
         };
@@ -13533,6 +13535,8 @@ export interface components {
             expectedVersion: number;
         };
         StayLifecycleRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: date */
             businessDate: string;
             /** Format: int64 */

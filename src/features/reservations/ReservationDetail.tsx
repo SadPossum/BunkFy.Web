@@ -12,6 +12,7 @@ import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
 import { createAndLinkGuestRecord, guestRecordPayloadFromBooking, hasPrimaryGuestRecord } from "./guestRecordWorkflow";
+import { resolveReservationLifecycleAttempt, type ReservationLifecycleAttempt, type ReservationLifecycleAction } from "./reservationLifecycleAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
 
 export type ReservationCapabilities = {
@@ -26,7 +27,7 @@ export type ReservationCapabilities = {
 };
 
 type DetailTab = "overview" | "guest" | "history";
-type ReservationAction = "cancel" | "check-in" | "no-show" | "check-out";
+type ReservationAction = ReservationLifecycleAction;
 const HISTORY_PAGE_SIZE = 20;
 
 export function ReservationDetail({ propertyId, reservationId, initialTab, capabilities, notice, onDismissNotice, onClose }: {
@@ -46,10 +47,12 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   const [editingDetails, setEditingDetails] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const observedVersion = useRef<{ reservationId: string; version: number } | null>(null);
+  const lifecycleAttempt = useRef<ReservationLifecycleAttempt | null>(null);
 
   useEffect(() => {
     setTab(initialTab ?? "overview");
     setPendingAction(null);
+    lifecycleAttempt.current = null;
     setEditingDetails(false);
     setHistoryPage(1);
   }, [initialTab, reservationId]);
@@ -116,16 +119,35 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   }, [propertyId, queryClient, reservation.data]);
 
   const actionMutation = useMutation({
-    mutationFn: ({ action, date, current }: { action: ReservationAction; date: string; current: Reservation }) => request<ReservationMutationReceipt>(
-      `/api/reservations/properties/${propertyId}/${current.reservationId}/${action}`,
-      {
-        method: "POST",
-        body: JSON.stringify(action === "cancel"
-          ? { expectedVersion: current.version }
-          : { businessDate: date, expectedVersion: current.version }),
-      },
-    ),
+    mutationFn: ({ action, date, current }: { action: ReservationAction; date: string; current: Reservation }) => {
+      const attempt = resolveReservationLifecycleAttempt(
+        lifecycleAttempt.current,
+        {
+          propertyId,
+          reservationId: current.reservationId,
+          action,
+          businessDate: action === "cancel" ? null : date,
+          expectedVersion: current.version,
+        },
+      );
+      lifecycleAttempt.current = attempt;
+      const requestPayload = attempt.payload;
+      return request<ReservationMutationReceipt>(
+        `/api/reservations/properties/${requestPayload.propertyId}/${requestPayload.reservationId}/${requestPayload.action}`,
+        {
+          method: "POST",
+          body: JSON.stringify(requestPayload.action === "cancel"
+            ? { operationId: attempt.operationId, expectedVersion: requestPayload.expectedVersion }
+            : {
+                operationId: attempt.operationId,
+                businessDate: requestPayload.businessDate,
+                expectedVersion: requestPayload.expectedVersion,
+              }),
+        },
+      );
+    },
     onSuccess: async (updated) => {
+      lifecycleAttempt.current = null;
       setPendingAction(null);
       await refresh(updated);
     },
@@ -143,6 +165,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   });
 
   function beginAction(action: ReservationAction, current: Reservation) {
+    lifecycleAttempt.current = null;
     setPendingAction(action);
     setBusinessDate(defaultBusinessDate(action, current));
     actionMutation.reset();
@@ -172,7 +195,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
             <div className="mt-3 sm:mt-0"><StatusBadge status={reservationStatusLabel(item.status)} /></div>
           </div>
 
-          <ReservationActions reservation={item} capabilities={capabilities} pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error} onBegin={beginAction} onDateChange={setBusinessDate} onConfirm={() => pendingAction && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })} onCancel={() => { setPendingAction(null); actionMutation.reset(); }} />
+          <ReservationActions reservation={item} capabilities={capabilities} pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error} onBegin={beginAction} onDateChange={setBusinessDate} onConfirm={() => pendingAction && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })} onCancel={() => { lifecycleAttempt.current = null; setPendingAction(null); actionMutation.reset(); }} />
 
           {!hasPrimaryGuestRecord(item) && capabilities.readGuests && capabilities.createGuests && capabilities.manageGuests && (
             <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition hover:border-primary/35 hover:bg-primary/8" onClick={() => setTab("guest")}>
