@@ -13610,6 +13610,8 @@ export interface components {
             expectedVersion: number;
         };
         UpdateReservationGuestDetailsRequest: {
+            /** Format: uuid */
+            operationId: string;
             primaryGuestName: string | null;
             email: string | null;
             phone: string | null;

@@ -12,6 +12,7 @@ import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
 import { createAndLinkGuestRecord, guestRecordPayloadFromBooking, hasPrimaryGuestRecord } from "./guestRecordWorkflow";
+import { resolveReservationGuestDetailsAttempt, type ReservationGuestDetailsAttempt, type ReservationGuestDetailsAttemptPayload } from "./reservationGuestDetailsAttempt";
 import { resolveReservationLifecycleAttempt, type ReservationLifecycleAttempt, type ReservationLifecycleAction } from "./reservationLifecycleAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
 
@@ -48,14 +49,16 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   const [historyPage, setHistoryPage] = useState(1);
   const observedVersion = useRef<{ reservationId: string; version: number } | null>(null);
   const lifecycleAttempt = useRef<ReservationLifecycleAttempt | null>(null);
+  const guestDetailsAttempt = useRef<ReservationGuestDetailsAttempt | null>(null);
 
   useEffect(() => {
     setTab(initialTab ?? "overview");
     setPendingAction(null);
     lifecycleAttempt.current = null;
+    guestDetailsAttempt.current = null;
     setEditingDetails(false);
     setHistoryPage(1);
-  }, [initialTab, reservationId]);
+  }, [initialTab, propertyId, reservationId]);
 
   const reservation = useQuery({
     queryKey: ["reservation", propertyId, reservationId],
@@ -154,11 +157,20 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   });
 
   const detailsMutation = useMutation({
-    mutationFn: ({ current, payload }: { current: Reservation; payload: Record<string, unknown> }) => request<ReservationMutationReceipt>(
-      `/api/reservations/properties/${propertyId}/${current.reservationId}/guest-details`,
-      { method: "PUT", body: JSON.stringify(payload) },
-    ),
+    mutationFn: (payload: ReservationGuestDetailsAttemptPayload) => {
+      const attempt = resolveReservationGuestDetailsAttempt(guestDetailsAttempt.current, payload);
+      guestDetailsAttempt.current = attempt;
+      const { propertyId: requestPropertyId, reservationId: requestReservationId, ...details } = attempt.payload;
+      return request<ReservationMutationReceipt>(
+        `/api/reservations/properties/${requestPropertyId}/${requestReservationId}/guest-details`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ operationId: attempt.operationId, ...details }),
+        },
+      );
+    },
     onSuccess: async (updated) => {
+      guestDetailsAttempt.current = null;
       setEditingDetails(false);
       await refresh(updated);
     },
@@ -216,9 +228,9 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
               <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div><h3 className="font-display text-lg font-semibold">Booking details</h3><p className="mt-1 text-xs text-base-content/50">Expected local times, booking contact and staff notes.</p></div>
-                  {capabilities.manage && !editingDetails && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => { setEditingDetails(true); detailsMutation.reset(); }}><Edit3 size={15} />Edit</button>}
+                  {capabilities.manage && !editingDetails && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => { guestDetailsAttempt.current = null; setEditingDetails(true); detailsMutation.reset(); }}><Edit3 size={15} />Edit</button>}
                 </div>
-                {editingDetails ? <GuestDetailsForm reservation={item} submitting={detailsMutation.isPending} error={detailsMutation.error} onSubmit={(payload) => detailsMutation.mutate({ current: item, payload })} onCancel={() => { setEditingDetails(false); detailsMutation.reset(); }} /> : <GuestDetailsReadOnly reservation={item} />}
+                {editingDetails ? <GuestDetailsForm reservation={item} submitting={detailsMutation.isPending} error={detailsMutation.error} onSubmit={(payload) => detailsMutation.mutate({ propertyId, reservationId: item.reservationId, ...payload })} onCancel={() => { guestDetailsAttempt.current = null; setEditingDetails(false); detailsMutation.reset(); }} /> : <GuestDetailsReadOnly reservation={item} />}
               </section>
               <LinkedGuestRecord propertyId={propertyId} reservation={item} canRead={capabilities.readGuests} canCreate={capabilities.createGuests} canManage={capabilities.manageGuests} onUpdated={refresh} />
             </div>
@@ -306,7 +318,9 @@ function GuestDetailsReadOnly({ reservation }: { reservation: Reservation }) {
   return <div className="grid gap-3 sm:grid-cols-2"><DetailRow icon={<Clock3 />} label="Expected arrival · property time" value={reservation.expectedArrivalTime ? formatTime(reservation.expectedArrivalTime) : "Not scheduled"} /><DetailRow icon={<Clock3 />} label="Expected departure · property time" value={reservation.expectedDepartureTime ? formatTime(reservation.expectedDepartureTime) : "Not scheduled"} /><DetailRow icon={<UserRound />} label="Primary guest" value={reservation.primaryGuestName} /><DetailRow icon={<UsersRound />} label="Guest count" value={String(reservation.guestCount)} /><DetailRow icon={<Mail />} label="Email" value={reservation.email || "Not provided"} /><DetailRow icon={<Phone />} label="Phone" value={reservation.phone || "Not provided"} />{reservation.notes && <div className="sm:col-span-2"><p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-base-content/40"><StickyNote size={14} />Notes</p><p className="rounded-xl bg-base-200 p-4 text-sm leading-6 text-base-content/65">{reservation.notes}</p></div>}</div>;
 }
 
-function GuestDetailsForm({ reservation, submitting, error, onSubmit, onCancel }: { reservation: Reservation; submitting: boolean; error: unknown; onSubmit: (payload: Record<string, unknown>) => void; onCancel: () => void }) {
+type GuestDetailsFormPayload = Omit<ReservationGuestDetailsAttemptPayload, "propertyId" | "reservationId">;
+
+function GuestDetailsForm({ reservation, submitting, error, onSubmit, onCancel }: { reservation: Reservation; submitting: boolean; error: unknown; onSubmit: (payload: GuestDetailsFormPayload) => void; onCancel: () => void }) {
   const [expectedArrivalTime, setExpectedArrivalTime] = useState(reservation.expectedArrivalTime?.slice(0, 5) ?? "");
   const [expectedDepartureTime, setExpectedDepartureTime] = useState(reservation.expectedDepartureTime?.slice(0, 5) ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {

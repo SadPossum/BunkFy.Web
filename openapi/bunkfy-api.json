@@ -19634,6 +19634,10 @@
       "UpdateReservationGuestDetailsRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "primaryGuestName": {
             "type": "string",
             "nullable": true
