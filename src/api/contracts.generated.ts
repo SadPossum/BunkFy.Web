@@ -9098,7 +9098,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -9139,7 +9139,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -9180,7 +9180,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -13460,6 +13460,8 @@ export interface components {
             department: string | null;
         };
         StaffDepartureRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: date */
             effectiveOn: string;
             reason: string | null;
@@ -13565,6 +13567,8 @@ export interface components {
             version: number;
         };
         StaffLifecycleRequest: {
+            /** Format: uuid */
+            operationId: string;
             reason: string | null;
             /** Format: int64 */
             expectedVersion: number;

@@ -9336,7 +9336,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                  "$ref": "#/components/schemas/StaffMemberMutationReceiptDto"
                 }
               }
             }
@@ -9376,7 +9376,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                  "$ref": "#/components/schemas/StaffMemberMutationReceiptDto"
                 }
               }
             }
@@ -9416,7 +9416,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                  "$ref": "#/components/schemas/StaffMemberMutationReceiptDto"
                 }
               }
             }
@@ -19035,6 +19035,10 @@
       "StaffDepartureRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "effectiveOn": {
             "type": "string",
             "format": "date"
@@ -19320,6 +19324,10 @@
       "StaffLifecycleRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "reason": {
             "type": "string",
             "nullable": true

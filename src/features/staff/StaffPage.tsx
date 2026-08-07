@@ -25,6 +25,10 @@ import {
   resolveStaffAuthSubjectChangeAttempt,
   type StaffAuthSubjectChangeAttempt,
 } from "./staffAuthSubjectChangeAttempt";
+import {
+  resolveStaffLifecycleAttempt,
+  type StaffLifecycleAttempt,
+} from "./staffLifecycleAttempt";
 
 const PAGE_SIZE = 30;
 const statusOptions = ["active", "suspended", "departed"] as const;
@@ -150,14 +154,19 @@ function StaffDetail({ memberId, initialTab, properties, selectedProperty, canRe
   const [lifecycleAction, setLifecycleAction] = useState<"suspend" | "resume" | "depart" | null>(null);
   const profileAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
   const authSubjectAttempt = useRef<StaffAuthSubjectChangeAttempt | null>(null);
-  useEffect(() => { setTab(initialTab === "account" && !canReadSensitive ? "profile" : initialTab); setEditing(false); setLifecycleAction(null); profileAttempt.current = null; authSubjectAttempt.current = null; }, [initialTab, memberId, canReadSensitive]);
+  const lifecycleAttempt = useRef<StaffLifecycleAttempt | null>(null);
+  useEffect(() => { setTab(initialTab === "account" && !canReadSensitive ? "profile" : initialTab); setEditing(false); setLifecycleAction(null); profileAttempt.current = null; authSubjectAttempt.current = null; lifecycleAttempt.current = null; }, [initialTab, memberId, canReadSensitive]);
   const member = useQuery({ queryKey: ["staff-member", memberId, canReadSensitive ? "profile" : "directory"], queryFn: () => request<StaffDetailMember>(`/api/staff/members/${memberId}${canReadSensitive ? "/profile" : ""}`), enabled: Boolean(memberId) });
   async function refresh() { await Promise.all([queryClient.invalidateQueries({ queryKey: ["staff-member", memberId] }), queryClient.invalidateQueries({ queryKey: ["staff-members"] })]); }
   const profileMutation = useMutation({ mutationFn: async ({ item, payload }: { item: StaffMember; payload: StaffCreatePayload }) => {
     profileAttempt.current = await resolveDurableStaffProfileUpdateAttempt(profileAttempt.current, item.staffMemberId, item.version, payload);
     return request<StaffMemberMutationReceipt>(`/api/staff/members/${item.staffMemberId}`, { method: "PUT", body: JSON.stringify({ ...payload, operationId: profileAttempt.current.operationId, expectedVersion: profileAttempt.current.expectedVersion }) });
   }, onSuccess: async () => { await refresh(); profileAttempt.current = null; setEditing(false); } });
-  const lifecycleMutation = useMutation({ mutationFn: ({ item, action, reason, effectiveOn }: { item: StaffDetailMember; action: "suspend" | "resume" | "depart"; reason: string; effectiveOn: string }) => request<StaffDirectoryMember>(`/api/staff/members/${item.staffMemberId}/${action}`, { method: "POST", body: JSON.stringify(action === "depart" ? { effectiveOn, reason, expectedVersion: item.version } : { reason, expectedVersion: item.version }) }), onSuccess: async () => { setLifecycleAction(null); await refresh(); } });
+  const lifecycleMutation = useMutation({ mutationFn: async ({ item, action, reason, effectiveOn }: { item: StaffDetailMember; action: "suspend" | "resume" | "depart"; reason: string; effectiveOn: string }) => {
+    lifecycleAttempt.current = await resolveStaffLifecycleAttempt(lifecycleAttempt.current, item.staffMemberId, item.version, action, reason, effectiveOn);
+    const attempt = lifecycleAttempt.current;
+    return request<StaffMemberMutationReceipt>(`/api/staff/members/${item.staffMemberId}/${action}`, { method: "POST", body: JSON.stringify(action === "depart" ? { operationId: attempt.operationId, effectiveOn, reason, expectedVersion: attempt.expectedVersion } : { operationId: attempt.operationId, reason, expectedVersion: attempt.expectedVersion }) });
+  }, onSuccess: async () => { await refresh(); lifecycleAttempt.current = null; setLifecycleAction(null); } });
   const authMutation = useMutation({ mutationFn: async ({ item, authSubjectId }: { item: StaffMember; authSubjectId: string | null }) => {
     authSubjectAttempt.current = await resolveStaffAuthSubjectChangeAttempt(authSubjectAttempt.current, item.staffMemberId, item.version, authSubjectId);
     return request<StaffMemberMutationReceipt>(`/api/staff/members/${item.staffMemberId}/auth-subject`, { method: "PUT", body: JSON.stringify({ authSubjectId, operationId: authSubjectAttempt.current.operationId, expectedVersion: authSubjectAttempt.current.expectedVersion }) });
@@ -165,7 +174,7 @@ function StaffDetail({ memberId, initialTab, properties, selectedProperty, canRe
   const item = member.data;
   return <Modal open={Boolean(memberId)} size="lg" title={item?.displayName || "Staff profile"} description={item ? `${item.jobTitle || "Staff member"}${item.department ? ` / ${item.department}` : ""}` : "Loading staff profile"} onClose={onClose}>{member.isLoading ? <LoadingState label="Loading staff profile" /> : member.error ? <ErrorState error={member.error} retry={() => void member.refetch()} /> : item ? <div className="space-y-5">
     <div className="flex flex-col gap-4 rounded-2xl bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><InitialAvatar name={item.displayName} variant="solid" /><div><p className="font-semibold">{item.displayName}</p><p className="text-xs text-base-content/50">{item.jobTitle || item.department || "Staff directory"}</p></div></div><div className="flex flex-wrap items-center gap-2"><StatusBadge status={staffStatusLabel(item.status)} />{canManageLifecycle && staffStatusKey(item.status) === "active" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLifecycleAction("suspend")}><UserRoundMinus size={15} />Suspend</button>}{canManageLifecycle && staffStatusKey(item.status) === "suspended" && <button type="button" className="btn btn-primary btn-sm" onClick={() => setLifecycleAction("resume")}><UserRoundCheck size={15} />Resume</button>}{canManageLifecycle && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => setLifecycleAction("depart")}><UserRoundX size={15} />Depart</button>}</div></div>
-    {lifecycleAction && <LifecyclePanel member={item} action={lifecycleAction} submitting={lifecycleMutation.isPending} error={lifecycleMutation.error} onCancel={() => { setLifecycleAction(null); lifecycleMutation.reset(); }} onConfirm={(reason, effectiveOn) => lifecycleMutation.mutate({ item, action: lifecycleAction, reason, effectiveOn })} />}
+    {lifecycleAction && <LifecyclePanel member={item} action={lifecycleAction} submitting={lifecycleMutation.isPending} error={lifecycleMutation.error} onCancel={() => { lifecycleAttempt.current = null; setLifecycleAction(null); lifecycleMutation.reset(); }} onConfirm={(reason, effectiveOn) => lifecycleMutation.mutate({ item, action: lifecycleAction, reason, effectiveOn })} />}
     <SegmentedTabs
       stretch
       value={tab}
