@@ -11792,6 +11792,8 @@ export interface components {
             expectedVersion: number;
         };
         GuestProfileWriteRequest: {
+            /** Format: uuid */
+            operationId: string;
             displayName: string | null;
             legalName: string | null;
             email: string | null;

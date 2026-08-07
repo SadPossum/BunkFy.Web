@@ -72,6 +72,7 @@ describe("guest record reservation workflow", () => {
       .mockResolvedValueOnce(linkedReservation);
 
     const result = await createAndLinkGuestRecord(request, "property-1", reservation, {
+      operationId: "guest-operation-1",
       profile: guestRecordPayloadFromBooking(reservation),
       timeoutMs: 100,
       retryDelayMs: 0,
@@ -99,6 +100,7 @@ describe("guest record reservation workflow", () => {
       .mockRejectedValueOnce(new ApiError("Link denied", 403));
 
     await expect(createAndLinkGuestRecord(request, "property-1", reservation, {
+      operationId: "guest-operation-1",
       profile: guestRecordPayloadFromBooking(reservation),
     }))
       .rejects.toBeInstanceOf(GuestRecordLinkError);
@@ -118,11 +120,14 @@ describe("guest record reservation workflow", () => {
     };
     const request = vi.fn().mockResolvedValueOnce(guest).mockResolvedValueOnce(linkedReservation);
 
-    await createAndLinkGuestRecord(request, "property-1", reservation, { profile });
+    await createAndLinkGuestRecord(request, "property-1", reservation, {
+      operationId: "guest-operation-1",
+      profile,
+    });
 
     expect(request).toHaveBeenNthCalledWith(1, "/api/guests/properties/property-1", {
       method: "POST",
-      body: JSON.stringify(profile),
+      body: JSON.stringify({ ...profile, operationId: "guest-operation-1" }),
     });
   });
 });

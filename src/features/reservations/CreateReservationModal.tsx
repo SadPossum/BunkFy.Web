@@ -22,6 +22,10 @@ import {
   type ReservationCreatePayload,
 } from "./reservationCreateAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
+import {
+  resolveGuestCreateAttempt,
+  type GuestCreateAttempt,
+} from "../guests/guestCreateAttempt";
 
 type ReservationStep = "reservation" | "guest";
 
@@ -63,6 +67,7 @@ export function CreateReservationModal({
   const [preferredLanguageTag, setPreferredLanguageTag] = useState("");
   const [guestNotes, setGuestNotes] = useState("");
   const createAttempt = useRef<ReservationCreateAttempt | null>(null);
+  const guestCreateAttempt = useRef<GuestCreateAttempt | null>(null);
 
   const availability = useQuery({
     queryKey: ["availability", propertyId, range.arrival, range.departure],
@@ -117,18 +122,25 @@ export function CreateReservationModal({
       });
 
       if (profileDetails) {
+        const profile = {
+          displayName: guestName.trim(),
+          legalName: emptyToNull(profileDetails.legalName),
+          email: emptyToNull(email),
+          phone: emptyToNull(phone),
+          dateOfBirth: emptyToNull(profileDetails.dateOfBirth),
+          nationalityCountryCode: emptyToNull(profileDetails.nationalityCountryCode)?.toUpperCase() ?? null,
+          preferredLanguageTag: emptyToNull(profileDetails.preferredLanguageTag),
+          notes: emptyToNull(profileDetails.notes),
+        };
+        guestCreateAttempt.current = resolveGuestCreateAttempt(
+          guestCreateAttempt.current,
+          propertyId,
+          profile,
+        );
         try {
           const saved = await createAndLinkGuestRecord(request, propertyId, created, {
-            profile: {
-              displayName: guestName.trim(),
-              legalName: emptyToNull(profileDetails.legalName),
-              email: emptyToNull(email),
-              phone: emptyToNull(phone),
-              dateOfBirth: emptyToNull(profileDetails.dateOfBirth),
-              nationalityCountryCode: emptyToNull(profileDetails.nationalityCountryCode)?.toUpperCase() ?? null,
-              preferredLanguageTag: emptyToNull(profileDetails.preferredLanguageTag),
-              notes: emptyToNull(profileDetails.notes),
-            },
+            operationId: guestCreateAttempt.current.operationId,
+            profile,
           });
           return { reservation: saved.reservation, warning: null, guestCreated: true };
         } catch (error) {
@@ -159,6 +171,7 @@ export function CreateReservationModal({
     },
     onSuccess: async ({ reservation, warning, guestCreated }) => {
       createAttempt.current = null;
+      guestCreateAttempt.current = null;
       if (guestCreated) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),

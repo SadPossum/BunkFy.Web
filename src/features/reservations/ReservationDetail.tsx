@@ -16,6 +16,7 @@ import { resolveReservationGuestDetailsAttempt, type ReservationGuestDetailsAtte
 import { resolveReservationGuestLinkAttempt, type ReservationGuestLinkAttempt } from "./reservationGuestLinkAttempt";
 import { resolveReservationLifecycleAttempt, type ReservationLifecycleAttempt, type ReservationLifecycleAction } from "./reservationLifecycleAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
+import { resolveGuestCreateAttempt, type GuestCreateAttempt } from "../guests/guestCreateAttempt";
 
 export type ReservationCapabilities = {
   manage: boolean;
@@ -339,7 +340,8 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
   const [choosing, setChoosing] = useState(!currentLink);
   const [candidate, setCandidate] = useState<GuestListItem | null>(null);
   const linkAttempt = useRef<ReservationGuestLinkAttempt | null>(null);
-  useEffect(() => { linkAttempt.current = null; setChoosing(!currentLink); setCandidate(null); }, [propertyId, reservation.reservationId, currentLink?.guestId]);
+  const createAttempt = useRef<GuestCreateAttempt | null>(null);
+  useEffect(() => { linkAttempt.current = null; createAttempt.current = null; setChoosing(!currentLink); setCandidate(null); }, [propertyId, reservation.reservationId, currentLink?.guestId]);
   const currentGuest = useQuery({
     queryKey: ["guest", propertyId, currentLink?.guestId],
     queryFn: () => request<GuestProfile>(`/api/guests/properties/${propertyId}/${currentLink?.guestId}`),
@@ -355,8 +357,20 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
     onSuccess: async (updated) => { linkAttempt.current = null; setChoosing(false); setCandidate(null); await queryClient.invalidateQueries({ queryKey: ["guest", propertyId] }); await onUpdated(updated); },
   });
   const createMutation = useMutation({
-    mutationFn: () => createAndLinkGuestRecord(request, propertyId, reservation, { profile: guestRecordPayloadFromBooking(reservation) }),
+    mutationFn: () => {
+      const profile = guestRecordPayloadFromBooking(reservation);
+      createAttempt.current = resolveGuestCreateAttempt(
+        createAttempt.current,
+        propertyId,
+        profile,
+      );
+      return createAndLinkGuestRecord(request, propertyId, reservation, {
+        operationId: createAttempt.current.operationId,
+        profile,
+      });
+    },
     onSuccess: async (created) => {
+      createAttempt.current = null;
       setChoosing(false);
       setCandidate(null);
       await onUpdated(created.reservation);

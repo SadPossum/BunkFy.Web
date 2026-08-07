@@ -14,7 +14,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { GuestListItem, GuestListResponse, GuestMutationReceipt, GuestProfile, GuestStayHistoryItem, GuestStayHistoryListResponse } from "../../api/types";
 import { guestStatusLabel, guestStatusValue, guestStayRoleLabel, guestStayStatusLabel } from "../../api/labels";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
@@ -34,6 +34,11 @@ import {
   PageHeader,
   StatusBadge,
 } from "../../components/ui/primitives";
+import {
+  resolveGuestCreateAttempt,
+  type GuestCreateAttempt,
+  type GuestCreatePayload,
+} from "./guestCreateAttempt";
 
 const PAGE_SIZE = 30;
 const STAY_PAGE_SIZE = 8;
@@ -41,16 +46,7 @@ const statusFilters = ["active", "all", "archived"] as const;
 type StatusFilter = (typeof statusFilters)[number];
 type GuestFormState = GuestProfile | null | undefined;
 
-type GuestWriteValues = {
-  displayName: string;
-  legalName: string | null;
-  email: string | null;
-  phone: string | null;
-  dateOfBirth: string | null;
-  nationalityCountryCode: string | null;
-  preferredLanguageTag: string | null;
-  notes: string | null;
-};
+type GuestWriteValues = GuestCreatePayload;
 
 type GuestFormSubmission = {
   guest: GuestProfile | null;
@@ -69,6 +65,7 @@ export function GuestsPage() {
   const [stayPage, setStayPage] = useState(1);
   const [formState, setFormState] = useState<GuestFormState>(undefined);
   const [archiveTarget, setArchiveTarget] = useState<GuestProfile | null>(null);
+  const createAttempt = useRef<GuestCreateAttempt | null>(null);
 
   const accessScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -110,16 +107,26 @@ export function GuestsPage() {
   });
 
   const guestMutation = useMutation<GuestMutationReceipt, Error, GuestFormSubmission>({
-    mutationFn: ({ guest, values }) => request<GuestMutationReceipt>(
-      guest
-        ? `/api/guests/properties/${selectedPropertyId}/${guest.guestId}`
-        : `/api/guests/properties/${selectedPropertyId}`,
-      {
-        method: guest ? "PUT" : "POST",
-        body: JSON.stringify(guest ? { ...values, expectedVersion: guest.version } : values),
-      },
-    ),
+    mutationFn: ({ guest, values }) => {
+      const body = guest
+        ? { ...values, expectedVersion: guest.version }
+        : (() => {
+            createAttempt.current = resolveGuestCreateAttempt(
+              createAttempt.current,
+              selectedPropertyId,
+              values,
+            );
+            return { ...values, operationId: createAttempt.current.operationId };
+          })();
+      return request<GuestMutationReceipt>(
+        guest
+          ? `/api/guests/properties/${selectedPropertyId}/${guest.guestId}`
+          : `/api/guests/properties/${selectedPropertyId}`,
+        { method: guest ? "PUT" : "POST", body: JSON.stringify(body) },
+      );
+    },
     onSuccess: async (saved) => {
+      createAttempt.current = null;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["guest-list", selectedPropertyId] }),
         queryClient.invalidateQueries({ queryKey: ["guest-detail", selectedPropertyId, saved.guestId] }),
@@ -145,6 +152,7 @@ export function GuestsPage() {
   });
 
   useEffect(() => {
+    createAttempt.current = null;
     setPage(1);
     setStayPage(1);
     setSelectedGuestId(null);
@@ -173,12 +181,14 @@ export function GuestsPage() {
 
   function openCreate() {
     guestMutation.reset();
+    createAttempt.current = null;
     selectGuest(null);
     setFormState(null);
   }
 
   function openEdit(guest: GuestProfile) {
     guestMutation.reset();
+    createAttempt.current = null;
     setSelectedGuestId(guest.guestId);
     setFormState(guest);
   }
@@ -287,7 +297,7 @@ export function GuestsPage() {
         submitting={guestMutation.isPending}
         error={guestMutation.error}
         onSubmit={(values) => guestMutation.mutate({ guest: formState ?? null, values })}
-        onClose={() => { guestMutation.reset(); setFormState(undefined); }}
+        onClose={() => { guestMutation.reset(); createAttempt.current = null; setFormState(undefined); }}
       />
 
       <ArchiveGuestModal

@@ -1,18 +1,10 @@
 import { ApiError } from "../../api/client";
 import type { GuestProfile, Reservation, ReservationMutationReceipt } from "../../api/types";
+import type { GuestCreatePayload } from "../guests/guestCreateAttempt";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
-export type GuestRecordWritePayload = {
-  displayName: string;
-  legalName: string | null;
-  email: string | null;
-  phone: string | null;
-  dateOfBirth: string | null;
-  nationalityCountryCode: string | null;
-  preferredLanguageTag: string | null;
-  notes: string | null;
-};
+export type GuestRecordWritePayload = GuestCreatePayload;
 
 export type GuestRecordProfileDetails = {
   legalName?: string | null;
@@ -23,6 +15,7 @@ export type GuestRecordProfileDetails = {
 };
 
 type CreateAndLinkGuestRecordOptions = {
+  operationId: string;
   profile: GuestRecordWritePayload;
   timeoutMs?: number;
   retryDelayMs?: number;
@@ -68,7 +61,7 @@ export async function createAndLinkGuestRecord(
 ): Promise<{ guest: GuestProfile; reservation: ReservationMutationReceipt }> {
   const guest = await request<GuestProfile>(`/api/guests/properties/${propertyId}`, {
     method: "POST",
-    body: JSON.stringify(options.profile),
+    body: JSON.stringify({ ...options.profile, operationId: options.operationId }),
   });
 
   try {
