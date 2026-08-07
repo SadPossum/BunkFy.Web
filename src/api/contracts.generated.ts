@@ -10833,6 +10833,8 @@ export interface components {
             roomVersion: number;
         };
         BedBatchWriteRequest: {
+            /** Format: uuid */
+            operationId: string;
             labels: string[] | null;
             /** Format: int64 */
             expectedRoomVersion: number;
@@ -10908,6 +10910,8 @@ export interface components {
         /** @enum {string} */
         BedStatus: "active" | "retired";
         BedWriteRequest: {
+            /** Format: uuid */
+            operationId: string;
             label: string | null;
             /** Format: int64 */
             expectedRoomVersion: number;

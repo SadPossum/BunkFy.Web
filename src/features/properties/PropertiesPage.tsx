@@ -30,6 +30,10 @@ import {
 } from "./propertyFormOptions";
 import { loadAllBeds, loadAllRooms } from "./propertiesApi";
 import {
+  resolveBedMutationAttempt,
+  type BedMutationAttempt,
+} from "./bedMutationAttempt";
+import {
   resolvePropertyCreateAttempt,
   type PropertyCreateAttempt,
 } from "./propertyCreateAttempt";
@@ -77,6 +81,7 @@ export function PropertiesPage() {
   const [roomForm, setRoomForm] = useState<RoomFormState>(null);
   const roomMutationAttempt = useRef<RoomMutationAttempt | null>(null);
   const [bedForm, setBedForm] = useState<BedFormState>(null);
+  const bedMutationAttempt = useRef<BedMutationAttempt | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [retirementTarget, setRetirementTarget] = useState<RetirementTarget | null>(null);
   const [retirementOutcome, setRetirementOutcome] = useState<TopologyRetirement | null>(null);
@@ -265,10 +270,24 @@ export function PropertiesPage() {
   const bedMutation = useMutation({
     mutationFn: async (input: BedMutationInput) => {
       if (!selectedRoom) throw new Error("Choose a room before adding beds.");
+      bedMutationAttempt.current = resolveBedMutationAttempt(
+        bedMutationAttempt.current,
+        {
+          propertyId: selectedPropertyId,
+          roomId: selectedRoom.roomId,
+          bedId: input.bed?.bedId,
+          expectedRoomVersion: input.bed?.roomVersion ?? selectedRoom.version,
+          labels: input.labels,
+        },
+      );
       if (input.bed) {
         return request<BedMutationReceipt>(`/api/properties/${selectedPropertyId}/rooms/${selectedRoom.roomId}/beds/${input.bed.bedId}`, {
           method: "PUT",
-          body: JSON.stringify({ label: input.labels[0], expectedRoomVersion: input.bed.roomVersion }),
+          body: JSON.stringify({
+            operationId: bedMutationAttempt.current.operationId,
+            label: input.labels[0],
+            expectedRoomVersion: bedMutationAttempt.current.expectedRoomVersion,
+          }),
         });
       }
 
@@ -277,14 +296,25 @@ export function PropertiesPage() {
         {
           method: "POST",
           body: JSON.stringify({
+            operationId: bedMutationAttempt.current.operationId,
             labels: input.labels,
-            expectedRoomVersion: selectedRoom.version,
+            expectedRoomVersion: bedMutationAttempt.current.expectedRoomVersion,
           }),
         },
       );
     },
-    onSuccess: async () => { await Promise.all([invalidateProperty(), queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId] })]); setBedForm(null); },
+    onSuccess: async () => {
+      bedMutationAttempt.current = null;
+      await Promise.all([invalidateProperty(), queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId] })]);
+      setBedForm(null);
+    },
   });
+
+  function closeBedForm() {
+    bedMutationAttempt.current = null;
+    bedMutation.reset();
+    setBedForm(null);
+  }
   const retireMutation = useMutation<TopologyRetirement | void, Error, RetirementMutationInput>({
     mutationFn: async ({ target, reason }) => {
       if (target.kind === "bed") {
@@ -377,7 +407,7 @@ export function PropertiesPage() {
 
       <PropertyForm state={(propertyForm?.property ? canManageProperty : canCreateProperty) ? propertyForm : null} mutation={propertyMutation} onClose={closePropertyForm} />
       <RoomForm state={canManageRooms ? roomForm : null} mutation={roomMutation} onClose={closeRoomForm} />
-      <BedForm state={canManageBeds ? bedForm : null} existingBeds={bedItems} mutation={bedMutation} onClose={() => { bedMutation.reset(); setBedForm(null); }} />
+      <BedForm state={canManageBeds ? bedForm : null} existingBeds={bedItems} mutation={bedMutation} onClose={closeBedForm} />
       <TopologyRetirementModal
         target={retirementTarget}
         outcome={retirementProcess.data ?? retirementOutcome}
