@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, BriefcaseBusiness, Building2, ChevronRight, CircleUserRound, Edit3, KeyRound, Mail, Phone, Plus, Search, ShieldAlert, UserRoundCheck, UserRoundMinus, UserRoundX, UsersRound } from "lucide-react";
-import { useDeferredValue, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { staffStatusLabel, staffStatusValue } from "../../api/labels";
 import type { Property, StaffDirectoryAssignment, StaffDirectoryListResponse, StaffDirectoryMember, StaffMember, StaffPropertyAssignment, StaffStatus } from "../../api/types";
@@ -12,6 +12,11 @@ import { EmptyState, ErrorState, FormActions, InitialAvatar, InlineFormActions, 
 import { DatePicker } from "../../components/ui/DatePicker";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import {
+  resolveStaffCreateAttempt,
+  type StaffCreateAttempt,
+  type StaffCreatePayload,
+} from "./staffCreateAttempt";
 
 const PAGE_SIZE = 30;
 const statusOptions = ["active", "suspended", "departed"] as const;
@@ -107,8 +112,26 @@ export function StaffPage() {
 
 function CreateStaffModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (member: StaffDirectoryMember) => Promise<void> }) {
   const { request } = useSession();
-  const mutation = useMutation({ mutationFn: (payload: Record<string, unknown>) => request<StaffDirectoryMember>("/api/staff/members", { method: "POST", body: JSON.stringify(payload) }), onSuccess: onCreated });
-  return <Modal open={open} title="New staff member" description="Create the workspace profile first. Property assignments can be added next." onClose={onClose}><StaffProfileForm includeAuthSubject submitting={mutation.isPending} error={mutation.error} submitLabel="Create staff member" onCancel={onClose} onSubmit={(payload) => mutation.mutate(payload)} /></Modal>;
+  const attempt = useRef<StaffCreateAttempt | null>(null);
+  const mutation = useMutation({
+    mutationFn: (payload: StaffCreatePayload) => {
+      attempt.current = resolveStaffCreateAttempt(attempt.current, payload);
+      return request<StaffDirectoryMember>("/api/staff/members", {
+        method: "POST",
+        body: JSON.stringify({ ...payload, operationId: attempt.current.operationId }),
+      });
+    },
+    onSuccess: async (created) => {
+      attempt.current = null;
+      await onCreated(created);
+    },
+  });
+  function close() {
+    attempt.current = null;
+    mutation.reset();
+    onClose();
+  }
+  return <Modal open={open} title="New staff member" description="Create the workspace profile first. Property assignments can be added next." onClose={close}><StaffProfileForm includeAuthSubject submitting={mutation.isPending} error={mutation.error} submitLabel="Create staff member" onCancel={close} onSubmit={(payload) => mutation.mutate(payload)} /></Modal>;
 }
 
 function StaffDetail({ memberId, initialTab, properties, selectedProperty, canReadSensitive, canManage, canManageLifecycle, canAssignCurrentProperty, onClose }: { memberId: string | null; initialTab: "profile" | "assignments" | "account"; properties: Property[]; selectedProperty: Property | null; canReadSensitive: boolean; canManage: boolean; canManageLifecycle: boolean; canAssignCurrentProperty: boolean; onClose: () => void }) {
@@ -153,7 +176,7 @@ function ProfileDetails({ member }: { member: StaffDetailMember }) {
   return <div className="grid gap-3 sm:grid-cols-2"><InfoRow icon={<CircleUserRound />} label="Legal name" value={member.legalName || "Not provided"} /><InfoRow icon={<BadgeCheck />} label="Employee number" value={member.employeeNumber || "Not provided"} /><InfoRow icon={<Mail />} label="Work email" value={member.workEmail || "Not provided"} href={member.workEmail ? `mailto:${member.workEmail}` : undefined} /><InfoRow icon={<Phone />} label="Work phone" value={member.workPhone || "Not provided"} href={member.workPhone ? `tel:${member.workPhone}` : undefined} /><InfoRow icon={<BriefcaseBusiness />} label="Job title" value={member.jobTitle || "Not provided"} /><InfoRow icon={<UsersRound />} label="Department" value={member.department || "Not provided"} /></div>;
 }
 
-function StaffProfileForm({ member, includeAuthSubject = false, submitting, error, submitLabel, onCancel, onSubmit }: { member?: StaffMember; includeAuthSubject?: boolean; submitting: boolean; error: unknown; submitLabel: string; onCancel: () => void; onSubmit: (payload: Record<string, unknown>) => void }) {
+function StaffProfileForm({ member, includeAuthSubject = false, submitting, error, submitLabel, onCancel, onSubmit }: { member?: StaffMember; includeAuthSubject?: boolean; submitting: boolean; error: unknown; submitLabel: string; onCancel: () => void; onSubmit: (payload: StaffCreatePayload) => void }) {
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); onSubmit({ displayName: String(data.get("displayName") ?? "").trim(), legalName: emptyToNull(data.get("legalName")), workEmail: emptyToNull(data.get("workEmail")), workPhone: emptyToNull(data.get("workPhone")), employeeNumber: emptyToNull(data.get("employeeNumber")), jobTitle: emptyToNull(data.get("jobTitle")), department: emptyToNull(data.get("department")), ...(includeAuthSubject ? { authSubjectId: emptyToNull(data.get("authSubjectId")) } : {}) }); }
   return <form className="space-y-4" onSubmit={submit}><TextField label="Display name" name="displayName" defaultValue={member?.displayName} maxLength={256} /><TextField label="Legal name (optional)" name="legalName" defaultValue={member?.legalName || ""} required={false} maxLength={256} /><div className="grid gap-4 sm:grid-cols-2"><TextField label="Work email" name="workEmail" type="email" defaultValue={member?.workEmail || ""} required={false} maxLength={320} /><TextField label="Work phone" name="workPhone" type="tel" defaultValue={member?.workPhone || ""} required={false} maxLength={64} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Employee number" name="employeeNumber" defaultValue={member?.employeeNumber || ""} required={false} maxLength={64} /><TextField label="Job title" name="jobTitle" defaultValue={member?.jobTitle || ""} required={false} maxLength={128} /></div><TextField label="Department" name="department" defaultValue={member?.department || ""} required={false} maxLength={128} />{includeAuthSubject && <details className="rounded-lg border border-base-300 p-4"><summary className="cursor-pointer text-sm font-semibold">Sign-in account link (advanced)</summary><div className="mt-4"><TextField label="Sign-in account ID" name="authSubjectId" required={false} maxLength={256} /><p className="mt-2 text-xs leading-5 text-base-content/50">Only set this when you know the exact account identifier.</p></div></details>}{Boolean(error) && <ErrorState error={error} />}{member ? <InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>{submitting && <span className="loading loading-spinner loading-xs" />}{submitLabel}</button></InlineFormActions> : <FormActions submitting={submitting} submitLabel={submitLabel} onCancel={onCancel} />}</form>;
 }

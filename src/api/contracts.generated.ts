@@ -13603,6 +13603,8 @@ export interface components {
             expectedVersion: number;
         };
         StaffProfileWriteRequest: {
+            /** Format: uuid */
+            operationId: string;
             displayName: string | null;
             legalName: string | null;
             workEmail: string | null;
