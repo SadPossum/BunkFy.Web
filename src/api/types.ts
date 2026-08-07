@@ -435,6 +435,8 @@ export type ReservationMutationReceipt = Omit<Schema<"ReservationMutationReceipt
   status: ReservationStatus;
 };
 
+export type LinkReservationGuestRequest = Schema<"LinkReservationGuestRequest">;
+
 export type UpdateReservationGuestDetailsRequest = NonNullableFields<
   Schema<"UpdateReservationGuestDetailsRequest">,
   "primaryGuestName"
