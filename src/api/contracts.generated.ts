@@ -8197,6 +8197,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reservations/properties/{propertyId}/{reservationId}/guest-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    reservationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReservationGuestRecordWriteRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationGuestRecordLinkProcessDto"];
+                    };
+                };
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationGuestRecordLinkProcessDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reservations/properties/{propertyId}/{reservationId}/guest-record/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    reservationId: string;
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationGuestRecordLinkProcessDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations/properties/{propertyId}": {
         parameters: {
             query?: never;
@@ -12904,6 +12994,52 @@ export interface components {
             /** Format: uuid */
             guestId: string;
             role: components["schemas"]["ReservationGuestRoleKind"];
+        };
+        ReservationGuestRecordLinkProcessDto: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: uuid */
+            guestId: string;
+            status: components["schemas"]["ReservationGuestRecordLinkStatus"];
+            reviewReason: components["schemas"]["ReservationGuestRecordLinkReviewReason"];
+            /** Format: int64 */
+            revision: number;
+            /** Format: int32 */
+            dispatchRevision: number;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string;
+            readonly isTerminal: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ReservationGuestRecordLinkReviewReason: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ReservationGuestRecordLinkStatus: 0 | 1 | 2 | 3 | 4;
+        ReservationGuestRecordWriteRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedReservationVersion: number;
+            displayName: string | null;
+            legalName: string | null;
+            email: string | null;
+            phone: string | null;
+            /** Format: date */
+            dateOfBirth: string | null;
+            nationalityCountryCode: string | null;
+            preferredLanguageTag: string | null;
+            notes: string | null;
         };
         /**
          * Format: int32

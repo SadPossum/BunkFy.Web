@@ -8313,6 +8313,113 @@
         }
       }
     },
+    "/api/reservations/properties/{propertyId}/{reservationId}/guest-record": {
+      "post": {
+        "tags": [
+          "Reservation Guest Records"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservationGuestRecordWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationGuestRecordLinkProcessDto"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationGuestRecordLinkProcessDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reservations/properties/{propertyId}/{reservationId}/guest-record/{operationId}": {
+      "get": {
+        "tags": [
+          "Reservation Guest Records"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationGuestRecordLinkProcessDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reservations/properties/{propertyId}": {
       "post": {
         "tags": [
@@ -17730,6 +17837,126 @@
         },
         "additionalProperties": false
       },
+      "ReservationGuestRecordLinkProcessDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "guestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReservationGuestRecordLinkStatus"
+          },
+          "reviewReason": {
+            "$ref": "#/components/schemas/ReservationGuestRecordLinkReviewReason"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "dispatchRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isTerminal": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationGuestRecordLinkReviewReason": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ReservationGuestRecordLinkStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ReservationGuestRecordWriteRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedReservationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "nationalityCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "preferredLanguageTag": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ReservationGuestRoleKind": {
         "enum": [
           0,
@@ -20471,6 +20698,9 @@
     },
     {
       "name": "Properties"
+    },
+    {
+      "name": "Reservation Guest Records"
     },
     {
       "name": "Reservations"

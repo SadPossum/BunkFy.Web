@@ -11,12 +11,11 @@ import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
-import { createAndLinkGuestRecord, guestRecordPayloadFromBooking, hasPrimaryGuestRecord } from "./guestRecordWorkflow";
+import { createAndLinkGuestRecord, guestRecordPayloadFromBooking, hasPrimaryGuestRecord, resolveReservationGuestRecordAttempt, type ReservationGuestRecordAttempt } from "./guestRecordWorkflow";
 import { resolveReservationGuestDetailsAttempt, type ReservationGuestDetailsAttempt, type ReservationGuestDetailsAttemptPayload } from "./reservationGuestDetailsAttempt";
 import { resolveReservationGuestLinkAttempt, type ReservationGuestLinkAttempt } from "./reservationGuestLinkAttempt";
 import { resolveReservationLifecycleAttempt, type ReservationLifecycleAttempt, type ReservationLifecycleAction } from "./reservationLifecycleAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
-import { resolveGuestCreateAttempt, type GuestCreateAttempt } from "../guests/guestCreateAttempt";
 
 export type ReservationCapabilities = {
   manage: boolean;
@@ -340,7 +339,7 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
   const [choosing, setChoosing] = useState(!currentLink);
   const [candidate, setCandidate] = useState<GuestListItem | null>(null);
   const linkAttempt = useRef<ReservationGuestLinkAttempt | null>(null);
-  const createAttempt = useRef<GuestCreateAttempt | null>(null);
+  const createAttempt = useRef<ReservationGuestRecordAttempt | null>(null);
   useEffect(() => { linkAttempt.current = null; createAttempt.current = null; setChoosing(!currentLink); setCandidate(null); }, [propertyId, reservation.reservationId, currentLink?.guestId]);
   const currentGuest = useQuery({
     queryKey: ["guest", propertyId, currentLink?.guestId],
@@ -359,13 +358,16 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
   const createMutation = useMutation({
     mutationFn: () => {
       const profile = guestRecordPayloadFromBooking(reservation);
-      createAttempt.current = resolveGuestCreateAttempt(
+      createAttempt.current = resolveReservationGuestRecordAttempt(
         createAttempt.current,
         propertyId,
+        reservation,
         profile,
       );
       return createAndLinkGuestRecord(request, propertyId, reservation, {
         operationId: createAttempt.current.operationId,
+        expectedReservationVersion:
+          createAttempt.current.expectedReservationVersion,
         profile,
       });
     },

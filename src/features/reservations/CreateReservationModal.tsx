@@ -12,7 +12,9 @@ import {
   createAndLinkGuestRecord,
   GuestRecordLinkError,
   linkGuestRecord,
+  resolveReservationGuestRecordAttempt,
   type GuestRecordProfileDetails,
+  type ReservationGuestRecordAttempt,
 } from "./guestRecordWorkflow";
 import { groupAvailabilityByRoom } from "./inventoryGrouping";
 import { ReservationInventoryPicker } from "./ReservationInventoryPicker";
@@ -22,10 +24,6 @@ import {
   type ReservationCreatePayload,
 } from "./reservationCreateAttempt";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
-import {
-  resolveGuestCreateAttempt,
-  type GuestCreateAttempt,
-} from "../guests/guestCreateAttempt";
 
 type ReservationStep = "reservation" | "guest";
 
@@ -67,7 +65,7 @@ export function CreateReservationModal({
   const [preferredLanguageTag, setPreferredLanguageTag] = useState("");
   const [guestNotes, setGuestNotes] = useState("");
   const createAttempt = useRef<ReservationCreateAttempt | null>(null);
-  const guestCreateAttempt = useRef<GuestCreateAttempt | null>(null);
+  const guestRecordAttempt = useRef<ReservationGuestRecordAttempt | null>(null);
 
   const availability = useQuery({
     queryKey: ["availability", propertyId, range.arrival, range.departure],
@@ -132,14 +130,17 @@ export function CreateReservationModal({
           preferredLanguageTag: emptyToNull(profileDetails.preferredLanguageTag),
           notes: emptyToNull(profileDetails.notes),
         };
-        guestCreateAttempt.current = resolveGuestCreateAttempt(
-          guestCreateAttempt.current,
+        guestRecordAttempt.current = resolveReservationGuestRecordAttempt(
+          guestRecordAttempt.current,
           propertyId,
+          created,
           profile,
         );
         try {
           const saved = await createAndLinkGuestRecord(request, propertyId, created, {
-            operationId: guestCreateAttempt.current.operationId,
+            operationId: guestRecordAttempt.current.operationId,
+            expectedReservationVersion:
+              guestRecordAttempt.current.expectedReservationVersion,
             profile,
           });
           return { reservation: saved.reservation, warning: null, guestCreated: true };
@@ -171,7 +172,7 @@ export function CreateReservationModal({
     },
     onSuccess: async ({ reservation, warning, guestCreated }) => {
       createAttempt.current = null;
-      guestCreateAttempt.current = null;
+      guestRecordAttempt.current = null;
       if (guestCreated) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["guest-list", propertyId] }),

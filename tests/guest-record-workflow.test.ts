@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError } from "../src/api/client";
-import type { GuestProfile, Reservation } from "../src/api/types";
+import type { Reservation } from "../src/api/types";
 import {
   createAndLinkGuestRecord,
   GuestRecordLinkError,
   guestRecordPayloadFromBooking,
   hasPrimaryGuestRecord,
+  resolveReservationGuestRecordAttempt,
 } from "../src/features/reservations/guestRecordWorkflow";
 
 const reservation = {
@@ -18,10 +18,18 @@ const reservation = {
   version: 4,
 } as unknown as Reservation;
 
-const guest = {
-  guestId: "guest-1",
-  displayName: "Maya Chen",
-} as GuestProfile;
+const readyProcess = {
+  operationId: "guest-operation-1",
+  propertyId: "property-1",
+  reservationId: "reservation-1",
+  guestId: "guest-operation-1",
+  status: 2,
+  reviewReason: 1,
+  revision: 2,
+  dispatchRevision: 1,
+  createdAtUtc: "2026-08-07T10:00:00Z",
+  updatedAtUtc: "2026-08-07T10:00:01Z",
+};
 
 describe("guest record reservation workflow", () => {
   it("builds a minimal durable profile from booking contact details", () => {
@@ -62,52 +70,135 @@ describe("guest record reservation workflow", () => {
     expect(hasPrimaryGuestRecord({ guests: [] })).toBe(false);
   });
 
-  it("creates a profile and waits for the reservation projection before linking", async () => {
-    const updatedReservation = { ...reservation, version: 5 } as Reservation;
-    const linkedReservation = { ...updatedReservation, guests: [{ guestId: guest.guestId, role: 1 }] } as Reservation;
+  it("keeps one exact operation for the same Reservation intent", () => {
+    const profile = guestRecordPayloadFromBooking(reservation);
+    const first = resolveReservationGuestRecordAttempt(
+      null,
+      "property-1",
+      reservation,
+      profile,
+      () => "operation-1",
+    );
+    const retry = resolveReservationGuestRecordAttempt(
+      first,
+      "property-1",
+      { ...reservation, version: 99 },
+      profile,
+      () => "operation-2",
+    );
+    const anotherReservation = resolveReservationGuestRecordAttempt(
+      retry,
+      "property-1",
+      { ...reservation, reservationId: "reservation-2" },
+      profile,
+      () => "operation-2",
+    );
+
+    expect(retry).toBe(first);
+    expect(retry.expectedReservationVersion).toBe(4);
+    expect(anotherReservation.operationId).toBe("operation-2");
+  });
+
+  it("starts one durable operation and waits for completion", async () => {
+    const linkedReservation = {
+      ...reservation,
+      version: 5,
+      guests: [{ guestId: "guest-operation-1", role: 1 }],
+    } as Reservation;
     const request = vi.fn()
-      .mockResolvedValueOnce(guest)
-      .mockRejectedValueOnce(new ApiError("Not visible yet", 409, "Reservations.GuestNotLinkable"))
-      .mockResolvedValueOnce(updatedReservation)
+      .mockResolvedValueOnce(readyProcess)
+      .mockResolvedValueOnce({ ...readyProcess, status: 3, revision: 3 })
       .mockResolvedValueOnce(linkedReservation);
 
     const result = await createAndLinkGuestRecord(request, "property-1", reservation, {
       operationId: "guest-operation-1",
+      expectedReservationVersion: 4,
       profile: guestRecordPayloadFromBooking(reservation),
       timeoutMs: 100,
       retryDelayMs: 0,
     });
 
-    expect(result).toEqual({ guest, reservation: linkedReservation });
+    expect(result).toEqual({
+      guestId: "guest-operation-1",
+      process: { ...readyProcess, status: 3, revision: 3 },
+      reservation: linkedReservation,
+    });
     expect(request).toHaveBeenNthCalledWith(
-      4,
-      "/api/reservations/properties/property-1/reservation-1/guests",
-      expect.objectContaining({
-        method: "PUT",
-        body: JSON.stringify({
-          guestId: "guest-1",
-          role: 1,
-          replaceExistingRole: false,
-          expectedVersion: 5,
-        }),
-      }),
+      1,
+      "/api/reservations/properties/property-1/reservation-1/guest-record",
+      {
+        method: "POST",
+        body: expect.any(String),
+      },
+    );
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({
+      ...guestRecordPayloadFromBooking(reservation),
+      operationId: "guest-operation-1",
+      expectedReservationVersion: 4,
+    });
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      "/api/reservations/properties/property-1/reservation-1/guest-record/guest-operation-1",
     );
   });
 
-  it("reports a created but unlinked profile without hiding the partial success", async () => {
+  it("follows the canonical process returned after a resumed start", async () => {
+    const canonical = {
+      ...readyProcess,
+      operationId: "canonical-operation",
+      guestId: "canonical-operation",
+    };
+    const linkedReservation = {
+      ...reservation,
+      guests: [{ guestId: "canonical-operation", role: 1 }],
+    } as Reservation;
     const request = vi.fn()
-      .mockResolvedValueOnce(guest)
-      .mockRejectedValueOnce(new ApiError("Link denied", 403));
+      .mockResolvedValueOnce(canonical)
+      .mockResolvedValueOnce({ ...canonical, status: 3 })
+      .mockResolvedValueOnce(linkedReservation);
+
+    const result = await createAndLinkGuestRecord(request, "property-1", reservation, {
+      operationId: "fresh-browser-operation",
+      expectedReservationVersion: reservation.version,
+      profile: guestRecordPayloadFromBooking(reservation),
+      timeoutMs: 100,
+      retryDelayMs: 0,
+    });
+
+    expect(result.guestId).toBe("canonical-operation");
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      "/api/reservations/properties/property-1/reservation-1/guest-record/canonical-operation",
+    );
+  });
+
+  it("surfaces a durable review state without falling back to browser linking", async () => {
+    const request = vi.fn().mockResolvedValueOnce({
+      ...readyProcess,
+      status: "needsReview",
+      reviewReason: "guestRestricted",
+    });
 
     await expect(createAndLinkGuestRecord(request, "property-1", reservation, {
       operationId: "guest-operation-1",
+      expectedReservationVersion: 4,
       profile: guestRecordPayloadFromBooking(reservation),
     }))
-      .rejects.toBeInstanceOf(GuestRecordLinkError);
+      .rejects.toMatchObject({
+        name: "GuestRecordLinkError",
+        message: expect.stringContaining("guest processing is restricted"),
+      });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls.flatMap((call) => call[0])).not.toContain(
+      "/api/guests/properties/property-1",
+    );
   });
 
   it("uses staff-supplied profile details when creating the durable record", async () => {
-    const linkedReservation = { ...reservation, guests: [{ guestId: guest.guestId, role: 1 }] } as Reservation;
+    const linkedReservation = {
+      ...reservation,
+      guests: [{ guestId: "guest-operation-1", role: 1 }],
+    } as Reservation;
     const profile = {
       displayName: "Maya Chen",
       legalName: "Maya Lin Chen",
@@ -118,16 +209,41 @@ describe("guest record reservation workflow", () => {
       preferredLanguageTag: "en-GB",
       notes: null,
     };
-    const request = vi.fn().mockResolvedValueOnce(guest).mockResolvedValueOnce(linkedReservation);
+    const request = vi.fn()
+      .mockResolvedValueOnce({ ...readyProcess, status: "completed" })
+      .mockResolvedValueOnce(linkedReservation);
 
     await createAndLinkGuestRecord(request, "property-1", reservation, {
       operationId: "guest-operation-1",
+      expectedReservationVersion: 4,
       profile,
     });
 
-    expect(request).toHaveBeenNthCalledWith(1, "/api/guests/properties/property-1", {
-      method: "POST",
-      body: JSON.stringify({ ...profile, operationId: "guest-operation-1" }),
-    });
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      "/api/reservations/properties/property-1/reservation-1/guest-record",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ...profile,
+          operationId: "guest-operation-1",
+          expectedReservationVersion: 4,
+        }),
+      },
+    );
+  });
+
+  it("stops bounded polling while the durable operation continues", async () => {
+    const request = vi.fn().mockResolvedValueOnce(readyProcess);
+
+    await expect(createAndLinkGuestRecord(request, "property-1", reservation, {
+      operationId: "guest-operation-1",
+      expectedReservationVersion: 4,
+      profile: guestRecordPayloadFromBooking(reservation),
+      timeoutMs: 0,
+      retryDelayMs: 0,
+    })).rejects.toBeInstanceOf(GuestRecordLinkError);
+
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

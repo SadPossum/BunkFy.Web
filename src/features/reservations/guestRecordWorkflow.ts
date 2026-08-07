@@ -1,6 +1,14 @@
 import { ApiError } from "../../api/client";
-import type { GuestProfile, Reservation, ReservationMutationReceipt } from "../../api/types";
-import type { GuestCreatePayload } from "../guests/guestCreateAttempt";
+import type {
+  Reservation,
+  ReservationGuestRecordLinkProcess,
+  ReservationGuestRecordWriteRequest,
+  ReservationMutationReceipt,
+} from "../../api/types";
+import {
+  guestCreateFingerprint,
+  type GuestCreatePayload,
+} from "../guests/guestCreateAttempt";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -16,6 +24,7 @@ export type GuestRecordProfileDetails = {
 
 type CreateAndLinkGuestRecordOptions = {
   operationId: string;
+  expectedReservationVersion: number;
   profile: GuestRecordWritePayload;
   timeoutMs?: number;
   retryDelayMs?: number;
@@ -23,12 +32,18 @@ type CreateAndLinkGuestRecordOptions = {
 
 type ReservationMutationTarget = Pick<ReservationMutationReceipt, "reservationId" | "version">;
 
+export type ReservationGuestRecordAttempt = {
+  fingerprint: string;
+  operationId: string;
+  expectedReservationVersion: number;
+};
+
 export class GuestRecordLinkError extends Error {
   constructor(
-    public readonly guest: GuestProfile,
-    cause: unknown,
+    message: string,
+    public readonly process: ReservationGuestRecordLinkProcess,
   ) {
-    super(`The Guest Record was created, but it could not be linked to the reservation: ${errorMessage(cause)}`);
+    super(message);
     this.name = "GuestRecordLinkError";
   }
 }
@@ -53,29 +68,83 @@ export function guestRecordPayloadFromBooking(
   };
 }
 
+export function resolveReservationGuestRecordAttempt(
+  current: ReservationGuestRecordAttempt | null,
+  propertyId: string,
+  reservation: ReservationMutationTarget,
+  profile: GuestRecordWritePayload,
+  createOperationId: () => string = () => crypto.randomUUID(),
+): ReservationGuestRecordAttempt {
+  const fingerprint = JSON.stringify({
+    propertyId,
+    reservationId: reservation.reservationId,
+    profile: guestCreateFingerprint(propertyId, profile),
+  });
+  return current?.fingerprint === fingerprint
+    ? current
+    : {
+        fingerprint,
+        operationId: createOperationId(),
+        expectedReservationVersion: reservation.version,
+      };
+}
+
 export async function createAndLinkGuestRecord(
   request: ApiRequest,
   propertyId: string,
   reservation: ReservationMutationTarget,
   options: CreateAndLinkGuestRecordOptions,
-): Promise<{ guest: GuestProfile; reservation: ReservationMutationReceipt }> {
-  const guest = await request<GuestProfile>(`/api/guests/properties/${propertyId}`, {
+): Promise<{
+  guestId: string;
+  process: ReservationGuestRecordLinkProcess;
+  reservation: Reservation;
+}> {
+  const route = `/api/reservations/properties/${propertyId}/${reservation.reservationId}/guest-record`;
+  const body: ReservationGuestRecordWriteRequest = {
+    ...options.profile,
+    operationId: options.operationId,
+    expectedReservationVersion: options.expectedReservationVersion,
+  };
+  let process = await request<ReservationGuestRecordLinkProcess>(route, {
     method: "POST",
-    body: JSON.stringify({ ...options.profile, operationId: options.operationId }),
+    body: JSON.stringify(body),
   });
 
-  try {
-    const linkedReservation = await linkGuestRecord(
-      request,
-      propertyId,
-      reservation,
-      guest.guestId,
-      options,
+  const deadline = Date.now() + (options.timeoutMs ?? 12_000);
+  let retryDelayMs = options.retryDelayMs ?? 300;
+  while (guestRecordLinkStatus(process.status) === "pending" && Date.now() < deadline) {
+    await delay(retryDelayMs);
+    process = await request<ReservationGuestRecordLinkProcess>(
+      `${route}/${process.operationId}`,
     );
-    return { guest, reservation: linkedReservation };
-  } catch (error) {
-    throw new GuestRecordLinkError(guest, error);
+    if (options.retryDelayMs === undefined) {
+      retryDelayMs = Math.min(Math.ceil(retryDelayMs * 1.6), 1_500);
+    }
   }
+
+  const status = guestRecordLinkStatus(process.status);
+  if (status === "review") {
+    throw new GuestRecordLinkError(
+      `The Guest Record is safe, but linking needs review: ${guestRecordReviewMessage(process.reviewReason)}`,
+      process,
+    );
+  }
+
+  if (status !== "completed") {
+    throw new GuestRecordLinkError(
+      "BunkFy is still linking the Guest Record. The operation will continue in the background.",
+      process,
+    );
+  }
+
+  const linkedReservation = await request<Reservation>(
+    `/api/reservations/properties/${propertyId}/${reservation.reservationId}`,
+  );
+  return {
+    guestId: process.guestId,
+    process,
+    reservation: linkedReservation,
+  };
 }
 
 export async function linkGuestRecord(
@@ -120,10 +189,36 @@ function isConvergenceError(error: unknown): boolean {
   );
 }
 
-function emptyToNull(value: string | null | undefined): string | null {
-  return value?.trim() || null;
+function guestRecordLinkStatus(status: number | string): "pending" | "completed" | "review" | "unknown" {
+  const normalized = String(status).replace(/[\s_-]/g, "").toLowerCase();
+  if (["1", "2", "prepared", "ready"].includes(normalized)) return "pending";
+  if (["3", "completed"].includes(normalized)) return "completed";
+  if (["4", "needsreview"].includes(normalized)) return "review";
+  return "unknown";
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
+function guestRecordReviewMessage(reason: number | string): string {
+  const normalized = String(reason).replace(/[\s_-]/g, "").toLowerCase();
+  return ({
+    "2": "the reservation is no longer available",
+    reservationunavailable: "the reservation is no longer available",
+    "3": "another primary Guest Record is already linked",
+    primaryguestoccupied: "another primary Guest Record is already linked",
+    "4": "the Guest Record is no longer available",
+    guestunavailable: "the Guest Record is no longer available",
+    "5": "guest processing is restricted",
+    guestrestricted: "guest processing is restricted",
+    "6": "the current country policy does not allow this operation",
+    countrypolicydenied: "the current country policy does not allow this operation",
+    "7": "automatic retries were exhausted",
+    retrylimitreached: "automatic retries were exhausted",
+  } as Record<string, string>)[normalized] ?? "the current Reservation or Guest state needs attention";
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, milliseconds));
+}
+
+function emptyToNull(value: string | null | undefined): string | null {
+  return value?.trim() || null;
 }
