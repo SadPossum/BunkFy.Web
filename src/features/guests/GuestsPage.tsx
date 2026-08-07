@@ -39,6 +39,11 @@ import {
   type GuestCreateAttempt,
   type GuestCreatePayload,
 } from "./guestCreateAttempt";
+import {
+  resolveGuestArchiveAttempt,
+  resolveGuestUpdateAttempt,
+  type GuestManagementAttempt,
+} from "./guestManagementAttempt";
 
 const PAGE_SIZE = 30;
 const STAY_PAGE_SIZE = 8;
@@ -66,6 +71,8 @@ export function GuestsPage() {
   const [formState, setFormState] = useState<GuestFormState>(undefined);
   const [archiveTarget, setArchiveTarget] = useState<GuestProfile | null>(null);
   const createAttempt = useRef<GuestCreateAttempt | null>(null);
+  const updateAttempt = useRef<GuestManagementAttempt | null>(null);
+  const archiveAttempt = useRef<GuestManagementAttempt | null>(null);
 
   const accessScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -109,7 +116,20 @@ export function GuestsPage() {
   const guestMutation = useMutation<GuestMutationReceipt, Error, GuestFormSubmission>({
     mutationFn: ({ guest, values }) => {
       const body = guest
-        ? { ...values, expectedVersion: guest.version }
+        ? (() => {
+            updateAttempt.current = resolveGuestUpdateAttempt(
+              updateAttempt.current,
+              selectedPropertyId,
+              guest.guestId,
+              guest.version,
+              values,
+            );
+            return {
+              ...values,
+              operationId: updateAttempt.current.operationId,
+              expectedVersion: guest.version,
+            };
+          })()
         : (() => {
             createAttempt.current = resolveGuestCreateAttempt(
               createAttempt.current,
@@ -127,6 +147,7 @@ export function GuestsPage() {
     },
     onSuccess: async (saved) => {
       createAttempt.current = null;
+      updateAttempt.current = null;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["guest-list", selectedPropertyId] }),
         queryClient.invalidateQueries({ queryKey: ["guest-detail", selectedPropertyId, saved.guestId] }),
@@ -137,11 +158,27 @@ export function GuestsPage() {
   });
 
   const archiveMutation = useMutation<GuestMutationReceipt, Error, GuestProfile>({
-    mutationFn: (guest) => request<GuestMutationReceipt>(
-      `/api/guests/properties/${selectedPropertyId}/${guest.guestId}/archive`,
-      { method: "POST", body: JSON.stringify({ expectedVersion: guest.version, confirmed: true }) },
-    ),
+    mutationFn: (guest) => {
+      archiveAttempt.current = resolveGuestArchiveAttempt(
+        archiveAttempt.current,
+        selectedPropertyId,
+        guest.guestId,
+        guest.version,
+      );
+      return request<GuestMutationReceipt>(
+        `/api/guests/properties/${selectedPropertyId}/${guest.guestId}/archive`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: archiveAttempt.current.operationId,
+            expectedVersion: guest.version,
+            confirmed: true,
+          }),
+        },
+      );
+    },
     onSuccess: async (archived) => {
+      archiveAttempt.current = null;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["guest-list", selectedPropertyId] }),
         queryClient.invalidateQueries({ queryKey: ["guest-detail", selectedPropertyId, archived.guestId] }),
@@ -153,6 +190,8 @@ export function GuestsPage() {
 
   useEffect(() => {
     createAttempt.current = null;
+    updateAttempt.current = null;
+    archiveAttempt.current = null;
     setPage(1);
     setStayPage(1);
     setSelectedGuestId(null);
@@ -182,6 +221,7 @@ export function GuestsPage() {
   function openCreate() {
     guestMutation.reset();
     createAttempt.current = null;
+    updateAttempt.current = null;
     selectGuest(null);
     setFormState(null);
   }
@@ -189,12 +229,14 @@ export function GuestsPage() {
   function openEdit(guest: GuestProfile) {
     guestMutation.reset();
     createAttempt.current = null;
+    updateAttempt.current = null;
     setSelectedGuestId(guest.guestId);
     setFormState(guest);
   }
 
   function openArchive(guest: GuestProfile) {
     archiveMutation.reset();
+    archiveAttempt.current = null;
     setSelectedGuestId(guest.guestId);
     setArchiveTarget(guest);
   }
@@ -297,7 +339,7 @@ export function GuestsPage() {
         submitting={guestMutation.isPending}
         error={guestMutation.error}
         onSubmit={(values) => guestMutation.mutate({ guest: formState ?? null, values })}
-        onClose={() => { guestMutation.reset(); createAttempt.current = null; setFormState(undefined); }}
+        onClose={() => { guestMutation.reset(); createAttempt.current = null; updateAttempt.current = null; setFormState(undefined); }}
       />
 
       <ArchiveGuestModal
@@ -305,7 +347,7 @@ export function GuestsPage() {
         submitting={archiveMutation.isPending}
         error={archiveMutation.error}
         onConfirm={() => { if (archiveTarget) archiveMutation.mutate(archiveTarget); }}
-        onClose={() => { archiveMutation.reset(); setArchiveTarget(null); }}
+        onClose={() => { archiveMutation.reset(); archiveAttempt.current = null; setArchiveTarget(null); }}
       />
     </>
   );

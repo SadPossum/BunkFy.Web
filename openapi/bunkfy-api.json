@@ -11771,6 +11771,10 @@
       "ArchiveGuestProfileRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
@@ -14776,6 +14780,10 @@
       "GuestProfileUpdateRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "displayName": {
             "type": "string",
             "nullable": true

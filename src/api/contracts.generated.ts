@@ -10769,6 +10769,8 @@ export interface components {
             expectedVersion: number;
         };
         ArchiveGuestProfileRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: int64 */
             expectedVersion: number;
             confirmed: boolean;
@@ -11869,6 +11871,8 @@ export interface components {
             archivedAtUtc: string | null;
         };
         GuestProfileUpdateRequest: {
+            /** Format: uuid */
+            operationId: string;
             displayName: string | null;
             legalName: string | null;
             email: string | null;
