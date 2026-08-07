@@ -12618,6 +12618,8 @@ export interface components {
             token: string | null;
         };
         PropertyCreateRequest: {
+            /** Format: uuid */
+            operationId: string;
             name: string | null;
             code: string | null;
             timeZoneId: string | null;

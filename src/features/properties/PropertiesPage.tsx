@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BedDouble, Building2, Edit3, Layers3, MapPin, MoreHorizontal, Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import type {
   Bed,
@@ -29,6 +29,10 @@ import {
   timeZoneLabel,
 } from "./propertyFormOptions";
 import { loadAllBeds, loadAllRooms } from "./propertiesApi";
+import {
+  resolvePropertyCreateAttempt,
+  type PropertyCreateAttempt,
+} from "./propertyCreateAttempt";
 import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
 import { TopologyRetirementModal, type RetirementTarget } from "./TopologyRetirementModal";
 
@@ -37,6 +41,12 @@ type RoomFormState = { room?: Room } | null;
 type BedFormState = { bed?: Bed } | null;
 type BedMutationInput = { bed?: Bed; labels: string[] };
 type BedMutationResult = BedMutationReceipt | BedBatchMutationReceipt;
+type PropertyMutationInput = {
+  property?: Property;
+  name: string;
+  code: string;
+  timeZoneId: string;
+};
 type RetirementMutationInput = { target: RetirementTarget; reason: string };
 const emptyBeds: Bed[] = [];
 
@@ -50,6 +60,7 @@ export function PropertiesPage() {
   const targetRoomId = searchParams.get("room");
   const targetBedId = searchParams.get("bed");
   const [propertyForm, setPropertyForm] = useState<PropertyFormState>(null);
+  const propertyCreateAttempt = useRef<PropertyCreateAttempt | null>(null);
   const [roomForm, setRoomForm] = useState<RoomFormState>(null);
   const [bedForm, setBedForm] = useState<BedFormState>(null);
   const [selectedRoomId, setSelectedRoomId] = useState("");
@@ -136,12 +147,49 @@ export function PropertiesPage() {
   };
 
   const propertyMutation = useMutation({
-    mutationFn: async (input: { property?: Property; name: string; code: string; timeZoneId: string }) => request<PropertyMutationReceipt>(input.property ? `/api/properties/${input.property.propertyId}` : "/api/properties/", {
-      method: input.property ? "PUT" : "POST",
-      body: JSON.stringify({ name: input.name, code: input.code, timeZoneId: input.timeZoneId, ...(input.property ? { expectedVersion: input.property.version } : {}) }),
-    }),
-    onSuccess: async (property) => { await invalidateProperty(); workspace.setSelectedPropertyId(property.propertyId); setPropertyForm(null); },
+    mutationFn: async (input: PropertyMutationInput) => {
+      if (input.property) {
+        return request<PropertyMutationReceipt>(
+          `/api/properties/${input.property.propertyId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              name: input.name,
+              code: input.code,
+              timeZoneId: input.timeZoneId,
+              expectedVersion: input.property.version,
+            }),
+          },
+        );
+      }
+
+      propertyCreateAttempt.current = resolvePropertyCreateAttempt(
+        propertyCreateAttempt.current,
+        input,
+      );
+      return request<PropertyMutationReceipt>("/api/properties/", {
+        method: "POST",
+        body: JSON.stringify({
+          operationId: propertyCreateAttempt.current.operationId,
+          name: input.name,
+          code: input.code,
+          timeZoneId: input.timeZoneId,
+        }),
+      });
+    },
+    onSuccess: async (property) => {
+      propertyCreateAttempt.current = null;
+      await invalidateProperty();
+      workspace.setSelectedPropertyId(property.propertyId);
+      setPropertyForm(null);
+    },
   });
+
+  function closePropertyForm() {
+    propertyCreateAttempt.current = null;
+    propertyMutation.reset();
+    setPropertyForm(null);
+  }
   const roomMutation = useMutation({
     mutationFn: async (input: { room?: Room; name: string; buildingLabel: string; floorLabel: string }) => request<RoomMutationReceipt>(input.room ? `/api/properties/${selectedPropertyId}/rooms/${input.room.roomId}` : `/api/properties/${selectedPropertyId}/rooms`, {
       method: input.room ? "PUT" : "POST",
@@ -250,7 +298,7 @@ export function PropertiesPage() {
         </div>
       )}
 
-      <PropertyForm state={(propertyForm?.property ? canManageProperty : canCreateProperty) ? propertyForm : null} mutation={propertyMutation} onClose={() => setPropertyForm(null)} />
+      <PropertyForm state={(propertyForm?.property ? canManageProperty : canCreateProperty) ? propertyForm : null} mutation={propertyMutation} onClose={closePropertyForm} />
       <RoomForm state={canManageRooms ? roomForm : null} mutation={roomMutation} onClose={() => setRoomForm(null)} />
       <BedForm state={canManageBeds ? bedForm : null} existingBeds={bedItems} mutation={bedMutation} onClose={() => { bedMutation.reset(); setBedForm(null); }} />
       <TopologyRetirementModal
@@ -265,7 +313,7 @@ export function PropertiesPage() {
   );
 }
 
-function PropertyForm({ state, mutation, onClose }: { state: PropertyFormState; mutation: ReturnType<typeof useMutation<PropertyMutationReceipt, Error, { property?: Property; name: string; code: string; timeZoneId: string }>>; onClose: () => void }) {
+function PropertyForm({ state, mutation, onClose }: { state: PropertyFormState; mutation: ReturnType<typeof useMutation<PropertyMutationReceipt, Error, PropertyMutationInput>>; onClose: () => void }) {
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ property: state?.property, name: String(data.get("name")), code: String(data.get("code")).toUpperCase(), timeZoneId: String(data.get("timeZoneId")) }); }
   return <Modal open={Boolean(state)} title={state?.property ? "Edit property" : "New property"} description="Property details are shared across topology, inventory and reservations." onClose={onClose}><form onSubmit={submit} className="space-y-4"><Input label="Property name" name="name" defaultValue={state?.property?.name} placeholder="Harbour House Hostel" /><div className="grid gap-4 sm:grid-cols-2"><Input label="Short code" name="code" defaultValue={state?.property?.code} placeholder="HBR" maxLength={16} /><TimeZoneSelect defaultValue={state?.property?.timeZoneId} /></div>{mutation.error && <ErrorState error={mutation.error} title="Couldn't save the property" />}<FormActions submitting={mutation.isPending} submitLabel={state?.property ? "Save changes" : "Create property"} onCancel={onClose} /></form></Modal>;
 }
