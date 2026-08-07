@@ -33,6 +33,10 @@ import {
   resolvePropertyCreateAttempt,
   type PropertyCreateAttempt,
 } from "./propertyCreateAttempt";
+import {
+  resolvePropertyUpdateAttempt,
+  type PropertyUpdateAttempt,
+} from "./propertyUpdateAttempt";
 import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
 import { TopologyRetirementModal, type RetirementTarget } from "./TopologyRetirementModal";
 
@@ -61,6 +65,7 @@ export function PropertiesPage() {
   const targetBedId = searchParams.get("bed");
   const [propertyForm, setPropertyForm] = useState<PropertyFormState>(null);
   const propertyCreateAttempt = useRef<PropertyCreateAttempt | null>(null);
+  const propertyUpdateAttempt = useRef<PropertyUpdateAttempt | null>(null);
   const [roomForm, setRoomForm] = useState<RoomFormState>(null);
   const [bedForm, setBedForm] = useState<BedFormState>(null);
   const [selectedRoomId, setSelectedRoomId] = useState("");
@@ -149,11 +154,22 @@ export function PropertiesPage() {
   const propertyMutation = useMutation({
     mutationFn: async (input: PropertyMutationInput) => {
       if (input.property) {
+        propertyUpdateAttempt.current = resolvePropertyUpdateAttempt(
+          propertyUpdateAttempt.current,
+          {
+            propertyId: input.property.propertyId,
+            expectedVersion: input.property.version,
+            name: input.name,
+            code: input.code,
+            timeZoneId: input.timeZoneId,
+          },
+        );
         return request<PropertyMutationReceipt>(
           `/api/properties/${input.property.propertyId}`,
           {
             method: "PUT",
             body: JSON.stringify({
+              operationId: propertyUpdateAttempt.current.operationId,
               name: input.name,
               code: input.code,
               timeZoneId: input.timeZoneId,
@@ -179,6 +195,7 @@ export function PropertiesPage() {
     },
     onSuccess: async (property) => {
       propertyCreateAttempt.current = null;
+      propertyUpdateAttempt.current = null;
       await invalidateProperty();
       workspace.setSelectedPropertyId(property.propertyId);
       setPropertyForm(null);
@@ -187,6 +204,7 @@ export function PropertiesPage() {
 
   function closePropertyForm() {
     propertyCreateAttempt.current = null;
+    propertyUpdateAttempt.current = null;
     propertyMutation.reset();
     setPropertyForm(null);
   }

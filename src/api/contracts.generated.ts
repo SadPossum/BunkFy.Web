@@ -12712,6 +12712,8 @@ export interface components {
         /** @enum {string} */
         PropertyStatus: "active" | "retired";
         PropertyUpdateRequest: {
+            /** Format: uuid */
+            operationId: string;
             name: string | null;
             code: string | null;
             timeZoneId: string | null;
