@@ -1,7 +1,7 @@
 import { ApiError } from "../../api/client";
 import type {
   StaffMember,
-  StaffProfileMutationReceipt,
+  StaffMemberMutationReceipt,
 } from "../../api/types";
 import {
   clearStaffProfileUpdateAttempt,
@@ -84,7 +84,7 @@ export async function completeCurrentStaffProfile(
   );
   saveStaffProfileUpdateAttempt(attempt);
   try {
-    await request<StaffProfileMutationReceipt>("/api/staff/me", {
+    await request<StaffMemberMutationReceipt>("/api/staff/me", {
       method: "PUT",
       body: JSON.stringify({
         ...payload,

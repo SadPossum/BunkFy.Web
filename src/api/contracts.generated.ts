@@ -8853,7 +8853,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffProfileMutationReceiptDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -8978,7 +8978,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffProfileMutationReceiptDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -9056,7 +9056,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -13361,6 +13361,8 @@ export interface components {
             expectedVersion: number;
         };
         StaffAuthSubjectRequest: {
+            /** Format: uuid */
+            operationId: string;
             authSubjectId: string | null;
             /** Format: int64 */
             expectedVersion: number;
@@ -13591,7 +13593,7 @@ export interface components {
             departedAtUtc: string | null;
             assignments: components["schemas"]["StaffPropertyAssignmentDto"][] | null;
         };
-        StaffProfileMutationReceiptDto: {
+        StaffMemberMutationReceiptDto: {
             /** Format: uuid */
             staffMemberId: string;
             status: components["schemas"]["StaffStatus"];

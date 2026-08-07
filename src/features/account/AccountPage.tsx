@@ -30,7 +30,7 @@ import type {
   MultiFactorCodeType,
   MultiFactorStatus,
   StaffMember,
-  StaffProfileMutationReceipt,
+  StaffMemberMutationReceipt,
   TotpEnrollment,
 } from "../../api/types";
 import { useSession } from "../../app/session";
@@ -454,7 +454,7 @@ function StaffProfilePanel({
         member.version,
         payload,
       );
-      await request<StaffProfileMutationReceipt>("/api/staff/me", {
+      await request<StaffMemberMutationReceipt>("/api/staff/me", {
         method: "PUT",
         body: JSON.stringify({
           ...payload,

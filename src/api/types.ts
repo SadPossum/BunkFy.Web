@@ -748,7 +748,7 @@ export type StaffMember = {
   assignments: StaffPropertyAssignment[];
 };
 
-export type StaffProfileMutationReceipt = {
+export type StaffMemberMutationReceipt = {
   staffMemberId: string;
   status: StaffStatus;
   version: number;
