@@ -9301,7 +9301,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -9344,7 +9344,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                        "application/json": components["schemas"]["StaffMemberMutationReceiptDto"];
                     };
                 };
             };
@@ -13353,6 +13353,8 @@ export interface components {
             refreshToken: string | null;
         };
         StaffAssignmentRequest: {
+            /** Format: uuid */
+            operationId: string;
             propertyJobTitle: string | null;
             isPrimary: boolean;
             /** Format: date */
@@ -13677,6 +13679,8 @@ export interface components {
          */
         StaffStatus: 0 | 1 | 2 | 3;
         StaffUnassignmentRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: date */
             effectiveTo: string;
             reason: string | null;

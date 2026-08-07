@@ -9564,7 +9564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                  "$ref": "#/components/schemas/StaffMemberMutationReceiptDto"
                 }
               }
             }
@@ -9613,7 +9613,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                  "$ref": "#/components/schemas/StaffMemberMutationReceiptDto"
                 }
               }
             }
@@ -18767,6 +18767,10 @@
       "StaffAssignmentRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "propertyJobTitle": {
             "type": "string",
             "nullable": true
@@ -19638,6 +19642,10 @@
       "StaffUnassignmentRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "effectiveTo": {
             "type": "string",
             "format": "date"
