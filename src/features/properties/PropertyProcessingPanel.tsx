@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Database, Globe2, Pause, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type {
   CountryPolicy,
   CountryPolicyListResponse,
@@ -28,6 +28,11 @@ import {
   propertyProcessingMessage,
   type PropertyProcessingActivationInput,
 } from "./propertyProcessing";
+import {
+  resolvePropertyActivationAttempt,
+  resolvePropertySimpleLifecycleAttempt,
+  type PropertyLifecycleAttempt,
+} from "./propertyLifecycleAttempt";
 
 type PropertyProcessingPanelProps = {
   property: Property;
@@ -40,6 +45,8 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
   const queryClient = useQueryClient();
   const [activationOpen, setActivationOpen] = useState(false);
   const [suspensionOpen, setSuspensionOpen] = useState(false);
+  const activationAttempt = useRef<PropertyLifecycleAttempt | null>(null);
+  const suspensionAttempt = useRef<PropertyLifecycleAttempt | null>(null);
   const processing = useQuery({
     queryKey: ["property-processing", property.propertyId],
     queryFn: () => request<PropertyProcessingState>(`/api/properties/${property.propertyId}/processing`),
@@ -59,21 +66,51 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
   }
 
   const activation = useMutation({
-    mutationFn: (input: PropertyProcessingActivationInput) => request<PropertyMutationReceipt>(
-      `/api/properties/${property.propertyId}/processing/activate`,
-      { method: "POST", body: JSON.stringify(input) },
-    ),
+    mutationFn: (input: PropertyProcessingActivationInput) => {
+      activationAttempt.current = resolvePropertyActivationAttempt(
+        activationAttempt.current,
+        property.propertyId,
+        input,
+      );
+      return request<PropertyMutationReceipt>(
+        `/api/properties/${property.propertyId}/processing/activate`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ...input,
+            operationId: activationAttempt.current.operationId,
+          }),
+        },
+      );
+    },
     onSuccess: async () => {
+      activationAttempt.current = null;
       setActivationOpen(false);
       await refreshProperty();
     },
   });
   const suspension = useMutation({
-    mutationFn: (expectedVersion: number) => request<void>(
-      `/api/properties/${property.propertyId}/processing/suspend`,
-      { method: "POST", body: JSON.stringify({ confirmed: true, expectedVersion }) },
-    ),
+    mutationFn: (expectedVersion: number) => {
+      suspensionAttempt.current = resolvePropertySimpleLifecycleAttempt(
+        suspensionAttempt.current,
+        "processing-suspension",
+        property.propertyId,
+        expectedVersion,
+      );
+      return request<PropertyMutationReceipt>(
+        `/api/properties/${property.propertyId}/processing/suspend`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: suspensionAttempt.current.operationId,
+            confirmed: true,
+            expectedVersion,
+          }),
+        },
+      );
+    },
     onSuccess: async () => {
+      suspensionAttempt.current = null;
       setSuspensionOpen(false);
       await refreshProperty();
     },
@@ -155,6 +192,7 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
         pending={activation.isPending}
         error={activation.error}
         onClose={() => {
+          activationAttempt.current = null;
           activation.reset();
           setActivationOpen(false);
         }}
@@ -166,6 +204,7 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
         pending={suspension.isPending}
         error={suspension.error}
         onClose={() => {
+          suspensionAttempt.current = null;
           suspension.reset();
           setSuspensionOpen(false);
         }}

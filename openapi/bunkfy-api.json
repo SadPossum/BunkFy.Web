@@ -7762,8 +7762,15 @@
           "required": true
         },
         "responses": {
-          "204": {
-            "description": "No Content"
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -7835,8 +7842,15 @@
           "required": true
         },
         "responses": {
-          "204": {
-            "description": "No Content"
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyMutationReceiptDto"
+                }
+              }
+            }
           }
         }
       }
@@ -10934,6 +10948,10 @@
       "ActivatePropertyProcessingRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "operatingCountryCode": {
             "type": "string",
             "nullable": true
@@ -18291,6 +18309,10 @@
       "RetirePropertyRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "confirmed": {
             "type": "boolean"
           },
@@ -19759,6 +19781,10 @@
       "SuspendPropertyProcessingRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "confirmed": {
             "type": "boolean"
           },

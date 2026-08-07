@@ -7740,12 +7740,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description No Content */
-                204: {
+                /** @description OK */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["PropertyMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -7820,12 +7822,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description No Content */
-                204: {
+                /** @description OK */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["PropertyMutationReceiptDto"];
+                    };
                 };
             };
         };
@@ -10447,6 +10451,8 @@ export interface components {
         /** @enum {string} */
         AccessProfileStatus: "active" | "archived";
         ActivatePropertyProcessingRequest: {
+            /** Format: uuid */
+            operationId: string;
             operatingCountryCode: string | null;
             policyId: string | null;
             /** Format: int32 */
@@ -13178,6 +13184,8 @@ export interface components {
             expectedRoomVersion: number;
         };
         RetirePropertyRequest: {
+            /** Format: uuid */
+            operationId: string;
             confirmed: boolean;
             /** Format: int64 */
             expectedVersion: number;
@@ -13723,6 +13731,8 @@ export interface components {
             department: string | null;
         };
         SuspendPropertyProcessingRequest: {
+            /** Format: uuid */
+            operationId: string;
             confirmed: boolean;
             /** Format: int64 */
             expectedVersion: number;

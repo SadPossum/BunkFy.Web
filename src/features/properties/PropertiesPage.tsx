@@ -34,6 +34,10 @@ import {
   type PropertyCreateAttempt,
 } from "./propertyCreateAttempt";
 import {
+  resolvePropertySimpleLifecycleAttempt,
+  type PropertyLifecycleAttempt,
+} from "./propertyLifecycleAttempt";
+import {
   resolvePropertyUpdateAttempt,
   type PropertyUpdateAttempt,
 } from "./propertyUpdateAttempt";
@@ -71,6 +75,7 @@ export function PropertiesPage() {
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [retirementTarget, setRetirementTarget] = useState<RetirementTarget | null>(null);
   const [retirementOutcome, setRetirementOutcome] = useState<TopologyRetirement | null>(null);
+  const propertyRetirementAttempt = useRef<PropertyLifecycleAttempt | null>(null);
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
   const propertyScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -252,12 +257,23 @@ export function PropertiesPage() {
           body: JSON.stringify({ reason }),
         });
       }
-      await request<void>(`/api/properties/${target.entity.propertyId}/retire`, {
+      propertyRetirementAttempt.current = resolvePropertySimpleLifecycleAttempt(
+        propertyRetirementAttempt.current,
+        "retirement",
+        target.entity.propertyId,
+        target.entity.version,
+      );
+      await request<PropertyMutationReceipt>(`/api/properties/${target.entity.propertyId}/retire`, {
         method: "POST",
-        body: JSON.stringify({ confirmed: true, expectedVersion: target.entity.version }),
+        body: JSON.stringify({
+          operationId: propertyRetirementAttempt.current.operationId,
+          confirmed: true,
+          expectedVersion: target.entity.version,
+        }),
       });
     },
     onSuccess: async (result, input) => {
+      propertyRetirementAttempt.current = null;
       await Promise.all([invalidateProperty(), queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId] })]);
       if (input.target.kind !== "property" && result) setRetirementOutcome(result);
       else setRetirementTarget(null);
@@ -265,6 +281,7 @@ export function PropertiesPage() {
   });
 
   function closeRetirement() {
+    propertyRetirementAttempt.current = null;
     retireMutation.reset();
     setRetirementOutcome(null);
     setRetirementTarget(null);
