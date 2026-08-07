@@ -21,7 +21,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type {
   AuthenticationMethods,
   AuthenticationSessions,
@@ -30,6 +30,7 @@ import type {
   MultiFactorCodeType,
   MultiFactorStatus,
   StaffMember,
+  StaffProfileMutationReceipt,
   TotpEnrollment,
 } from "../../api/types";
 import { useSession } from "../../app/session";
@@ -44,6 +45,10 @@ import {
   StatusBadge,
 } from "../../components/ui/primitives";
 import { SelectPicker } from "../../components/ui/SelectPicker";
+import {
+  resolveStaffProfileUpdateAttempt,
+  type StaffProfileUpdateAttempt,
+} from "../staff/staffProfileUpdateAttempt";
 import { StaffProfileFields } from "../workspaces/StaffProfileFields";
 import type { StaffProfileDraft } from "../workspaces/staffOnboarding";
 
@@ -427,11 +432,14 @@ function StaffProfilePanel({
 }) {
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState<StaffProfileDraft>(() => staffDraft(member));
+  const updateAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
   useEffect(() => setProfile(staffDraft(member)), [member]);
+  useEffect(() => {
+    updateAttempt.current = null;
+  }, [member.staffMemberId]);
   const update = useMutation({
-    mutationFn: () => request<StaffMember>("/api/staff/me", {
-      method: "PUT",
-      body: JSON.stringify({
+    mutationFn: async () => {
+      const payload = {
         ...profile,
         legalName: profile.legalName.trim() || null,
         workEmail: profile.workEmail.trim() || null,
@@ -439,10 +447,25 @@ function StaffProfilePanel({
         employeeNumber: member.employeeNumber ?? null,
         jobTitle: profile.jobTitle.trim() || null,
         department: profile.department.trim() || null,
-        expectedVersion: member.version,
-      }),
-    }),
+      };
+      updateAttempt.current = await resolveStaffProfileUpdateAttempt(
+        updateAttempt.current,
+        member.staffMemberId,
+        member.version,
+        payload,
+      );
+      await request<StaffProfileMutationReceipt>("/api/staff/me", {
+        method: "PUT",
+        body: JSON.stringify({
+          ...payload,
+          operationId: updateAttempt.current.operationId,
+          expectedVersion: updateAttempt.current.expectedVersion,
+        }),
+      });
+      return request<StaffMember>("/api/staff/me");
+    },
     onSuccess: (updated) => {
+      updateAttempt.current = null;
       onUpdated(updated);
       setEditing(false);
     },
@@ -467,7 +490,7 @@ function StaffProfilePanel({
             <StaffProfileFields value={profile} onChange={setProfile} />
             {update.error && <div className="mt-4"><ErrorState error={update.error} /></div>}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" className="btn btn-ghost" onClick={() => { setProfile(staffDraft(member)); setEditing(false); update.reset(); }} disabled={update.isPending}>Cancel</button>
+              <button type="button" className="btn btn-ghost" onClick={() => { updateAttempt.current = null; setProfile(staffDraft(member)); setEditing(false); update.reset(); }} disabled={update.isPending}>Cancel</button>
               <button className="btn btn-primary" disabled={update.isPending || !profile.displayName.trim()}>
                 {update.isPending && <span className="loading loading-spinner loading-sm" />}
                 Save profile

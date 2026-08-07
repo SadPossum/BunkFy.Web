@@ -9080,7 +9080,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffMemberDto"
+                  "$ref": "#/components/schemas/StaffProfileMutationReceiptDto"
                 }
               }
             }
@@ -9226,7 +9226,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                  "$ref": "#/components/schemas/StaffProfileMutationReceiptDto"
                 }
               }
             }
@@ -19401,9 +19401,34 @@
         },
         "additionalProperties": false
       },
+      "StaffProfileMutationReceiptDto": {
+        "type": "object",
+        "properties": {
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StaffStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "StaffProfileUpdateRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "displayName": {
             "type": "string",
             "nullable": true

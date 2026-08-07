@@ -1,5 +1,14 @@
 import { ApiError } from "../../api/client";
-import type { StaffMember } from "../../api/types";
+import type {
+  StaffMember,
+  StaffProfileMutationReceipt,
+} from "../../api/types";
+import {
+  clearStaffProfileUpdateAttempt,
+  readStaffProfileUpdateAttempt,
+  resolveDurableStaffProfileUpdateAttempt,
+  saveStaffProfileUpdateAttempt,
+} from "../staff/staffProfileUpdateAttempt";
 
 const INVITE_STAFF_DRAFT_KEY = "bunkfy.invite.staff-profile.v2";
 const LEGACY_INVITE_STAFF_DRAFT_KEY = "bunkfy.invite.staff-profile.v1";
@@ -58,19 +67,41 @@ export async function completeCurrentStaffProfile(
   profile: StaffProfileDraft,
 ): Promise<StaffMember> {
   const current = await waitForCurrentStaffProfile(request);
-  return request<StaffMember>("/api/staff/me", {
-    method: "PUT",
-    body: JSON.stringify({
-      displayName: profile.displayName.trim(),
-      legalName: emptyToNull(profile.legalName),
-      workEmail: emptyToNull(profile.workEmail),
-      workPhone: emptyToNull(profile.workPhone),
-      employeeNumber: current.employeeNumber ?? null,
-      jobTitle: emptyToNull(profile.jobTitle),
-      department: emptyToNull(profile.department),
-      expectedVersion: current.version,
-    }),
-  });
+  const payload = {
+    displayName: profile.displayName.trim(),
+    legalName: emptyToNull(profile.legalName),
+    workEmail: emptyToNull(profile.workEmail),
+    workPhone: emptyToNull(profile.workPhone),
+    employeeNumber: current.employeeNumber ?? null,
+    jobTitle: emptyToNull(profile.jobTitle),
+    department: emptyToNull(profile.department),
+  };
+  const attempt = await resolveDurableStaffProfileUpdateAttempt(
+    readStaffProfileUpdateAttempt(current.staffMemberId),
+    current.staffMemberId,
+    current.version,
+    payload,
+  );
+  saveStaffProfileUpdateAttempt(attempt);
+  try {
+    await request<StaffProfileMutationReceipt>("/api/staff/me", {
+      method: "PUT",
+      body: JSON.stringify({
+        ...payload,
+        operationId: attempt.operationId,
+        expectedVersion: attempt.expectedVersion,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      clearStaffProfileUpdateAttempt(current.staffMemberId);
+    }
+    throw error;
+  }
+
+  const updated = await waitForCurrentStaffProfile(request);
+  clearStaffProfileUpdateAttempt(current.staffMemberId);
+  return updated;
 }
 
 async function waitForCurrentStaffProfile(

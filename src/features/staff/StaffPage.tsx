@@ -3,7 +3,7 @@ import { BadgeCheck, BriefcaseBusiness, Building2, ChevronRight, CircleUserRound
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { staffStatusLabel, staffStatusValue } from "../../api/labels";
-import type { Property, StaffDirectoryAssignment, StaffDirectoryListResponse, StaffDirectoryMember, StaffMember, StaffPropertyAssignment, StaffStatus } from "../../api/types";
+import type { Property, StaffDirectoryAssignment, StaffDirectoryListResponse, StaffDirectoryMember, StaffMember, StaffProfileMutationReceipt, StaffPropertyAssignment, StaffStatus } from "../../api/types";
 import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
@@ -17,6 +17,10 @@ import {
   type StaffCreateAttempt,
   type StaffCreatePayload,
 } from "./staffCreateAttempt";
+import {
+  resolveStaffProfileUpdateAttempt,
+  type StaffProfileUpdateAttempt,
+} from "./staffProfileUpdateAttempt";
 
 const PAGE_SIZE = 30;
 const statusOptions = ["active", "suspended", "departed"] as const;
@@ -140,10 +144,14 @@ function StaffDetail({ memberId, initialTab, properties, selectedProperty, canRe
   const [tab, setTab] = useState<"profile" | "assignments" | "account">(initialTab === "account" && !canReadSensitive ? "profile" : initialTab);
   const [editing, setEditing] = useState(false);
   const [lifecycleAction, setLifecycleAction] = useState<"suspend" | "resume" | "depart" | null>(null);
-  useEffect(() => { setTab(initialTab === "account" && !canReadSensitive ? "profile" : initialTab); setEditing(false); setLifecycleAction(null); }, [initialTab, memberId, canReadSensitive]);
+  const profileAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
+  useEffect(() => { setTab(initialTab === "account" && !canReadSensitive ? "profile" : initialTab); setEditing(false); setLifecycleAction(null); profileAttempt.current = null; }, [initialTab, memberId, canReadSensitive]);
   const member = useQuery({ queryKey: ["staff-member", memberId, canReadSensitive ? "profile" : "directory"], queryFn: () => request<StaffDetailMember>(`/api/staff/members/${memberId}${canReadSensitive ? "/profile" : ""}`), enabled: Boolean(memberId) });
   async function refresh() { await Promise.all([queryClient.invalidateQueries({ queryKey: ["staff-member", memberId] }), queryClient.invalidateQueries({ queryKey: ["staff-members"] })]); }
-  const profileMutation = useMutation({ mutationFn: ({ item, payload }: { item: StaffMember; payload: Record<string, unknown> }) => request<StaffDirectoryMember>(`/api/staff/members/${item.staffMemberId}`, { method: "PUT", body: JSON.stringify({ ...payload, expectedVersion: item.version }) }), onSuccess: async () => { setEditing(false); await refresh(); } });
+  const profileMutation = useMutation({ mutationFn: async ({ item, payload }: { item: StaffMember; payload: StaffCreatePayload }) => {
+    profileAttempt.current = await resolveStaffProfileUpdateAttempt(profileAttempt.current, item.staffMemberId, item.version, payload);
+    return request<StaffProfileMutationReceipt>(`/api/staff/members/${item.staffMemberId}`, { method: "PUT", body: JSON.stringify({ ...payload, operationId: profileAttempt.current.operationId, expectedVersion: profileAttempt.current.expectedVersion }) });
+  }, onSuccess: async () => { await refresh(); profileAttempt.current = null; setEditing(false); } });
   const lifecycleMutation = useMutation({ mutationFn: ({ item, action, reason, effectiveOn }: { item: StaffDetailMember; action: "suspend" | "resume" | "depart"; reason: string; effectiveOn: string }) => request<StaffDirectoryMember>(`/api/staff/members/${item.staffMemberId}/${action}`, { method: "POST", body: JSON.stringify(action === "depart" ? { effectiveOn, reason, expectedVersion: item.version } : { reason, expectedVersion: item.version }) }), onSuccess: async () => { setLifecycleAction(null); await refresh(); } });
   const authMutation = useMutation({ mutationFn: ({ item, authSubjectId }: { item: StaffMember; authSubjectId: string | null }) => request<StaffDirectoryMember>(`/api/staff/members/${item.staffMemberId}/auth-subject`, { method: "PUT", body: JSON.stringify({ authSubjectId, expectedVersion: item.version }) }), onSuccess: refresh });
   const item = member.data;
@@ -161,7 +169,7 @@ function StaffDetail({ memberId, initialTab, properties, selectedProperty, canRe
         ...(canReadSensitive ? [{ value: "account" as const, label: "Account", icon: <KeyRound size={15} /> }] : []),
       ]}
     />
-    {tab === "profile" && <section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Profile</h3><p className="mt-1 text-xs text-base-content/50">Workspace identity and role information.</p></div>{isFullStaffMember(item) && canManage && !editing && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing && isFullStaffMember(item) ? <StaffProfileForm member={item} submitting={profileMutation.isPending} error={profileMutation.error} submitLabel="Save profile" onCancel={() => { setEditing(false); profileMutation.reset(); }} onSubmit={(payload) => profileMutation.mutate({ item, payload })} /> : <ProfileDetails member={item} />}</section>}
+    {tab === "profile" && <section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Profile</h3><p className="mt-1 text-xs text-base-content/50">Workspace identity and role information.</p></div>{isFullStaffMember(item) && canManage && !editing && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing && isFullStaffMember(item) ? <StaffProfileForm member={item} submitting={profileMutation.isPending} error={profileMutation.error} submitLabel="Save profile" onCancel={() => { profileAttempt.current = null; setEditing(false); profileMutation.reset(); }} onSubmit={(payload) => profileMutation.mutate({ item, payload })} /> : <ProfileDetails member={item} />}</section>}
     {tab === "assignments" && <AssignmentsPanel member={item} properties={properties} selectedProperty={selectedProperty} canAssign={canAssignCurrentProperty} onUpdated={refresh} />}
     {tab === "account" && isFullStaffMember(item) && <AccountLinkPanel member={item} canManage={canManage && staffStatusKey(item.status) !== "departed"} submitting={authMutation.isPending} error={authMutation.error} onSave={(authSubjectId) => authMutation.mutate({ item, authSubjectId })} />}
     <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>

@@ -748,6 +748,13 @@ export type StaffMember = {
   assignments: StaffPropertyAssignment[];
 };
 
+export type StaffProfileMutationReceipt = {
+  staffMemberId: string;
+  status: StaffStatus;
+  version: number;
+  completedAtUtc: string;
+};
+
 export type StaffDirectoryListResponse = {
   items: StaffDirectoryListItem[];
   page: number;
