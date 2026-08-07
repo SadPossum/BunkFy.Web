@@ -41,6 +41,10 @@ import {
   resolvePropertyUpdateAttempt,
   type PropertyUpdateAttempt,
 } from "./propertyUpdateAttempt";
+import {
+  resolveRoomMutationAttempt,
+  type RoomMutationAttempt,
+} from "./roomMutationAttempt";
 import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
 import { TopologyRetirementModal, type RetirementTarget } from "./TopologyRetirementModal";
 
@@ -71,6 +75,7 @@ export function PropertiesPage() {
   const propertyCreateAttempt = useRef<PropertyCreateAttempt | null>(null);
   const propertyUpdateAttempt = useRef<PropertyUpdateAttempt | null>(null);
   const [roomForm, setRoomForm] = useState<RoomFormState>(null);
+  const roomMutationAttempt = useRef<RoomMutationAttempt | null>(null);
   const [bedForm, setBedForm] = useState<BedFormState>(null);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [retirementTarget, setRetirementTarget] = useState<RetirementTarget | null>(null);
@@ -214,12 +219,49 @@ export function PropertiesPage() {
     setPropertyForm(null);
   }
   const roomMutation = useMutation({
-    mutationFn: async (input: { room?: Room; name: string; buildingLabel: string; floorLabel: string }) => request<RoomMutationReceipt>(input.room ? `/api/properties/${selectedPropertyId}/rooms/${input.room.roomId}` : `/api/properties/${selectedPropertyId}/rooms`, {
-      method: input.room ? "PUT" : "POST",
-      body: JSON.stringify({ name: input.name, buildingLabel: input.buildingLabel || null, floorLabel: input.floorLabel || null, ...(input.room ? { expectedVersion: input.room.version } : { expectedPropertyVersion: selectedProperty?.version ?? 0 }) }),
-    }),
-    onSuccess: async (room) => { await invalidateProperty(); setSelectedRoomId(room.roomId); setRoomForm(null); },
+    mutationFn: async (input: { room?: Room; name: string; buildingLabel: string; floorLabel: string }) => {
+      roomMutationAttempt.current = resolveRoomMutationAttempt(
+        roomMutationAttempt.current,
+        {
+          propertyId: selectedPropertyId,
+          roomId: input.room?.roomId,
+          expectedVersion: input.room?.version ?? selectedProperty?.version ?? 0,
+          name: input.name,
+          buildingLabel: input.buildingLabel,
+          floorLabel: input.floorLabel,
+        },
+      );
+      return request<RoomMutationReceipt>(
+        input.room
+          ? `/api/properties/${selectedPropertyId}/rooms/${input.room.roomId}`
+          : `/api/properties/${selectedPropertyId}/rooms`,
+        {
+          method: input.room ? "PUT" : "POST",
+          body: JSON.stringify({
+            operationId: roomMutationAttempt.current.operationId,
+            name: input.name,
+            buildingLabel: input.buildingLabel || null,
+            floorLabel: input.floorLabel || null,
+            ...(input.room
+              ? { expectedVersion: roomMutationAttempt.current.expectedVersion }
+              : { expectedPropertyVersion: roomMutationAttempt.current.expectedVersion }),
+          }),
+        },
+      );
+    },
+    onSuccess: async (room) => {
+      roomMutationAttempt.current = null;
+      await invalidateProperty();
+      setSelectedRoomId(room.roomId);
+      setRoomForm(null);
+    },
   });
+
+  function closeRoomForm() {
+    roomMutationAttempt.current = null;
+    roomMutation.reset();
+    setRoomForm(null);
+  }
   const bedMutation = useMutation({
     mutationFn: async (input: BedMutationInput) => {
       if (!selectedRoom) throw new Error("Choose a room before adding beds.");
@@ -334,7 +376,7 @@ export function PropertiesPage() {
       )}
 
       <PropertyForm state={(propertyForm?.property ? canManageProperty : canCreateProperty) ? propertyForm : null} mutation={propertyMutation} onClose={closePropertyForm} />
-      <RoomForm state={canManageRooms ? roomForm : null} mutation={roomMutation} onClose={() => setRoomForm(null)} />
+      <RoomForm state={canManageRooms ? roomForm : null} mutation={roomMutation} onClose={closeRoomForm} />
       <BedForm state={canManageBeds ? bedForm : null} existingBeds={bedItems} mutation={bedMutation} onClose={() => { bedMutation.reset(); setBedForm(null); }} />
       <TopologyRetirementModal
         target={retirementTarget}

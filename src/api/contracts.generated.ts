@@ -13201,6 +13201,8 @@ export interface components {
             expectedVersion: number;
         };
         RoomCreateRequest: {
+            /** Format: uuid */
+            operationId: string;
             name: string | null;
             /** Format: int64 */
             expectedPropertyVersion: number;
@@ -13337,6 +13339,8 @@ export interface components {
         /** @enum {string} */
         RoomStatus: "active" | "retired";
         RoomUpdateRequest: {
+            /** Format: uuid */
+            operationId: string;
             name: string | null;
             /** Format: int64 */
             expectedVersion: number;
