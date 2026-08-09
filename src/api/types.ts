@@ -39,6 +39,13 @@ export type OrganizationInvitation = NonNullableFields<
   "inviterSubjectId"
 >;
 
+export type OrganizationInvitationIssuance = Omit<
+  Schema<"OrganizationInvitationIssuanceDto">,
+  "invitation"
+> & {
+  invitation: OrganizationInvitation;
+};
+
 export type OrganizationInvitationIssued = Omit<
   Schema<"OrganizationInvitationIssuedDto">,
   "invitation" | "token"
@@ -70,12 +77,11 @@ export type OrganizationEnrollmentLink = NonNullableFields<
   "creatorSubjectId"
 >;
 
-export type OrganizationEnrollmentLinkIssued = Omit<
-  Schema<"OrganizationEnrollmentLinkIssuedDto">,
-  "enrollmentLink" | "token"
+export type OrganizationEnrollmentLinkIssuance = Omit<
+  Schema<"OrganizationEnrollmentLinkIssuanceDto">,
+  "enrollmentLink"
 > & {
   enrollmentLink: OrganizationEnrollmentLink;
-  token: string;
 };
 
 export type OrganizationEnrollmentClaim = NonNullableFields<

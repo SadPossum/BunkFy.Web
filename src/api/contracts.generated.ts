@@ -7163,7 +7163,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationInvitationIssuedDto"];
+                        "application/json": components["schemas"]["OrganizationInvitationIssuanceDto"];
                     };
                 };
             };
@@ -7312,7 +7312,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationEnrollmentLinkIssuedDto"];
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkIssuanceDto"];
                     };
                 };
             };
@@ -11182,6 +11182,8 @@ export interface components {
             reason: string | null;
         };
         CreateOrganizationEnrollmentLinkRequest: {
+            /** Format: uuid */
+            sourceId: string;
             /** Format: int32 */
             lifetimeHours: number | null;
             /** Format: int32 */
@@ -11189,6 +11191,8 @@ export interface components {
             approvalMode: components["schemas"]["OrganizationEnrollmentApprovalMode"];
         };
         CreateOrganizationInvitationRequest: {
+            /** Format: uuid */
+            sourceId: string;
             recipientEmail: string | null;
             /** Format: int32 */
             lifetimeHours: number | null;
@@ -12497,9 +12501,10 @@ export interface components {
             /** Format: date-time */
             lastChangedAtUtc: string;
         };
-        OrganizationEnrollmentLinkIssuedDto: {
+        OrganizationEnrollmentLinkIssuanceDto: {
             enrollmentLink: components["schemas"]["OrganizationEnrollmentLinkDto"];
             token: string | null;
+            outcome: components["schemas"]["OrganizationJoinSourceIssuanceOutcome"];
         };
         OrganizationEnrollmentLinkListResponse: {
             items: components["schemas"]["OrganizationEnrollmentLinkDto"][] | null;
@@ -12556,6 +12561,11 @@ export interface components {
             /** Format: date-time */
             lastChangedAtUtc: string;
         };
+        OrganizationInvitationIssuanceDto: {
+            invitation: components["schemas"]["OrganizationInvitationDto"];
+            token: string | null;
+            outcome: components["schemas"]["OrganizationJoinSourceIssuanceOutcome"];
+        };
         OrganizationInvitationIssuedDto: {
             invitation: components["schemas"]["OrganizationInvitationDto"];
             token: string | null;
@@ -12588,6 +12598,8 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
         };
+        /** @enum {string} */
+        OrganizationJoinSourceIssuanceOutcome: "issued" | "already-issued";
         OrganizationLifecycleRequest: {
             /** Format: int64 */
             expectedVersion: number;

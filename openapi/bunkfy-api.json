@@ -7141,7 +7141,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationInvitationIssuedDto"
+                  "$ref": "#/components/schemas/OrganizationInvitationIssuanceDto"
                 }
               }
             }
@@ -7323,7 +7323,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationEnrollmentLinkIssuedDto"
+                  "$ref": "#/components/schemas/OrganizationEnrollmentLinkIssuanceDto"
                 }
               }
             }
@@ -12940,6 +12940,10 @@
       "CreateOrganizationEnrollmentLinkRequest": {
         "type": "object",
         "properties": {
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "lifetimeHours": {
             "type": "integer",
             "format": "int32",
@@ -12958,6 +12962,10 @@
       "CreateOrganizationInvitationRequest": {
         "type": "object",
         "properties": {
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "recipientEmail": {
             "type": "string",
             "nullable": true
@@ -16430,7 +16438,7 @@
         },
         "additionalProperties": false
       },
-      "OrganizationEnrollmentLinkIssuedDto": {
+      "OrganizationEnrollmentLinkIssuanceDto": {
         "type": "object",
         "properties": {
           "enrollmentLink": {
@@ -16439,6 +16447,9 @@
           "token": {
             "type": "string",
             "nullable": true
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/OrganizationJoinSourceIssuanceOutcome"
           }
         },
         "additionalProperties": false
@@ -16597,6 +16608,22 @@
         },
         "additionalProperties": false
       },
+      "OrganizationInvitationIssuanceDto": {
+        "type": "object",
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/OrganizationInvitationDto"
+          },
+          "token": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/OrganizationJoinSourceIssuanceOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "OrganizationInvitationIssuedDto": {
         "type": "object",
         "properties": {
@@ -16693,6 +16720,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "OrganizationJoinSourceIssuanceOutcome": {
+        "enum": [
+          "issued",
+          "already-issued"
+        ],
+        "type": "string"
       },
       "OrganizationLifecycleRequest": {
         "type": "object",
