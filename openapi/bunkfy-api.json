@@ -16877,6 +16877,10 @@
       "OrganizationMembershipLifecycleRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "targetSubjectId": {
             "type": "string",
             "nullable": true

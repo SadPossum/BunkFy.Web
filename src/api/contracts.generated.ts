@@ -12681,6 +12681,8 @@ export interface components {
             lastChangedAtUtc: string;
         };
         OrganizationMembershipLifecycleRequest: {
+            /** Format: uuid */
+            operationId: string;
             targetSubjectId: string | null;
             /** Format: int64 */
             expectedOrganizationVersion: number;
