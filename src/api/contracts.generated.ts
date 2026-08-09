@@ -5813,7 +5813,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReleaseManualBlockGroupRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -11131,6 +11135,8 @@ export interface components {
             sourceSystem: string | null;
         };
         CreateManualBlockGroupRequest: {
+            /** Format: uuid */
+            operationId: string;
             target: components["schemas"]["InventoryBlockTarget"];
             /** Format: date */
             arrival: string;
@@ -11139,6 +11145,8 @@ export interface components {
             reason: string | null;
         };
         CreateManualBlockRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: uuid */
             inventoryUnitId: string;
             /** Format: date */
@@ -12800,7 +12808,13 @@ export interface components {
             /** Format: int64 */
             expectedProjectionRevision: number;
         };
+        ReleaseManualBlockGroupRequest: {
+            /** Format: uuid */
+            operationId: string;
+        };
         ReleaseManualBlockRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: int64 */
             expectedVersion: number;
         };

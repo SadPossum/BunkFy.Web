@@ -38,6 +38,11 @@ import { BlockInventoryModal, type CreateBlockGroupPayload } from "./BlockInvent
 import { buildBlockTargetOptions, groupActiveBlocks } from "./inventoryBlocking";
 import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "./inventoryApi";
 import { sellableInventorySummary } from "./inventorySummary";
+import {
+  resolveManualBlockCreateAttempt,
+  resolveManualBlockGroupReleaseAttempt,
+  type ManualBlockMutationAttempt,
+} from "./manualBlockMutationAttempt";
 import { resolveSalesModeMutationAttempt, type SalesModeMutationAttempt } from "./salesModeMutationAttempt";
 import { SalesModeChangeModal, type PendingSalesModeChange } from "./SalesModeChangeModal";
 
@@ -54,6 +59,8 @@ export function InventoryPage() {
   const [range, setRange] = useState(defaultRange);
   const [pendingSalesModeChange, setPendingSalesModeChange] = useState<PendingSalesModeChange | null>(null);
   const salesModeAttempt = useRef<SalesModeMutationAttempt | null>(null);
+  const createBlockAttempt = useRef<ManualBlockMutationAttempt | null>(null);
+  const releaseBlockAttempt = useRef<ManualBlockMutationAttempt | null>(null);
   const enabled = Boolean(selectedPropertyId);
   const accessScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -135,6 +142,8 @@ export function InventoryPage() {
 
   useEffect(() => {
     salesModeAttempt.current = null;
+    createBlockAttempt.current = null;
+    releaseBlockAttempt.current = null;
     setPendingSalesModeChange(null);
   }, [selectedPropertyId]);
 
@@ -168,12 +177,18 @@ export function InventoryPage() {
     },
   });
   const createBlockGroup = useMutation({
-    mutationFn: (payload: CreateBlockGroupPayload) =>
-      request<ManualBlockGroupMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/block-groups`, {
+    mutationFn: (payload: CreateBlockGroupPayload) => {
+      createBlockAttempt.current = resolveManualBlockCreateAttempt(
+        createBlockAttempt.current,
+        { propertyId: selectedPropertyId!, ...payload },
+      );
+      return request<ManualBlockGroupMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/block-groups`, {
         method: "POST",
-        body: JSON.stringify(payload),
-      }),
+        body: JSON.stringify({ operationId: createBlockAttempt.current.operationId, ...payload }),
+      });
+    },
     onSuccess: async () => {
+      createBlockAttempt.current = null;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
         queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
@@ -182,16 +197,33 @@ export function InventoryPage() {
     },
   });
   const releaseBlockGroup = useMutation({
-    mutationFn: (blockGroupId: string) =>
-      request<ManualBlockGroupMutationReceipt>(
+    mutationFn: (blockGroupId: string) => {
+      releaseBlockAttempt.current = resolveManualBlockGroupReleaseAttempt(
+        releaseBlockAttempt.current,
+        selectedPropertyId!,
+        blockGroupId,
+      );
+      return request<ManualBlockGroupMutationReceipt>(
         `/api/inventory/properties/${selectedPropertyId}/block-groups/${blockGroupId}/release`,
-        { method: "POST" },
-      ),
-    onSuccess: () => Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
-      queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
-    ]),
+        {
+          method: "POST",
+          body: JSON.stringify({ operationId: releaseBlockAttempt.current.operationId }),
+        },
+      );
+    },
+    onSuccess: async () => {
+      releaseBlockAttempt.current = null;
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
+        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
+      ]);
+    },
   });
+
+  function closeBlockModal() {
+    createBlockAttempt.current = null;
+    setBlockOpen(false);
+  }
 
   if (!selectedProperty) {
     return <EmptyState icon={<DoorOpen />} title="Choose a property first" description="Inventory is managed within a property. Create or select one to continue." />;
@@ -310,7 +342,7 @@ export function InventoryPage() {
         propertyName={selectedProperty.name}
         rooms={rooms}
         mutation={createBlockGroup}
-        onClose={() => setBlockOpen(false)}
+        onClose={closeBlockModal}
       />
       <SalesModeChangeModal
         change={pendingSalesModeChange}

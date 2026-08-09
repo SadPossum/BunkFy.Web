@@ -5906,6 +5906,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseManualBlockGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -12821,6 +12831,10 @@
       "CreateManualBlockGroupRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "target": {
             "$ref": "#/components/schemas/InventoryBlockTarget"
           },
@@ -12842,6 +12856,10 @@
       "CreateManualBlockRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "inventoryUnitId": {
             "type": "string",
             "format": "uuid"
@@ -17311,9 +17329,23 @@
         },
         "additionalProperties": false
       },
+      "ReleaseManualBlockGroupRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReleaseManualBlockRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
