@@ -141,6 +141,10 @@ describe("frontend repository foundation", () => {
       join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
       "utf8",
     );
+    const inviteSources = readFileSync(
+      join(repositoryRoot, "src", "features", "workspaces", "WorkspaceInvitesSettings.tsx"),
+      "utf8",
+    );
     const joinRequests = readFileSync(
       join(repositoryRoot, "src", "features", "workspaces", "WorkspaceJoinRequestSettings.tsx"),
       "utf8",
@@ -163,6 +167,8 @@ describe("frontend repository foundation", () => {
     expect(reservations).not.toContain('totalCount={reservations.data?.totalCount}');
     expect(reservations).not.toContain("Load more reservations");
     expect(workspace).toContain("page=${memberPage}&pageSize=${MEMBERS_PAGE_SIZE}");
+    expect(workspace).toContain("hasMore={members.data?.hasMore}");
+    expect(inviteSources).toContain("hasMore={sources.data?.hasMore}");
     expect(joinRequests).toContain("hasMore={joinRequests.data?.hasMore}");
     expect(connection).toContain("page=${page}&pageSize=${CREDENTIALS_PAGE_SIZE}");
     expect(privacyRequests).toContain("hasMore={cases.data?.hasMore}");

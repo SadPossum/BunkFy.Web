@@ -381,6 +381,7 @@ function JoinSourceLifecycle({
             pageSize={SOURCE_PAGE_SIZE}
             itemCount={sources.data?.items.length ?? 0}
             itemLabel={kind === "invitation" ? "invitation" : "QR link"}
+            hasMore={sources.data?.hasMore}
             disabled={sources.isFetching || management.isPending}
             onPageChange={setPage}
           />

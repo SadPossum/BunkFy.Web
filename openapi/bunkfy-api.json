@@ -16526,6 +16526,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -16693,6 +16696,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -16756,6 +16762,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -16794,6 +16803,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -16815,6 +16827,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -20641,6 +20656,9 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

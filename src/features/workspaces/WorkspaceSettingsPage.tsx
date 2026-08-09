@@ -139,6 +139,7 @@ export function WorkspaceSettingsPage() {
               properties={properties}
               page={memberPage}
               pageSize={MEMBERS_PAGE_SIZE}
+              hasMore={members.data?.hasMore}
               loading={members.isLoading}
               fetching={members.isFetching}
               error={members.error}

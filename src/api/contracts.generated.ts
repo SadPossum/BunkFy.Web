@@ -12556,6 +12556,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         /** @enum {string} */
         OrganizationEnrollmentLinkStatus: "active" | "disabled" | "rotated" | "expired" | "capacity-reached";
@@ -12616,6 +12617,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         OrganizationInvitationPreviewDto: {
             /** Format: uuid */
@@ -12637,6 +12639,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         /** @enum {string} */
         OrganizationJoinSourceIssuanceOutcome: "issued" | "already-issued";
@@ -12650,6 +12653,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         OrganizationMemberListResponse: {
             items: components["schemas"]["OrganizationMembershipDto"][] | null;
@@ -12657,6 +12661,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         OrganizationMembershipDto: {
             /** Format: uuid */
@@ -14067,6 +14072,7 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
+            hasMore: boolean;
         };
         WorkspaceStaffJoinSourceReplacementDto: {
             /** Format: uuid */

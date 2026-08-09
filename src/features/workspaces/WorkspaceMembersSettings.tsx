@@ -25,6 +25,7 @@ export function WorkspaceMembersSettings({
   properties,
   page,
   pageSize,
+  hasMore,
   loading,
   fetching,
   error,
@@ -38,6 +39,7 @@ export function WorkspaceMembersSettings({
   properties: Property[];
   page: number;
   pageSize: number;
+  hasMore: boolean | undefined;
   loading: boolean;
   fetching: boolean;
   error: unknown;
@@ -169,6 +171,7 @@ export function WorkspaceMembersSettings({
         pageSize={pageSize}
         itemCount={memberships.length}
         itemLabel="member"
+        hasMore={hasMore}
         disabled={fetching}
         onPageChange={onPageChange}
       />
