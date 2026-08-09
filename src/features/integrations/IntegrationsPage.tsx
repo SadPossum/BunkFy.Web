@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, Cable, ClipboardCheck, Plus, Radio, ShieldAlert, Zap } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
-import type { AdapterConnectionListItem, AdapterConnectionListResponse, AdapterConnectionMutationReceipt, AdapterTypeCapability, AdapterTypeCapabilityListResponse } from "../../api/types";
+import type { AdapterConnectionCreateRequest, AdapterConnectionListItem, AdapterConnectionListResponse, AdapterConnectionMutationReceipt, AdapterTypeCapability, AdapterTypeCapabilityListResponse } from "../../api/types";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useTargetProperty } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
@@ -13,6 +13,11 @@ import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { ConnectionDetail } from "./ConnectionDetail";
+import {
+  resolveConnectionCreateAttempt,
+  type ConnectionCreateAttempt,
+  type ConnectionCreatePayload,
+} from "./connectionCreateAttempt";
 import { loadAllAdapterConnections } from "./ingestionApi";
 import { IngestionActivity } from "./IngestionActivity";
 import { ProposalQueue } from "./ProposalQueue";
@@ -94,9 +99,216 @@ export function IntegrationsPage() {
 function ConnectionRow({ connection, onOpen }: { connection: AdapterConnectionListItem; onOpen: () => void }) { return <button type="button" className="grid w-full gap-3 p-5 text-left transition hover:bg-base-200/70 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6" onClick={onOpen}><div className="flex min-w-0 items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary/15 text-secondary"><Radio size={18} /></div><div className="min-w-0"><p className="truncate font-semibold">{connection.adapterType}</p><p className="mt-1 truncate text-xs text-base-content/45">Connection {connection.connectionId.slice(0, 8).toUpperCase()}</p></div></div><div className="text-xs text-base-content/50 sm:text-right"><p className="font-semibold capitalize text-base-content/70">{adapterExecutionModeLabel(connection.executionMode)}</p><p className="mt-1">{connection.pollingIntervalSeconds ? `Every ${formatDuration(connection.pollingIntervalSeconds)}` : adapterConflictPolicyLabel(connection.conflictPolicy)}</p></div><StatusBadge status={adapterConnectionStatusLabel(connection.status)} /></button>; }
 
 function CreateConnectionModal({ open, propertyId, adapterTypes, onClose, onCreated }: { open: boolean; propertyId: string; adapterTypes: AdapterTypeCapability[]; onClose: () => void; onCreated: (connection: AdapterConnectionMutationReceipt) => Promise<void> }) {
-  const { request } = useSession(); const [adapterType, setAdapterType] = useState(adapterTypes[0]?.adapterType ?? ""); const capability = adapterTypes.find((item) => item.adapterType === adapterType); const modes = capability?.executionModes.map(modeKey).filter((value): value is "polling" | "continuous" | "push" | "remotePolling" => value !== "unknown") ?? []; const [executionMode, setExecutionMode] = useState<"polling" | "continuous" | "push" | "remotePolling">(modes[0] ?? "polling"); const [conflictPolicy, setConflictPolicy] = useState<"suggestionsOnly" | "autoApplyWhenAdapterBaselineUnchanged">("suggestionsOnly"); useEffect(() => { if (!open) return; const first = adapterTypes[0]; setAdapterType(first?.adapterType ?? ""); const firstMode = first?.executionModes.map(modeKey).find((value) => value !== "unknown"); setExecutionMode(firstMode || "polling"); setConflictPolicy("suggestionsOnly"); }, [adapterTypes, open]); useEffect(() => { if (modes.length && !modes.includes(executionMode)) setExecutionMode(modes[0]); }, [executionMode, modes]); const mutation = useMutation({ mutationFn: (payload: Record<string, unknown>) => request<AdapterConnectionMutationReceipt>(`/api/ingestion/properties/${propertyId}/connections`, { method: "POST", body: JSON.stringify(payload) }), onSuccess: onCreated });
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ adapterType, executionMode: adapterExecutionModeValue(executionMode), conflictPolicy: adapterConflictPolicyValue(conflictPolicy), configurationReference: String(data.get("configurationReference") ?? "").trim(), secretReference: emptyToNull(data.get("secretReference")) }); }
-  return <Modal open={open} title="New integration connection" description="Choose a registered adapter and how it should exchange observations with BunkFy." onClose={onClose}>{adapterTypes.length ? <form className="space-y-4" onSubmit={submit}><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Adapter type</span><SelectPicker className="w-full" value={adapterType} onValueChange={setAdapterType} ariaLabel="Adapter type" options={adapterTypes.map((adapter) => ({ value: adapter.adapterType, label: adapter.adapterType }))} /></label><div className="grid gap-4 sm:grid-cols-2"><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Execution mode</span><SelectPicker className="w-full" value={executionMode} onValueChange={(value) => setExecutionMode(value as typeof executionMode)} ariaLabel="Execution mode" options={modes.map((mode) => ({ value: mode, label: capitalize(adapterExecutionModeLabel(mode)) }))} /></label><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Conflict policy</span><SelectPicker className="w-full" value={conflictPolicy} onValueChange={(value) => setConflictPolicy(value as typeof conflictPolicy)} ariaLabel="Conflict policy" options={[{ value: "suggestionsOnly", label: "Suggestions only" }, { value: "autoApplyWhenAdapterBaselineUnchanged", label: "Auto-apply safe updates" }]} /></label></div><div className="rounded-lg bg-base-200 p-4"><div className="flex items-start gap-3"><Zap size={17} className="mt-0.5 text-primary" /><div><p className="text-sm font-semibold">{conflictPolicy === "suggestionsOnly" ? "Staff review every conflicting update" : "Apply only against an unchanged adapter baseline"}</p><p className="mt-1 text-xs leading-5 text-base-content/50">You can change this policy later without recreating the connection.</p></div></div></div><TextField label="Configuration reference" name="configurationReference" placeholder="config://booking-provider/property-a" /><TextField label="Secret reference (optional)" name="secretReference" placeholder="secret://booking-provider/property-a" required={false} />{mutation.error && <ErrorState error={mutation.error} />}<FormActions submitting={mutation.isPending} submitLabel="Create connection" onCancel={onClose} disabled={!adapterType || !modes.length} /></form> : <div><EmptyState icon={<Cable />} title="No adapter types registered" description="Install or register an adapter capability before creating a connection." /><div className="mt-4 flex justify-end"><button className="btn btn-ghost" onClick={onClose}>Close</button></div></div>}</Modal>;
+  const { request } = useSession();
+  const [adapterType, setAdapterType] = useState(
+    adapterTypes[0]?.adapterType ?? "",
+  );
+  const [executionMode, setExecutionMode] = useState<
+    "polling" | "continuous" | "push" | "remotePolling"
+  >("polling");
+  const [conflictPolicy, setConflictPolicy] = useState<
+    "suggestionsOnly" | "autoApplyWhenAdapterBaselineUnchanged"
+  >("suggestionsOnly");
+  const attempt = useRef<ConnectionCreateAttempt | null>(null);
+  const wasOpen = useRef(false);
+  const capability = adapterTypes.find(
+    (item) => item.adapterType === adapterType,
+  );
+  const modes = capability?.executionModes
+    .map(modeKey)
+    .filter((value): value is typeof executionMode => value !== "unknown") ?? [];
+  const mutation = useMutation({
+    mutationFn: (payload: ConnectionCreatePayload & { operationId: string }) => {
+      const requestBody: AdapterConnectionCreateRequest = {
+        operationId: payload.operationId,
+        adapterType: payload.adapterType,
+        executionMode: payload.executionMode,
+        conflictPolicy: payload.conflictPolicy,
+        configurationReference: payload.configurationReference,
+        secretReference: payload.secretReference,
+      };
+      return request<AdapterConnectionMutationReceipt>(
+        `/api/ingestion/properties/${propertyId}/connections`,
+        { method: "POST", body: JSON.stringify(requestBody) },
+      );
+    },
+    onSuccess: async (created) => {
+      attempt.current = null;
+      await onCreated(created);
+    },
+  });
+
+  useEffect(() => {
+    if (!open) {
+      wasOpen.current = false;
+      attempt.current = null;
+      return;
+    }
+
+    const selectedAdapterExists = adapterTypes.some(
+      (item) => item.adapterType === adapterType,
+    );
+    if (!wasOpen.current || !selectedAdapterExists) {
+      const first = adapterTypes[0];
+      setAdapterType(first?.adapterType ?? "");
+      const firstMode = first?.executionModes
+        .map(modeKey)
+        .find((value) => value !== "unknown");
+      setExecutionMode(firstMode || "polling");
+      if (!wasOpen.current) {
+        setConflictPolicy("suggestionsOnly");
+        attempt.current = null;
+      }
+    }
+    wasOpen.current = true;
+  }, [adapterType, adapterTypes, open]);
+
+  useEffect(() => {
+    if (modes.length && !modes.includes(executionMode)) {
+      setExecutionMode(modes[0]);
+    }
+  }, [executionMode, modes]);
+
+  function close() {
+    if (mutation.isPending) return;
+    attempt.current = null;
+    mutation.reset();
+    onClose();
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const payload: ConnectionCreatePayload = {
+      propertyId,
+      adapterType,
+      executionMode: adapterExecutionModeValue(executionMode),
+      conflictPolicy: adapterConflictPolicyValue(conflictPolicy),
+      configurationReference: String(
+        data.get("configurationReference") ?? "",
+      ).trim(),
+      secretReference: emptyToNull(data.get("secretReference")),
+    };
+    attempt.current = resolveConnectionCreateAttempt(
+      attempt.current,
+      payload,
+    );
+    mutation.mutate({
+      ...payload,
+      operationId: attempt.current.operationId,
+    });
+  }
+
+  return (
+    <Modal
+      open={open}
+      title="New integration connection"
+      description="Choose a registered adapter and how it should exchange observations with BunkFy."
+      onClose={close}
+    >
+      {adapterTypes.length ? (
+        <form className="space-y-4" onSubmit={submit}>
+          <label className="form-control block">
+            <span className="label-text mb-1.5 block text-sm font-semibold">
+              Adapter type
+            </span>
+            <SelectPicker
+              className="w-full"
+              value={adapterType}
+              onValueChange={setAdapterType}
+              ariaLabel="Adapter type"
+              options={adapterTypes.map((adapter) => ({
+                value: adapter.adapterType,
+                label: adapter.adapterType,
+              }))}
+            />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="form-control block">
+              <span className="label-text mb-1.5 block text-sm font-semibold">
+                Execution mode
+              </span>
+              <SelectPicker
+                className="w-full"
+                value={executionMode}
+                onValueChange={(value) =>
+                  setExecutionMode(value as typeof executionMode)}
+                ariaLabel="Execution mode"
+                options={modes.map((mode) => ({
+                  value: mode,
+                  label: capitalize(adapterExecutionModeLabel(mode)),
+                }))}
+              />
+            </label>
+            <label className="form-control block">
+              <span className="label-text mb-1.5 block text-sm font-semibold">
+                Conflict policy
+              </span>
+              <SelectPicker
+                className="w-full"
+                value={conflictPolicy}
+                onValueChange={(value) =>
+                  setConflictPolicy(value as typeof conflictPolicy)}
+                ariaLabel="Conflict policy"
+                options={[
+                  { value: "suggestionsOnly", label: "Suggestions only" },
+                  {
+                    value: "autoApplyWhenAdapterBaselineUnchanged",
+                    label: "Auto-apply safe updates",
+                  },
+                ]}
+              />
+            </label>
+          </div>
+          <div className="rounded-lg bg-base-200 p-4">
+            <div className="flex items-start gap-3">
+              <Zap size={17} className="mt-0.5 text-primary" />
+              <div>
+                <p className="text-sm font-semibold">
+                  {conflictPolicy === "suggestionsOnly"
+                    ? "Staff review every conflicting update"
+                    : "Apply only against an unchanged adapter baseline"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-base-content/50">
+                  You can change this policy later without recreating the
+                  connection.
+                </p>
+              </div>
+            </div>
+          </div>
+          <TextField
+            label="Configuration reference"
+            name="configurationReference"
+            placeholder="config://booking-provider/property-a"
+          />
+          <TextField
+            label="Secret reference (optional)"
+            name="secretReference"
+            placeholder="secret://booking-provider/property-a"
+            required={false}
+          />
+          {mutation.error && <ErrorState error={mutation.error} />}
+          <FormActions
+            submitting={mutation.isPending}
+            submitLabel="Create connection"
+            onCancel={close}
+            disabled={!adapterType || !modes.length}
+          />
+        </form>
+      ) : (
+        <div>
+          <EmptyState
+            icon={<Cable />}
+            title="No adapter types registered"
+            description="Install or register an adapter capability before creating a connection."
+          />
+          <div className="mt-4 flex justify-end">
+            <button className="btn btn-ghost" onClick={close}>Close</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 function TextField({ label, name, placeholder, required = true }: { label: string; name: string; placeholder?: string; required?: boolean }) { return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} placeholder={placeholder} required={required} /></label>; }

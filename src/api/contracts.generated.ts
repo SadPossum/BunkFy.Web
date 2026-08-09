@@ -11125,6 +11125,8 @@ export interface components {
             token: string | null;
         };
         CreateConnectionRequest: {
+            /** Format: uuid */
+            operationId: string;
             adapterType: string | null;
             executionMode: components["schemas"]["AdapterExecutionMode"];
             conflictPolicy: components["schemas"]["AdapterConflictPolicy"];

@@ -12793,6 +12793,10 @@
       "CreateConnectionRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "adapterType": {
             "type": "string",
             "nullable": true

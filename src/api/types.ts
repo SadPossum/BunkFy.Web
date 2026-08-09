@@ -802,6 +802,10 @@ export type AdapterConnectionListResponse = {
   hasMore: boolean;
 };
 export type AdapterConnectionMutationReceipt = Pick<AdapterConnection, "connectionId" | "status" | "version">;
+export type AdapterConnectionCreateRequest = NonNullableFields<
+  Schema<"CreateConnectionRequest">,
+  "operationId" | "adapterType" | "configurationReference"
+>;
 
 export type AdapterTypeCapability = {
   adapterType: string;
