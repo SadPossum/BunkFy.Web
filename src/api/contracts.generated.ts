@@ -7247,7 +7247,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationInvitationIssuedDto"];
+                        "application/json": components["schemas"]["OrganizationInvitationIssuanceDto"];
                     };
                 };
             };
@@ -7344,7 +7344,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["ChangeOrganizationEnrollmentLinkRequest"];
+                    "application/json": components["schemas"]["DisableOrganizationEnrollmentLinkRequest"];
                 };
             };
             responses: {
@@ -7354,7 +7354,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationEnrollmentLinkMutationDto"];
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkDto"];
                     };
                 };
             };
@@ -7386,7 +7386,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["ChangeOrganizationEnrollmentLinkRequest"];
+                    "application/json": components["schemas"]["RotateOrganizationEnrollmentLinkRequest"];
                 };
             };
             responses: {
@@ -7396,7 +7396,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationEnrollmentLinkMutationDto"];
+                        "application/json": components["schemas"]["OrganizationEnrollmentLinkIssuanceDto"];
                     };
                 };
             };
@@ -10970,12 +10970,6 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
-        ChangeOrganizationEnrollmentLinkRequest: {
-            /** Format: int64 */
-            expectedVersion: number;
-            /** Format: int32 */
-            replacementLifetimeHours: number | null;
-        };
         ChangeProposalDto: {
             /** Format: uuid */
             proposalId: string;
@@ -11664,6 +11658,10 @@ export interface components {
          * @enum {integer}
          */
         DataRightsVerificationStatus: 0 | 1 | 2 | 3 | 4;
+        DisableOrganizationEnrollmentLinkRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         DiscoverDataRightsSubjectsRequest: {
             /** Format: uuid */
             recordId: string | null;
@@ -12500,6 +12498,10 @@ export interface components {
             createdAtUtc: string;
             /** Format: date-time */
             lastChangedAtUtc: string;
+            /** Format: uuid */
+            replacesEnrollmentLinkId: string | null;
+            /** Format: int64 */
+            replacesEnrollmentLinkVersion: number | null;
         };
         OrganizationEnrollmentLinkIssuanceDto: {
             enrollmentLink: components["schemas"]["OrganizationEnrollmentLinkDto"];
@@ -12512,10 +12514,6 @@ export interface components {
             page: number;
             /** Format: int32 */
             pageSize: number;
-        };
-        OrganizationEnrollmentLinkMutationDto: {
-            enrollmentLink: components["schemas"]["OrganizationEnrollmentLinkDto"];
-            replacementToken: string | null;
         };
         /** @enum {string} */
         OrganizationEnrollmentLinkStatus: "active" | "disabled" | "rotated" | "expired" | "capacity-reached";
@@ -12560,15 +12558,15 @@ export interface components {
             createdAtUtc: string;
             /** Format: date-time */
             lastChangedAtUtc: string;
+            /** Format: uuid */
+            replacesInvitationId: string | null;
+            /** Format: int64 */
+            replacesInvitationVersion: number | null;
         };
         OrganizationInvitationIssuanceDto: {
             invitation: components["schemas"]["OrganizationInvitationDto"];
             token: string | null;
             outcome: components["schemas"]["OrganizationJoinSourceIssuanceOutcome"];
-        };
-        OrganizationInvitationIssuedDto: {
-            invitation: components["schemas"]["OrganizationInvitationDto"];
-            token: string | null;
         };
         OrganizationInvitationListResponse: {
             items: components["schemas"]["OrganizationInvitationDto"][] | null;
@@ -12813,6 +12811,8 @@ export interface components {
             password: string | null;
         };
         ReissueOrganizationInvitationRequest: {
+            /** Format: uuid */
+            replacementSourceId: string;
             /** Format: int64 */
             expectedVersion: number;
             /** Format: int32 */
@@ -13416,6 +13416,14 @@ export interface components {
             expectedVersion: number;
             buildingLabel: string | null;
             floorLabel: string | null;
+        };
+        RotateOrganizationEnrollmentLinkRequest: {
+            /** Format: uuid */
+            replacementSourceId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: int32 */
+            replacementLifetimeHours: number | null;
         };
         SelectDataRightsSubjectRequest: {
             coordinate: components["schemas"]["DataRightsSubjectCoordinate"];

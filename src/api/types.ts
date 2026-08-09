@@ -46,14 +46,6 @@ export type OrganizationInvitationIssuance = Omit<
   invitation: OrganizationInvitation;
 };
 
-export type OrganizationInvitationIssued = Omit<
-  Schema<"OrganizationInvitationIssuedDto">,
-  "invitation" | "token"
-> & {
-  invitation: OrganizationInvitation;
-  token: string;
-};
-
 export type OrganizationInvitationPreview = NonNullableFields<
   Schema<"OrganizationInvitationPreviewDto">,
   "organizationName" | "organizationSlug"

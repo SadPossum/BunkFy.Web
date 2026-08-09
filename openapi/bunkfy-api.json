@@ -7239,7 +7239,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationInvitationIssuedDto"
+                  "$ref": "#/components/schemas/OrganizationInvitationIssuanceDto"
                 }
               }
             }
@@ -7360,7 +7360,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeOrganizationEnrollmentLinkRequest"
+                "$ref": "#/components/schemas/DisableOrganizationEnrollmentLinkRequest"
               }
             }
           },
@@ -7372,7 +7372,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationEnrollmentLinkMutationDto"
+                  "$ref": "#/components/schemas/OrganizationEnrollmentLinkDto"
                 }
               }
             }
@@ -7409,7 +7409,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeOrganizationEnrollmentLinkRequest"
+                "$ref": "#/components/schemas/RotateOrganizationEnrollmentLinkRequest"
               }
             }
           },
@@ -7421,7 +7421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationEnrollmentLinkMutationDto"
+                  "$ref": "#/components/schemas/OrganizationEnrollmentLinkIssuanceDto"
                 }
               }
             }
@@ -12330,21 +12330,6 @@
         },
         "additionalProperties": false
       },
-      "ChangeOrganizationEnrollmentLinkRequest": {
-        "type": "object",
-        "properties": {
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "replacementLifetimeHours": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "ChangeProposalDto": {
         "type": "object",
         "properties": {
@@ -14210,6 +14195,16 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "DisableOrganizationEnrollmentLinkRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
       },
       "DiscoverDataRightsSubjectsRequest": {
         "type": "object",
@@ -16434,6 +16429,16 @@
           "lastChangedAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "replacesEnrollmentLinkId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "replacesEnrollmentLinkVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16471,19 +16476,6 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
-          }
-        },
-        "additionalProperties": false
-      },
-      "OrganizationEnrollmentLinkMutationDto": {
-        "type": "object",
-        "properties": {
-          "enrollmentLink": {
-            "$ref": "#/components/schemas/OrganizationEnrollmentLinkDto"
-          },
-          "replacementToken": {
-            "type": "string",
-            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16604,6 +16596,16 @@
           "lastChangedAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "replacesInvitationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "replacesInvitationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16620,19 +16622,6 @@
           },
           "outcome": {
             "$ref": "#/components/schemas/OrganizationJoinSourceIssuanceOutcome"
-          }
-        },
-        "additionalProperties": false
-      },
-      "OrganizationInvitationIssuedDto": {
-        "type": "object",
-        "properties": {
-          "invitation": {
-            "$ref": "#/components/schemas/OrganizationInvitationDto"
-          },
-          "token": {
-            "type": "string",
-            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17344,6 +17333,10 @@
       "ReissueOrganizationInvitationRequest": {
         "type": "object",
         "properties": {
+          "replacementSourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
@@ -18900,6 +18893,25 @@
           },
           "floorLabel": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RotateOrganizationEnrollmentLinkRequest": {
+        "type": "object",
+        "properties": {
+          "replacementSourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "replacementLifetimeHours": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },
