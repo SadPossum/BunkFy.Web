@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { DatabaseZap, MailPlus, Settings2, ShieldCheck, UsersRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   Organization,
   OrganizationMemberListResponse,
@@ -24,6 +24,11 @@ import {
   resolveWorkspaceSettingsCapabilities,
   type WorkspaceSettingsTab,
 } from "./workspaceSettingsAccess";
+import {
+  resolveWorkspaceUpdateAttempt,
+  type WorkspaceUpdateAttempt,
+  type WorkspaceUpdatePayload,
+} from "./workspaceUpdateAttempt";
 
 const MEMBERS_PAGE_SIZE = 25;
 
@@ -179,12 +184,36 @@ function GeneralSettings({
   const { request } = useSession();
   const [name, setName] = useState(workspace.name);
   const [slug, setSlug] = useState(workspace.slug);
+  const updateAttempt = useRef<WorkspaceUpdateAttempt | null>(null);
   const update = useMutation({
-    mutationFn: () => request(`/api/organizations/${workspace.organizationId}`, {
-      method: "PUT",
-      body: JSON.stringify({ name: name.trim(), slug: slug.trim(), expectedVersion: workspace.version }),
-    }),
-    onSuccess: onSaved,
+    mutationFn: () => {
+      const payload: WorkspaceUpdatePayload = {
+        organizationId: workspace.organizationId,
+        expectedVersion: workspace.version,
+        name,
+        slug,
+      };
+      updateAttempt.current = resolveWorkspaceUpdateAttempt(
+        updateAttempt.current,
+        payload,
+      );
+      return request<Organization>(
+        `/api/organizations/${workspace.organizationId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            operationId: updateAttempt.current.operationId,
+            name: name.trim(),
+            slug: slug.trim(),
+            expectedVersion: workspace.version,
+          }),
+        },
+      );
+    },
+    onSuccess: async () => {
+      updateAttempt.current = null;
+      await onSaved();
+    },
   });
   return (
     <section className="max-w-3xl">

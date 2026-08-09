@@ -12644,6 +12644,8 @@ export interface components {
         /** @enum {string} */
         OrganizationJoinSourceIssuanceOutcome: "issued" | "already-issued";
         OrganizationLifecycleRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: int64 */
             expectedVersion: number;
         };
@@ -13914,6 +13916,8 @@ export interface components {
             expectedVersion: number;
         };
         UpdateOrganizationRequest: {
+            /** Format: uuid */
+            operationId: string;
             name: string | null;
             slug: string | null;
             /** Format: int64 */
