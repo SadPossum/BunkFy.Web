@@ -10,7 +10,7 @@ import {
   Plus,
   Unlock,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type {
   InventoryAvailabilityResponse,
@@ -38,6 +38,7 @@ import { BlockInventoryModal, type CreateBlockGroupPayload } from "./BlockInvent
 import { buildBlockTargetOptions, groupActiveBlocks } from "./inventoryBlocking";
 import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "./inventoryApi";
 import { sellableInventorySummary } from "./inventorySummary";
+import { resolveSalesModeMutationAttempt, type SalesModeMutationAttempt } from "./salesModeMutationAttempt";
 import { SalesModeChangeModal, type PendingSalesModeChange } from "./SalesModeChangeModal";
 
 export function InventoryPage() {
@@ -52,6 +53,7 @@ export function InventoryPage() {
   const [blockOpen, setBlockOpen] = useState(false);
   const [range, setRange] = useState(defaultRange);
   const [pendingSalesModeChange, setPendingSalesModeChange] = useState<PendingSalesModeChange | null>(null);
+  const salesModeAttempt = useRef<SalesModeMutationAttempt | null>(null);
   const enabled = Boolean(selectedPropertyId);
   const accessScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -131,16 +133,33 @@ export function InventoryPage() {
       : { arrival: targetArrival, departure: targetDeparture });
   }, [targetArrival, targetDeparture]);
 
+  useEffect(() => {
+    salesModeAttempt.current = null;
+    setPendingSalesModeChange(null);
+  }, [selectedPropertyId]);
+
   const salesModeMutation = useMutation({
-    mutationFn: ({ room, salesMode }: { room: RoomInventory; salesMode: "roomLevel" | "bedLevel" }) =>
-      request<RoomInventoryMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/rooms/${room.roomId}/sales-mode`, {
+    mutationFn: ({ room, salesMode }: { room: RoomInventory; salesMode: "roomLevel" | "bedLevel" }) => {
+      salesModeAttempt.current = resolveSalesModeMutationAttempt(
+        salesModeAttempt.current,
+        {
+          propertyId: selectedPropertyId!,
+          roomId: room.roomId,
+          salesMode,
+          expectedVersion: room.version,
+        },
+      );
+      return request<RoomInventoryMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/rooms/${room.roomId}/sales-mode`, {
         method: "PUT",
         body: JSON.stringify({
+          operationId: salesModeAttempt.current.operationId,
           salesMode: inventorySalesModeValue(salesMode),
-          expectedVersion: room.version,
+          expectedVersion: salesModeAttempt.current.expectedVersion,
         }),
-      }),
+      });
+    },
     onSuccess: async () => {
+      salesModeAttempt.current = null;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["inventory-rooms", selectedPropertyId] }),
         queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
@@ -218,6 +237,7 @@ export function InventoryPage() {
           canConfigure={canConfigure}
           pending={salesModeMutation.isPending}
           onModeChange={(room, salesMode) => {
+            salesModeAttempt.current = null;
             salesModeMutation.reset();
             setPendingSalesModeChange({ room, salesMode });
           }}
@@ -299,7 +319,10 @@ export function InventoryPage() {
         pending={salesModeMutation.isPending}
         error={salesModeImpact.error ?? salesModeMutation.error}
         onConfirm={() => pendingSalesModeChange && salesModeMutation.mutate(pendingSalesModeChange)}
-        onClose={() => setPendingSalesModeChange(null)}
+        onClose={() => {
+          salesModeAttempt.current = null;
+          setPendingSalesModeChange(null);
+        }}
       />
     </>
   );

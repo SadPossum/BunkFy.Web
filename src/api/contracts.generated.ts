@@ -11044,6 +11044,8 @@ export interface components {
             expectedVersion: number;
         };
         ConfigureSalesModeRequest: {
+            /** Format: uuid */
+            operationId: string;
             salesMode: components["schemas"]["InventorySalesMode"];
             /** Format: int64 */
             expectedVersion: number;

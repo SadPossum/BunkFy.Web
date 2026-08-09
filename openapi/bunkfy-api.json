@@ -12528,6 +12528,10 @@
       "ConfigureSalesModeRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "salesMode": {
             "$ref": "#/components/schemas/InventorySalesMode"
           },
