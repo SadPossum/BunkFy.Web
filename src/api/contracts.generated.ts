@@ -11194,6 +11194,8 @@ export interface components {
             lifetimeHours: number | null;
         };
         CreateOrganizationRequest: {
+            /** Format: uuid */
+            operationId: string;
             name: string | null;
             slug: string | null;
         };

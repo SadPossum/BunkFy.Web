@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Building2, Link2, LogOut } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import type { OrganizationMembershipSummary } from "../../api/types";
 import { useSession } from "../../app/session";
@@ -12,6 +12,10 @@ import {
   completeCurrentStaffProfile,
   defaultStaffProfile,
 } from "./staffOnboarding";
+import {
+  resolveWorkspaceCreationAttempt,
+  type WorkspaceCreationAttempt,
+} from "./workspaceCreationAttempt";
 
 export function WorkspaceOnboardingPage() {
   const navigate = useNavigate();
@@ -22,14 +26,25 @@ export function WorkspaceOnboardingPage() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [staffProfile, setStaffProfile] = useState(() => defaultStaffProfile(session?.username));
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
+  const creationAttempt = useRef<WorkspaceCreationAttempt | null>(null);
   const create = useMutation({
     mutationFn: async () => {
-      const workspace = createdWorkspaceId
-        ? null
-        : await request<OrganizationMembershipSummary>("/api/organizations", {
-            method: "POST",
-            body: JSON.stringify({ name: name.trim(), slug: slug.trim() }),
-          });
+      let workspace: OrganizationMembershipSummary | null = null;
+      if (!createdWorkspaceId) {
+        const payload = { name: name.trim(), slug: slug.trim() };
+        creationAttempt.current = resolveWorkspaceCreationAttempt(
+          creationAttempt.current,
+          payload,
+        );
+        workspace = await request<OrganizationMembershipSummary>("/api/organizations", {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: creationAttempt.current.operationId,
+            ...payload,
+          }),
+        });
+        creationAttempt.current = null;
+      }
       const workspaceId = createdWorkspaceId ?? workspace!.organization.organizationId;
       setCreatedWorkspaceId(workspaceId);
       selectWorkspace(workspaceId);
@@ -104,6 +119,7 @@ export function WorkspaceOnboardingPage() {
                 autoFocus
                 required
                 maxLength={160}
+                disabled={create.isPending || createdWorkspaceId !== null}
               />
             </label>
             <label className="mt-4 block">
@@ -118,6 +134,7 @@ export function WorkspaceOnboardingPage() {
                 placeholder="harbor-house"
                 required
                 maxLength={80}
+                disabled={create.isPending || createdWorkspaceId !== null}
               />
             </label>
             <div className="my-6 h-px bg-base-300" />
