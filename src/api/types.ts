@@ -887,7 +887,21 @@ export type AdapterIngressCredentialMutationReceipt = Pick<
   AdapterIngressCredential,
   "credentialId" | "connectionId" | "status" | "version"
 >;
-export type CreateAdapterIngressCredentialResponse = { credential: AdapterIngressCredential; token: string };
+export type AdapterIngressCredentialCreateRequest = {
+  operationId: string;
+  label: string;
+  expiresAtUtc?: string | null;
+  sourceSystem?: string | null;
+};
+export type AdapterIngressCredentialIssuanceOutcome =
+  | Schema<"AdapterIngressCredentialIssuanceOutcome">
+  | "issued"
+  | "alreadyIssued";
+export type CreateAdapterIngressCredentialResponse = {
+  credential: AdapterIngressCredential;
+  outcome: AdapterIngressCredentialIssuanceOutcome;
+  token: string | null;
+};
 
 export type ChangeProposalStatus = Schema<"ChangeProposalStatus"> | "pending" | "applying" | "applied" | "rejected" | "superseded" | "stale" | "failed";
 export type ChangeProposal = {

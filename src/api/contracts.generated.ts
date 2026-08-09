@@ -4988,7 +4988,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["VersionRequest"];
+                    "application/json": components["schemas"]["ConnectionControlRequest"];
                 };
             };
             responses: {
@@ -10649,6 +10649,11 @@ export interface components {
             configurationSchemaVersion: number;
             sourceSystem: string | null;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AdapterIngressCredentialIssuanceOutcome: 0 | 1 | 2;
         AdapterIngressCredentialListItemDto: {
             /** Format: uuid */
             credentialId: string;
@@ -11130,6 +11135,7 @@ export interface components {
         };
         CreateAdapterIngressCredentialResponse: {
             credential: components["schemas"]["AdapterIngressCredentialDto"];
+            outcome: components["schemas"]["AdapterIngressCredentialIssuanceOutcome"];
             token: string | null;
         };
         CreateConnectionRequest: {
@@ -11147,6 +11153,8 @@ export interface components {
             requesterRelationship: components["schemas"]["DataRightsRequesterRelationship"];
         };
         CreateIngressCredentialRequest: {
+            /** Format: uuid */
+            operationId: string;
             label: string | null;
             /** Format: date-time */
             expiresAtUtc: string | null;
@@ -13876,10 +13884,6 @@ export interface components {
             codeType: components["schemas"]["MultiFactorCodeType"];
             code: string | null;
             refreshToken: string | null;
-        };
-        VersionRequest: {
-            /** Format: int64 */
-            expectedVersion: number;
         };
         VersionedDataRightsCaseRequest: {
             /** Format: int64 */

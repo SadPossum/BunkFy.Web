@@ -4942,7 +4942,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/ConnectionControlRequest"
               }
             }
           },
@@ -11454,6 +11454,15 @@
         },
         "additionalProperties": false
       },
+      "AdapterIngressCredentialIssuanceOutcome": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "AdapterIngressCredentialListItemDto": {
         "type": "object",
         "properties": {
@@ -12801,6 +12810,9 @@
           "credential": {
             "$ref": "#/components/schemas/AdapterIngressCredentialDto"
           },
+          "outcome": {
+            "$ref": "#/components/schemas/AdapterIngressCredentialIssuanceOutcome"
+          },
           "token": {
             "type": "string",
             "nullable": true
@@ -12854,6 +12866,10 @@
       "CreateIngressCredentialRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "label": {
             "type": "string",
             "nullable": true
@@ -20180,16 +20196,6 @@
           "refreshToken": {
             "type": "string",
             "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "VersionRequest": {
-        "type": "object",
-        "properties": {
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int64"
           }
         },
         "additionalProperties": false

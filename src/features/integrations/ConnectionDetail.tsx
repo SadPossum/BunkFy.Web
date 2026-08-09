@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, Check, Clipboard, Clock3, Edit3, HeartPulse, KeyRound, Link2, PauseCircle, PlayCircle, RefreshCcw, Save, Settings2, ShieldCheck, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeLabel, adapterExecutionModeValue, credentialStatusLabel, ingestionOperationalStateLabel, ingestionRunStatusLabel } from "../../api/labels";
-import type { AdapterConnection, AdapterConnectionControlRequest, AdapterConnectionHealth, AdapterConnectionMutationReceipt, AdapterConnectionPollingScheduleRequest, AdapterConnectionUpdateRequest, AdapterIngressCredentialListItem, AdapterIngressCredentialListResponse, AdapterIngressCredentialMutationReceipt, AdapterTypeCapability, CreateAdapterIngressCredentialResponse } from "../../api/types";
+import type { AdapterConnection, AdapterConnectionControlRequest, AdapterConnectionHealth, AdapterConnectionMutationReceipt, AdapterConnectionPollingScheduleRequest, AdapterConnectionUpdateRequest, AdapterIngressCredentialCreateRequest, AdapterIngressCredentialListItem, AdapterIngressCredentialListResponse, AdapterIngressCredentialMutationReceipt, AdapterTypeCapability, CreateAdapterIngressCredentialResponse } from "../../api/types";
 import { useSession } from "../../app/session";
 import { ErrorState, InlineFormActions, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
@@ -10,6 +10,7 @@ import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { resolveConnectionUpdateAttempt, type ConnectionSettingsUpdate, type ConnectionUpdateAttempt, type ConnectionUpdatePayload } from "./connectionUpdateAttempt";
 import { resolveConnectionControlAttempt, type ConnectionControlAttempt, type ConnectionControlPayload } from "./connectionControlAttempt";
+import { credentialIssuanceOutcomeKey, resolveCredentialIssueAttempt, resolveCredentialRevokeAttempt, type CredentialMutationAttempt } from "./credentialMutationAttempt";
 
 type ConnectionTab = "health" | "settings" | "credentials";
 type ConfirmAction = "enable" | "disable" | "reset-checkpoint" | "clear-schedule";
@@ -54,7 +55,7 @@ export function ConnectionDetail({ propertyId, connectionId, adapterTypes, canMa
     <SegmentedTabs stretch value={tab} ariaLabel="Connection details" onValueChange={setTab} options={[{ value: "health", label: "Health", icon: <HeartPulse size={15} /> }, { value: "settings", label: "Settings", icon: <Settings2 size={15} /> }, { value: "credentials", label: "Credentials", icon: <KeyRound size={15} /> }]} />
     {tab === "health" && <ConnectionHealth query={health} />}
     {tab === "settings" && <div className="space-y-5"><section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Connection settings</h3><p className="mt-1 text-xs text-base-content/50">Execution, conflict handling, and configuration references.</p></div>{canManage && !editing && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing ? <ConnectionSettingsForm connection={item} capability={capability} submitting={updateMutation.isPending} error={updateMutation.error} onCancel={() => { updateAttempt.current = null; setEditing(false); updateMutation.reset(); }} onSave={(settings) => updateMutation.mutate({ item, settings })} /> : <ConnectionSettingsReadOnly connection={item} />}</section><PollingSchedule connection={item} capability={capability} canManage={canManage} submitting={scheduleMutation.isPending || actionMutation.isPending} error={scheduleMutation.error || actionMutation.error} onConfigure={(intervalSeconds, maxAttempts) => scheduleMutation.mutate({ item, intervalSeconds, maxAttempts })} onCancel={() => { scheduleAttempt.current = null; scheduleMutation.reset(); }} onClear={() => setConfirmAction("clear-schedule")} />{canManage && item.checkpoint && <section className="rounded-2xl border border-warning/25 bg-warning/8 p-4"><div className="flex items-start justify-between gap-4"><div><h3 className="font-semibold">Processing checkpoint</h3><p className="mt-1 break-all text-xs text-base-content/55">{item.checkpoint}</p><p className="mt-2 text-xs text-base-content/50">Reset only when the adapter must replay data from its initial position.</p></div><button type="button" className="btn btn-ghost btn-sm shrink-0 text-error" onClick={() => setConfirmAction("reset-checkpoint")}><RefreshCcw size={15} />Reset</button></div></section>}</div>}
-    {tab === "credentials" && <CredentialsPanel propertyId={propertyId} connection={item} canManage={canManageCredentials} />}
+    {tab === "credentials" && <CredentialsPanel key={`${propertyId}:${item.connectionId}`} propertyId={propertyId} connection={item} canManage={canManageCredentials} />}
     <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
   </div> : null}</Modal>;
 }
@@ -87,6 +88,8 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
   const [creating, setCreating] = useState(false);
   const [issued, setIssued] = useState<CreateAdapterIngressCredentialResponse | null>(null);
   const [page, setPage] = useState(1);
+  const issueAttempt = useRef<CredentialMutationAttempt | null>(null);
+  const revokeAttempt = useRef<CredentialMutationAttempt | null>(null);
   const credentials = useQuery({
     queryKey: ["ingestion-credentials", propertyId, connection.connectionId, page],
     queryFn: () => request<AdapterIngressCredentialListResponse>(
@@ -94,11 +97,29 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
     ),
   });
   const createMutation = useMutation({
-    mutationFn: ({ label, expiresAtUtc }: { label: string; expiresAtUtc: string }) => request<CreateAdapterIngressCredentialResponse>(
-      `/api/ingestion/properties/${propertyId}/connections/${connection.connectionId}/credentials`,
-      { method: "POST", body: JSON.stringify({ label, expiresAtUtc }) },
-    ),
+    mutationFn: ({ label, expiresAtUtc }: { label: string; expiresAtUtc: string }) => {
+      issueAttempt.current = resolveCredentialIssueAttempt(
+        issueAttempt.current,
+        {
+          propertyId,
+          connectionId: connection.connectionId,
+          label,
+          expiresAtUtc,
+          defaultSourceSystem: connection.adapterType,
+        },
+      );
+      const body: AdapterIngressCredentialCreateRequest = {
+        operationId: issueAttempt.current.operationId,
+        label,
+        expiresAtUtc,
+      };
+      return request<CreateAdapterIngressCredentialResponse>(
+        `/api/ingestion/properties/${propertyId}/connections/${connection.connectionId}/credentials`,
+        { method: "POST", body: JSON.stringify(body) },
+      );
+    },
     onSuccess: async (result) => {
+      issueAttempt.current = null;
       setIssued(result);
       setCreating(false);
       setPage(1);
@@ -106,11 +127,29 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
     },
   });
   const revokeMutation = useMutation({
-    mutationFn: (credential: AdapterIngressCredentialListItem) => request<AdapterIngressCredentialMutationReceipt>(
-      `/api/ingestion/properties/${propertyId}/connections/${connection.connectionId}/credentials/${credential.credentialId}/revoke`,
-      { method: "POST", body: JSON.stringify({ expectedVersion: credential.version }) },
-    ),
+    mutationFn: (credential: AdapterIngressCredentialListItem) => {
+      revokeAttempt.current = resolveCredentialRevokeAttempt(
+        revokeAttempt.current,
+        {
+          propertyId,
+          connectionId: connection.connectionId,
+          credentialId: credential.credentialId,
+          expectedVersion: credential.version,
+        },
+      );
+      return request<AdapterIngressCredentialMutationReceipt>(
+        `/api/ingestion/properties/${propertyId}/connections/${connection.connectionId}/credentials/${credential.credentialId}/revoke`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: revokeAttempt.current.operationId,
+            expectedVersion: credential.version,
+          }),
+        },
+      );
+    },
     onSuccess: async () => {
+      revokeAttempt.current = null;
       await queryClient.invalidateQueries({ queryKey: ["ingestion-credentials", propertyId, connection.connectionId] });
     },
   });
@@ -125,9 +164,9 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
             <h3 className="font-display text-lg font-semibold">Ingress credentials</h3>
             <p className="mt-1 text-xs text-base-content/50">Credentials authenticate push or remote adapter workers. Tokens are shown once.</p>
           </div>
-          {canManage && !creating && <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreating(true)}><KeyRound size={15} />Issue credential</button>}
+          {canManage && !creating && <button type="button" className="btn btn-primary btn-sm" onClick={() => { issueAttempt.current = null; createMutation.reset(); setIssued(null); setCreating(true); }}><KeyRound size={15} />Issue credential</button>}
         </div>
-        {creating && <CredentialForm submitting={createMutation.isPending} error={createMutation.error} onCancel={() => { setCreating(false); createMutation.reset(); }} onCreate={(label, expiresAtUtc) => createMutation.mutate({ label, expiresAtUtc })} />}
+        {creating && <CredentialForm submitting={createMutation.isPending} error={createMutation.error} onCancel={() => { issueAttempt.current = null; setCreating(false); createMutation.reset(); }} onCreate={(label, expiresAtUtc) => createMutation.mutate({ label, expiresAtUtc })} />}
       </section>
       {credentials.isLoading ? <LoadingState label="Loading credentials" /> : credentials.error ? <ErrorState error={credentials.error} retry={() => void credentials.refetch()} /> : items.length ? (
         <section className="overflow-hidden rounded-2xl border border-base-300">
@@ -142,8 +181,23 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
   );
 }
 
-function CredentialForm({ submitting, error, onCancel, onCreate }: { submitting: boolean; error: unknown; onCancel: () => void; onCreate: (label: string, expiresAtUtc: string) => void }) { const [label, setLabel] = useState(""); const [expires, setExpires] = useState(defaultCredentialExpiry()); return <form className="mt-4 grid gap-4 rounded-lg bg-base-200 p-4 sm:grid-cols-[1fr_220px_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); onCreate(label.trim(), new Date(expires).toISOString()); }}><TextInput label="Credential label" value={label} onChange={setLabel} /><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Expires</span><input className="input input-bordered w-full" type="datetime-local" value={expires} min={localDateTimeValue(new Date())} onChange={(event) => setExpires(event.target.value)} required /></label><div className="flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting || !label.trim()}>{submitting && <span className="loading loading-spinner loading-xs" />}Issue</button></div>{Boolean(error) && <div className="sm:col-span-3"><ErrorState error={error} /></div>}</form>; }
-function IssuedToken({ result, onDone }: { result: CreateAdapterIngressCredentialResponse; onDone: () => void }) { const [copied, setCopied] = useState(false); async function copy() { await navigator.clipboard.writeText(result.token); setCopied(true); } return <section className="rounded-2xl border border-warning/30 bg-warning/8 p-4"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">Copy this token now</h3><p className="mt-1 text-sm text-base-content/60">BunkFy will not show the credential token again.</p></div></div><textarea className="textarea textarea-bordered mt-4 min-h-20 w-full break-all font-mono text-xs" readOnly value={result.token} onFocus={(event) => event.currentTarget.select()} /><div className="mt-3 flex justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={copy}>{copied ? <Check size={15} /> : <Clipboard size={15} />}{copied ? "Copied" : "Copy token"}</button><button type="button" className="btn btn-primary btn-sm" onClick={onDone}>I saved it</button></div></section>; }
+function CredentialForm({ submitting, error, onCancel, onCreate }: { submitting: boolean; error: unknown; onCancel: () => void; onCreate: (label: string, expiresAtUtc: string) => void }) { const [label, setLabel] = useState(""); const [expires, setExpires] = useState(defaultCredentialExpiry()); return <form className="mt-4 grid gap-4 rounded-lg bg-base-200 p-4 sm:grid-cols-[1fr_220px_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); onCreate(label.trim(), new Date(expires).toISOString()); }}><TextInput label="Credential label" value={label} onChange={setLabel} disabled={submitting} /><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Expires</span><input className="input input-bordered w-full" type="datetime-local" value={expires} min={localDateTimeValue(new Date())} onChange={(event) => setExpires(event.target.value)} required disabled={submitting} /></label><div className="flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting || !label.trim()}>{submitting && <span className="loading loading-spinner loading-xs" />}Issue</button></div>{Boolean(error) && <div className="sm:col-span-3"><ErrorState error={error} /></div>}</form>; }
+function IssuedToken({ result, onDone }: { result: CreateAdapterIngressCredentialResponse; onDone: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const token = result.token;
+  const firstIssuance = credentialIssuanceOutcomeKey(result.outcome) === "issued";
+  if (!firstIssuance || token === null) {
+    return <section className="rounded-2xl border border-warning/30 bg-warning/8 p-4" aria-live="polite"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">Token is no longer available</h3><p className="mt-1 text-sm leading-6 text-base-content/60">The credential <strong>{result.credential.label}</strong> was issued by an earlier attempt. BunkFy stores no recoverable copy of its one-time token. Revoke that credential below, then issue a replacement.</p></div></div><div className="mt-3 flex justify-end"><button type="button" className="btn btn-ghost btn-sm" onClick={onDone}>Dismiss</button></div></section>;
+  }
+  const issuedToken = token;
+
+  async function copy() {
+    await navigator.clipboard.writeText(issuedToken);
+    setCopied(true);
+  }
+
+  return <section className="rounded-2xl border border-warning/30 bg-warning/8 p-4" aria-live="polite"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">Copy this token now</h3><p className="mt-1 text-sm text-base-content/60">BunkFy will not show the credential token again.</p></div></div><textarea className="textarea textarea-bordered mt-4 min-h-20 w-full break-all font-mono text-xs" readOnly value={issuedToken} onFocus={(event) => event.currentTarget.select()} /><div className="mt-3 flex justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={copy}>{copied ? <Check size={15} /> : <Clipboard size={15} />}{copied ? "Copied" : "Copy token"}</button><button type="button" className="btn btn-primary btn-sm" onClick={onDone}>I saved it</button></div></section>;
+}
 
 function ConnectionConfirmation({ action, connection, submitting, error, onCancel, onConfirm }: { action: ConfirmAction; connection: AdapterConnection; submitting: boolean; error: unknown; onCancel: () => void; onConfirm: () => void }) { const copy = action === "enable" ? { title: "Enable this connection?", body: "Scheduled or remote processing may resume immediately.", button: "Enable connection", tone: "btn-primary" } : action === "disable" ? { title: "Disable this connection?", body: "New scheduled processing stops, but existing records and activity remain available.", button: "Disable connection", tone: "btn-error" } : action === "clear-schedule" ? { title: "Clear the polling schedule?", body: "The connection remains configured but will not be polled automatically.", button: "Clear schedule", tone: "btn-error" } : { title: "Reset the processing checkpoint?", body: `The adapter may replay records from its initial position. Current checkpoint: ${connection.checkpoint}`, button: "Reset checkpoint", tone: "btn-error" }; return <section className="rounded-2xl border border-warning/30 bg-warning/8 p-4"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">{copy.title}</h3><p className="mt-1 text-sm leading-6 text-base-content/60">{copy.body}</p></div></div>{Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}<div className="mt-4 flex justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button><button type="button" className={`btn btn-sm ${copy.tone}`} onClick={onConfirm} disabled={submitting}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.button}</button></div></section>; }
 
