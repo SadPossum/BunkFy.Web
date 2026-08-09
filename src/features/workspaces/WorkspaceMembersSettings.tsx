@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import type {
@@ -46,6 +46,10 @@ export function WorkspaceMembersSettings({
 }) {
   const { request } = useSession();
   const [editing, setEditing] = useState<OrganizationMembership | null>(null);
+  const [transferTargetSubjectId, setTransferTargetSubjectId] = useState<string | null>(null);
+  const transferTarget = memberships.find(
+    (membership) => membership.subjectId === transferTargetSubjectId,
+  ) ?? null;
   const profiles = useQuery({
     queryKey: ["workspace-access", workspace.organizationId, "active-profiles"],
     queryFn: () => request<WorkspaceAccessProfileListResponse>(
@@ -63,8 +67,31 @@ export function WorkspaceMembersSettings({
           expectedTargetVersion: membership.version,
         }),
       }),
-    onSuccess: onChanged,
+    onSuccess: async () => {
+      await onChanged();
+      setTransferTargetSubjectId(null);
+    },
+    onError: async () => {
+      await onChanged();
+    },
   });
+
+  useEffect(() => {
+    if (!transferTargetSubjectId) return;
+
+    const refreshedTarget = memberships.find(
+      (membership) => membership.subjectId === transferTargetSubjectId,
+    );
+    if (refreshedTarget && isOwner(refreshedTarget.role) && !isOwner(currentMembership.role)) {
+      setTransferTargetSubjectId(null);
+    }
+  }, [currentMembership.role, memberships, transferTargetSubjectId]);
+
+  function closeTransferConfirmation() {
+    if (transfer.isPending) return;
+    setTransferTargetSubjectId(null);
+    transfer.reset();
+  }
 
   if (loading) return <div className="loading loading-spinner loading-md text-primary" />;
   if (error) return <SettingsError error={error} />;
@@ -121,7 +148,14 @@ export function WorkspaceMembersSettings({
                   </button>
                 )}
                 {!self && active && !owner && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => transfer.mutate(membership)} disabled={transfer.isPending}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      transfer.reset();
+                      setTransferTargetSubjectId(membership.subjectId);
+                    }}
+                    disabled={transfer.isPending}
+                  >
                     <ShieldCheck size={15} />Make owner
                   </button>
                 )}
@@ -138,8 +172,6 @@ export function WorkspaceMembersSettings({
         disabled={fetching}
         onPageChange={onPageChange}
       />
-      {transfer.error && <SettingsError error={transfer.error} />}
-
       {editing && profiles.data && (
         <MemberAccessEditor
           key={`${editing.membershipId}-${editing.version}`}
@@ -149,6 +181,48 @@ export function WorkspaceMembersSettings({
           properties={properties}
           onClose={() => setEditing(null)}
         />
+      )}
+
+      {transferTarget && (
+        <Modal
+          open
+          title={`Make member ${shortSubject(transferTarget.subjectId)} the workspace owner?`}
+          description="Ownership controls workspace governance and can be held by more than one active member."
+          onClose={closeTransferConfirmation}
+        >
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="rounded-lg border border-base-300 bg-base-200/55 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-base-content/45">Current account</p>
+              <p className="mt-2 font-semibold">{currentUsername}</p>
+              <p className="mt-1 text-sm text-base-content/55">Owner to member</p>
+            </div>
+            <ArrowRight className="mx-auto rotate-90 text-primary sm:rotate-0" size={20} />
+            <div className="rounded-lg border border-primary/25 bg-primary/8 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">New owner</p>
+              <p className="mt-2 font-semibold">Member {shortSubject(transferTarget.subjectId)}</p>
+              <p className="mt-1 text-sm text-base-content/55">Member to owner</p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-base-content/65">
+            You will lose owner-only workspace controls immediately. The new owner can manage members,
+            invitations, roles, retention settings, and future ownership changes.
+          </p>
+          {transfer.error && <SettingsError error={transfer.error} />}
+          <ModalActions>
+            <button type="button" className="btn btn-ghost" onClick={closeTransferConfirmation} disabled={transfer.isPending}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary min-w-36 text-white"
+              onClick={() => transfer.mutate(transferTarget)}
+              disabled={transfer.isPending}
+            >
+              {transfer.isPending && <span className="loading loading-spinner loading-sm" />}
+              Transfer ownership
+            </button>
+          </ModalActions>
+        </Modal>
       )}
     </section>
   );
