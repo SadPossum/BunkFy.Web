@@ -20009,6 +20009,10 @@
       "UpdateConnectionRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "executionMode": {
             "$ref": "#/components/schemas/AdapterExecutionMode"
           },

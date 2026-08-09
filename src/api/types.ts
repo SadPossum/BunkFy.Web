@@ -806,6 +806,10 @@ export type AdapterConnectionCreateRequest = NonNullableFields<
   Schema<"CreateConnectionRequest">,
   "operationId" | "adapterType" | "configurationReference"
 >;
+export type AdapterConnectionUpdateRequest = NonNullableFields<
+  Schema<"UpdateConnectionRequest">,
+  "operationId" | "configurationReference"
+>;
 
 export type AdapterTypeCapability = {
   adapterType: string;

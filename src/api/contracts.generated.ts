@@ -13818,6 +13818,8 @@ export interface components {
             expectedVersion: number;
         };
         UpdateConnectionRequest: {
+            /** Format: uuid */
+            operationId: string;
             executionMode: components["schemas"]["AdapterExecutionMode"];
             conflictPolicy: components["schemas"]["AdapterConflictPolicy"];
             configurationReference: string | null;
