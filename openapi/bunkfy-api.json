@@ -6052,6 +6052,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -6179,6 +6189,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -17409,6 +17429,10 @@
       "RequestBedRetirementRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "reason": {
             "type": "string",
             "nullable": true
@@ -17444,6 +17468,10 @@
       "RequestRoomRetirementRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "reason": {
             "type": "string",
             "nullable": true
@@ -18379,6 +18407,20 @@
           },
           "cascadeBeds": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetryRetirementRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false

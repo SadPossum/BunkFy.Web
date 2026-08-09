@@ -49,6 +49,11 @@ import {
   resolveRoomMutationAttempt,
   type RoomMutationAttempt,
 } from "./roomMutationAttempt";
+import {
+  resolveTopologyRetirementRequestAttempt,
+  resolveTopologyRetirementRetryAttempt,
+  type TopologyRetirementMutationAttempt,
+} from "./topologyRetirementMutationAttempt";
 import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
 import { TopologyRetirementModal, type RetirementTarget } from "./TopologyRetirementModal";
 
@@ -64,6 +69,8 @@ type PropertyMutationInput = {
   timeZoneId: string;
 };
 type RetirementMutationInput = { target: RetirementTarget; reason: string };
+type InventoryRetirementTarget = Extract<RetirementTarget, { kind: "bed" | "room" }>;
+type RetirementRetryInput = { target: InventoryRetirementTarget; outcome: TopologyRetirement };
 const emptyBeds: Bed[] = [];
 
 export function PropertiesPage() {
@@ -85,6 +92,8 @@ export function PropertiesPage() {
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [retirementTarget, setRetirementTarget] = useState<RetirementTarget | null>(null);
   const [retirementOutcome, setRetirementOutcome] = useState<TopologyRetirement | null>(null);
+  const retirementRequestAttempt = useRef<TopologyRetirementMutationAttempt | null>(null);
+  const retirementRetryAttempt = useRef<TopologyRetirementMutationAttempt | null>(null);
   const propertyRetirementAttempt = useRef<PropertyLifecycleAttempt | null>(null);
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
   const propertyScope = session && selectedPropertyId
@@ -318,15 +327,35 @@ export function PropertiesPage() {
   const retireMutation = useMutation<TopologyRetirement | void, Error, RetirementMutationInput>({
     mutationFn: async ({ target, reason }) => {
       if (target.kind === "bed") {
+        retirementRequestAttempt.current = resolveTopologyRetirementRequestAttempt(
+          retirementRequestAttempt.current,
+          {
+            propertyId: selectedPropertyId,
+            targetKind: target.kind,
+            roomId: target.roomId,
+            targetId: target.entity.bedId,
+            reason,
+          },
+        );
         return request<BedRetirement>(`/api/inventory/properties/${selectedPropertyId}/rooms/${target.roomId}/beds/${target.entity.bedId}/retirement`, {
           method: "POST",
-          body: JSON.stringify({ reason }),
+          body: JSON.stringify({ operationId: retirementRequestAttempt.current.operationId, reason }),
         });
       }
       if (target.kind === "room") {
+        retirementRequestAttempt.current = resolveTopologyRetirementRequestAttempt(
+          retirementRequestAttempt.current,
+          {
+            propertyId: selectedPropertyId,
+            targetKind: target.kind,
+            roomId: target.entity.roomId,
+            targetId: target.entity.roomId,
+            reason,
+          },
+        );
         return request<RoomRetirement>(`/api/inventory/properties/${selectedPropertyId}/rooms/${target.entity.roomId}/retirement`, {
           method: "POST",
-          body: JSON.stringify({ reason }),
+          body: JSON.stringify({ operationId: retirementRequestAttempt.current.operationId, reason }),
         });
       }
       propertyRetirementAttempt.current = resolvePropertySimpleLifecycleAttempt(
@@ -345,16 +374,56 @@ export function PropertiesPage() {
       });
     },
     onSuccess: async (result, input) => {
-      propertyRetirementAttempt.current = null;
+      if (input.target.kind === "property") propertyRetirementAttempt.current = null;
+      else retirementRequestAttempt.current = null;
       await Promise.all([invalidateProperty(), queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId] })]);
       if (input.target.kind !== "property" && result) setRetirementOutcome(result);
       else setRetirementTarget(null);
     },
   });
 
+  const retryRetirementMutation = useMutation<TopologyRetirement, Error, RetirementRetryInput>({
+    mutationFn: async ({ target, outcome }) => {
+      retirementRetryAttempt.current = resolveTopologyRetirementRetryAttempt(
+        retirementRetryAttempt.current,
+        {
+          propertyId: selectedPropertyId,
+          targetKind: target.kind,
+          topologyChangeId: outcome.topologyChangeId,
+          expectedVersion: outcome.version,
+        },
+      );
+      return request<TopologyRetirement>(
+        `/api/inventory/properties/${selectedPropertyId}/${target.kind}-retirements/${outcome.topologyChangeId}/retry`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: retirementRetryAttempt.current.operationId,
+            expectedVersion: outcome.version,
+          }),
+        },
+      );
+    },
+    onSuccess: async (result, input) => {
+      retirementRetryAttempt.current = null;
+      queryClient.setQueryData(
+        ["topology-retirement", selectedPropertyId, input.target.kind, result.topologyChangeId],
+        result,
+      );
+      setRetirementOutcome(result);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventory-rooms", selectedPropertyId] }),
+        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
+      ]);
+    },
+  });
+
   function closeRetirement() {
     propertyRetirementAttempt.current = null;
+    retirementRequestAttempt.current = null;
+    retirementRetryAttempt.current = null;
     retireMutation.reset();
+    retryRetirementMutation.reset();
     setRetirementOutcome(null);
     setRetirementTarget(null);
   }
@@ -412,8 +481,18 @@ export function PropertiesPage() {
         target={retirementTarget}
         outcome={retirementProcess.data ?? retirementOutcome}
         pending={retireMutation.isPending}
-        error={retireMutation.error || retirementProcess.error}
+        error={retireMutation.error}
+        refreshError={retirementProcess.error}
+        retryPending={retryRetirementMutation.isPending}
+        retryError={retryRetirementMutation.error}
         onConfirm={(reason) => retirementTarget && retireMutation.mutate({ target: retirementTarget, reason })}
+        onRefresh={() => void retirementProcess.refetch()}
+        onRetry={() => {
+          if (retirementTarget?.kind === "bed" || retirementTarget?.kind === "room") {
+            const outcome = retirementProcess.data ?? retirementOutcome;
+            if (outcome) retryRetirementMutation.mutate({ target: retirementTarget, outcome });
+          }
+        }}
         onClose={closeRetirement}
       />
     </>

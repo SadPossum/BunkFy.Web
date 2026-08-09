@@ -5936,7 +5936,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RetryRetirementRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -6054,7 +6058,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RetryRetirementRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -12840,6 +12848,8 @@ export interface components {
             lifetimeHours: number;
         };
         RequestBedRetirementRequest: {
+            /** Format: uuid */
+            operationId: string;
             reason: string | null;
         };
         RequestDataRightsExportRequest: {
@@ -12853,6 +12863,8 @@ export interface components {
             emailId: string | null;
         };
         RequestRoomRetirementRequest: {
+            /** Format: uuid */
+            operationId: string;
             reason: string | null;
         };
         ReservationDataRightsCorrectionReceiptDto: {
@@ -13215,6 +13227,12 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             cascadeBeds: boolean;
+        };
+        RetryRetirementRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         RevokeOrganizationInvitationRequest: {
             /** Format: int64 */
