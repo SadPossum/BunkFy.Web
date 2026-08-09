@@ -4752,7 +4752,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["VersionRequest"];
+                    "application/json": components["schemas"]["ConnectionControlRequest"];
                 };
             };
             responses: {
@@ -4794,7 +4794,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["VersionRequest"];
+                    "application/json": components["schemas"]["ConnectionControlRequest"];
                 };
             };
             responses: {
@@ -4836,7 +4836,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["VersionRequest"];
+                    "application/json": components["schemas"]["ConnectionControlRequest"];
                 };
             };
             responses: {
@@ -4878,7 +4878,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["VersionRequest"];
+                    "application/json": components["schemas"]["ConnectionControlRequest"];
                 };
             };
             responses: {
@@ -11048,6 +11048,8 @@ export interface components {
             code: string | null;
         };
         ConfigurePollingScheduleRequest: {
+            /** Format: uuid */
+            operationId: string;
             /** Format: int32 */
             intervalSeconds: number;
             /** Format: int32 */
@@ -11086,6 +11088,12 @@ export interface components {
         ConfirmPasswordRecoveryRequest: {
             code: string | null;
             newPassword: string | null;
+        };
+        ConnectionControlRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         CountryPolicyDescriptorDto: {
             policyId: string | null;

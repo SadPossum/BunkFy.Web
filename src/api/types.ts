@@ -810,6 +810,9 @@ export type AdapterConnectionUpdateRequest = NonNullableFields<
   Schema<"UpdateConnectionRequest">,
   "operationId" | "configurationReference"
 >;
+export type AdapterConnectionControlRequest = Schema<"ConnectionControlRequest">;
+export type AdapterConnectionPollingScheduleRequest =
+  Schema<"ConfigurePollingScheduleRequest">;
 
 export type AdapterTypeCapability = {
   adapterType: string;

@@ -4635,7 +4635,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/ConnectionControlRequest"
               }
             }
           },
@@ -4684,7 +4684,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/ConnectionControlRequest"
               }
             }
           },
@@ -4733,7 +4733,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/ConnectionControlRequest"
               }
             }
           },
@@ -4782,7 +4782,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/ConnectionControlRequest"
               }
             }
           },
@@ -12540,6 +12540,10 @@
       "ConfigurePollingScheduleRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "intervalSeconds": {
             "type": "integer",
             "format": "int32"
@@ -12645,6 +12649,20 @@
           "newPassword": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConnectionControlRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
