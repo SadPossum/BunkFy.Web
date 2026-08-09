@@ -7,6 +7,7 @@ import {
   Link2,
   LogOut,
   MailCheck,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -32,8 +33,10 @@ import {
 import { waitForWorkspaceAccess } from "./workspaceAccess";
 import {
   clearPreservedWorkspaceJoinSecret,
+  isWorkspaceStaffOnboardingExpired,
   isWorkspaceStaffOnboardingInProgress,
   isWorkspaceStaffOnboardingTerminallyDenied,
+  isWorkspaceStaffOnboardingWithdrawn,
   parseWorkspaceJoinSecret,
   readPreservedWorkspaceJoinSecret,
   resolveEnrollmentJoin,
@@ -65,6 +68,10 @@ export function JoinWorkspacePage() {
     secret?.kind === "enrollment" &&
       hasPendingEnrollment(secret.token, accountKey),
   );
+  const [withdrawalConfirmation, setWithdrawalConfirmation] = useState(false);
+  const [withdrawalResolution, setWithdrawalResolution] = useState<
+    "withdrawn" | "expired" | null
+  >(null);
   const preview = useQuery<
     OrganizationInvitationPreview | OrganizationEnrollmentPreview
   >({
@@ -202,8 +209,49 @@ export function JoinWorkspacePage() {
       navigate("/", { replace: true });
     },
   });
+  const withdraw = useMutation<OrganizationEnrollmentOutcome>({
+    mutationFn: async () => {
+      const application = staffApplication.data;
+      if (
+        !application?.claimId ||
+        !application.claimVersion ||
+        application.status !== 2
+      ) {
+        throw new Error("This access request is no longer awaiting approval.");
+      }
+
+      const outcome = await request<OrganizationEnrollmentOutcome>(
+        `/api/organization-enrollment/${encodeURIComponent(application.organizationId)}` +
+          `/join-requests/${encodeURIComponent(application.claimId)}/withdraw`,
+        {
+          method: "POST",
+          body: JSON.stringify({ expectedVersion: application.claimVersion }),
+        },
+      );
+      const status = outcome.claim.status;
+      if (status !== "withdrawn" && status !== "expired") {
+        throw new Error("The access request changed while it was being withdrawn.");
+      }
+      return outcome;
+    },
+    onSuccess: (outcome) => {
+      forgetPendingEnrollment(secret?.token, accountKey);
+      setPendingApproval(false);
+      setWithdrawalConfirmation(false);
+      setWithdrawalResolution(
+        outcome.claim.status === "expired" ? "expired" : "withdrawn",
+      );
+      clearPreservedWorkspaceJoinSecret();
+      window.history.replaceState(null, "", "/join");
+      void staffApplication.refetch();
+    },
+    onError: () => {
+      void staffApplication.refetch();
+    },
+  });
   const resetJoin = join.reset;
   const resetApprovedActivation = approvedActivation.reset;
+  const resetWithdraw = withdraw.reset;
 
   useEffect(() => {
     setPendingApproval(
@@ -212,11 +260,42 @@ export function JoinWorkspacePage() {
     );
     resetJoin();
     resetApprovedActivation();
-  }, [accountKey, resetApprovedActivation, resetJoin, secret?.kind, secret?.token, secretKey]);
+    resetWithdraw();
+    setWithdrawalConfirmation(false);
+    setWithdrawalResolution(null);
+  }, [
+    accountKey,
+    resetApprovedActivation,
+    resetJoin,
+    resetWithdraw,
+    secret?.kind,
+    secret?.token,
+    secretKey,
+  ]);
 
   useEffect(() => {
     const application = staffApplication.data;
     if (!application) return;
+
+    if (withdrawalResolution) return;
+
+    if (isWorkspaceStaffOnboardingWithdrawn(application.status)) {
+      forgetPendingEnrollment(secret?.token, accountKey);
+      setPendingApproval(false);
+      setWithdrawalResolution("withdrawn");
+      clearPreservedWorkspaceJoinSecret();
+      window.history.replaceState(null, "", "/join");
+      return;
+    }
+
+    if (isWorkspaceStaffOnboardingExpired(application.status)) {
+      forgetPendingEnrollment(secret?.token, accountKey);
+      setPendingApproval(false);
+      setWithdrawalResolution("expired");
+      clearPreservedWorkspaceJoinSecret();
+      window.history.replaceState(null, "", "/join");
+      return;
+    }
 
     if (isWorkspaceStaffOnboardingInProgress(application.status)) {
       setPendingApproval(true);
@@ -247,6 +326,7 @@ export function JoinWorkspacePage() {
     approvedActivation,
     secret?.token,
     staffApplication.data,
+    withdrawalResolution,
   ]);
 
   async function activateWorkspace(workspaceId: string) {
@@ -269,9 +349,16 @@ export function JoinWorkspacePage() {
       join.error.code === "Organizations.EnrollmentClaimUnavailable") ||
     isWorkspaceStaffOnboardingTerminallyDenied(staffApplication.data?.status);
   const provisioningFailed = staffApplication.data?.status === 6;
+  const canWithdraw =
+    isEnrollment &&
+    pendingApproval &&
+    staffApplication.data?.status === 2 &&
+    Boolean(staffApplication.data.claimId) &&
+    Boolean(staffApplication.data.claimVersion);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pendingApproval || requestRejected || withdrawalResolution) return;
     join.mutate();
   }
 
@@ -361,18 +448,58 @@ export function JoinWorkspacePage() {
                 {new Date(data.expiresAtUtc).toLocaleString()}
               </p>
             </div>
-            <div className="py-6">
-              <h2 className="font-display text-xl font-semibold">
-                Your staff profile
-              </h2>
-              <p className="mb-5 mt-1 text-sm leading-6 text-base-content/50">
-                Review the contact details your team will see after you join.
-              </p>
-              <StaffProfileFields
-                value={staffProfile}
-                onChange={updateStaffProfile}
-              />
-            </div>
+            {!withdrawalResolution && !pendingApproval && (
+              <div className="py-6">
+                <h2 className="font-display text-xl font-semibold">
+                  Your staff profile
+                </h2>
+                <p className="mb-5 mt-1 text-sm leading-6 text-base-content/50">
+                  Review the contact details your team will see after you join.
+                </p>
+                <StaffProfileFields
+                  value={staffProfile}
+                  onChange={updateStaffProfile}
+                />
+              </div>
+            )}
+
+            {withdrawalResolution && (
+              <div
+                className={`rounded-lg border p-5 ${
+                  withdrawalResolution === "withdrawn"
+                    ? "border-success/25 bg-success/8"
+                    : "border-warning/30 bg-warning/8"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`grid size-10 shrink-0 place-items-center rounded-lg ${
+                      withdrawalResolution === "withdrawn"
+                        ? "bg-success/12 text-success"
+                        : "bg-warning/12 text-warning"
+                    }`}
+                  >
+                    {withdrawalResolution === "withdrawn" ? (
+                      <CheckCircle2 size={19} />
+                    ) : (
+                      <Clock3 size={19} />
+                    )}
+                  </span>
+                  <div>
+                    <h2 className="font-display text-lg font-semibold">
+                      {withdrawalResolution === "withdrawn"
+                        ? "Request withdrawn"
+                        : "Request expired"}
+                    </h2>
+                    <p className="mt-1 text-sm leading-6 text-base-content/60">
+                      {withdrawalResolution === "withdrawn"
+                        ? "This request is no longer waiting for approval. BunkFy is clearing the staged staff profile as the update is processed."
+                        : "The approval window ended before withdrawal completed. Ask the workspace owner for a new team link if you still need access."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {pendingApproval && (
               <div className="rounded-lg border border-info/25 bg-info/8 p-5">
@@ -390,17 +517,72 @@ export function JoinWorkspacePage() {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm mt-4"
-                  onClick={() => void staffApplication.refetch()}
-                  disabled={staffApplication.isFetching}
-                >
-                  {staffApplication.isFetching && (
-                    <span className="loading loading-spinner loading-xs" />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => void staffApplication.refetch()}
+                    disabled={staffApplication.isFetching}
+                  >
+                    {staffApplication.isFetching && (
+                      <span className="loading loading-spinner loading-xs" />
+                    )}
+                    Check approval now
+                  </button>
+                  {canWithdraw && !withdrawalConfirmation && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm text-error"
+                      onClick={() => {
+                        withdraw.reset();
+                        setWithdrawalConfirmation(true);
+                      }}
+                    >
+                      <XCircle size={16} />
+                      Withdraw request
+                    </button>
                   )}
-                  Check approval now
-                </button>
+                </div>
+                {withdrawalConfirmation && (
+                  <div className="mt-4 border-t border-info/20 pt-4">
+                    <p className="text-sm font-semibold">Withdraw this request?</p>
+                    <p className="mt-1 text-sm leading-6 text-base-content/60">
+                      Your staged staff details will be removed. You will need a
+                      new team link to request access again.
+                    </p>
+                    {withdraw.error && (
+                      <div className="alert alert-error mt-3 text-sm">
+                        {withdraw.error.message}
+                      </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={withdraw.isPending}
+                        onClick={() => {
+                          withdraw.reset();
+                          setWithdrawalConfirmation(false);
+                        }}
+                      >
+                        Keep waiting
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-error btn-sm"
+                        disabled={withdraw.isPending}
+                        onClick={() => withdraw.mutate()}
+                      >
+                        {withdraw.isPending ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          <XCircle size={16} />
+                        )}
+                        Withdraw request
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -458,7 +640,7 @@ export function JoinWorkspacePage() {
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => navigate("/", { replace: true })}
+                onClick={leaveJoin}
               >
                 Back to BunkFy
               </button>
@@ -470,7 +652,7 @@ export function JoinWorkspacePage() {
                 >
                   Open workspace
                 </button>
-              ) : !pendingApproval && !requestRejected ? (
+              ) : !pendingApproval && !requestRejected && !withdrawalResolution ? (
                 <button
                   className="btn btn-primary"
                   disabled={

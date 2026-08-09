@@ -6581,6 +6581,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/organization-enrollment/{organizationId}/join-requests/{claimId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    organizationId: string;
+                    claimId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WithdrawOrganizationJoinRequestRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrganizationEnrollmentOutcomeDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/organization-invitations/preview": {
         parameters: {
             query?: never;
@@ -12477,7 +12519,7 @@ export interface components {
             decisionExpiresAtUtc: string | null;
         };
         /** @enum {string} */
-        OrganizationEnrollmentClaimStatus: "pending" | "accepted" | "rejected" | "expired";
+        OrganizationEnrollmentClaimStatus: "pending" | "accepted" | "rejected" | "expired" | "withdrawn";
         OrganizationEnrollmentLinkDto: {
             /** Format: uuid */
             enrollmentLinkId: string;
@@ -13911,6 +13953,10 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        WithdrawOrganizationJoinRequestRequest: {
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         WorkspaceAccessCatalogueDto: {
             permissions: components["schemas"]["WorkspaceAccessPermissionDto"][] | null;
             protectedSeedKeys: string[] | null;
@@ -14135,7 +14181,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+        WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
     };
     responses: never;
     parameters: never;

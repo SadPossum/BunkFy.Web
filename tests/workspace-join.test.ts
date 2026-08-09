@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   isWorkspaceStaffOnboardingInProgress,
+  isWorkspaceStaffOnboardingExpired,
   isWorkspaceStaffOnboardingTerminallyDenied,
+  isWorkspaceStaffOnboardingWithdrawn,
   parseWorkspaceJoinSecret,
   resolveEnrollmentJoin,
   workspaceJoinSourceKind,
@@ -57,5 +59,9 @@ describe("workspace enrollment outcomes", () => {
     expect(isWorkspaceStaffOnboardingTerminallyDenied(7)).toBe(true);
     expect(isWorkspaceStaffOnboardingTerminallyDenied(8)).toBe(true);
     expect(isWorkspaceStaffOnboardingTerminallyDenied(5)).toBe(false);
+    expect(isWorkspaceStaffOnboardingExpired(9)).toBe(true);
+    expect(isWorkspaceStaffOnboardingExpired(10)).toBe(false);
+    expect(isWorkspaceStaffOnboardingWithdrawn(10)).toBe(true);
+    expect(isWorkspaceStaffOnboardingWithdrawn(9)).toBe(false);
   });
 });

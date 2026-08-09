@@ -71,3 +71,11 @@ export function isWorkspaceStaffOnboardingInProgress(status: number | undefined)
 export function isWorkspaceStaffOnboardingTerminallyDenied(status: number | undefined): boolean {
   return status === 7 || status === 8;
 }
+
+export function isWorkspaceStaffOnboardingExpired(status: number | undefined): boolean {
+  return status === 9;
+}
+
+export function isWorkspaceStaffOnboardingWithdrawn(status: number | undefined): boolean {
+  return status === 10;
+}

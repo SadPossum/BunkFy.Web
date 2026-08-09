@@ -6549,6 +6549,55 @@
         }
       }
     },
+    "/api/organization-enrollment/{organizationId}/join-requests/{claimId}/withdraw": {
+      "post": {
+        "tags": [
+          "Organization Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "claimId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawOrganizationJoinRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationEnrollmentOutcomeDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/organization-invitations/preview": {
       "post": {
         "tags": [
@@ -16381,7 +16430,8 @@
           "pending",
           "accepted",
           "rejected",
-          "expired"
+          "expired",
+          "withdrawn"
         ],
         "type": "string"
       },
@@ -20260,6 +20310,16 @@
         },
         "additionalProperties": false
       },
+      "WithdrawOrganizationJoinRequestRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkspaceAccessCatalogueDto": {
         "type": "object",
         "properties": {
@@ -20895,7 +20955,8 @@
           6,
           7,
           8,
-          9
+          9,
+          10
         ],
         "type": "integer",
         "format": "int32"
