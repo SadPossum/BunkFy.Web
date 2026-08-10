@@ -34,7 +34,7 @@ import type {
   TotpEnrollment,
 } from "../../api/types";
 import { useSession } from "../../app/session";
-import { emailVerificationEnabled } from "../../app/environment";
+import { useProductCapabilities } from "../../app/productCapabilities";
 import { focusedResourceClass, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useWorkspace } from "../../app/workspace";
 import {
@@ -976,6 +976,7 @@ function EmailPanel({
   methods: AuthenticationMethods;
   mutation: SecurityMutation;
 }) {
+  const { emailVerificationEnabled } = useProductCapabilities();
   const [confirming, setConfirming] = useState(false);
   function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

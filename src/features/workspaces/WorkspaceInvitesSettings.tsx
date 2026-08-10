@@ -19,7 +19,7 @@ import type {
   WorkspaceStaffJoinSourceListResponse,
   WorkspaceStaffJoinSourceReplacement,
 } from "../../api/types";
-import { emailVerificationEnabled } from "../../app/environment";
+import { useProductCapabilities } from "../../app/productCapabilities";
 import { useSession } from "../../app/session";
 import { Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
@@ -115,6 +115,7 @@ function JoinSourceCreation({
   properties: Property[];
   onIssued: (kind: IssuedJoinLink["kind"], issuance: WorkspaceStaffJoinSourceIssuance, lifetimeHours: number) => void;
 }) {
+  const { emailVerificationEnabled } = useProductCapabilities();
   const { request } = useSession();
   const queryClient = useQueryClient();
   const reusableProfiles = profiles.filter((profile) => REUSABLE_PROFILE_KEYS.has(profile.key));

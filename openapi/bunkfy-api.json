@@ -7622,6 +7622,26 @@
         }
       }
     },
+    "/api/product-capabilities": {
+      "get": {
+        "tags": [
+          "Product"
+        ],
+        "operationId": "GetBunkFyProductCapabilities",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BunkFyProductCapabilitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/properties": {
       "get": {
         "tags": [
@@ -12361,6 +12381,15 @@
           "code": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BunkFyProductCapabilitiesResponse": {
+        "type": "object",
+        "properties": {
+          "emailVerificationEnabled": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -21053,6 +21082,9 @@
     },
     {
       "name": "Organizations"
+    },
+    {
+      "name": "Product"
     },
     {
       "name": "Properties"

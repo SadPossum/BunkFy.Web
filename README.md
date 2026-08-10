@@ -33,7 +33,7 @@ Run the app directly:
 pnpm dev
 ```
 
-The default API address is `http://localhost:5194`. Override it with `VITE_BUNKFY_API_BASE_URL` (`/` selects the same origin), or run the root Aspire AppHost to inject the API endpoint automatically. Email verification controls are enabled only when `VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED=true` and the deployment has a working backend sender.
+The default API address is `http://localhost:5194`. Override it with `VITE_BUNKFY_API_BASE_URL` (`/` selects the same origin), or run the root Aspire AppHost to inject the API endpoint automatically. Email verification controls use the runtime `/api/product-capabilities` response and fail closed when the composed backend delivery path is unavailable.
 
 Browser refresh state is stored only in path-scoped `HttpOnly`, `SameSite=Strict` cookies. The access token remains in memory, concurrent unauthorized requests share one refresh operation, and supported browsers serialize cookie rotation across tabs with Web Locks; no bearer or refresh token is persisted in browser storage.
 

@@ -20,7 +20,7 @@ import type {
   OrganizationInvitationPreview,
   WorkspaceStaffOnboarding,
 } from "../../api/types";
-import { emailVerificationEnabled } from "../../app/environment";
+import { useProductCapabilities } from "../../app/productCapabilities";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { StaffProfileFields } from "./StaffProfileFields";
@@ -688,6 +688,7 @@ function InvitationVerificationRecovery({
   request: ReturnType<typeof useSession>["request"];
   onVerified: () => void;
 }) {
+  const { emailVerificationEnabled } = useProductCapabilities();
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState("");
   const methods = useQuery({
