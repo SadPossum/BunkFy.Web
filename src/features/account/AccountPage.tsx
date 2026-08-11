@@ -444,7 +444,6 @@ function StaffProfilePanel({
         legalName: profile.legalName.trim() || null,
         workEmail: profile.workEmail.trim() || null,
         workPhone: profile.workPhone.trim() || null,
-        employeeNumber: member.employeeNumber ?? null,
         jobTitle: profile.jobTitle.trim() || null,
         department: profile.department.trim() || null,
       };

@@ -8917,7 +8917,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["StaffProfileUpdateRequest"];
+                    "application/json": components["schemas"]["StaffSelfProfileUpdateRequest"];
                 };
             };
             responses: {
@@ -13836,6 +13836,18 @@ export interface components {
             /** Format: int32 */
             pageSize: number;
             hasMore: boolean;
+        };
+        StaffSelfProfileUpdateRequest: {
+            /** Format: uuid */
+            operationId: string;
+            displayName: string | null;
+            legalName: string | null;
+            workEmail: string | null;
+            workPhone: string | null;
+            jobTitle: string | null;
+            department: string | null;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         /**
          * Format: int32

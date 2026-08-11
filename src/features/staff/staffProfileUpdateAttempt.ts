@@ -8,11 +8,11 @@ import {
   staffMutationHash,
 } from "./staffMutationAttempt";
 
-const ONBOARDING_ATTEMPT_KEY = "bunkfy.onboarding.staff-profile-update.v1";
+const ONBOARDING_ATTEMPT_KEY = "bunkfy.onboarding.staff-profile-update.v2";
 
 export type StaffProfileUpdatePayload = Omit<
   StaffCreatePayload,
-  "authSubjectId"
+  "authSubjectId" | "employeeNumber"
 >;
 
 export type StaffProfileUpdateAttempt = {
@@ -107,7 +107,7 @@ async function resolveAttempt(
   createOperationId: () => string,
 ): Promise<StaffProfileUpdateAttempt> {
   const requestFingerprint = await staffMutationHash([
-    "staff-profile-update-ui-request-v1",
+    "staff-profile-update-ui-request-v2",
     staffMemberId.toLowerCase(),
     String(expectedVersion),
     profileFingerprint,
@@ -128,9 +128,13 @@ async function staffProfileFingerprint(
   payload: StaffProfileUpdatePayload,
 ): Promise<string> {
   return staffMutationHash([
-    "staff-profile-update-ui-profile-v1",
+    "staff-profile-update-ui-profile-v2",
     staffMemberId.toLowerCase(),
-    staffCreateFingerprint({ ...payload, authSubjectId: null }),
+    staffCreateFingerprint({
+      ...payload,
+      employeeNumber: null,
+      authSubjectId: null,
+    }),
   ]);
 }
 

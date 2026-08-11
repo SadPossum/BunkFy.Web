@@ -72,7 +72,6 @@ export async function completeCurrentStaffProfile(
     legalName: emptyToNull(profile.legalName),
     workEmail: emptyToNull(profile.workEmail),
     workPhone: emptyToNull(profile.workPhone),
-    employeeNumber: current.employeeNumber ?? null,
     jobTitle: emptyToNull(profile.jobTitle),
     department: emptyToNull(profile.department),
   };

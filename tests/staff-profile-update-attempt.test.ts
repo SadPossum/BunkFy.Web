@@ -13,7 +13,6 @@ const payload: StaffProfileUpdatePayload = {
   legalName: "Maya Q. Chen",
   workEmail: "maya@example.test",
   workPhone: "+44 20 1234 5678",
-  employeeNumber: "EMP-42",
   jobTitle: "Manager",
   department: "Operations",
 };
@@ -122,13 +121,13 @@ describe("staff profile update attempt", () => {
     expect([...values.values()].join()).not.toContain("Maya");
 
     values.set(
-      "bunkfy.onboarding.staff-profile-update.v1:member-1",
+      "bunkfy.onboarding.staff-profile-update.v2:member-1",
       JSON.stringify({ ...attempt, expectedVersion: 0 }),
     );
     expect(readStaffProfileUpdateAttempt("member-1", storage)).toBeNull();
 
     values.set(
-      "bunkfy.onboarding.staff-profile-update.v1:member-1",
+      "bunkfy.onboarding.staff-profile-update.v2:member-1",
       JSON.stringify({ ...attempt, operationId: "not-a-guid" }),
     );
     expect(readStaffProfileUpdateAttempt("member-1", storage)).toBeNull();
