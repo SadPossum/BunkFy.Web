@@ -9,14 +9,17 @@ import type {
   PropertyMutationReceipt,
   PropertyProcessingState,
 } from "../../api/types";
+import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
 import { useSession } from "../../app/session";
 import {
   ErrorState,
   FormActions,
   LoadingState,
   Modal,
+  ModalActions,
   StatusBadge,
 } from "../../components/ui/primitives";
+import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
   availableCountryPolicies,
@@ -115,6 +118,15 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
       await refreshProperty();
     },
   });
+  const activationNeedsAuthentication =
+    isInsufficientAuthenticationError(activation.error);
+
+  function retryActivationAfterAuthentication() {
+    const input = activation.variables;
+    if (!input) return;
+    activation.reset();
+    activation.mutate(input);
+  }
 
   if (processing.isLoading) {
     return <div className="card border border-base-300 bg-base-100 shadow-sm"><LoadingState label="Checking data processing" /></div>;
@@ -190,7 +202,15 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
         processing={state}
         policies={selectablePolicies}
         pending={activation.isPending}
-        error={activation.error}
+        error={activationNeedsAuthentication ? null : activation.error}
+        authenticationPrompt={activationNeedsAuthentication ? (
+          <RecentAuthenticationPrompt
+            error={activation.error}
+            title="Confirm your password to enable data processing"
+            description={`This will enable or change the policy governing guest, reservation and adapter data for ${property.name}.`}
+            onAuthenticated={retryActivationAfterAuthentication}
+          />
+        ) : null}
         onClose={() => {
           activationAttempt.current = null;
           activation.reset();
@@ -233,13 +253,14 @@ function PolicyCoordinate({ label, value }: { label: string; value: string }) {
   return <div className="min-w-0"><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-base-content/40">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div>;
 }
 
-function PolicyActivationModal({ open, property, processing, policies, pending, error, onClose, onSubmit }: {
+function PolicyActivationModal({ open, property, processing, policies, pending, error, authenticationPrompt, onClose, onSubmit }: {
   open: boolean;
   property: Property;
   processing: PropertyProcessingState;
   policies: CountryPolicy[];
   pending: boolean;
   error: unknown;
+  authenticationPrompt: ReactNode;
   onClose: () => void;
   onSubmit: (input: PropertyProcessingActivationInput) => void;
 }) {
@@ -308,7 +329,14 @@ function PolicyActivationModal({ open, property, processing, policies, pending, 
 
   return (
     <Modal open={open} title={processing.governancePolicy ? "Change country policy" : "Configure data processing"} description={`Choose the deployment policy coordinates for ${property.name}.`} onClose={onClose} size="lg">
-      {!selectedPolicy ? <div className="py-8"><LoadingState label="No usable policy available" /></div> : (
+      {!selectedPolicy ? <div className="py-8"><LoadingState label="No usable policy available" /></div> : authenticationPrompt ? (
+        <div className="space-y-4">
+          {authenticationPrompt}
+          <ModalActions>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          </ModalActions>
+        </div>
+      ) : (
         <form onSubmit={submit} className="space-y-5">
           <PickerField label="Country policy">
             <SelectPicker

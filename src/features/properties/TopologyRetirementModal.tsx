@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Clock3, Trash2 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { Bed, Property, Room, TopologyRetirement } from "../../api/types";
 import { ErrorState, Modal, ModalActions } from "../../components/ui/primitives";
@@ -14,6 +14,7 @@ export function TopologyRetirementModal({
   outcome,
   pending,
   error,
+  authenticationPrompt,
   refreshError,
   retryPending,
   retryError,
@@ -26,6 +27,7 @@ export function TopologyRetirementModal({
   outcome: TopologyRetirement | null;
   pending: boolean;
   error: Error | null;
+  authenticationPrompt?: ReactNode;
   refreshError: Error | null;
   retryPending: boolean;
   retryError: Error | null;
@@ -48,6 +50,16 @@ export function TopologyRetirementModal({
       ? target.entity.name
       : `bed ${target.entity.label}`;
   const rejected = outcome?.status === 5;
+  const warning = (
+    <div className="flex gap-3 rounded-lg border border-warning/25 bg-warning/10 p-4 text-sm">
+      <AlertTriangle className="mt-0.5 shrink-0 text-warning-content" size={18} />
+      <p>
+        {isInventoryRetirement
+          ? `Existing reservations and manual blocks stay intact. Retirement completes only after staff move or release every active claim${target.kind === "room" ? " and any bed retirement finishes" : ""}.`
+          : "Review dependent rooms, beds, inventory and reservations before continuing."}
+      </p>
+    </div>
+  );
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,16 +94,17 @@ export function TopologyRetirementModal({
           onRetry={onRetry}
           onClose={onClose}
         />
+      ) : authenticationPrompt ? (
+        <div className="space-y-4">
+          {warning}
+          {authenticationPrompt}
+          <ModalActions>
+            <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Cancel</button>
+          </ModalActions>
+        </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <div className="flex gap-3 rounded-lg border border-warning/25 bg-warning/10 p-4 text-sm">
-            <AlertTriangle className="mt-0.5 shrink-0 text-warning-content" size={18} />
-            <p>
-              {isInventoryRetirement
-                ? `Existing reservations and manual blocks stay intact. Retirement completes only after staff move or release every active claim${target.kind === "room" ? " and any bed retirement finishes" : ""}.`
-                : "Review dependent rooms, beds, inventory and reservations before continuing."}
-            </p>
-          </div>
+          {warning}
           {isInventoryRetirement && (
             <label className="form-control block">
               <span className="label-text mb-1.5 block text-sm font-semibold">Reason</span>

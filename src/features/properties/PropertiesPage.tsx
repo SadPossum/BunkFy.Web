@@ -14,12 +14,14 @@ import type {
   RoomRetirement,
   TopologyRetirement,
 } from "../../api/types";
+import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, topologyRetirementNeedsLiveRefresh } from "../../app/liveUpdates";
 import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { EmptyState, ErrorState, FormActions, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
   createDefaultBedLabels,
@@ -417,6 +419,16 @@ export function PropertiesPage() {
       ]);
     },
   });
+  const propertyRetirementNeedsAuthentication =
+    retirementTarget?.kind === "property" &&
+    isInsufficientAuthenticationError(retireMutation.error);
+
+  function retryPropertyRetirementAfterAuthentication() {
+    const input = retireMutation.variables;
+    if (!input || input.target.kind !== "property") return;
+    retireMutation.reset();
+    retireMutation.mutate(input);
+  }
 
   function closeRetirement() {
     propertyRetirementAttempt.current = null;
@@ -481,7 +493,15 @@ export function PropertiesPage() {
         target={retirementTarget}
         outcome={retirementProcess.data ?? retirementOutcome}
         pending={retireMutation.isPending}
-        error={retireMutation.error}
+        error={propertyRetirementNeedsAuthentication ? null : retireMutation.error}
+        authenticationPrompt={propertyRetirementNeedsAuthentication ? (
+          <RecentAuthenticationPrompt
+            error={retireMutation.error}
+            title="Confirm your password to retire this property"
+            description="Property retirement is terminal and changes the topology available to the workspace."
+            onAuthenticated={retryPropertyRetirementAfterAuthentication}
+          />
+        ) : null}
         refreshError={retirementProcess.error}
         retryPending={retryRetirementMutation.isPending}
         retryError={retryRetirementMutation.error}
