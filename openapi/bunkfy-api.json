@@ -17604,6 +17604,9 @@
             "type": "string",
             "format": "uuid"
           },
+          "confirmed": {
+            "type": "boolean"
+          },
           "reason": {
             "type": "string",
             "nullable": true
@@ -17642,6 +17645,9 @@
           "operationId": {
             "type": "string",
             "format": "uuid"
+          },
+          "confirmed": {
+            "type": "boolean"
           },
           "reason": {
             "type": "string",

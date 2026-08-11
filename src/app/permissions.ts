@@ -14,6 +14,7 @@ export const permissions = {
   inventoryRead: "inventory.read",
   inventoryConfigure: "inventory.configure",
   inventoryBlocksManage: "inventory.blocks.manage",
+  inventoryRetire: "inventory.retire",
   reservationsRead: "reservations.read",
   reservationsCreate: "reservations.create",
   reservationsManage: "reservations.manage",

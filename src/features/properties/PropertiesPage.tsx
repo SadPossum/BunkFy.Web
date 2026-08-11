@@ -54,6 +54,7 @@ import {
 import {
   resolveTopologyRetirementRequestAttempt,
   resolveTopologyRetirementRetryAttempt,
+  topologyRetirementRequestPayload,
   type TopologyRetirementMutationAttempt,
 } from "./topologyRetirementMutationAttempt";
 import { PropertyProcessingPanel } from "./PropertyProcessingPanel";
@@ -107,14 +108,14 @@ export function PropertiesPage() {
       { permission: permissions.propertiesManage, scope: propertyScope },
       { permission: permissions.roomsManage, scope: propertyScope },
       { permission: permissions.bedsManage, scope: propertyScope },
-      { permission: permissions.inventoryConfigure, scope: propertyScope },
+      { permission: permissions.inventoryRetire, scope: propertyScope },
     ] : []),
   ]);
   const canCreateProperty = access.allows(permissions.propertiesManage, tenantScope);
   const canManageProperty = access.allows(permissions.propertiesManage, propertyScope);
   const canManageRooms = access.allows(permissions.roomsManage, propertyScope);
   const canManageBeds = access.allows(permissions.bedsManage, propertyScope);
-  const canConfigureInventory = access.allows(permissions.inventoryConfigure, propertyScope);
+  const canRetireInventory = access.allows(permissions.inventoryRetire, propertyScope);
 
   const rooms = useQuery({
     queryKey: ["rooms", selectedPropertyId],
@@ -341,7 +342,7 @@ export function PropertiesPage() {
         );
         return request<BedRetirement>(`/api/inventory/properties/${selectedPropertyId}/rooms/${target.roomId}/beds/${target.entity.bedId}/retirement`, {
           method: "POST",
-          body: JSON.stringify({ operationId: retirementRequestAttempt.current.operationId, reason }),
+          body: JSON.stringify(topologyRetirementRequestPayload(retirementRequestAttempt.current, reason)),
         });
       }
       if (target.kind === "room") {
@@ -357,7 +358,7 @@ export function PropertiesPage() {
         );
         return request<RoomRetirement>(`/api/inventory/properties/${selectedPropertyId}/rooms/${target.entity.roomId}/retirement`, {
           method: "POST",
-          body: JSON.stringify({ operationId: retirementRequestAttempt.current.operationId, reason }),
+          body: JSON.stringify(topologyRetirementRequestPayload(retirementRequestAttempt.current, reason)),
         });
       }
       propertyRetirementAttempt.current = resolvePropertySimpleLifecycleAttempt(
@@ -419,13 +420,13 @@ export function PropertiesPage() {
       ]);
     },
   });
-  const propertyRetirementNeedsAuthentication =
-    retirementTarget?.kind === "property" &&
+  const retirementNeedsAuthentication =
+    Boolean(retirementTarget) &&
     isInsufficientAuthenticationError(retireMutation.error);
 
-  function retryPropertyRetirementAfterAuthentication() {
+  function retryRetirementAfterAuthentication() {
     const input = retireMutation.variables;
-    if (!input || input.target.kind !== "property") return;
+    if (!input) return;
     retireMutation.reset();
     retireMutation.mutate(input);
   }
@@ -475,9 +476,9 @@ export function PropertiesPage() {
                   <div className="border-b border-base-300 p-3 md:border-b-0 md:border-r">
                     {roomItems.map((room) => <button key={room.roomId} onClick={() => setSelectedRoomId(room.roomId)} className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${selectedRoom?.roomId === room.roomId ? "bg-base-200" : "hover:bg-base-200/60"} ${focusedRoomId === room.roomId ? focusedResourceClass : ""}`}><div className="grid size-9 place-items-center rounded-lg bg-secondary/15 text-secondary"><BedDouble size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{room.name}</p><p className="truncate text-xs text-base-content/40">{[room.buildingLabel, room.floorLabel].filter(Boolean).join(" · ") || "No location labels"}</p></div><MoreHorizontal size={16} className="text-base-content/30" /></button>)}
                   </div>
-                  {selectedRoom && <div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-display text-xl font-semibold">{selectedRoom.name}</h3><StatusBadge status={selectedRoom.status} /></div><p className="mt-1 text-sm text-base-content/45">{[selectedRoom.buildingLabel, selectedRoom.floorLabel].filter(Boolean).join(" · ") || "No building or floor label"}</p></div>{canManageRooms && <div className="dropdown dropdown-end"><button tabIndex={0} className="btn btn-circle btn-ghost btn-sm" aria-label={`Actions for ${selectedRoom.name}`}><MoreHorizontal size={18} /></button><ul tabIndex={0} className="menu dropdown-content z-10 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"><li><button onClick={() => setRoomForm({ room: selectedRoom })}><Edit3 size={15} />Edit room</button></li>{canConfigureInventory && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "room", entity: selectedRoom })}><Trash2 size={15} />Retire</button></li>}</ul></div>}</div>
+                  {selectedRoom && <div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-display text-xl font-semibold">{selectedRoom.name}</h3><StatusBadge status={selectedRoom.status} /></div><p className="mt-1 text-sm text-base-content/45">{[selectedRoom.buildingLabel, selectedRoom.floorLabel].filter(Boolean).join(" · ") || "No building or floor label"}</p></div>{canManageRooms && <div className="dropdown dropdown-end"><button tabIndex={0} className="btn btn-circle btn-ghost btn-sm" aria-label={`Actions for ${selectedRoom.name}`}><MoreHorizontal size={18} /></button><ul tabIndex={0} className="menu dropdown-content z-10 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"><li><button onClick={() => setRoomForm({ room: selectedRoom })}><Edit3 size={15} />Edit room</button></li>{canRetireInventory && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "room", entity: selectedRoom })}><Trash2 size={15} />Retire</button></li>}</ul></div>}</div>
                     <div className="my-5 flex items-center justify-between"><p className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Beds</p>{canManageBeds && <button className="btn btn-sm btn-outline" onClick={() => setBedForm({})}><Plus size={15} />Add bed</button>}</div>
-                    {beds.isLoading ? <LoadingState label="Loading beds" /> : beds.error ? <ErrorState error={beds.error} /> : !bedItems.length ? <EmptyState icon={<BedDouble />} title="No beds in this room" description="Add beds for bed-level sales, or configure the room for room-level inventory." action={canManageBeds ? <button className="btn btn-sm btn-primary" onClick={() => setBedForm({})}>Add beds</button> : undefined} /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{bedItems.map((bed) => <div key={bed.bedId} className={`rounded-xl border border-base-300 p-4 ${focusedBedId === bed.bedId ? focusedResourceClass : ""}`}><div className="flex items-start justify-between"><div className="grid size-9 place-items-center rounded-lg bg-accent/15 text-accent-content"><BedDouble size={17} /></div>{canManageBeds && <div className="dropdown dropdown-end"><button tabIndex={0} className="btn btn-circle btn-ghost btn-xs" aria-label={`Actions for ${bed.label}`}><MoreHorizontal size={15} /></button><ul tabIndex={0} className="menu dropdown-content z-10 w-36 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"><li><button onClick={() => setBedForm({ bed })}>Edit</button></li>{canConfigureInventory && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "bed", entity: bed, roomId: selectedRoom.roomId })}>Retire</button></li>}</ul></div>}</div><p className="mt-3 font-semibold">{bed.label}</p><div className="mt-2"><StatusBadge status={bed.status} /></div></div>)}</div>}
+                    {beds.isLoading ? <LoadingState label="Loading beds" /> : beds.error ? <ErrorState error={beds.error} /> : !bedItems.length ? <EmptyState icon={<BedDouble />} title="No beds in this room" description="Add beds for bed-level sales, or configure the room for room-level inventory." action={canManageBeds ? <button className="btn btn-sm btn-primary" onClick={() => setBedForm({})}>Add beds</button> : undefined} /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{bedItems.map((bed) => <div key={bed.bedId} className={`rounded-xl border border-base-300 p-4 ${focusedBedId === bed.bedId ? focusedResourceClass : ""}`}><div className="flex items-start justify-between"><div className="grid size-9 place-items-center rounded-lg bg-accent/15 text-accent-content"><BedDouble size={17} /></div>{canManageBeds && <div className="dropdown dropdown-end"><button tabIndex={0} className="btn btn-circle btn-ghost btn-xs" aria-label={`Actions for ${bed.label}`}><MoreHorizontal size={15} /></button><ul tabIndex={0} className="menu dropdown-content z-10 w-36 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"><li><button onClick={() => setBedForm({ bed })}>Edit</button></li>{canRetireInventory && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "bed", entity: bed, roomId: selectedRoom.roomId })}>Retire</button></li>}</ul></div>}</div><p className="mt-3 font-semibold">{bed.label}</p><div className="mt-2"><StatusBadge status={bed.status} /></div></div>)}</div>}
                   </div>}
                 </div>
               )}
@@ -493,13 +494,13 @@ export function PropertiesPage() {
         target={retirementTarget}
         outcome={retirementProcess.data ?? retirementOutcome}
         pending={retireMutation.isPending}
-        error={propertyRetirementNeedsAuthentication ? null : retireMutation.error}
-        authenticationPrompt={propertyRetirementNeedsAuthentication ? (
+        error={retirementNeedsAuthentication ? null : retireMutation.error}
+        authenticationPrompt={retirementNeedsAuthentication ? (
           <RecentAuthenticationPrompt
             error={retireMutation.error}
-            title="Confirm your password to retire this property"
-            description="Property retirement is terminal and changes the topology available to the workspace."
-            onAuthenticated={retryPropertyRetirementAfterAuthentication}
+            title={`Confirm your password to retire this ${retirementTarget?.kind ?? "topology"}`}
+            description="Retirement is terminal and changes the topology available to the workspace."
+            onAuthenticated={retryRetirementAfterAuthentication}
           />
         ) : null}
         refreshError={retirementProcess.error}

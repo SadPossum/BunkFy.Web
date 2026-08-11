@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveTopologyRetirementRequestAttempt,
   resolveTopologyRetirementRetryAttempt,
+  topologyRetirementRequestPayload,
 } from "../src/features/properties/topologyRetirementMutationAttempt";
 
 describe("topology retirement mutation attempts", () => {
@@ -31,6 +32,26 @@ describe("topology retirement mutation attempts", () => {
 
     expect(retry).toBe(first);
     expect(retry.operationId).toBe("operation-1");
+  });
+
+  it("builds an explicitly confirmed request without changing retry identity", () => {
+    const attempt = resolveTopologyRetirementRequestAttempt(
+      null,
+      {
+        propertyId: "property-a",
+        targetKind: "room",
+        roomId: "room-a",
+        targetId: "room-a",
+        reason: "Renovation",
+      },
+      () => "operation-1",
+    );
+
+    expect(topologyRetirementRequestPayload(attempt, "  Renovation  ")).toEqual({
+      operationId: "operation-1",
+      confirmed: true,
+      reason: "Renovation",
+    });
   });
 
   it("rotates request identity when the intended retirement changes", () => {

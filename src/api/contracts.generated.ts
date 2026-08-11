@@ -12952,6 +12952,7 @@ export interface components {
         RequestBedRetirementRequest: {
             /** Format: uuid */
             operationId: string;
+            confirmed: boolean;
             reason: string | null;
         };
         RequestDataRightsExportRequest: {
@@ -12967,6 +12968,7 @@ export interface components {
         RequestRoomRetirementRequest: {
             /** Format: uuid */
             operationId: string;
+            confirmed: boolean;
             reason: string | null;
         };
         ReservationDataRightsCorrectionReceiptDto: {

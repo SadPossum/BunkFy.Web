@@ -18,6 +18,12 @@ export type TopologyRetirementRetryAttemptInput = {
   expectedVersion: number;
 };
 
+export type TopologyRetirementRequestPayload = {
+  operationId: string;
+  confirmed: true;
+  reason: string;
+};
+
 export function resolveTopologyRetirementRequestAttempt(
   current: TopologyRetirementMutationAttempt | null,
   input: TopologyRetirementRequestAttemptInput,
@@ -51,6 +57,17 @@ export function resolveTopologyRetirementRetryAttempt(
     }),
     createOperationId,
   );
+}
+
+export function topologyRetirementRequestPayload(
+  attempt: TopologyRetirementMutationAttempt,
+  reason: string,
+): TopologyRetirementRequestPayload {
+  return {
+    operationId: attempt.operationId,
+    confirmed: true,
+    reason: reason.trim(),
+  };
 }
 
 function resolveAttempt(
