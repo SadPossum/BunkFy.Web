@@ -63,6 +63,7 @@ export function StaffPage() {
     { permission: permissions.staffSensitiveProfileRead, scope: tenantScope },
     { permission: permissions.staffCreate, scope: tenantScope },
     { permission: permissions.staffManage, scope: tenantScope },
+    { permission: permissions.staffAccountLinksManage, scope: tenantScope },
     { permission: permissions.staffManageLifecycle, scope: tenantScope },
     ...(propertyScope ? [{ permission: permissions.staffAssignProperties, scope: propertyScope }] : []),
   ] : []);
@@ -70,6 +71,7 @@ export function StaffPage() {
   const canReadSensitive = access.allows(permissions.staffSensitiveProfileRead, tenantScope);
   const canCreate = access.allows(permissions.staffCreate, tenantScope);
   const canManage = access.allows(permissions.staffManage, tenantScope);
+  const canManageAccountLinks = access.allows(permissions.staffAccountLinksManage, tenantScope);
   const canManageLifecycle = access.allows(permissions.staffManageLifecycle, tenantScope);
   const canAssignCurrentProperty = Boolean(propertyScope && access.allows(permissions.staffAssignProperties, propertyScope));
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
@@ -126,7 +128,7 @@ export function StaffPage() {
       </section>
 
       <CreateStaffModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={async (created) => { await queryClient.invalidateQueries({ queryKey: ["staff-members"] }); setCreateOpen(false); selectMember(created.staffMemberId); }} />
-      <StaffDetail memberId={searchParams.get("member")} initialTab={staffDetailTab(searchParams.get("section"))} properties={properties} selectedProperty={selectedProperty} canReadSensitive={canReadSensitive} canManage={canManage} canManageLifecycle={canManageLifecycle} canAssignCurrentProperty={canAssignCurrentProperty} onClose={() => selectMember(null)} />
+      <StaffDetail memberId={searchParams.get("member")} initialTab={staffDetailTab(searchParams.get("section"))} properties={properties} selectedProperty={selectedProperty} canReadSensitive={canReadSensitive} canManage={canManage} canManageAccountLinks={canManageAccountLinks} canManageLifecycle={canManageLifecycle} canAssignCurrentProperty={canAssignCurrentProperty} onClose={() => selectMember(null)} />
     </>
   );
 }
@@ -155,7 +157,7 @@ function CreateStaffModal({ open, onClose, onCreated }: { open: boolean; onClose
   return <Modal open={open} title="New staff member" description="Create the workspace profile first. Account links and property assignments can be added next." onClose={close}><StaffProfileForm submitting={mutation.isPending} error={mutation.error} submitLabel="Create staff member" onCancel={close} onSubmit={(payload) => mutation.mutate(payload)} /></Modal>;
 }
 
-function StaffDetail({ memberId, initialTab, properties, selectedProperty, canReadSensitive, canManage, canManageLifecycle, canAssignCurrentProperty, onClose }: { memberId: string | null; initialTab: "profile" | "assignments" | "account"; properties: Property[]; selectedProperty: Property | null; canReadSensitive: boolean; canManage: boolean; canManageLifecycle: boolean; canAssignCurrentProperty: boolean; onClose: () => void }) {
+function StaffDetail({ memberId, initialTab, properties, selectedProperty, canReadSensitive, canManage, canManageAccountLinks, canManageLifecycle, canAssignCurrentProperty, onClose }: { memberId: string | null; initialTab: "profile" | "assignments" | "account"; properties: Property[]; selectedProperty: Property | null; canReadSensitive: boolean; canManage: boolean; canManageAccountLinks: boolean; canManageLifecycle: boolean; canAssignCurrentProperty: boolean; onClose: () => void }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"profile" | "assignments" | "account">(initialTab === "account" && !canReadSensitive ? "profile" : initialTab);
@@ -197,7 +199,7 @@ function StaffDetail({ memberId, initialTab, properties, selectedProperty, canRe
     />
     {tab === "profile" && <section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Profile</h3><p className="mt-1 text-xs text-base-content/50">Workspace identity and role information.</p></div>{isFullStaffMember(item) && canManage && !editing && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing && isFullStaffMember(item) ? <StaffProfileForm member={item} submitting={profileMutation.isPending} error={profileMutation.error} submitLabel="Save profile" onCancel={() => { profileAttempt.current = null; setEditing(false); profileMutation.reset(); }} onSubmit={(payload) => profileMutation.mutate({ item, payload })} /> : <ProfileDetails member={item} />}</section>}
     {tab === "assignments" && <AssignmentsPanel member={item} properties={properties} selectedProperty={selectedProperty} canAssign={canAssignCurrentProperty} onUpdated={refresh} />}
-    {tab === "account" && isFullStaffMember(item) && <AccountLinkPanel member={item} canManage={canManage} canManageLifecycle={canManageLifecycle} submitting={authMutation.isPending} error={authMutation.error} onRequestSuspension={() => setLifecycleAction("suspend")} onSave={(authSubjectId) => authMutation.mutate({ item, authSubjectId })} />}
+    {tab === "account" && isFullStaffMember(item) && <AccountLinkPanel member={item} canManageAccountLinks={canManageAccountLinks} canManageLifecycle={canManageLifecycle} submitting={authMutation.isPending} error={authMutation.error} onRequestSuspension={() => setLifecycleAction("suspend")} onSave={(authSubjectId) => authMutation.mutate({ item, authSubjectId })} />}
     <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
   </div> : null}</Modal>;
 }
@@ -240,13 +242,13 @@ function AssignmentCard({ assignment, property }: { assignment: StaffAssignment;
   return <article className={`rounded-2xl border p-4 ${current ? "border-primary/20 bg-primary/5" : "border-base-300 bg-base-100"}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{property?.name || "Unknown property"}</h4>{assignment.isPrimary && <span className="badge border-0 bg-primary text-primary-content">Primary</span>}{!current && <span className="badge badge-ghost">Ended</span>}</div><p className="mt-1 text-sm text-base-content/55">{assignment.propertyJobTitle || "No property-specific title"}</p></div><p className="text-xs text-base-content/45">{formatDate(assignment.effectiveFrom)} / {effectiveTo ? formatDate(effectiveTo) : "Current"}</p></div></article>;
 }
 
-function AccountLinkPanel({ member, canManage, canManageLifecycle, submitting, error, onRequestSuspension, onSave }: { member: StaffMember; canManage: boolean; canManageLifecycle: boolean; submitting: boolean; error: unknown; onRequestSuspension: () => void; onSave: (value: string | null) => void }) {
+function AccountLinkPanel({ member, canManageAccountLinks, canManageLifecycle, submitting, error, onRequestSuspension, onSave }: { member: StaffMember; canManageAccountLinks: boolean; canManageLifecycle: boolean; submitting: boolean; error: unknown; onRequestSuspension: () => void; onSave: (value: string | null) => void }) {
   const [value, setValue] = useState(member.authSubjectId || "");
   useEffect(() => setValue(member.authSubjectId || ""), [member.authSubjectId]);
   const transition = resolveStaffAuthSubjectTransition(
     staffStatusKey(member.status),
     Boolean(member.authSubjectId),
-    canManage,
+    canManageAccountLinks,
     canManageLifecycle,
   );
   const normalizedValue = value.trim();

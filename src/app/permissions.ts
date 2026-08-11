@@ -29,6 +29,7 @@ export const permissions = {
   staffSensitiveProfileRead: "staff.sensitive-profile.read",
   staffCreate: "staff.create",
   staffManage: "staff.manage",
+  staffAccountLinksManage: "staff.account-links.manage",
   staffAssignProperties: "staff.assign-properties",
   staffManageLifecycle: "staff.manage-lifecycle",
   ingestionRead: "ingestion.read",

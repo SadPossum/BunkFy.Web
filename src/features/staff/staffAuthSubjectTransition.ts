@@ -15,10 +15,10 @@ export type StaffAuthSubjectTransitionState = {
 export function resolveStaffAuthSubjectTransition(
   status: StaffAuthSubjectTransitionStatus,
   linked: boolean,
-  canManage: boolean,
+  canManageAccountLinks: boolean,
   canManageLifecycle: boolean,
 ): StaffAuthSubjectTransitionState {
-  if (!canManage) {
+  if (!canManageAccountLinks) {
     return readOnly(
       linked
         ? "This staff profile is linked to a sign-in account. Access and permissions are managed separately."
