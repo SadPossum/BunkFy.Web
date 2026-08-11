@@ -10,7 +10,7 @@ describe("workspace settings access", () => {
       owner: false,
       profilesRead: true,
       profilesManage: true,
-      staffManage: true,
+      staffOnboardingManage: true,
       retentionRead: true,
     });
 
@@ -23,7 +23,7 @@ describe("workspace settings access", () => {
       owner: false,
       profilesRead: true,
       profilesManage: false,
-      staffManage: false,
+      staffOnboardingManage: false,
       retentionRead: false,
     });
 
@@ -32,19 +32,19 @@ describe("workspace settings access", () => {
     expect(canOpenWorkspaceSettingsTab("roles", access)).toBe(true);
   });
 
-  it("requires both staff management and role visibility for invites", () => {
+  it("requires both onboarding management and role visibility for invites", () => {
     const withoutProfiles = resolveWorkspaceSettingsCapabilities({
       owner: false,
       profilesRead: false,
       profilesManage: false,
-      staffManage: true,
+      staffOnboardingManage: true,
       retentionRead: false,
     });
     const delegatedManager = resolveWorkspaceSettingsCapabilities({
       owner: false,
       profilesRead: true,
       profilesManage: false,
-      staffManage: true,
+      staffOnboardingManage: true,
       retentionRead: false,
     });
 
@@ -58,7 +58,7 @@ describe("workspace settings access", () => {
       owner: true,
       profilesRead: false,
       profilesManage: false,
-      staffManage: false,
+      staffOnboardingManage: false,
       retentionRead: false,
     });
 

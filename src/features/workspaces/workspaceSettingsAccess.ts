@@ -17,20 +17,20 @@ export function resolveWorkspaceSettingsCapabilities({
   owner,
   profilesRead,
   profilesManage,
-  staffManage,
+  staffOnboardingManage,
   retentionRead,
 }: {
   owner: boolean;
   profilesRead: boolean;
   profilesManage: boolean;
-  staffManage: boolean;
+  staffOnboardingManage: boolean;
   retentionRead: boolean;
 }): WorkspaceSettingsCapabilities {
   return {
     canReadMembers: owner,
     canReadRoles: owner || profilesRead,
     canManageRoles: owner || profilesManage,
-    canManageInvites: owner || (staffManage && profilesRead),
+    canManageInvites: owner || (staffOnboardingManage && profilesRead),
     canReadRetention: owner || retentionRead,
   };
 }

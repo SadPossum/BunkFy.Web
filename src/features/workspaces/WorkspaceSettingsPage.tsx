@@ -48,7 +48,7 @@ export function WorkspaceSettingsPage() {
     ? [
       { permission: permissions.accessProfilesRead, scope: tenantScope },
       { permission: permissions.accessProfilesManage, scope: tenantScope },
-      { permission: permissions.staffManage, scope: tenantScope },
+      { permission: permissions.workspaceStaffOnboardingManage, scope: tenantScope },
       { permission: permissions.retentionRead, scope: tenantScope },
     ]
     : []);
@@ -57,7 +57,10 @@ export function WorkspaceSettingsPage() {
     owner,
     profilesRead: permissionAccess.allows(permissions.accessProfilesRead, tenantScope),
     profilesManage: permissionAccess.allows(permissions.accessProfilesManage, tenantScope),
-    staffManage: permissionAccess.allows(permissions.staffManage, tenantScope),
+    staffOnboardingManage: permissionAccess.allows(
+      permissions.workspaceStaffOnboardingManage,
+      tenantScope,
+    ),
     retentionRead: permissionAccess.allows(permissions.retentionRead, tenantScope),
   });
   const members = useQuery({

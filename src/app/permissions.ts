@@ -6,6 +6,7 @@ export const permissions = {
   accessProfilesRead: "access-control.profiles.read",
   accessProfilesManage: "access-control.profiles.manage",
   accessProfilesAssign: "access-control.profiles.assign",
+  workspaceStaffOnboardingManage: "workspaces.staff-onboarding.manage",
   propertiesRead: "properties.read",
   propertiesManage: "properties.properties.manage",
   roomsManage: "properties.rooms.manage",
