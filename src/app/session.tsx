@@ -12,6 +12,7 @@ import {
   apiDownload,
   apiRequest,
   apiStream,
+  accessTokenSubjectId,
   resolveApiBaseUrl,
   type ApiDownload,
   type ApiSession,
@@ -126,7 +127,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
           },
         );
-        const refreshed = { ...identity, accessToken };
+        const refreshed = {
+          ...identity,
+          accessToken,
+          subjectId: accessTokenSubjectId(accessToken),
+        };
         if (!acceptsRefreshRef.current) {
           throw new Error("You are signed out.");
         }
@@ -191,6 +196,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           ...response,
           tenantId: GLOBAL_IDENTITY_SCOPE,
           username: credentials.username,
+          subjectId: accessTokenSubjectId(response.accessToken),
         });
         return null;
       });
@@ -219,6 +225,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           ...response,
           tenantId: GLOBAL_IDENTITY_SCOPE,
           username,
+          subjectId: accessTokenSubjectId(response.accessToken),
         };
         try {
           const methods = await apiRequest<AuthenticationMethods>(
@@ -355,6 +362,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             ...response,
             tenantId: GLOBAL_IDENTITY_SCOPE,
             username: `${providerLabel(provider)} account`,
+            subjectId: accessTokenSubjectId(response.accessToken),
           };
           try {
             const methods = await apiRequest<AuthenticationMethods>(
@@ -441,7 +449,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         },
         active,
       );
-      setSession({ ...active, accessToken: response.accessToken });
+      setSession({
+        ...active,
+        accessToken: response.accessToken,
+        subjectId: accessTokenSubjectId(response.accessToken),
+      });
     },
     [setSession],
   );
@@ -458,7 +470,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         },
         active,
       );
-      setSession({ ...active, accessToken: response.accessToken });
+      setSession({
+        ...active,
+        accessToken: response.accessToken,
+        subjectId: accessTokenSubjectId(response.accessToken),
+      });
       return response.recoveryCodes;
     },
     [setSession],
