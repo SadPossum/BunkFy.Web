@@ -68,7 +68,7 @@ vi.mock("../src/features/workspaces/WorkspaceInvitesSettings", async () => {
   };
 });
 
-describe("workspace invite workspace boundary", () => {
+describe("workspace settings recovery boundaries", () => {
   let container: HTMLDivElement;
   let queryClient: QueryClient;
   let root: Root;
@@ -78,8 +78,10 @@ describe("workspace invite workspace boundary", () => {
       .IS_REACT_ACT_ENVIRONMENT = true;
     testState.completions.clear();
     testState.request.mockReset();
-    testState.refetchWorkspaces.mockClear();
+    testState.refetchWorkspaces.mockReset();
+    testState.refetchWorkspaces.mockResolvedValue(undefined);
     testState.workspace = workspace("a");
+    window.sessionStorage.clear();
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -118,6 +120,45 @@ describe("workspace invite workspace boundary", () => {
     expect(completionText()).toBe(`${workspaceId("b")}:token-from-b`);
   });
 
+  it("replays the same update after PUT succeeds but the authoritative refetch fails", async () => {
+    testState.request.mockResolvedValue({
+      ...testState.workspace!.organization,
+      version: 2,
+    });
+    testState.refetchWorkspaces
+      .mockRejectedValueOnce(new Error("Workspace refresh failed."))
+      .mockResolvedValueOnce(undefined);
+
+    await renderPage();
+    await clickSave();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(testState.request).toHaveBeenCalledTimes(1);
+        expect(testState.refetchWorkspaces).toHaveBeenCalledTimes(1);
+        expect(container.textContent).toContain("Workspace refresh failed.");
+      });
+    });
+    expect(window.sessionStorage.length).toBe(1);
+
+    await clickSave();
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(testState.request).toHaveBeenCalledTimes(2);
+        expect(testState.refetchWorkspaces).toHaveBeenCalledTimes(2);
+        expect(container.textContent).not.toContain("Workspace refresh failed.");
+      });
+    });
+
+    const requestBodies = testState.request.mock.calls.map((call) =>
+      JSON.parse(String((call[1] as RequestInit).body)) as {
+        operationId: string;
+        expectedVersion: number;
+      });
+    expect(requestBodies[1]?.operationId).toBe(requestBodies[0]?.operationId);
+    expect(requestBodies.map((body) => body.expectedVersion)).toEqual([1, 1]);
+    expect(window.sessionStorage.length).toBe(0);
+  });
+
   async function renderPage() {
     await act(async () => {
       root.render(
@@ -137,6 +178,15 @@ describe("workspace invite workspace boundary", () => {
 
   function completionText(): string | null {
     return container.querySelector('[data-testid="invite-completion"]')?.textContent ?? null;
+  }
+
+  async function clickSave() {
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((candidate) => candidate.textContent?.includes("Save changes"));
+    if (!button) throw new Error("Save changes button was not rendered.");
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
   }
 });
 

@@ -216,12 +216,12 @@ function GeneralSettings({
           }),
         },
       );
-      await clearWorkspaceUpdateAttempt(accountId, workspace.organizationId);
-      updateAttempt.current = null;
       return result;
     },
     onSuccess: async () => {
       await onSaved();
+      await clearWorkspaceUpdateAttempt(accountId, workspace.organizationId);
+      updateAttempt.current = null;
     },
   });
   return (
