@@ -5959,6 +5959,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    topologyChangeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CancelRetirementRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BedRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
         parameters: {
             query?: never;
@@ -6061,6 +6103,48 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["RetryRetirementRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoomRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/room-retirements/{topologyChangeId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    topologyChangeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CancelRetirementRequest"];
                 };
             };
             responses: {
@@ -10962,6 +11046,8 @@ export interface components {
             requestedBy: string | null;
             status: components["schemas"]["InventoryRetirementStatus"];
             rejectionReason: components["schemas"]["BedRetirementFinalizationRejectionReason"];
+            cancellationReason: string | null;
+            canceledBy: string | null;
             /** Format: int32 */
             activeAllocationCount: number;
             /** Format: int32 */
@@ -10976,6 +11062,8 @@ export interface components {
             updatedAtUtc: string | null;
             /** Format: date-time */
             completedAtUtc: string | null;
+            /** Format: date-time */
+            canceledAtUtc: string | null;
         };
         /**
          * Format: int32
@@ -11030,6 +11118,14 @@ export interface components {
             operationId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        CancelRetirementRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            confirmed: boolean;
+            reason: string | null;
         };
         ChangeProposalDto: {
             /** Format: uuid */
@@ -12160,7 +12256,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        InventoryRetirementStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        InventoryRetirementStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6;
         /**
          * Format: int32
          * @enum {integer}
@@ -13463,6 +13559,8 @@ export interface components {
             requestedBy: string | null;
             status: components["schemas"]["InventoryRetirementStatus"];
             rejectionReason: components["schemas"]["RoomRetirementFinalizationRejectionReason"];
+            cancellationReason: string | null;
+            canceledBy: string | null;
             /** Format: int32 */
             activeAllocationCount: number;
             /** Format: int32 */
@@ -13479,6 +13577,8 @@ export interface components {
             updatedAtUtc: string | null;
             /** Format: date-time */
             completedAtUtc: string | null;
+            /** Format: date-time */
+            canceledAtUtc: string | null;
         };
         /**
          * Format: int32

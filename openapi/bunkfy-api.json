@@ -6076,6 +6076,55 @@
         }
       }
     },
+    "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}/cancel": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "topologyChangeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
       "post": {
         "tags": [
@@ -6194,6 +6243,55 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RetryRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/room-retirements/{topologyChangeId}/cancel": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "topologyChangeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRetirementRequest"
               }
             }
           },
@@ -12199,6 +12297,14 @@
           "rejectionReason": {
             "$ref": "#/components/schemas/BedRetirementFinalizationRejectionReason"
           },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "canceledBy": {
+            "type": "string",
+            "nullable": true
+          },
           "activeAllocationCount": {
             "type": "integer",
             "format": "int32"
@@ -12232,6 +12338,11 @@
             "nullable": true
           },
           "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canceledAtUtc": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -12404,6 +12515,27 @@
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CancelRetirementRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -15438,7 +15570,8 @@
           2,
           3,
           4,
-          5
+          5,
+          6
         ],
         "type": "integer",
         "format": "int32"
@@ -18938,6 +19071,14 @@
           "rejectionReason": {
             "$ref": "#/components/schemas/RoomRetirementFinalizationRejectionReason"
           },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "canceledBy": {
+            "type": "string",
+            "nullable": true
+          },
           "activeAllocationCount": {
             "type": "integer",
             "format": "int32"
@@ -18975,6 +19116,11 @@
             "nullable": true
           },
           "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canceledAtUtc": {
             "type": "string",
             "format": "date-time",
             "nullable": true

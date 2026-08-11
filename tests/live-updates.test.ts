@@ -38,6 +38,8 @@ describe("live update state detection", () => {
     expect(topologyRetirementNeedsLiveRefresh(3)).toBe(true);
     expect(topologyRetirementNeedsLiveRefresh(4)).toBe(false);
     expect(topologyRetirementNeedsLiveRefresh("rejected")).toBe(false);
+    expect(topologyRetirementNeedsLiveRefresh(6)).toBe(false);
+    expect(topologyRetirementNeedsLiveRefresh("canceled")).toBe(false);
   });
 });
 

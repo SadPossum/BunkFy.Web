@@ -18,10 +18,22 @@ export type TopologyRetirementRetryAttemptInput = {
   expectedVersion: number;
 };
 
+export type TopologyRetirementCancellationAttemptInput = {
+  propertyId: string;
+  targetKind: "bed" | "room";
+  topologyChangeId: string;
+  expectedVersion: number;
+  reason: string;
+};
+
 export type TopologyRetirementRequestPayload = {
   operationId: string;
   confirmed: true;
   reason: string;
+};
+
+export type TopologyRetirementCancellationPayload = TopologyRetirementRequestPayload & {
+  expectedVersion: number;
 };
 
 export function resolveTopologyRetirementRequestAttempt(
@@ -59,12 +71,43 @@ export function resolveTopologyRetirementRetryAttempt(
   );
 }
 
+export function resolveTopologyRetirementCancellationAttempt(
+  current: TopologyRetirementMutationAttempt | null,
+  input: TopologyRetirementCancellationAttemptInput,
+  createOperationId: () => string = () => crypto.randomUUID(),
+): TopologyRetirementMutationAttempt {
+  return resolveAttempt(
+    current,
+    JSON.stringify({
+      action: `${input.targetKind}-retirement-cancellation`,
+      propertyId: normalizeId(input.propertyId),
+      topologyChangeId: normalizeId(input.topologyChangeId),
+      expectedVersion: input.expectedVersion,
+      reason: input.reason.trim(),
+    }),
+    createOperationId,
+  );
+}
+
 export function topologyRetirementRequestPayload(
   attempt: TopologyRetirementMutationAttempt,
   reason: string,
 ): TopologyRetirementRequestPayload {
   return {
     operationId: attempt.operationId,
+    confirmed: true,
+    reason: reason.trim(),
+  };
+}
+
+export function topologyRetirementCancellationPayload(
+  attempt: TopologyRetirementMutationAttempt,
+  expectedVersion: number,
+  reason: string,
+): TopologyRetirementCancellationPayload {
+  return {
+    operationId: attempt.operationId,
+    expectedVersion,
     confirmed: true,
     reason: reason.trim(),
   };
