@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, BriefcaseBusiness, Building2, ChevronRight, CircleUserRound, Edit3, KeyRound, Mail, Phone, Plus, Search, ShieldAlert, UserRoundCheck, UserRoundMinus, UserRoundX, UsersRound } from "lucide-react";
+import { BadgeCheck, BriefcaseBusiness, Building2, ChevronRight, CircleUserRound, Edit3, KeyRound, Link2, Mail, Phone, Plus, Search, ShieldAlert, Unlink2, UserRoundCheck, UserRoundMinus, UserRoundX, UsersRound } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { staffStatusLabel, staffStatusValue } from "../../api/labels";
@@ -25,6 +25,10 @@ import {
   resolveStaffAuthSubjectChangeAttempt,
   type StaffAuthSubjectChangeAttempt,
 } from "./staffAuthSubjectChangeAttempt";
+import {
+  resolveStaffAuthSubjectTransition,
+  type StaffAuthSubjectTransitionStatus,
+} from "./staffAuthSubjectTransition";
 import {
   resolveStaffLifecycleAttempt,
   type StaffLifecycleAttempt,
@@ -193,7 +197,7 @@ function StaffDetail({ memberId, initialTab, properties, selectedProperty, canRe
     />
     {tab === "profile" && <section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Profile</h3><p className="mt-1 text-xs text-base-content/50">Workspace identity and role information.</p></div>{isFullStaffMember(item) && canManage && !editing && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing && isFullStaffMember(item) ? <StaffProfileForm member={item} submitting={profileMutation.isPending} error={profileMutation.error} submitLabel="Save profile" onCancel={() => { profileAttempt.current = null; setEditing(false); profileMutation.reset(); }} onSubmit={(payload) => profileMutation.mutate({ item, payload })} /> : <ProfileDetails member={item} />}</section>}
     {tab === "assignments" && <AssignmentsPanel member={item} properties={properties} selectedProperty={selectedProperty} canAssign={canAssignCurrentProperty} onUpdated={refresh} />}
-    {tab === "account" && isFullStaffMember(item) && <AccountLinkPanel member={item} canManage={canManage && staffStatusKey(item.status) !== "departed"} submitting={authMutation.isPending} error={authMutation.error} onSave={(authSubjectId) => authMutation.mutate({ item, authSubjectId })} />}
+    {tab === "account" && isFullStaffMember(item) && <AccountLinkPanel member={item} canManage={canManage} canManageLifecycle={canManageLifecycle} submitting={authMutation.isPending} error={authMutation.error} onRequestSuspension={() => setLifecycleAction("suspend")} onSave={(authSubjectId) => authMutation.mutate({ item, authSubjectId })} />}
     <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
   </div> : null}</Modal>;
 }
@@ -236,7 +240,28 @@ function AssignmentCard({ assignment, property }: { assignment: StaffAssignment;
   return <article className={`rounded-2xl border p-4 ${current ? "border-primary/20 bg-primary/5" : "border-base-300 bg-base-100"}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{property?.name || "Unknown property"}</h4>{assignment.isPrimary && <span className="badge border-0 bg-primary text-primary-content">Primary</span>}{!current && <span className="badge badge-ghost">Ended</span>}</div><p className="mt-1 text-sm text-base-content/55">{assignment.propertyJobTitle || "No property-specific title"}</p></div><p className="text-xs text-base-content/45">{formatDate(assignment.effectiveFrom)} / {effectiveTo ? formatDate(effectiveTo) : "Current"}</p></div></article>;
 }
 
-function AccountLinkPanel({ member, canManage, submitting, error, onSave }: { member: StaffMember; canManage: boolean; submitting: boolean; error: unknown; onSave: (value: string | null) => void }) { const [value, setValue] = useState(member.authSubjectId || ""); useEffect(() => setValue(member.authSubjectId || ""), [member.authSubjectId]); return <section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><KeyRound size={19} /></div><div><h3 className="font-display text-lg font-semibold">Sign-in account link</h3><p className="mt-1 text-sm leading-6 text-base-content/55">This connects the staff profile to a BunkFy account. Permissions are managed separately.</p></div></div><label className="form-control mt-5 block"><span className="label-text mb-1.5 block text-sm font-semibold">Sign-in account ID</span><input className="input input-bordered w-full font-mono text-sm" value={value} maxLength={256} disabled={!canManage} placeholder="Not linked" onChange={(event) => setValue(event.target.value)} /></label>{Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}{canManage && <InlineFormActions>{member.authSubjectId && <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => onSave(null)} disabled={submitting}>Clear link</button>}<button type="button" className="btn btn-primary btn-sm" onClick={() => onSave(emptyStringToNull(value))} disabled={submitting || value.trim() === (member.authSubjectId || "")}>{submitting && <span className="loading loading-spinner loading-xs" />}Save account link</button></InlineFormActions>}</section>; }
+function AccountLinkPanel({ member, canManage, canManageLifecycle, submitting, error, onRequestSuspension, onSave }: { member: StaffMember; canManage: boolean; canManageLifecycle: boolean; submitting: boolean; error: unknown; onRequestSuspension: () => void; onSave: (value: string | null) => void }) {
+  const [value, setValue] = useState(member.authSubjectId || "");
+  useEffect(() => setValue(member.authSubjectId || ""), [member.authSubjectId]);
+  const transition = resolveStaffAuthSubjectTransition(
+    staffStatusKey(member.status),
+    Boolean(member.authSubjectId),
+    canManage,
+    canManageLifecycle,
+  );
+  const normalizedValue = value.trim();
+
+  return <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
+    <div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><KeyRound size={19} /></div><div><h3 className="font-display text-lg font-semibold">Sign-in account link</h3><p className="mt-1 text-sm leading-6 text-base-content/55">Connect the employment profile to one BunkFy account.</p></div></div>
+    <label className="form-control mt-5 block"><span className="label-text mb-1.5 block text-sm font-semibold">Sign-in account ID</span><input className="input input-bordered w-full font-mono text-sm" value={value} maxLength={256} disabled={!transition.canEdit} placeholder="Not linked" onChange={(event) => setValue(event.target.value)} /></label>
+    <div className={`mt-4 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${transition.attention ? "border-warning/30 bg-warning/8" : "border-base-300 bg-base-200"}`}><p className="text-sm leading-6 text-base-content/65">{transition.guidance}</p>{transition.canRequestSuspension && <button type="button" className="btn btn-ghost btn-sm shrink-0" onClick={onRequestSuspension}><UserRoundMinus size={15} />Suspend first</button>}</div>
+    {Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}
+    {(transition.canClear || transition.canEdit) && <InlineFormActions>
+      {transition.canClear && <button type="button" className="btn btn-error btn-sm" onClick={() => onSave(null)} disabled={submitting}><Unlink2 size={15} />Clear account link</button>}
+      {transition.canEdit && <button type="button" className="btn btn-primary btn-sm" onClick={() => onSave(normalizedValue)} disabled={submitting || !normalizedValue}>{submitting && <span className="loading loading-spinner loading-xs" />}<Link2 size={15} />Link account</button>}
+    </InlineFormActions>}
+  </section>;
+}
 
 function StaffIdentity({ member }: { member: Pick<StaffDirectoryMember, "displayName" | "jobTitle" | "department"> }) { return <div className="flex min-w-0 items-center gap-3"><InitialAvatar name={member.displayName} size="sm" /><div className="min-w-0"><p className="truncate font-semibold">{member.displayName}</p><p className="mt-1 truncate text-xs text-base-content/45">{member.jobTitle || member.department || "Staff directory"}</p></div></div>; }
 function InfoRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) { return <div className="flex items-start gap-3 rounded-xl border border-base-300 p-4"><span className="mt-0.5 text-primary">{icon}</span><div className="min-w-0"><p className="text-xs text-base-content/40">{label}</p>{href ? <a className="mt-1 block truncate text-sm font-semibold text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 truncate text-sm font-semibold">{value}</p>}</div></div>; }
@@ -245,7 +270,7 @@ function FormDatePicker({ name, defaultValue, min, max, ariaLabel }: { name: str
 function isFullStaffMember(member: StaffDetailMember): member is StaffMember { return "createdAtUtc" in member; }
 function isFullStaffAssignment(assignment: StaffAssignment): assignment is StaffPropertyAssignment { return "assignedAtUtc" in assignment; }
 function assignmentIsCurrent(assignment: StaffAssignment) { return isFullStaffAssignment(assignment) ? assignment.isCurrent : true; }
-function staffStatusKey(status: StaffStatus) { if (typeof status === "string") return status.toLowerCase(); return ({ 1: "active", 2: "suspended", 3: "departed" } as Record<number, string>)[status] ?? "unknown"; }
+function staffStatusKey(status: StaffStatus): StaffAuthSubjectTransitionStatus { if (typeof status === "string") { const normalized = status.toLowerCase(); return normalized === "active" || normalized === "suspended" || normalized === "departed" ? normalized : "unknown"; } return ({ 1: "active", 2: "suspended", 3: "departed" } as Record<number, StaffAuthSubjectTransitionStatus>)[status] ?? "unknown"; }
 function staffDetailTab(value: string | null): "profile" | "assignments" | "account" { return value === "assignments" || value === "account" ? value : "profile"; }
 function emptyToNull(value: FormDataEntryValue | null) { return emptyStringToNull(String(value ?? "")); }
 function emptyStringToNull(value: string) { const normalized = value.trim(); return normalized || null; }
