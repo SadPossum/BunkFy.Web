@@ -1,21 +1,23 @@
 import { useMutation } from "@tanstack/react-query";
 import { Building2, Link2, LogOut } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import type { OrganizationMembershipSummary } from "../../api/types";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { BrandMark } from "../../components/ui/BrandMark";
-import { waitForWorkspaceAccess } from "./workspaceAccess";
 import { StaffProfileFields } from "./StaffProfileFields";
+import { defaultStaffProfile } from "./staffOnboarding";
 import {
-  completeCurrentStaffProfile,
-  defaultStaffProfile,
-} from "./staffOnboarding";
-import {
+  clearWorkspaceCreationAttempt,
+  readWorkspaceCreationAttempt,
   resolveWorkspaceCreationAttempt,
   type WorkspaceCreationAttempt,
 } from "./workspaceCreationAttempt";
+import {
+  continueWorkspaceOnboarding,
+  recoverCreatedWorkspace,
+} from "./workspaceOnboardingFlow";
 
 export function WorkspaceOnboardingPage() {
   const navigate = useNavigate();
@@ -26,32 +28,97 @@ export function WorkspaceOnboardingPage() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [staffProfile, setStaffProfile] = useState(() => defaultStaffProfile(session?.username));
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
+  const [recoveryState, setRecoveryState] = useState<
+    "restoring" | "ready" | "created" | "pending"
+  >("restoring");
+  const [recoveryError, setRecoveryError] = useState<unknown>(null);
   const creationAttempt = useRef<WorkspaceCreationAttempt | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const accountId = session?.subjectId;
+    creationAttempt.current = null;
+    setCreatedWorkspaceId(null);
+    setRecoveryError(null);
+    setRecoveryState("restoring");
+
+    if (!accountId) {
+      setRecoveryState("ready");
+      return () => {
+        active = false;
+      };
+    }
+
+    void (async () => {
+      try {
+        const attempt = await readWorkspaceCreationAttempt(accountId);
+        if (!active) return;
+        creationAttempt.current = attempt;
+        if (!attempt) {
+          setRecoveryState("ready");
+          return;
+        }
+
+        const workspace = await recoverCreatedWorkspace(request, attempt);
+        if (!active) return;
+        if (!workspace) {
+          setRecoveryState("pending");
+          return;
+        }
+
+        setCreatedWorkspaceId(workspace.organization.organizationId);
+        setName(workspace.organization.name);
+        setSlug(workspace.organization.slug);
+        setSlugEdited(true);
+        setRecoveryState("created");
+      } catch (error) {
+        if (!active) return;
+        setRecoveryError(error);
+        setRecoveryState("ready");
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [request, session?.subjectId]);
+
   const create = useMutation({
     mutationFn: async () => {
+      const accountId = session?.subjectId;
+      if (!accountId) throw new Error("You are signed out.");
       let workspace: OrganizationMembershipSummary | null = null;
       if (!createdWorkspaceId) {
         const payload = { name: name.trim(), slug: slug.trim() };
-        creationAttempt.current = resolveWorkspaceCreationAttempt(
+        creationAttempt.current = await resolveWorkspaceCreationAttempt(
           creationAttempt.current,
+          accountId,
           payload,
         );
-        workspace = await request<OrganizationMembershipSummary>("/api/organizations", {
-          method: "POST",
-          body: JSON.stringify({
-            operationId: creationAttempt.current.operationId,
-            ...payload,
-          }),
-        });
-        creationAttempt.current = null;
+        workspace = await recoverCreatedWorkspace(request, creationAttempt.current);
+        workspace ??= await request<OrganizationMembershipSummary>(
+          "/api/organizations",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              operationId: creationAttempt.current.operationId,
+              ...payload,
+            }),
+          },
+        );
       }
       const workspaceId = createdWorkspaceId ?? workspace!.organization.organizationId;
       setCreatedWorkspaceId(workspaceId);
-      selectWorkspace(workspaceId);
-      await waitForWorkspaceAccess(request, workspaceId);
-      await refetchWorkspaces();
-      setSelectedWorkspaceId(workspaceId);
-      await completeCurrentStaffProfile(request, staffProfile);
+      await continueWorkspaceOnboarding({
+        request,
+        workspaceId,
+        staffProfile,
+        selectWorkspace,
+        refetchWorkspaces,
+        setSelectedWorkspaceId,
+        clearCreationAttempt: () => clearWorkspaceCreationAttempt(accountId),
+      });
+      creationAttempt.current = null;
       return workspaceId;
     },
     onSuccess: () => {
@@ -138,10 +205,35 @@ export function WorkspaceOnboardingPage() {
               />
             </label>
             <div className="my-6 h-px bg-base-300" />
+            {recoveryState === "restoring" && (
+              <div className="alert alert-info mb-5 py-3 text-sm">
+                Checking for an interrupted workspace setup…
+              </div>
+            )}
+            {recoveryState === "created" && (
+              <div className="alert alert-info mb-5 py-3 text-sm">
+                This workspace was already created. Finish your staff profile to complete setup.
+              </div>
+            )}
+            {recoveryState === "pending" && (
+              <div className="alert alert-warning mb-5 py-3 text-sm">
+                An interrupted create attempt is ready to retry. Re-enter the same workspace details to reuse it safely.
+              </div>
+            )}
+            {Boolean(recoveryError) && (
+              <div className="alert alert-error mb-5 py-3 text-sm">
+                {recoveryError instanceof Error
+                  ? recoveryError.message
+                  : "The interrupted workspace setup could not be checked."}
+              </div>
+            )}
             <div className="mb-4">
               <h3 className="font-display text-lg font-semibold">Your staff profile</h3>
               <p className="mt-1 text-sm leading-6 text-base-content/50">
                 This creates your owner profile in the Staff directory.
+              </p>
+              <p className="mt-1 text-xs leading-5 text-base-content/45">
+                Interrupted setup recovery lasts for reloads in this browser tab, not after the tab or browser session is closed.
               </p>
             </div>
             <StaffProfileFields value={staffProfile} onChange={setStaffProfile} />
@@ -150,7 +242,10 @@ export function WorkspaceOnboardingPage() {
                 {create.error instanceof Error ? create.error.message : "Workspace creation failed."}
               </div>
             )}
-            <button className="btn btn-primary mt-6 w-full" disabled={create.isPending}>
+            <button
+              className="btn btn-primary mt-6 w-full"
+              disabled={create.isPending || recoveryState === "restoring"}
+            >
               {create.isPending && <span className="loading loading-spinner loading-sm" />}
               {createdWorkspaceId ? "Save staff profile" : "Create workspace"}
             </button>

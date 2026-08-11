@@ -25,6 +25,7 @@ import {
   type WorkspaceSettingsTab,
 } from "./workspaceSettingsAccess";
 import {
+  clearWorkspaceUpdateAttempt,
   resolveWorkspaceUpdateAttempt,
   type WorkspaceUpdateAttempt,
   type WorkspaceUpdatePayload,
@@ -131,6 +132,7 @@ export function WorkspaceSettingsPage() {
             <GeneralSettings
               key={workspace.organizationId}
               workspace={workspace}
+              accountId={session?.subjectId ?? ""}
               canManage={owner}
               onSaved={refetchWorkspaces}
             />
@@ -160,6 +162,7 @@ export function WorkspaceSettingsPage() {
           )}
           {tab === "invites" && capabilities.canManageInvites && (
             <WorkspaceInvitesSettings
+              key={workspace.organizationId}
               workspaceId={workspace.organizationId}
               properties={properties}
               onMembershipChanged={refreshWorkspace}
@@ -174,10 +177,12 @@ export function WorkspaceSettingsPage() {
 
 function GeneralSettings({
   workspace,
+  accountId,
   canManage,
   onSaved,
 }: {
   workspace: Organization;
+  accountId: string;
   canManage: boolean;
   onSaved: () => Promise<void>;
 }) {
@@ -186,18 +191,20 @@ function GeneralSettings({
   const [slug, setSlug] = useState(workspace.slug);
   const updateAttempt = useRef<WorkspaceUpdateAttempt | null>(null);
   const update = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      if (!accountId) throw new Error("You are signed out.");
       const payload: WorkspaceUpdatePayload = {
         organizationId: workspace.organizationId,
         expectedVersion: workspace.version,
         name,
         slug,
       };
-      updateAttempt.current = resolveWorkspaceUpdateAttempt(
+      updateAttempt.current = await resolveWorkspaceUpdateAttempt(
         updateAttempt.current,
+        accountId,
         payload,
       );
-      return request<Organization>(
+      const result = await request<Organization>(
         `/api/organizations/${workspace.organizationId}`,
         {
           method: "PUT",
@@ -209,9 +216,11 @@ function GeneralSettings({
           }),
         },
       );
+      await clearWorkspaceUpdateAttempt(accountId, workspace.organizationId);
+      updateAttempt.current = null;
+      return result;
     },
     onSuccess: async () => {
-      updateAttempt.current = null;
       await onSaved();
     },
   });

@@ -8,12 +8,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type {
-  OrganizationListResponse,
-  OrganizationMembershipSummary,
-  Property,
-} from "../api/types";
+import type { OrganizationMembershipSummary, Property } from "../api/types";
 import { loadAllProperties } from "../features/properties/propertiesApi";
+import {
+  loadAllWorkspaces,
+  resolveSelectedWorkspaceId,
+} from "../features/workspaces/workspacesApi";
 import { useSession } from "./session";
 
 const WORKSPACE_STORAGE_KEY = "bunkfy.workspace.current.v1";
@@ -45,23 +45,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   });
   const workspacesQuery = useQuery({
     queryKey: ["organizations", "mine"],
-    queryFn: () => request<OrganizationListResponse>("/api/organizations?page=1&pageSize=100"),
+    queryFn: (context) => loadAllWorkspaces(request, context.signal),
   });
-  const workspaces = workspacesQuery.data?.items ?? [];
+  const workspaces = workspacesQuery.data ?? [];
 
   useEffect(() => {
-    if (workspacesQuery.isLoading) return;
-    const selectedExists = workspaces.some(
-      (item) => item.organization.organizationId === selectedWorkspaceId,
-    );
-    const nextId = selectedExists
-      ? selectedWorkspaceId
-      : workspaces[0]?.organization.organizationId ?? "";
+    if (workspacesQuery.isLoading || workspacesQuery.error) return;
+    const nextId = resolveSelectedWorkspaceId(workspaces, selectedWorkspaceId);
     if (nextId !== selectedWorkspaceId) setSelectedWorkspaceIdState(nextId);
     selectWorkspace(nextId);
     if (nextId) localStorage.setItem(WORKSPACE_STORAGE_KEY, nextId);
     else localStorage.removeItem(WORKSPACE_STORAGE_KEY);
-  }, [selectWorkspace, selectedWorkspaceId, workspaces, workspacesQuery.isLoading]);
+  }, [
+    selectWorkspace,
+    selectedWorkspaceId,
+    workspaces,
+    workspacesQuery.error,
+    workspacesQuery.isLoading,
+  ]);
 
   const setSelectedWorkspaceId = useCallback(
     (id: string) => {
@@ -115,7 +116,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectedWorkspaceId,
       setSelectedWorkspaceId,
       refetchWorkspaces: async () => {
-        await workspacesQuery.refetch();
+        await workspacesQuery.refetch({ throwOnError: true });
       },
       properties,
       propertiesLoading: propertiesQuery.isLoading,
