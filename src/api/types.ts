@@ -809,6 +809,8 @@ export type AdapterConnectionUpdateRequest = NonNullableFields<
   "operationId" | "configurationReference"
 >;
 export type AdapterConnectionControlRequest = Schema<"ConnectionControlRequest">;
+export type AdapterConnectionCheckpointResetRequest =
+  Schema<"ResetConnectionCheckpointRequest">;
 export type AdapterConnectionPollingScheduleRequest =
   Schema<"ConfigurePollingScheduleRequest">;
 

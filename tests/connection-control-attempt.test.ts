@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createConnectionControlRequest,
   resolveConnectionControlAttempt,
   type ConnectionControlPayload,
 } from "../src/features/integrations/connectionControlAttempt";
@@ -88,5 +89,14 @@ describe("connection control attempts", () => {
     expect(retry.operationId).toBe("operation-1");
     expect(changedInterval.operationId).toBe("operation-2");
     expect(changedAttempts.operationId).toBe("operation-3");
+  });
+
+  it("confirms only checkpoint-reset requests", () => {
+    expect(createConnectionControlRequest("reset-checkpoint", "operation-1", 7))
+      .toEqual({ operationId: "operation-1", expectedVersion: 7, confirmed: true });
+    expect(createConnectionControlRequest("disable", "operation-2", 8))
+      .toEqual({ operationId: "operation-2", expectedVersion: 8 });
+    expect(createConnectionControlRequest("clear-schedule", "operation-3", 9))
+      .not.toHaveProperty("confirmed");
   });
 });

@@ -4782,7 +4782,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ConnectionControlRequest"
+                "$ref": "#/components/schemas/ResetConnectionCheckpointRequest"
               }
             }
           },
@@ -18376,6 +18376,23 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "ResetConnectionCheckpointRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "ResolveOrganizationJoinRequestRequest": {
         "type": "object",

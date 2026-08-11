@@ -2,14 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, Check, Clipboard, Clock3, Edit3, HeartPulse, KeyRound, Link2, PauseCircle, PlayCircle, RefreshCcw, Save, Settings2, ShieldCheck, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeLabel, adapterExecutionModeValue, credentialStatusLabel, ingestionOperationalStateLabel, ingestionRunStatusLabel } from "../../api/labels";
-import type { AdapterConnection, AdapterConnectionControlRequest, AdapterConnectionHealth, AdapterConnectionMutationReceipt, AdapterConnectionPollingScheduleRequest, AdapterConnectionUpdateRequest, AdapterIngressCredentialCreateRequest, AdapterIngressCredentialListItem, AdapterIngressCredentialListResponse, AdapterIngressCredentialMutationReceipt, AdapterTypeCapability, CreateAdapterIngressCredentialResponse } from "../../api/types";
+import type { AdapterConnection, AdapterConnectionHealth, AdapterConnectionMutationReceipt, AdapterConnectionPollingScheduleRequest, AdapterConnectionUpdateRequest, AdapterIngressCredentialCreateRequest, AdapterIngressCredentialListItem, AdapterIngressCredentialListResponse, AdapterIngressCredentialMutationReceipt, AdapterTypeCapability, CreateAdapterIngressCredentialResponse } from "../../api/types";
+import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
 import { useSession } from "../../app/session";
 import { ErrorState, InlineFormActions, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
+import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { resolveConnectionUpdateAttempt, type ConnectionSettingsUpdate, type ConnectionUpdateAttempt, type ConnectionUpdatePayload } from "./connectionUpdateAttempt";
-import { resolveConnectionControlAttempt, type ConnectionControlAttempt, type ConnectionControlPayload } from "./connectionControlAttempt";
+import { createConnectionControlRequest, resolveConnectionControlAttempt, type ConnectionControlAttempt, type ConnectionControlPayload } from "./connectionControlAttempt";
 import { credentialIssuanceOutcomeKey, resolveCredentialIssueAttempt, resolveCredentialRevokeAttempt, type CredentialMutationAttempt } from "./credentialMutationAttempt";
 
 type ConnectionTab = "health" | "settings" | "credentials";
@@ -32,7 +34,11 @@ export function ConnectionDetail({ propertyId, connectionId, adapterTypes, canMa
   const actionMutation = useMutation({ mutationFn: ({ item, action }: { item: AdapterConnection; action: ConfirmAction }) => {
     const payload: ConnectionControlPayload = { propertyId, connectionId: item.connectionId, action, expectedVersion: item.version };
     actionAttempt.current = resolveConnectionControlAttempt(actionAttempt.current, payload);
-    const requestBody: AdapterConnectionControlRequest = { operationId: actionAttempt.current.operationId, expectedVersion: item.version };
+    const requestBody = createConnectionControlRequest(
+      action,
+      actionAttempt.current.operationId,
+      item.version,
+    );
     return request<AdapterConnectionMutationReceipt>(`/api/ingestion/properties/${propertyId}/connections/${item.connectionId}/${action === "clear-schedule" ? "polling-schedule/clear" : action}`, { method: "POST", body: JSON.stringify(requestBody) });
   }, onSuccess: async () => { actionAttempt.current = null; setConfirmAction(null); await refresh(); } });
   const updateMutation = useMutation({ mutationFn: ({ item, settings }: { item: AdapterConnection; settings: ConnectionSettingsUpdate }) => {
@@ -47,14 +53,38 @@ export function ConnectionDetail({ propertyId, connectionId, adapterTypes, canMa
     const requestBody: AdapterConnectionPollingScheduleRequest = { operationId: scheduleAttempt.current.operationId, intervalSeconds, maxAttempts, expectedVersion: item.version };
     return request<AdapterConnectionMutationReceipt>(`/api/ingestion/properties/${propertyId}/connections/${item.connectionId}/polling-schedule`, { method: "PUT", body: JSON.stringify(requestBody) });
   }, onSuccess: async () => { scheduleAttempt.current = null; await refresh(); } });
+  const actionNeedsAuthentication = isInsufficientAuthenticationError(actionMutation.error);
+  function retryActionAfterAuthentication() {
+    const variables = actionMutation.variables;
+    if (!variables) return;
+    actionMutation.reset();
+    actionMutation.mutate(variables);
+  }
   const item = connection.data;
   const capability = adapterTypes.find((entry) => entry.adapterType === item?.adapterType);
   return <Modal open={Boolean(connectionId)} size="lg" title={item?.adapterType || "Integration connection"} description={item ? `${adapterExecutionModeLabel(item.executionMode)} · connection ${item.connectionId.slice(0, 8).toUpperCase()}` : "Loading connection"} onClose={onClose}>{connection.isLoading ? <LoadingState label="Loading connection" /> : connection.error ? <ErrorState error={connection.error} retry={() => void connection.refetch()} /> : item ? <div className="space-y-5">
     <div className="flex flex-col gap-4 rounded-2xl bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-base-content/40">Connection</p><p className="mt-1 font-semibold">{item.configurationReference}</p><p className="mt-1 text-xs text-base-content/50">{adapterConflictPolicyLabel(item.conflictPolicy)}</p></div><div className="flex flex-wrap items-center gap-2"><StatusBadge status={adapterConnectionStatusLabel(item.status)} />{canManage && adapterConnectionStatusLabel(item.status) === "enabled" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmAction("disable")}><PauseCircle size={15} />Disable</button>}{canManage && adapterConnectionStatusLabel(item.status) === "disabled" && <button type="button" className="btn btn-primary btn-sm" onClick={() => setConfirmAction("enable")}><PlayCircle size={15} />Enable</button>}</div></div>
-    {confirmAction && <ConnectionConfirmation action={confirmAction} connection={item} submitting={actionMutation.isPending} error={actionMutation.error} onCancel={() => { actionAttempt.current = null; setConfirmAction(null); actionMutation.reset(); }} onConfirm={() => actionMutation.mutate({ item, action: confirmAction })} />}
+    {confirmAction && <ConnectionConfirmation
+      action={confirmAction}
+      connection={item}
+      submitting={actionMutation.isPending || actionNeedsAuthentication}
+      error={actionNeedsAuthentication ? null : actionMutation.error}
+      onCancel={() => {
+        actionAttempt.current = null;
+        setConfirmAction(null);
+        actionMutation.reset();
+      }}
+      onConfirm={() => actionMutation.mutate({ item, action: confirmAction })}
+    />}
+    {actionNeedsAuthentication && <RecentAuthenticationPrompt
+      error={actionMutation.error}
+      title="Confirm your password to reset the checkpoint"
+      description="Checkpoint reset changes where this adapter resumes processing."
+      onAuthenticated={retryActionAfterAuthentication}
+    />}
     <SegmentedTabs stretch value={tab} ariaLabel="Connection details" onValueChange={setTab} options={[{ value: "health", label: "Health", icon: <HeartPulse size={15} /> }, { value: "settings", label: "Settings", icon: <Settings2 size={15} /> }, { value: "credentials", label: "Credentials", icon: <KeyRound size={15} /> }]} />
     {tab === "health" && <ConnectionHealth query={health} />}
-    {tab === "settings" && <div className="space-y-5"><section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Connection settings</h3><p className="mt-1 text-xs text-base-content/50">Execution, conflict handling, and configuration references.</p></div>{canManage && !editing && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing ? <ConnectionSettingsForm connection={item} capability={capability} submitting={updateMutation.isPending} error={updateMutation.error} onCancel={() => { updateAttempt.current = null; setEditing(false); updateMutation.reset(); }} onSave={(settings) => updateMutation.mutate({ item, settings })} /> : <ConnectionSettingsReadOnly connection={item} />}</section><PollingSchedule connection={item} capability={capability} canManage={canManage} submitting={scheduleMutation.isPending || actionMutation.isPending} error={scheduleMutation.error || actionMutation.error} onConfigure={(intervalSeconds, maxAttempts) => scheduleMutation.mutate({ item, intervalSeconds, maxAttempts })} onCancel={() => { scheduleAttempt.current = null; scheduleMutation.reset(); }} onClear={() => setConfirmAction("clear-schedule")} />{canManage && item.checkpoint && <section className="rounded-2xl border border-warning/25 bg-warning/8 p-4"><div className="flex items-start justify-between gap-4"><div><h3 className="font-semibold">Processing checkpoint</h3><p className="mt-1 break-all text-xs text-base-content/55">{item.checkpoint}</p><p className="mt-2 text-xs text-base-content/50">Reset only when the adapter must replay data from its initial position.</p></div><button type="button" className="btn btn-ghost btn-sm shrink-0 text-error" onClick={() => setConfirmAction("reset-checkpoint")}><RefreshCcw size={15} />Reset</button></div></section>}</div>}
+    {tab === "settings" && <div className="space-y-5"><section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Connection settings</h3><p className="mt-1 text-xs text-base-content/50">Execution, conflict handling, and configuration references.</p></div>{canManage && !editing && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing ? <ConnectionSettingsForm connection={item} capability={capability} submitting={updateMutation.isPending} error={updateMutation.error} onCancel={() => { updateAttempt.current = null; setEditing(false); updateMutation.reset(); }} onSave={(settings) => updateMutation.mutate({ item, settings })} /> : <ConnectionSettingsReadOnly connection={item} />}</section><PollingSchedule connection={item} capability={capability} canManage={canManage} submitting={scheduleMutation.isPending || actionMutation.isPending} error={scheduleMutation.error || (confirmAction === "clear-schedule" ? actionMutation.error : null)} onConfigure={(intervalSeconds, maxAttempts) => scheduleMutation.mutate({ item, intervalSeconds, maxAttempts })} onCancel={() => { scheduleAttempt.current = null; scheduleMutation.reset(); }} onClear={() => setConfirmAction("clear-schedule")} />{canManage && item.checkpoint && <section className="rounded-2xl border border-warning/25 bg-warning/8 p-4"><div className="flex items-start justify-between gap-4"><div><h3 className="font-semibold">Processing checkpoint</h3><p className="mt-1 break-all text-xs text-base-content/55">{item.checkpoint}</p><p className="mt-2 text-xs text-base-content/50">Reset only when the adapter must replay data from its initial position.</p></div><button type="button" className="btn btn-ghost btn-sm shrink-0 text-error" onClick={() => setConfirmAction("reset-checkpoint")}><RefreshCcw size={15} />Reset</button></div></section>}</div>}
     {tab === "credentials" && <CredentialsPanel key={`${propertyId}:${item.connectionId}`} propertyId={propertyId} connection={item} canManage={canManageCredentials} />}
     <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
   </div> : null}</Modal>;
@@ -153,6 +183,23 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
       await queryClient.invalidateQueries({ queryKey: ["ingestion-credentials", propertyId, connection.connectionId] });
     },
   });
+  const issueNeedsAuthentication = isInsufficientAuthenticationError(createMutation.error);
+  const revokeNeedsAuthentication = isInsufficientAuthenticationError(revokeMutation.error);
+
+  function retryIssueAfterAuthentication() {
+    const variables = createMutation.variables;
+    if (!variables) return;
+    createMutation.reset();
+    createMutation.mutate(variables);
+  }
+
+  function retryRevokeAfterAuthentication() {
+    const variables = revokeMutation.variables;
+    if (!variables) return;
+    revokeMutation.reset();
+    revokeMutation.mutate(variables);
+  }
+
   const items = credentials.data?.credentials ?? [];
 
   return (
@@ -166,17 +213,38 @@ function CredentialsPanel({ propertyId, connection, canManage }: { propertyId: s
           </div>
           {canManage && !creating && <button type="button" className="btn btn-primary btn-sm" onClick={() => { issueAttempt.current = null; createMutation.reset(); setIssued(null); setCreating(true); }}><KeyRound size={15} />Issue credential</button>}
         </div>
-        {creating && <CredentialForm submitting={createMutation.isPending} error={createMutation.error} onCancel={() => { issueAttempt.current = null; setCreating(false); createMutation.reset(); }} onCreate={(label, expiresAtUtc) => createMutation.mutate({ label, expiresAtUtc })} />}
+        {creating && <CredentialForm
+          submitting={createMutation.isPending || issueNeedsAuthentication}
+          error={issueNeedsAuthentication ? null : createMutation.error}
+          onCancel={() => {
+            issueAttempt.current = null;
+            setCreating(false);
+            createMutation.reset();
+          }}
+          onCreate={(label, expiresAtUtc) => createMutation.mutate({ label, expiresAtUtc })}
+        />}
+        {issueNeedsAuthentication && <div className="mt-4"><RecentAuthenticationPrompt
+          error={createMutation.error}
+          title="Confirm your password to issue this credential"
+          description="Ingress tokens grant an adapter permission to submit property data."
+          onAuthenticated={retryIssueAfterAuthentication}
+        /></div>}
       </section>
       {credentials.isLoading ? <LoadingState label="Loading credentials" /> : credentials.error ? <ErrorState error={credentials.error} retry={() => void credentials.refetch()} /> : items.length ? (
         <section className="overflow-hidden rounded-2xl border border-base-300">
           <div className="divide-y divide-base-300">
-            {items.map((credential) => <article key={credential.credentialId} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h4 className="font-semibold">{credential.label}</h4><StatusBadge status={credentialStatusLabel(credential.status)} /></div><p className="mt-1 text-xs text-base-content/50">Slot {credential.slot} · expires {formatDateTime(credential.expiresAtUtc)}</p>{credential.lastAuthenticatedAtUtc && <p className="mt-1 text-xs text-base-content/45">Last used {timeAgo(credential.lastAuthenticatedAtUtc)}</p>}</div>{canManage && credentialStatusLabel(credential.status) === "active" && <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => revokeMutation.mutate(credential)} disabled={revokeMutation.isPending}><Trash2 size={15} />Revoke</button>}</div></article>)}
+            {items.map((credential) => <article key={credential.credentialId} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h4 className="font-semibold">{credential.label}</h4><StatusBadge status={credentialStatusLabel(credential.status)} /></div><p className="mt-1 text-xs text-base-content/50">Slot {credential.slot} · expires {formatDateTime(credential.expiresAtUtc)}</p>{credential.lastAuthenticatedAtUtc && <p className="mt-1 text-xs text-base-content/45">Last used {timeAgo(credential.lastAuthenticatedAtUtc)}</p>}</div>{canManage && credentialStatusLabel(credential.status) === "active" && <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => revokeMutation.mutate(credential)} disabled={revokeMutation.isPending || revokeNeedsAuthentication}><Trash2 size={15} />Revoke</button>}</div></article>)}
           </div>
           <PaginationBar page={page} pageSize={CREDENTIALS_PAGE_SIZE} itemCount={items.length} hasMore={credentials.data?.hasMore} itemLabel="credential" disabled={credentials.isFetching} onPageChange={setPage} />
         </section>
       ) : <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><KeyRound className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No credentials issued</h3><p className="mt-1 text-sm text-base-content/50">Issue one when an adapter worker needs to submit observations.</p></div>}
-      {revokeMutation.error && <ErrorState error={revokeMutation.error} />}
+      {revokeNeedsAuthentication && <RecentAuthenticationPrompt
+        error={revokeMutation.error}
+        title="Confirm your password to revoke this credential"
+        description="Revocation immediately prevents this adapter token from submitting more data."
+        onAuthenticated={retryRevokeAfterAuthentication}
+      />}
+      {revokeMutation.error && !revokeNeedsAuthentication && <ErrorState error={revokeMutation.error} />}
     </div>
   );
 }

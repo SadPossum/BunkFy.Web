@@ -1,3 +1,8 @@
+import type {
+  AdapterConnectionCheckpointResetRequest,
+  AdapterConnectionControlRequest,
+} from "../../api/types";
+
 export type ConnectionControlAction =
   | "enable"
   | "disable"
@@ -47,4 +52,15 @@ export function connectionControlFingerprint(
     expectedVersion: payload.expectedVersion,
     schedule,
   });
+}
+
+export function createConnectionControlRequest(
+  action: ConnectionControlAction,
+  operationId: string,
+  expectedVersion: number,
+): AdapterConnectionControlRequest | AdapterConnectionCheckpointResetRequest {
+  const request = { operationId, expectedVersion };
+  return action === "reset-checkpoint"
+    ? { ...request, confirmed: true }
+    : request;
 }

@@ -4878,7 +4878,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["ConnectionControlRequest"];
+                    "application/json": components["schemas"]["ResetConnectionCheckpointRequest"];
                 };
             };
             responses: {
@@ -13249,6 +13249,13 @@ export interface components {
          * @enum {integer}
          */
         ReservationStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        ResetConnectionCheckpointRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            confirmed: boolean;
+        };
         ResolveOrganizationJoinRequestRequest: {
             /** Format: int64 */
             expectedVersion: number;

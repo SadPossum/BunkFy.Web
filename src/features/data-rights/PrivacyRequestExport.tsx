@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { Link } from "react-router";
 import { ApiError } from "../../api/client";
 import type { DataRightsCase, DataRightsExportArtifact } from "../../api/types";
+import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
 import { useSession } from "../../app/session";
 import { ErrorState, StatusBadge } from "../../components/ui/primitives";
 import {
@@ -83,7 +84,7 @@ export function PrivacyRequestExport({
       queryClient.setQueryData(artifactQueryKey, result);
     },
     onError: (error) => {
-      if (isInsufficientAuthentication(error)) {
+      if (isInsufficientAuthenticationError(error)) {
         setShowPasswordStepUp(true);
       }
     },
@@ -106,7 +107,7 @@ export function PrivacyRequestExport({
     },
     onSuccess: () => setDownloadNeedsMfa(false),
     onError: (error) => {
-      if (isInsufficientAuthentication(error)) {
+      if (isInsufficientAuthenticationError(error)) {
         setDownloadNeedsMfa(true);
       }
     },
@@ -146,11 +147,11 @@ export function PrivacyRequestExport({
   const status = current ? dataRightsExportStatusKey(current.status) : "notRequested";
   const busy = generation.isPending || dataRightsExportNeedsLiveRefresh(current?.status);
   const generationError = generation.error &&
-    !isInsufficientAuthentication(generation.error)
+    !isInsufficientAuthenticationError(generation.error)
     ? generation.error
     : null;
   const downloadError = downloadArtifact.error &&
-    !isInsufficientAuthentication(downloadArtifact.error)
+    !isInsufficientAuthenticationError(downloadArtifact.error)
     ? downloadArtifact.error
     : null;
 
@@ -338,11 +339,6 @@ function ExportAction({
       {action && <div className="shrink-0">{action}</div>}
     </div>
   );
-}
-
-function isInsufficientAuthentication(error: unknown): boolean {
-  return error instanceof ApiError &&
-    error.code === "Security.InsufficientAuthentication";
 }
 
 function formatDateTime(value: string): string {
