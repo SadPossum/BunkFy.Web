@@ -13795,7 +13795,6 @@ export interface components {
             employeeNumber: string | null;
             jobTitle: string | null;
             department: string | null;
-            authSubjectId: string | null;
         };
         StaffPropertyAssignmentDto: {
             /** Format: uuid */

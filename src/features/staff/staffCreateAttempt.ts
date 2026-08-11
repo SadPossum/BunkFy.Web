@@ -6,7 +6,6 @@ export type StaffCreatePayload = {
   employeeNumber: string | null;
   jobTitle: string | null;
   department: string | null;
-  authSubjectId?: string | null;
 };
 
 export type StaffCreateAttempt = {
@@ -34,7 +33,6 @@ export function staffCreateFingerprint(payload: StaffCreatePayload): string {
     employeeNumber: normalizeOptional(payload.employeeNumber),
     jobTitle: normalizeOptional(payload.jobTitle),
     department: normalizeOptional(payload.department),
-    authSubjectId: normalizeOptional(payload.authSubjectId),
   });
 }
 

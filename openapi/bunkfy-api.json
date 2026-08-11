@@ -19828,10 +19828,6 @@
           "department": {
             "type": "string",
             "nullable": true
-          },
-          "authSubjectId": {
-            "type": "string",
-            "nullable": true
           }
         },
         "additionalProperties": false

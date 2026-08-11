@@ -12,7 +12,6 @@ const payload: StaffCreatePayload = {
   employeeNumber: "EMP-42",
   jobTitle: "Manager",
   department: "Operations",
-  authSubjectId: "account-maya",
 };
 
 describe("staff create attempt", () => {
@@ -24,7 +23,6 @@ describe("staff create attempt", () => {
         ...payload,
         displayName: "  Maya Chen  ",
         workEmail: " MAYA@EXAMPLE.TEST ",
-        authSubjectId: " account-maya ",
       },
       () => "operation-2",
     );
