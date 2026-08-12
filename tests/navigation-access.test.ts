@@ -47,4 +47,14 @@ describe("navigation access", () => {
     expect(navigationScopes("tenant", tenant, property)).toEqual([tenant]);
     expect(navigationItemAllowed([], [tenant], () => false)).toBe(true);
   });
+
+  it("does not turn property access into a tenant-wide Staff grant", () => {
+    const granted = new Set([`staff.read@${property}`]);
+
+    expect(navigationItemAllowed(
+      ["staff.read"],
+      navigationScopes("tenant", tenant, property),
+      (permission, scope) => granted.has(`${permission}@${scope}`),
+    )).toBe(false);
+  });
 });

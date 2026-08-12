@@ -15,7 +15,7 @@ const navigation = [
   { to: "/reservations", label: "Reservations", icon: CalendarDays, scope: "tenant-or-property", required: [permissions.reservationsRead] },
   { to: "/guests", label: "Guests", icon: UsersRound, scope: "tenant-or-property", required: [permissions.guestsRead] },
   { to: "/privacy-requests", label: "Privacy requests", icon: ShieldCheck, scope: "tenant-or-property", required: [permissions.dataRightsRead] },
-  { to: "/staff", label: "Staff", icon: UserRoundCog, scope: "tenant-or-property", required: [permissions.staffRead] },
+  { to: "/staff", label: "Staff", icon: UserRoundCog, scope: "tenant", required: [permissions.staffRead] },
   { to: "/inventory", label: "Inventory", icon: Blocks, scope: "tenant-or-property", required: [permissions.inventoryRead] },
   { to: "/integrations", label: "Integrations", icon: Cable, scope: "tenant-or-property", required: [permissions.ingestionRead] },
   { to: "/properties", label: "Properties", icon: Building2, scope: "tenant-or-property", required: [permissions.propertiesRead] },
