@@ -67,6 +67,7 @@ function BasicSelectPicker({
           sideOffset={6}
           collisionPadding={12}
           className="z-[1100] max-h-[min(22rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-xl"
+          onEscapeKeyDown={containPickerEscape}
         >
           <Select.ScrollUpButton className="grid h-7 place-items-center bg-base-100 text-base-content/45">
             <ChevronUp size={15} />
@@ -165,7 +166,7 @@ function SearchableSelectPicker({
             collisionPadding={12}
             className="z-[1100] max-h-[min(22rem,var(--radix-popover-content-available-height))] overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-xl outline-none"
             style={{ width: "var(--radix-popover-trigger-width)" }}
-            onEscapeKeyDown={(event) => event.stopPropagation()}
+            onEscapeKeyDown={containPickerEscape}
           >
           <div className="border-b border-base-300 p-2">
             <label className="flex h-9 items-center gap-2 rounded-md bg-base-200 px-3 text-base-content/50 focus-within:ring-2 focus-within:ring-primary/15">
@@ -271,4 +272,8 @@ export function filterSelectOptions(
 
 export function normalizeSelectValue(value?: string): string {
   return value ?? "";
+}
+
+export function containPickerEscape(event: Pick<Event, "stopPropagation">): void {
+  event.stopPropagation();
 }

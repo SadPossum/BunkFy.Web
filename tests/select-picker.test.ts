@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  containPickerEscape,
   filterSelectOptions,
   normalizeSelectValue,
   type SelectPickerOption,
@@ -28,5 +29,13 @@ describe("select picker", () => {
     expect(normalizeSelectValue(undefined)).toBe("");
     expect(normalizeSelectValue("")).toBe("");
     expect(normalizeSelectValue("front-desk")).toBe("front-desk");
+  });
+
+  it("contains Escape inside an open picker", () => {
+    let stopped = false;
+
+    containPickerEscape({ stopPropagation: () => { stopped = true; } });
+
+    expect(stopped).toBe(true);
   });
 });
