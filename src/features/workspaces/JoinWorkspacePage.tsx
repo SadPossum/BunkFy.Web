@@ -124,6 +124,19 @@ export function JoinWorkspacePage() {
     },
     refetchIntervalInBackground: false,
   });
+  const workspaceActivation = useMutation({
+    mutationFn: async (workspaceId: string) => {
+      await activateWorkspace(workspaceId);
+      return workspaceId;
+    },
+    onSuccess: () => {
+      forgetPendingEnrollment(secret?.token, accountKey);
+      setPendingApproval(false);
+      clearPreservedWorkspaceJoinSecret();
+      window.history.replaceState(null, "", "/");
+      navigate("/", { replace: true });
+    },
+  });
   const join = useMutation<WorkspaceJoinResolution>({
     mutationFn: async () => {
       if (!secret) throw new Error("This invitation link is incomplete.");
@@ -155,7 +168,6 @@ export function JoinWorkspacePage() {
           },
         );
         const workspaceId = acceptance.membership.organization.organizationId;
-        await activateWorkspace(workspaceId);
         return { kind: "joined", workspaceId };
       }
 
@@ -167,9 +179,6 @@ export function JoinWorkspacePage() {
         },
       );
       const resolution = resolveEnrollmentJoin(outcome);
-      if (resolution.kind === "joined") {
-        await activateWorkspace(resolution.workspaceId);
-      }
       return resolution;
     },
     onSuccess: (resolution) => {
@@ -180,11 +189,7 @@ export function JoinWorkspacePage() {
         return;
       }
 
-      forgetPendingEnrollment(secret?.token, accountKey);
-      setPendingApproval(false);
-      clearPreservedWorkspaceJoinSecret();
-      window.history.replaceState(null, "", "/");
-      navigate("/", { replace: true });
+      workspaceActivation.mutate(resolution.workspaceId);
     },
     onError: (error) => {
       if (
@@ -194,19 +199,6 @@ export function JoinWorkspacePage() {
         forgetPendingEnrollment(secret?.token, accountKey);
         setPendingApproval(false);
       }
-    },
-  });
-  const approvedActivation = useMutation({
-    mutationFn: async (workspaceId: string) => {
-      await activateWorkspace(workspaceId);
-      return workspaceId;
-    },
-    onSuccess: () => {
-      forgetPendingEnrollment(secret?.token, accountKey);
-      setPendingApproval(false);
-      clearPreservedWorkspaceJoinSecret();
-      window.history.replaceState(null, "", "/");
-      navigate("/", { replace: true });
     },
   });
   const withdraw = useMutation<OrganizationEnrollmentOutcome>({
@@ -250,7 +242,7 @@ export function JoinWorkspacePage() {
     },
   });
   const resetJoin = join.reset;
-  const resetApprovedActivation = approvedActivation.reset;
+  const resetWorkspaceActivation = workspaceActivation.reset;
   const resetWithdraw = withdraw.reset;
 
   useEffect(() => {
@@ -259,13 +251,13 @@ export function JoinWorkspacePage() {
         hasPendingEnrollment(secret.token, accountKey),
     );
     resetJoin();
-    resetApprovedActivation();
+    resetWorkspaceActivation();
     resetWithdraw();
     setWithdrawalConfirmation(false);
     setWithdrawalResolution(null);
   }, [
     accountKey,
-    resetApprovedActivation,
+    resetWorkspaceActivation,
     resetJoin,
     resetWithdraw,
     secret?.kind,
@@ -316,14 +308,13 @@ export function JoinWorkspacePage() {
 
     if (
       application.status === 5 &&
-      !approvedActivation.isPending &&
-      !approvedActivation.isSuccess
+      workspaceActivation.isIdle
     ) {
-      approvedActivation.mutate(application.organizationId);
+      workspaceActivation.mutate(application.organizationId);
     }
   }, [
     accountKey,
-    approvedActivation,
+    workspaceActivation,
     secret?.token,
     staffApplication.data,
     withdrawalResolution,
@@ -349,6 +340,11 @@ export function JoinWorkspacePage() {
       join.error.code === "Organizations.EnrollmentClaimUnavailable") ||
     isWorkspaceStaffOnboardingTerminallyDenied(staffApplication.data?.status);
   const provisioningFailed = staffApplication.data?.status === 6;
+  const accessApproved = staffApplication.data?.status === 5;
+  const openingWorkspace = accessApproved ||
+    workspaceActivation.isPending ||
+    workspaceActivation.isError;
+  const showAccessProgress = pendingApproval || openingWorkspace;
   const canWithdraw =
     isEnrollment &&
     pendingApproval &&
@@ -358,7 +354,7 @@ export function JoinWorkspacePage() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pendingApproval || requestRejected || withdrawalResolution) return;
+    if (showAccessProgress || requestRejected || withdrawalResolution) return;
     join.mutate();
   }
 
@@ -448,7 +444,7 @@ export function JoinWorkspacePage() {
                 {new Date(data.expiresAtUtc).toLocaleString()}
               </p>
             </div>
-            {!withdrawalResolution && !pendingApproval && (
+            {!withdrawalResolution && !showAccessProgress && (
               <div className="py-6">
                 <h2 className="font-display text-xl font-semibold">
                   Your staff profile
@@ -501,7 +497,7 @@ export function JoinWorkspacePage() {
               </div>
             )}
 
-            {pendingApproval && (
+            {showAccessProgress && (
               <div className="rounded-lg border border-info/25 bg-info/8 p-5">
                 <div className="flex items-start gap-3">
                   <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-info/12 text-info">
@@ -509,40 +505,43 @@ export function JoinWorkspacePage() {
                   </span>
                   <div>
                     <h2 className="font-display text-lg font-semibold">
-                      Request sent
+                      {openingWorkspace ? "Opening workspace" : "Request sent"}
                     </h2>
                     <p className="mt-1 text-sm leading-6 text-base-content/60">
-                      A workspace owner must approve this QR request. BunkFy
-                      checks periodically while this page is open.
+                      {openingWorkspace
+                        ? "Your request was approved. BunkFy is finishing your access and will open the workspace automatically."
+                        : "A workspace owner must approve this QR request. BunkFy checks periodically while this page is open."}
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => void staffApplication.refetch()}
-                    disabled={staffApplication.isFetching}
-                  >
-                    {staffApplication.isFetching && (
-                      <span className="loading loading-spinner loading-xs" />
-                    )}
-                    Check approval now
-                  </button>
-                  {canWithdraw && !withdrawalConfirmation && (
+                {!openingWorkspace && (
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm text-error"
-                      onClick={() => {
-                        withdraw.reset();
-                        setWithdrawalConfirmation(true);
-                      }}
+                      className="btn btn-outline btn-sm"
+                      onClick={() => void staffApplication.refetch()}
+                      disabled={staffApplication.isFetching}
                     >
-                      <XCircle size={16} />
-                      Withdraw request
+                      {staffApplication.isFetching && (
+                        <span className="loading loading-spinner loading-xs" />
+                      )}
+                      Check approval now
                     </button>
-                  )}
-                </div>
+                    {canWithdraw && !withdrawalConfirmation && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm text-error"
+                        onClick={() => {
+                          withdraw.reset();
+                          setWithdrawalConfirmation(true);
+                        }}
+                      >
+                        <XCircle size={16} />
+                        Withdraw request
+                      </button>
+                    )}
+                  </div>
+                )}
                 {withdrawalConfirmation && (
                   <div className="mt-4 border-t border-info/20 pt-4">
                     <p className="text-sm font-semibold">Withdraw this request?</p>
@@ -624,16 +623,30 @@ export function JoinWorkspacePage() {
             {join.error &&
               !verificationRequired &&
               !requestRejected &&
-              !pendingApproval && (
+              !showAccessProgress && (
                 <div className="alert alert-error text-sm">
                   {alreadyJoined
                     ? "You already belong to this workspace."
                     : join.error.message}
                 </div>
               )}
-            {approvedActivation.error && (
-              <div className="alert alert-error text-sm">
-                {approvedActivation.error.message}
+            {workspaceActivation.error && (
+              <div className="alert alert-error items-start text-sm">
+                <div>
+                  <p className="font-semibold">The workspace is ready, but it could not be opened.</p>
+                  <p className="mt-1">{workspaceActivation.error.message}</p>
+                </div>
+                {workspaceActivation.variables && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => workspaceActivation.mutate(
+                      workspaceActivation.variables,
+                    )}
+                  >
+                    Try opening workspace
+                  </button>
+                )}
               </div>
             )}
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -652,12 +665,12 @@ export function JoinWorkspacePage() {
                 >
                   Open workspace
                 </button>
-              ) : !pendingApproval && !requestRejected && !withdrawalResolution ? (
+              ) : !showAccessProgress && !requestRejected && !withdrawalResolution ? (
                 <button
                   className="btn btn-primary"
                   disabled={
                     join.isPending ||
-                    approvedActivation.isPending ||
+                    workspaceActivation.isPending ||
                     !staffProfile.displayName.trim()
                   }
                 >

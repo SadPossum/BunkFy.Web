@@ -32,6 +32,24 @@ describe("workspace access readiness", () => {
     );
   });
 
+  it("honors a known rate-limit response while access is converging", async () => {
+    const request = vi.fn()
+      .mockRejectedValueOnce(new ApiError(
+        "Too many requests.",
+        429,
+        "Http.RateLimitExceeded",
+        0,
+      ))
+      .mockResolvedValueOnce({ items: [], page: 1, pageSize: 1, hasMore: false });
+
+    await waitForWorkspaceAccess(request, "workspace-a", {
+      timeoutMs: 1_000,
+      retryDelayMs: 0,
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it("reports a delayed projection instead of navigating into a denial", async () => {
     const request = vi.fn().mockRejectedValue(
       new ApiError("Access denied.", 403, "Properties.AccessDenied"),
@@ -50,6 +68,18 @@ describe("workspace access readiness", () => {
       timeoutMs: 1_000,
       retryDelayMs: 0,
     })).rejects.toThrow("Signed out.");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry an unrelated rate-limit contract", async () => {
+    const request = vi.fn().mockRejectedValue(
+      new ApiError("Try later.", 429, "Provider.RateLimitExceeded", 0),
+    );
+
+    await expect(waitForWorkspaceAccess(request, "workspace-a", {
+      timeoutMs: 1_000,
+      retryDelayMs: 0,
+    })).rejects.toThrow("Try later.");
     expect(request).toHaveBeenCalledTimes(1);
   });
 });

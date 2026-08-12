@@ -6,6 +6,7 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly code?: string,
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -97,7 +98,25 @@ async function toApiError(response: Response): Promise<ApiError> {
   const code = getString(payload, "code") ||
     getNestedString(payload, "error", "code") ||
     (isErrorCode(title) ? title : undefined);
-  return new ApiError(detail || `Request failed with HTTP ${response.status}`, response.status, code);
+  return new ApiError(
+    detail || `Request failed with HTTP ${response.status}`,
+    response.status,
+    code,
+    parseRetryAfterMilliseconds(response.headers.get("retry-after")),
+  );
+}
+
+function parseRetryAfterMilliseconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.ceil(seconds * 1_000);
+  }
+
+  const date = Date.parse(value);
+  if (!Number.isFinite(date)) return undefined;
+  return Math.max(0, date - Date.now());
 }
 
 function isErrorCode(value: string | undefined): value is string {

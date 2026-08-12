@@ -218,6 +218,28 @@ describe("frontend repository foundation", () => {
     });
   });
 
+  it("preserves server retry guidance on API errors", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      title: "Http.RateLimitExceeded",
+      status: 429,
+    }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/problem+json",
+        "Retry-After": "3",
+      },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const error = await apiRequest<void>("/api/rate-limited").catch((reason) => reason);
+
+    expect(error).toMatchObject({
+      status: 429,
+      code: "Http.RateLimitExceeded",
+      retryAfterMs: 3_000,
+    });
+  });
+
   it("keeps authenticated downloads inside the browser session boundary", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("payload", { status: 200, headers: { "Content-Type": "application/octet-stream" } }));
     vi.stubGlobal("fetch", fetchMock);
