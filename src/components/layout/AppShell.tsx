@@ -5,19 +5,20 @@ import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } f
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { useNotifications } from "../../features/notifications/notifications";
+import { navigationItemAllowed, navigationScopes } from "./navigationAccess";
 import { BrandMark } from "../ui/BrandMark";
 import { InitialAvatar } from "../ui/primitives";
 import { SelectPicker } from "../ui/SelectPicker";
 
 const navigation = [
-  { to: "/", label: "Overview", icon: Gauge, scope: "tenant", required: [permissions.propertiesRead, permissions.inventoryRead, permissions.reservationsRead] },
-  { to: "/reservations", label: "Reservations", icon: CalendarDays, scope: "tenant", required: [permissions.reservationsRead] },
-  { to: "/guests", label: "Guests", icon: UsersRound, scope: "tenant", required: [permissions.guestsRead] },
+  { to: "/", label: "Overview", icon: Gauge, scope: "tenant-or-property", required: [permissions.propertiesRead, permissions.inventoryRead, permissions.reservationsRead] },
+  { to: "/reservations", label: "Reservations", icon: CalendarDays, scope: "tenant-or-property", required: [permissions.reservationsRead] },
+  { to: "/guests", label: "Guests", icon: UsersRound, scope: "tenant-or-property", required: [permissions.guestsRead] },
   { to: "/privacy-requests", label: "Privacy requests", icon: ShieldCheck, scope: "tenant-or-property", required: [permissions.dataRightsRead] },
-  { to: "/staff", label: "Staff", icon: UserRoundCog, scope: "tenant", required: [permissions.staffRead] },
-  { to: "/inventory", label: "Inventory", icon: Blocks, scope: "tenant", required: [permissions.inventoryRead] },
-  { to: "/integrations", label: "Integrations", icon: Cable, scope: "tenant", required: [permissions.ingestionRead] },
-  { to: "/properties", label: "Properties", icon: Building2, scope: "tenant", required: [permissions.propertiesRead] },
+  { to: "/staff", label: "Staff", icon: UserRoundCog, scope: "tenant-or-property", required: [permissions.staffRead] },
+  { to: "/inventory", label: "Inventory", icon: Blocks, scope: "tenant-or-property", required: [permissions.inventoryRead] },
+  { to: "/integrations", label: "Integrations", icon: Cable, scope: "tenant-or-property", required: [permissions.ingestionRead] },
+  { to: "/properties", label: "Properties", icon: Building2, scope: "tenant-or-property", required: [permissions.propertiesRead] },
   { to: "/workspace", label: "Workspace settings", icon: Settings2, scope: "tenant", required: [] },
 ] as const;
 
@@ -38,9 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? propertyAccessScope(selectedWorkspaceId, selectedPropertyId)
     : "";
   const scopesForNavigationItem = (item: (typeof navigation)[number]) =>
-    item.scope === "tenant"
-      ? [tenantScope]
-      : [tenantScope, propertyScope];
+    navigationScopes(item.scope, tenantScope, propertyScope);
   const navigationChecks = [...new Map(
     navigation.flatMap((item) => {
       return scopesForNavigationItem(item)
@@ -52,12 +51,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     }),
   ).values()];
   const navigationAccess = usePermissions(navigationChecks);
-  const visibleNavigation = navigation.filter((item) =>
-    item.required.every((permission) =>
-      scopesForNavigationItem(item)
-        .filter(Boolean)
-        .some((scope) => navigationAccess.allows(permission, scope))),
-  );
+  const visibleNavigation = navigation.filter((item) => navigationItemAllowed(
+    item.required,
+    scopesForNavigationItem(item),
+    navigationAccess.allows,
+  ));
   const { unreadCount } = useNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
 
