@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
+  IssueWorkspaceEnrollmentLinkRequest,
   Property,
   WorkspaceAccessProfile,
   WorkspaceAccessProfileListResponse,
@@ -32,6 +33,13 @@ import { canReplaceJoinSource, isActiveJoinSource, joinSourceStatusLabel } from 
 const ACTIVE_PROFILE_PAGE_SIZE = 100;
 const SOURCE_PAGE_SIZE = 10;
 const REUSABLE_PROFILE_KEYS = new Set(["front-desk", "housekeeping", "viewer"]);
+const ENROLLMENT_APPROVAL_OPTIONS: Array<{
+  value: IssueWorkspaceEnrollmentLinkRequest["approvalMode"];
+  label: string;
+}> = [
+  { value: "requires-approval", label: "Owner approval" },
+  { value: "automatic", label: "Automatic" },
+];
 
 type IssuedJoinLink = {
   kind: "invitation" | "enrollment";
@@ -128,7 +136,9 @@ function JoinSourceCreation({
   const [enrollmentPropertyIds, setEnrollmentPropertyIds] = useState<string[]>([]);
   const [enrollmentLifetimeHours, setEnrollmentLifetimeHours] = useState(24);
   const [maximumClaims, setMaximumClaims] = useState(20);
-  const [approvalMode, setApprovalMode] = useState("2");
+  const [approvalMode, setApprovalMode] = useState<
+    IssueWorkspaceEnrollmentLinkRequest["approvalMode"]
+  >("requires-approval");
   const [enrollmentSourceId, setEnrollmentSourceId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
@@ -167,16 +177,17 @@ function JoinSourceCreation({
     mutationFn: () => {
       const profile = reusableProfiles.find((item) => item.profileId === enrollmentProfileId);
       if (!profile) throw new Error("Choose a reusable low-privilege role.");
+      const payload: IssueWorkspaceEnrollmentLinkRequest = {
+        sourceId: enrollmentSourceId,
+        lifetimeHours: enrollmentLifetimeHours,
+        maximumClaims,
+        approvalMode,
+        profileKey: profile.key,
+        propertyIds: enrollmentPropertyIds,
+      };
       return request<WorkspaceStaffJoinSourceIssuance>("/api/workspace-staff-enrollment/sources/enrollment-links", {
         method: "POST",
-        body: JSON.stringify({
-          sourceId: enrollmentSourceId,
-          lifetimeHours: enrollmentLifetimeHours,
-          maximumClaims,
-          approvalMode: Number(approvalMode),
-          profileKey: profile.key,
-          propertyIds: enrollmentPropertyIds,
-        }),
+        body: JSON.stringify(payload),
       });
     },
     onSuccess: async (result) => {
@@ -261,12 +272,14 @@ function JoinSourceCreation({
             <span className="mb-1.5 block text-sm font-semibold">Approval</span>
             <SelectPicker
               value={approvalMode}
-              onValueChange={(value) => { setApprovalMode(value); setEnrollmentSourceId(crypto.randomUUID()); }}
+              onValueChange={(value) => {
+                const selected = ENROLLMENT_APPROVAL_OPTIONS.find((option) => option.value === value);
+                if (!selected) return;
+                setApprovalMode(selected.value);
+                setEnrollmentSourceId(crypto.randomUUID());
+              }}
               ariaLabel="Enrollment approval"
-              options={[
-                { value: "2", label: "Owner approval" },
-                { value: "1", label: "Automatic" },
-              ]}
+              options={ENROLLMENT_APPROVAL_OPTIONS}
             />
           </label>
         </div>

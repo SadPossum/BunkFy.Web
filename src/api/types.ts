@@ -193,6 +193,9 @@ export type WorkspaceStaffJoinSourceReplacement = Omit<
   replacement: WorkspaceStaffJoinSourceIssuance;
 };
 
+export type IssueWorkspaceEnrollmentLinkRequest =
+  Schema<"IssueWorkspaceEnrollmentLinkRequest">;
+
 export type RetentionExecutionStatus = Schema<"RetentionExecutionStatus">;
 export type RetentionTargetScopeKind = Schema<"RetentionTargetScopeKind">;
 
