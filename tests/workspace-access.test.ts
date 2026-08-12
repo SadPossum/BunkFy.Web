@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ApiError } from "../src/api/client";
 import { accessChecksMatchTenant } from "../src/app/permissions";
 import { waitForWorkspaceAccess } from "../src/features/workspaces/workspaceAccess";
 
@@ -15,10 +16,10 @@ describe("workspace access readiness", () => {
     }])).toBe(true);
   });
 
-  it("waits until the access projection grants baseline workspace access", async () => {
+  it("waits until visible properties can resolve property-scoped access", async () => {
     const request = vi.fn()
-      .mockResolvedValueOnce({ permissions: [{ allowed: false }] })
-      .mockResolvedValueOnce({ permissions: [{ allowed: true }] });
+      .mockRejectedValueOnce(new ApiError("Access denied.", 403, "Properties.AccessDenied"))
+      .mockResolvedValueOnce({ items: [], page: 1, pageSize: 1, hasMore: false });
 
     await waitForWorkspaceAccess(request, "workspace-a", {
       timeoutMs: 1_000,
@@ -27,27 +28,28 @@ describe("workspace access readiness", () => {
 
     expect(request).toHaveBeenCalledTimes(2);
     expect(request).toHaveBeenLastCalledWith(
-      "/api/access/permissions/evaluate",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          checks: [{
-            permission: "properties.read",
-            scope: "tenant:workspace-a",
-          }],
-        }),
-      }),
+      "/api/properties?page=1&pageSize=1",
     );
   });
 
   it("reports a delayed projection instead of navigating into a denial", async () => {
-    const request = vi.fn().mockResolvedValue({
-      permissions: [{ allowed: false }],
-    });
+    const request = vi.fn().mockRejectedValue(
+      new ApiError("Access denied.", 403, "Properties.AccessDenied"),
+    );
 
     await expect(waitForWorkspaceAccess(request, "workspace-a", {
       timeoutMs: 0,
       retryDelayMs: 0,
     })).rejects.toThrow("Workspace access is still being prepared");
+  });
+
+  it("does not retry authentication or server failures", async () => {
+    const request = vi.fn().mockRejectedValue(new ApiError("Signed out.", 401));
+
+    await expect(waitForWorkspaceAccess(request, "workspace-a", {
+      timeoutMs: 1_000,
+      retryDelayMs: 0,
+    })).rejects.toThrow("Signed out.");
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

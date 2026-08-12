@@ -1,5 +1,4 @@
-import type { AccessPermissionEvaluationResponse } from "../../api/types";
-import { permissions, tenantAccessScope } from "../../app/permissions";
+import { ApiError } from "../../api/client";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -8,22 +7,20 @@ export async function waitForWorkspaceAccess(
   workspaceId: string,
   options: { timeoutMs?: number; retryDelayMs?: number } = {},
 ): Promise<void> {
+  if (!workspaceId.trim()) throw new Error("A workspace is required.");
   const timeoutMs = options.timeoutMs ?? 10_000;
   const retryDelayMs = options.retryDelayMs ?? 250;
-  const scope = tenantAccessScope(workspaceId);
   const deadline = Date.now() + timeoutMs;
 
   while (true) {
-    const result = await request<AccessPermissionEvaluationResponse>(
-      "/api/access/permissions/evaluate",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          checks: [{ permission: permissions.propertiesRead, scope }],
-        }),
-      },
-    );
-    if (result.permissions.some((decision) => decision.allowed)) return;
+    try {
+      // The visible-properties query succeeds for both tenant-wide owners and
+      // property-scoped staff once their access grants are available.
+      await request<unknown>("/api/properties?page=1&pageSize=1");
+      return;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 403) throw error;
+    }
     if (Date.now() >= deadline) {
       throw new Error("Workspace access is still being prepared. Try again in a moment.");
     }

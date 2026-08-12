@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "pnpm typecheck && vite build",
+    "browser:install": "playwright install chromium",
     "contracts:generate": "pwsh -NoProfile -File ../../eng/update-web-contracts.ps1",
     "contracts:check": "pwsh -NoProfile -File ../../eng/update-web-contracts.ps1 -Check -NoBuild",
     "preview": "vite preview --host 0.0.0.0",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^24.9.0",
     "@types/react": "^19.2.17",
