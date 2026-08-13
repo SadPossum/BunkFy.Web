@@ -5,22 +5,21 @@ import {
   CalendarSearch,
   CheckCircle2,
   CircleSlash2,
+  ChevronRight,
   DoorOpen,
   History,
   Plus,
-  Unlock,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type {
   InventoryAvailabilityResponse,
   ManualBlockGroup,
-  ManualBlockGroupMutationReceipt,
   RoomInventory,
   RoomInventoryChangeImpact,
   RoomInventoryMutationReceipt,
 } from "../../api/types";
-import { inventorySalesModeValue, manualBlockStatusLabel } from "../../api/labels";
+import { inventorySalesModeValue } from "../../api/labels";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
@@ -30,21 +29,32 @@ import {
   ErrorState,
   LoadingState,
   PageHeader,
+  StatusBadge,
 } from "../../components/ui/primitives";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
-import { BlockInventoryModal, type CreateBlockGroupPayload } from "./BlockInventoryModal";
-import { buildBlockTargetOptions, groupActiveBlocks } from "./inventoryBlocking";
-import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "./inventoryApi";
-import { sellableInventorySummary } from "./inventorySummary";
+import { canAdvanceCursor, initialCursorPage, nextCursorPage, previousCursorPage } from "./cursorPaging";
+import { buildBlockTargetOptions, findBlockTargetOption } from "./inventoryBlocking";
 import {
-  resolveManualBlockCreateAttempt,
-  resolveManualBlockGroupReleaseAttempt,
-  type ManualBlockMutationAttempt,
-} from "./manualBlockMutationAttempt";
+  loadAllRoomInventory,
+  loadManualBlockGroupPage,
+  manualBlockGroupStatuses,
+  MANUAL_BLOCK_GROUP_PAGE_SIZE,
+} from "./inventoryApi";
+import { sellableInventorySummary } from "./inventorySummary";
+import { ManualBlockGroupDetailsModal } from "./ManualBlockGroupDetailsModal";
+import {
+  ManualBlockGroupWorkflowModal,
+  type ManualBlockGroupWorkflow,
+} from "./ManualBlockGroupWorkflowModal";
+import { manualBlockGroupStatusLabel, manualBlockGroupTargetLabel } from "./manualBlockGroupWorkflow";
+import { type ManualBlockMutationAttempt } from "./manualBlockMutationAttempt";
+import { ReleaseManualBlockGroupModal } from "./ReleaseManualBlockGroupModal";
 import { resolveSalesModeMutationAttempt, type SalesModeMutationAttempt } from "./salesModeMutationAttempt";
 import { SalesModeChangeModal, type PendingSalesModeChange } from "./SalesModeChangeModal";
+import { defaultInventoryRange } from "./inventoryDates";
 
 export function InventoryPage() {
   const { request, session } = useSession();
@@ -54,45 +64,60 @@ export function InventoryPage() {
   useTargetProperty(searchParams.get("property"));
   const targetArrival = searchParams.get("arrival");
   const targetDeparture = searchParams.get("departure");
-  const blockView = searchParams.get("history") === "all" ? "all" : "active";
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [range, setRange] = useState(defaultRange);
+  const blockView = searchParams.get("history") === "all"
+    ? "all"
+    : searchParams.get("history") === "partial"
+      ? "partial"
+      : "active";
+  const [blockGroupWorkflow, setBlockGroupWorkflow] = useState<ManualBlockGroupWorkflow | null>(null);
+  const [detailsBlockGroupId, setDetailsBlockGroupId] = useState<string | null>(null);
+  const [releaseBlockGroup, setReleaseBlockGroup] = useState<ManualBlockGroup | null>(null);
+  const [blockGroupPage, setBlockGroupPage] = useState(initialCursorPage);
+  const [range, setRange] = useState(() => defaultInventoryRange(selectedProperty?.timeZoneId ?? "UTC"));
   const [pendingSalesModeChange, setPendingSalesModeChange] = useState<PendingSalesModeChange | null>(null);
   const salesModeAttempt = useRef<SalesModeMutationAttempt | null>(null);
-  const createBlockAttempt = useRef<ManualBlockMutationAttempt | null>(null);
-  const releaseBlockAttempt = useRef<ManualBlockMutationAttempt | null>(null);
+  const blockGroupMutationAttempt = useRef<ManualBlockMutationAttempt | null>(null);
+  const releaseBlockGroupAttempt = useRef<ManualBlockMutationAttempt | null>(null);
   const enabled = Boolean(selectedPropertyId);
   const accessScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
     : "";
   const access = usePermissions(accessScope ? [
+    { permission: permissions.inventoryRead, scope: accessScope },
     { permission: permissions.inventoryConfigure, scope: accessScope },
-    { permission: permissions.inventoryBlocksManage, scope: accessScope },
+    { permission: permissions.inventoryBlockGroupsManage, scope: accessScope },
   ] : []);
+  const canReadInventory = access.allows(permissions.inventoryRead, accessScope);
   const canConfigure = access.allows(permissions.inventoryConfigure, accessScope);
-  const canManageBlocks = access.allows(permissions.inventoryBlocksManage, accessScope);
+  const canManageBlockGroups = access.allows(permissions.inventoryBlockGroupsManage, accessScope);
+  const inventoryEnabled = enabled && !access.isLoading && canReadInventory;
 
   const inventory = useQuery({
     queryKey: ["inventory-rooms", selectedPropertyId],
     queryFn: ({ signal }) => loadAllRoomInventory(request, selectedPropertyId!, signal),
-    enabled,
+    enabled: inventoryEnabled,
   });
   const availability = useQuery({
     queryKey: ["availability", selectedPropertyId, range.arrival, range.departure],
     queryFn: () => request<InventoryAvailabilityResponse>(
       `/api/inventory/properties/${selectedPropertyId}/availability?arrival=${range.arrival}&departure=${range.departure}`,
     ),
-    enabled: enabled && Boolean(range.arrival && range.departure),
+    enabled: inventoryEnabled && Boolean(range.arrival && range.departure),
   });
-  const blocks = useQuery({
-    queryKey: ["blocks", selectedPropertyId, blockView],
-    queryFn: ({ signal }) => loadAllManualInventoryBlocks(
+  const blockGroups = useQuery({
+    queryKey: ["inventory-block-groups", selectedPropertyId, blockView, blockGroupPage.cursor],
+    queryFn: ({ signal }) => loadManualBlockGroupPage(
       request,
       selectedPropertyId!,
-      blockView === "all",
+      blockView === "active"
+        ? manualBlockGroupStatuses.active
+        : blockView === "partial"
+          ? manualBlockGroupStatuses.partiallyReleased
+          : null,
+      blockGroupPage.cursor,
       signal,
     ),
-    enabled,
+    enabled: inventoryEnabled,
   });
   const salesModeImpact = useQuery({
     queryKey: ["room-sales-mode-impact", selectedPropertyId, pendingSalesModeChange?.room.roomId],
@@ -101,7 +126,7 @@ export function InventoryPage() {
     ),
     enabled: Boolean(selectedPropertyId && pendingSalesModeChange),
   });
-  const focusedResourceId = useTransientResourceFocus(Boolean(inventory.data && blocks.data));
+  const focusedResourceId = useTransientResourceFocus(Boolean(inventory.data && blockGroups.data));
 
   const rooms = inventory.data?.rooms ?? [];
   const targetUnitId = searchParams.get("unit");
@@ -119,17 +144,15 @@ export function InventoryPage() {
     () => buildBlockTargetOptions(selectedProperty?.name ?? "Property", rooms),
     [rooms, selectedProperty?.name],
   );
-  const activeBlockGroups = useMemo(
-    () => groupActiveBlocks(blocks.data?.blocks ?? [], targetOptions),
-    [blocks.data?.blocks, targetOptions],
-  );
 
-  function setBlockView(value: "active" | "all") {
+  function setBlockView(value: "active" | "partial" | "all") {
     const next = new URLSearchParams(searchParams);
     if (value === "all") next.set("history", "all");
+    else if (value === "partial") next.set("history", "partial");
     else next.delete("history");
     next.delete("focus");
     next.delete("blockGroup");
+    setBlockGroupPage(initialCursorPage());
     setSearchParams(next, { replace: true });
   }
 
@@ -141,11 +164,24 @@ export function InventoryPage() {
   }, [targetArrival, targetDeparture]);
 
   useEffect(() => {
+    if (targetArrival && targetDeparture && targetArrival < targetDeparture) return;
+    setRange(defaultInventoryRange(selectedProperty?.timeZoneId ?? "UTC"));
+  }, [selectedPropertyId, selectedProperty?.timeZoneId, targetArrival, targetDeparture]);
+
+  useEffect(() => {
     salesModeAttempt.current = null;
-    createBlockAttempt.current = null;
-    releaseBlockAttempt.current = null;
+    blockGroupMutationAttempt.current = null;
+    releaseBlockGroupAttempt.current = null;
+    setBlockGroupPage(initialCursorPage());
+    setBlockGroupWorkflow(null);
+    setDetailsBlockGroupId(null);
+    setReleaseBlockGroup(null);
     setPendingSalesModeChange(null);
   }, [selectedPropertyId]);
+
+  useEffect(() => {
+    if (targetBlockGroupId) setDetailsBlockGroupId(targetBlockGroupId);
+  }, [targetBlockGroupId]);
 
   const salesModeMutation = useMutation({
     mutationFn: ({ room, salesMode }: { room: RoomInventory; salesMode: "roomLevel" | "bedLevel" }) => {
@@ -176,60 +212,23 @@ export function InventoryPage() {
       setPendingSalesModeChange(null);
     },
   });
-  const createBlockGroup = useMutation({
-    mutationFn: (payload: CreateBlockGroupPayload) => {
-      createBlockAttempt.current = resolveManualBlockCreateAttempt(
-        createBlockAttempt.current,
-        { propertyId: selectedPropertyId!, ...payload },
-      );
-      return request<ManualBlockGroupMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/block-groups`, {
-        method: "POST",
-        body: JSON.stringify({ operationId: createBlockAttempt.current.operationId, ...payload }),
-      });
-    },
-    onSuccess: async () => {
-      createBlockAttempt.current = null;
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
-        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
-      ]);
-      setBlockOpen(false);
-    },
-  });
-  const releaseBlockGroup = useMutation({
-    mutationFn: (blockGroupId: string) => {
-      releaseBlockAttempt.current = resolveManualBlockGroupReleaseAttempt(
-        releaseBlockAttempt.current,
-        selectedPropertyId!,
-        blockGroupId,
-      );
-      return request<ManualBlockGroupMutationReceipt>(
-        `/api/inventory/properties/${selectedPropertyId}/block-groups/${blockGroupId}/release`,
-        {
-          method: "POST",
-          body: JSON.stringify({ operationId: releaseBlockAttempt.current.operationId }),
-        },
-      );
-    },
-    onSuccess: async () => {
-      releaseBlockAttempt.current = null;
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
-        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
-      ]);
-    },
-  });
-
-  function closeBlockModal() {
-    createBlockAttempt.current = null;
-    setBlockOpen(false);
+  function refreshBlockGroupState() {
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["inventory-block-groups", selectedPropertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-block-group", selectedPropertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-block-group-members", selectedPropertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
+    ]);
   }
 
   if (!selectedProperty) {
     return <EmptyState icon={<DoorOpen />} title="Choose a property first" description="Inventory is managed within a property. Create or select one to continue." />;
   }
-  if (inventory.isLoading || blocks.isLoading) return <LoadingState label="Loading inventory" />;
-  if (inventory.error || blocks.error) return <ErrorState error={inventory.error ?? blocks.error} />;
+  if (inventory.isLoading || blockGroups.isLoading || access.isLoading) return <LoadingState label="Loading inventory" />;
+  if (inventory.error || blockGroups.error || access.error) return <ErrorState error={inventory.error ?? blockGroups.error ?? access.error} />;
+  if (!canReadInventory) {
+    return <EmptyState icon={<Blocks />} title="Inventory access required" description="Your current property role does not include inventory.read." />;
+  }
 
   const availableCount = availability.data?.units.filter((item) => item.isAvailable).length ?? 0;
   const unavailableCount = availability.data?.units.filter((item) => !item.isAvailable).length ?? 0;
@@ -240,10 +239,10 @@ export function InventoryPage() {
         eyebrow={selectedProperty.name}
         title="Inventory"
         description="Control how rooms are sold, check availability, and take physical areas out of service."
-        action={canManageBlocks ? (
+        action={canManageBlockGroups ? (
           <button
             className="btn btn-primary"
-            onClick={() => setBlockOpen(true)}
+            onClick={() => setBlockGroupWorkflow({ kind: "create" })}
             disabled={targetOptions.length === 0}
           >
             <Plus size={17} />
@@ -287,63 +286,117 @@ export function InventoryPage() {
               onValueChange={setBlockView}
               options={[
                 { value: "active", label: "Active", icon: <Blocks size={14} /> },
+                { value: "partial", label: "Partial", icon: <CircleSlash2 size={14} /> },
                 { value: "all", label: "All", icon: <History size={14} /> },
               ]}
             />
           </div>
-          {activeBlockGroups.length === 0 ? (
+          {(blockGroups.data?.blockGroups.length ?? 0) === 0 ? (
             <div className="p-6">
               <EmptyState
                 icon={<Blocks />}
-                title={blockView === "active" ? "No active blocks" : "No block history"}
-                description={blockView === "active" ? "All configured inventory is free from manual blocks." : "No inventory blocks have been recorded yet."}
+                title={blockView === "active" ? "No active block groups" : blockView === "partial" ? "No partially released groups" : "No block history"}
+                description={blockView === "active"
+                  ? "No groups are currently in the Active state. Check Partial for legacy groups that still have active members."
+                  : blockView === "partial"
+                    ? "No groups have a mix of active and released members."
+                    : "No inventory block groups have been recorded yet."}
               />
             </div>
           ) : (
-            <div className="divide-y divide-base-300">
-              {activeBlockGroups.map((group) => (
+            <>
+              <div className="divide-y divide-base-300">
+              {blockGroups.data?.blockGroups.map((group) => {
+                const target = findBlockTargetOption(targetOptions, group.target);
+                return (
                 <div key={group.blockGroupId} className={`px-5 py-4 sm:px-6 ${group.blockGroupId === focusedBlockGroupId ? focusedResourceClass : ""}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{group.label}</p>
+                      <p className="truncate font-semibold">{target?.label ?? manualBlockGroupTargetLabel(group.target)}</p>
                       <p className="mt-1 text-xs text-base-content/45">
-                        {group.detail} - {formatDate(group.arrival)} to {formatDate(group.departure)}
+                        {group.activeBlockCount} active of {group.initialBlockCount} - {formatDate(group.arrival)} to {formatDate(group.departure)}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      {blockView === "all" && (
-                        <span className={`badge badge-sm ${blockStatus(group) === "released" ? "badge-ghost" : "badge-neutral"}`}>
-                          {capitalize(blockStatus(group))}
-                        </span>
-                      )}
-                    {canManageBlocks && blockStatus(group) === "active" && (
                       <button
-                        className="btn btn-ghost btn-sm shrink-0 text-primary"
-                        onClick={() => releaseBlockGroup.mutate(group.blockGroupId)}
-                        disabled={releaseBlockGroup.isPending}
+                        type="button"
+                        className="btn btn-ghost btn-sm shrink-0"
+                        onClick={() => setDetailsBlockGroupId(group.blockGroupId)}
+                        aria-label={`View details for ${target?.label ?? "inventory block group"}`}
                       >
-                        <Unlock size={15} />
-                        Release
+                        Details <ChevronRight size={15} />
                       </button>
-                    )}
                     </div>
                   </div>
-                  <p className="mt-3 rounded-lg bg-base-200 px-3 py-2 text-xs text-base-content/60">{group.reason}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <StatusBadge status={manualBlockGroupStatusLabel(group.status)} />
+                    {group.replacesGroupId && <span className="badge badge-ghost badge-sm">Replacement</span>}
+                    <p className="min-w-0 flex-1 truncate rounded-lg bg-base-200 px-3 py-2 text-xs text-base-content/60">{group.reason || "No reason recorded"}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );})}
+              </div>
+              <PaginationBar
+                page={blockGroupPage.page}
+                pageSize={blockGroups.data?.pageSize ?? MANUAL_BLOCK_GROUP_PAGE_SIZE}
+                itemCount={blockGroups.data?.blockGroups.length ?? 0}
+                itemLabel="block group"
+                hasMore={canAdvanceCursor(blockGroupPage, blockGroups.data?.nextCursor ?? null)}
+                disabled={blockGroups.isFetching}
+                onPageChange={(page) => setBlockGroupPage((current) => page > current.page
+                  ? nextCursorPage(current, blockGroups.data?.nextCursor ?? null)
+                  : previousCursorPage(current))}
+              />
+            </>
           )}
-          {releaseBlockGroup.error && <div className="p-5"><ErrorState error={releaseBlockGroup.error} /></div>}
         </section>
       </div>
 
-      <BlockInventoryModal
-        open={blockOpen && canManageBlocks}
-        propertyName={selectedProperty.name}
-        rooms={rooms}
-        mutation={createBlockGroup}
-        onClose={closeBlockModal}
-      />
+      {blockGroupWorkflow && canManageBlockGroups && (
+        <ManualBlockGroupWorkflowModal
+          key={blockGroupWorkflow.kind === "create" ? "create" : `replace:${blockGroupWorkflow.group.blockGroupId}:${blockGroupWorkflow.group.version}`}
+          workflow={blockGroupWorkflow}
+          propertyId={selectedPropertyId!}
+          propertyName={selectedProperty.name}
+          propertyTimeZoneId={selectedProperty.timeZoneId}
+          rooms={rooms}
+          attemptRef={blockGroupMutationAttempt}
+          onCompleted={refreshBlockGroupState}
+          onRefreshRequired={refreshBlockGroupState}
+          onClose={() => setBlockGroupWorkflow(null)}
+        />
+      )}
+      {detailsBlockGroupId && (
+        <ManualBlockGroupDetailsModal
+          key={detailsBlockGroupId}
+          blockGroupId={detailsBlockGroupId}
+          propertyId={selectedPropertyId!}
+          propertyName={selectedProperty.name}
+          rooms={rooms}
+          canManage={canManageBlockGroups}
+          onReplace={(group) => {
+            setDetailsBlockGroupId(null);
+            setBlockGroupWorkflow({ kind: "replace", group });
+          }}
+          onRelease={(group) => {
+            setDetailsBlockGroupId(null);
+            setReleaseBlockGroup(group);
+          }}
+          onNavigateGroup={setDetailsBlockGroupId}
+          onClose={() => setDetailsBlockGroupId(null)}
+        />
+      )}
+      {releaseBlockGroup && canManageBlockGroups && (
+        <ReleaseManualBlockGroupModal
+          key={`${releaseBlockGroup.blockGroupId}:${releaseBlockGroup.version}`}
+          group={releaseBlockGroup}
+          propertyId={selectedPropertyId!}
+          attemptRef={releaseBlockGroupAttempt}
+          onCompleted={refreshBlockGroupState}
+          onRefreshRequired={refreshBlockGroupState}
+          onClose={() => setReleaseBlockGroup(null)}
+        />
+      )}
       <SalesModeChangeModal
         change={pendingSalesModeChange}
         impact={salesModeImpact.data}
@@ -528,17 +581,6 @@ function normalizeSalesMode(value: RoomInventory["salesMode"]): "unconfigured" |
   return "unconfigured";
 }
 
-function defaultRange() {
-  const arrival = new Date();
-  arrival.setDate(arrival.getDate() + 1);
-  const departure = new Date(arrival);
-  departure.setDate(departure.getDate() + 2);
-  return {
-    arrival: arrival.toISOString().slice(0, 10),
-    departure: departure.toISOString().slice(0, 10),
-  };
-}
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
@@ -546,9 +588,3 @@ function formatDate(value: string) {
     year: "numeric",
   }).format(new Date(`${value}T12:00:00`));
 }
-
-function blockStatus(group: { blocks: ManualBlockGroup["blocks"] }) {
-  return manualBlockStatusLabel(group.blocks[0]?.status ?? 0);
-}
-
-function capitalize(value: string) { return value.slice(0, 1).toUpperCase() + value.slice(1); }
