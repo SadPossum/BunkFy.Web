@@ -12,7 +12,7 @@ import { SelectPicker } from "../../components/ui/SelectPicker";
 import { hasPrimaryGuestRecord } from "../reservations/guestRecordWorkflow";
 
 const PAGE_SIZE = 25;
-const filters = ["pending", "applying", "applied", "rejected", "stale", "failed"] as const;
+const filters = ["pending", "applying", "applied", "rejected", "superseded", "stale", "failed"] as const;
 type ProposalFilter = "all" | (typeof filters)[number];
 
 export function ProposalQueue({ propertyId, canReadSensitiveHistory, canDecide, canSuggestGuestRecords }: { propertyId: string; canReadSensitiveHistory: boolean; canDecide: boolean; canSuggestGuestRecords: boolean }) {
