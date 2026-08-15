@@ -157,6 +157,10 @@ function friendlyErrorMessage(error: unknown): string {
     if (error.code === "Properties.CountryPolicy.PolicyExpired") return "This country policy has expired. Choose another configured policy.";
     if (error.code === "Properties.CountryPolicy.RequiredAcknowledgementMissing") return "Accept every acknowledgement required by the selected policy.";
     if (error.code?.startsWith("Properties.CountryPolicy.")) return "These policy coordinates are no longer accepted. Refresh and choose a configured policy.";
+    if (error.code === "Inventory.BlockGroupSelectionMismatch") return "Inventory changed after the preview. Preview the current selection before confirming.";
+    if (error.code === "Inventory.VersionConflict") return "This inventory record changed. Refresh it before making another change.";
+    if (error.code === "Inventory.BlockGroupTargetTooLarge") return "This scope now exceeds the 500-unit atomic limit. Narrow it and preview again.";
+    if (error.code === "Inventory.ManagementOperationConflict") return "This operation identity was already used for a different inventory change. Start a new attempt.";
     if (error.code === "DataRights.DecisionActorCannotExecute") return "A different authorized staff member must execute this approved request.";
     if (error.code === "DataRights.VersionConflict") return "This privacy request changed. Review the latest state and try again.";
     if (error.code === "Retention.ScheduleRetryEvidenceChanged") return "This retention schedule changed. Refresh its latest evidence before retrying.";
