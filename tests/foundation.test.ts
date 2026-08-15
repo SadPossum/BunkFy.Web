@@ -173,7 +173,7 @@ describe("frontend repository foundation", () => {
     expect(joinRequests).toContain("hasMore={joinRequests.data?.hasMore}");
     expect(connection).toContain("page=${page}&pageSize=${CREDENTIALS_PAGE_SIZE}");
     expect(privacyRequests).toContain("hasMore={cases.data?.hasMore}");
-    expect(privacyDiscovery).toContain("discover.data?.limitReached");
+    expect(privacyDiscovery).toContain("visibleDiscovery?.limitReached");
   });
 
   it("keeps modal backdrops out of the accessibility tree without creating an unnamed button", () => {

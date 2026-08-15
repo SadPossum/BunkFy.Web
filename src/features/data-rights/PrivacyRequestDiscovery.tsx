@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Search, ShieldCheck, Trash2 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   DataRightsCase,
   DataRightsSelectedSubject,
@@ -11,10 +11,15 @@ import type {
 import { useSession } from "../../app/session";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { ErrorState } from "../../components/ui/primitives";
+import {
+  createDataRightsDiscoveryAttempt,
+  isDataRightsDiscoveryAttemptCurrent,
+  type DataRightsDiscoveryAttempt,
+  type DataRightsDiscoveryCriteria,
+  type DataRightsDiscoveryLookupKind,
+  type DataRightsDiscoveryOwner,
+} from "./dataRightsDiscoveryAttempt";
 import { isDataRightsRestriction } from "./dataRightsWorkflow";
-
-type DataOwner = "guests" | "reservations" | "ingestion" | "staff";
-type LookupKind = "recordId" | "email" | "phone" | "accountSubjectId";
 
 const ownerOptions = [
   { value: "guests", label: "Guest record" },
@@ -42,33 +47,78 @@ export function PrivacyRequestDiscovery({
   const { request } = useSession();
   const restriction = isDataRightsRestriction(dataRightsCase);
   const singleSubject = scopeKind === "staff" || restriction;
-  const [ownerKey, setOwnerKey] = useState<DataOwner>(
+  const [ownerKey, setOwnerKey] = useState<DataRightsDiscoveryOwner>(
     scopeKind === "staff" ? "staff" : restriction ? "guests" : "reservations",
   );
-  const [lookupKind, setLookupKind] = useState<LookupKind>("recordId");
+  const [lookupKind, setLookupKind] = useState<DataRightsDiscoveryLookupKind>("recordId");
   const [lookup, setLookup] = useState("");
   const [name, setName] = useState("");
-  const [candidates, setCandidates] = useState<DataRightsSubjectCandidate[]>([]);
+  const discoveryGeneration = useRef(0);
+  const discoveryController = useRef<AbortController | null>(null);
+  const [discoveryResult, setDiscoveryResult] = useState<{
+    attempt: DataRightsDiscoveryAttempt;
+    response: DataRightsSubjectDiscoveryResponse;
+  } | null>(null);
+  const [discoveryError, setDiscoveryError] = useState<unknown>(null);
   const selectedSubjects = selected?.subjects ?? [];
+  const discoveryCriteria: DataRightsDiscoveryCriteria = {
+    caseId: dataRightsCase.id,
+    caseVersion: dataRightsCase.version,
+    scopeKind,
+    ownerKey,
+    lookupKind,
+    lookup,
+    name,
+  };
+  const discoveryCriteriaRef = useRef(discoveryCriteria);
+  discoveryCriteriaRef.current = discoveryCriteria;
+  const visibleDiscovery = discoveryResult &&
+      isDataRightsDiscoveryAttemptCurrent(
+        discoveryResult.attempt,
+        discoveryCriteria,
+        discoveryGeneration.current,
+      )
+    ? discoveryResult.response
+    : null;
+  const candidates = visibleDiscovery?.candidates ?? [];
   const discover = useMutation({
-    mutationFn: () => request<DataRightsSubjectDiscoveryResponse>(
+    mutationFn: ({
+      attempt,
+      controller,
+    }: {
+      attempt: DataRightsDiscoveryAttempt;
+      controller: AbortController;
+    }) => request<DataRightsSubjectDiscoveryResponse>(
       `${basePath}/subjects/discover`,
       {
         method: "POST",
-        body: JSON.stringify({
-          recordId: lookupKind === "recordId" ? lookup.trim() : null,
-          email: lookupKind === "email" ? lookup.trim() : null,
-          phone: lookupKind === "phone" ? lookup.trim() : null,
-          name: scopeKind === "guest" && ownerKey !== "ingestion"
-            ? name.trim() || null
-            : null,
-          dateOfBirth: null,
-          accountSubjectId: lookupKind === "accountSubjectId" ? lookup.trim() : null,
-          ownerKey,
-        }),
+        body: JSON.stringify(attempt.request),
+        signal: controller.signal,
       },
     ),
-    onSuccess: (response) => setCandidates(response.candidates),
+    onSuccess: (response, { attempt, controller }) => {
+      if (discoveryController.current === controller) {
+        discoveryController.current = null;
+      }
+      if (!isDataRightsDiscoveryAttemptCurrent(
+        attempt,
+        discoveryCriteriaRef.current,
+        discoveryGeneration.current,
+      )) return;
+      setDiscoveryError(null);
+      setDiscoveryResult({ attempt, response });
+    },
+    onError: (error, { attempt, controller }) => {
+      if (discoveryController.current === controller) {
+        discoveryController.current = null;
+      }
+      if (controller.signal.aborted || !isDataRightsDiscoveryAttemptCurrent(
+        attempt,
+        discoveryCriteriaRef.current,
+        discoveryGeneration.current,
+      )) return;
+      setDiscoveryError(error);
+    },
   });
   const select = useMutation({
     mutationFn: (candidate: DataRightsSubjectCandidate) => request<DataRightsCase>(
@@ -82,8 +132,7 @@ export function PrivacyRequestDiscovery({
       },
     ),
     onSuccess: async (updated) => {
-      setCandidates([]);
-      discover.reset();
+      clearDiscovery();
       await onCaseUpdated(updated);
       await refreshSelected();
     },
@@ -110,26 +159,52 @@ export function PrivacyRequestDiscovery({
   });
 
   useEffect(() => {
+    clearDiscovery();
     setOwnerKey(scopeKind === "staff" ? "staff" : restriction ? "guests" : "reservations");
     setLookupKind("recordId");
     setLookup("");
     setName("");
-    setCandidates([]);
   }, [dataRightsCase.id, restriction, scopeKind]);
 
-  function changeOwner(nextOwner: DataOwner) {
+  useEffect(() => {
+    clearDiscovery();
+  }, [dataRightsCase.version]);
+
+  useEffect(() => () => {
+    discoveryGeneration.current += 1;
+    const controller = discoveryController.current;
+    discoveryController.current = null;
+    if (controller) controller.abort();
+  }, []);
+
+  function clearDiscovery() {
+    discoveryGeneration.current += 1;
+    const controller = discoveryController.current;
+    discoveryController.current = null;
+    if (controller) controller.abort();
+    setDiscoveryResult(null);
+    setDiscoveryError(null);
+    discover.reset();
+  }
+
+  function changeOwner(nextOwner: DataRightsDiscoveryOwner) {
+    clearDiscovery();
     setOwnerKey(nextOwner);
     setLookupKind("recordId");
     setLookup("");
     setName("");
-    setCandidates([]);
-    discover.reset();
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCandidates([]);
-    discover.mutate();
+    clearDiscovery();
+    const controller = new AbortController();
+    const attempt = createDataRightsDiscoveryAttempt(
+      discoveryCriteriaRef.current,
+      discoveryGeneration.current,
+    );
+    discoveryController.current = controller;
+    discover.mutate({ attempt, controller });
   }
 
   return (
@@ -217,10 +292,9 @@ export function PrivacyRequestDiscovery({
             value={lookupKind}
             ariaLabel="Staff lookup type"
             onValueChange={(value) => {
+              clearDiscovery();
               setLookupKind(value);
               setLookup("");
-              setCandidates([]);
-              discover.reset();
             }}
             options={[
               { value: "recordId", label: "Staff ID" },
@@ -234,10 +308,9 @@ export function PrivacyRequestDiscovery({
             value={lookupKind}
             ariaLabel={`${dataOwnerLabel(ownerKey)} lookup type`}
             onValueChange={(value) => {
+              clearDiscovery();
               setLookupKind(value);
               setLookup("");
-              setCandidates([]);
-              discover.reset();
             }}
             options={[
               { value: "recordId", label: ownerKey === "guests" ? "Guest ID" : "Reservation ID" },
@@ -260,7 +333,10 @@ export function PrivacyRequestDiscovery({
               className="input input-bordered w-full"
               type={lookupKind === "email" ? "email" : "text"}
               value={lookup}
-              onChange={(event) => setLookup(event.target.value)}
+              onChange={(event) => {
+                clearDiscovery();
+                setLookup(event.target.value);
+              }}
               placeholder={lookupPlaceholder(lookupKind)}
               required
             />
@@ -273,7 +349,10 @@ export function PrivacyRequestDiscovery({
               <input
                 className="input input-bordered w-full"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  clearDiscovery();
+                  setName(event.target.value);
+                }}
                 placeholder="Used only to narrow the match"
               />
             </label>
@@ -292,13 +371,13 @@ export function PrivacyRequestDiscovery({
           </form>
         )}
 
-      {(discover.error || select.error || unselect.error) && (
+      {(discoveryError || select.error || unselect.error) && (
         <div className="mt-4">
-          <ErrorState error={discover.error ?? select.error ?? unselect.error} />
+          <ErrorState error={discoveryError ?? select.error ?? unselect.error} />
         </div>
       )}
 
-      {discover.data?.limitReached && candidates.length > 0 && (
+      {visibleDiscovery?.limitReached && candidates.length > 0 && (
         <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning/25 bg-warning/8 px-4 py-3 text-sm text-base-content/65">
           <AlertTriangle size={17} className="mt-0.5 shrink-0 text-warning" />
           <p>
@@ -329,7 +408,7 @@ export function PrivacyRequestDiscovery({
         </div>
       )}
 
-      {discover.isSuccess && discover.data.candidates.length === 0 && (
+      {visibleDiscovery && visibleDiscovery.candidates.length === 0 && (
         <p className="mt-4 rounded-lg bg-base-200 px-4 py-3 text-sm text-base-content/55">
           No {dataOwnerLabel(ownerKey).toLowerCase()} matched that exact identifier
           {scopeKind === "guest" ? " in this property" : " in this workspace"}.
@@ -381,7 +460,10 @@ function CandidateButton({
   );
 }
 
-function lookupLabel(owner: DataOwner, kind: LookupKind): string {
+function lookupLabel(
+  owner: DataRightsDiscoveryOwner,
+  kind: DataRightsDiscoveryLookupKind,
+): string {
   if (owner === "staff") {
     return kind === "accountSubjectId" ? "Account subject ID" : "Staff ID";
   }
@@ -391,7 +473,7 @@ function lookupLabel(owner: DataOwner, kind: LookupKind): string {
   return owner === "guests" ? "Guest phone" : "Booking phone";
 }
 
-function lookupPlaceholder(kind: LookupKind): string {
+function lookupPlaceholder(kind: DataRightsDiscoveryLookupKind): string {
   if (kind === "accountSubjectId") return "Exact authentication subject ID";
   if (kind === "recordId") return "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
   if (kind === "email") return "guest@example.com";
