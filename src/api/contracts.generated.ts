@@ -7786,6 +7786,15 @@ export interface paths {
                         "application/json": components["schemas"]["PropertyListResponse"];
                     };
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         put?: never;
@@ -7811,8 +7820,164 @@ export interface paths {
                         "application/json": components["schemas"]["PropertyMutationReceiptDto"];
                     };
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/time-zones/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                    countryCode?: string;
+                    cursor?: string;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyTimeZoneCatalogPageDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{propertyId}/time-zones/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    search?: string;
+                    countryCode?: string;
+                    cursor?: string;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyTimeZoneCatalogPageDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/time-zones/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyTimeZoneCompliancePageDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7883,6 +8048,15 @@ export interface paths {
                         "application/json": components["schemas"]["PropertyDto"];
                     };
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         put: {
@@ -7907,6 +8081,112 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["PropertyMutationReceiptDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{propertyId}/time-zone/operations/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PropertyTimeZoneRecoveryDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{propertyId}/time-zone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetPropertyTimeZoneRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SetPropertyTimeZoneReceiptDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };
@@ -7943,6 +8223,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["PropertyProcessingStateDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };
@@ -7988,6 +8277,15 @@ export interface paths {
                         "application/json": components["schemas"]["PropertyMutationReceiptDto"];
                     };
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -8027,6 +8325,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["PropertyMutationReceiptDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };
@@ -12928,6 +13235,16 @@ export interface components {
         PreviewOrganizationInvitationRequest: {
             token: string | null;
         };
+        ProblemDetails: {
+            type: string | null;
+            title: string | null;
+            /** Format: int32 */
+            status: number | null;
+            detail: string | null;
+            instance: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         PropertyCreateRequest: {
             /** Format: uuid */
             operationId: string;
@@ -12941,6 +13258,12 @@ export interface components {
             name: string | null;
             code: string | null;
             timeZoneId: string | null;
+            timeZoneStatus: components["schemas"]["PropertyTimeZoneStatus"];
+            canonicalTimeZoneId: string | null;
+            timeZoneCatalogVersion: string | null;
+            /** Format: date-time */
+            timeZoneObservedAtUtc: string;
+            timeZoneCorrectionAllowed: boolean;
             status: components["schemas"]["PropertyStatus"];
             processingStatus: components["schemas"]["PropertyProcessingStatus"];
             governancePolicy: components["schemas"]["PropertyGovernancePolicyBindingDto"];
@@ -12983,6 +13306,12 @@ export interface components {
             name: string | null;
             code: string | null;
             timeZoneId: string | null;
+            timeZoneStatus: components["schemas"]["PropertyTimeZoneStatus"];
+            canonicalTimeZoneId: string | null;
+            timeZoneCatalogVersion: string | null;
+            /** Format: date-time */
+            timeZoneObservedAtUtc: string;
+            timeZoneCorrectionAllowed: boolean;
             status: components["schemas"]["PropertyStatus"];
             processingStatus: components["schemas"]["PropertyProcessingStatus"];
             /** Format: int64 */
@@ -13022,6 +13351,63 @@ export interface components {
         PropertyProcessingStatus: "unconfigured" | "enabled" | "suspended";
         /** @enum {string} */
         PropertyStatus: "active" | "retired";
+        PropertyTimeZoneCatalogItemDto: {
+            timeZoneId: string | null;
+            countries: components["schemas"]["PropertyTimeZoneCountryDto"][] | null;
+            comment: string | null;
+            /** Format: int32 */
+            utcOffsetMinutes: number;
+            runtimeAvailable: boolean;
+        };
+        PropertyTimeZoneCatalogPageDto: {
+            catalogVersion: string | null;
+            /** Format: date-time */
+            observedAtUtc: string;
+            timeZones: components["schemas"]["PropertyTimeZoneCatalogItemDto"][] | null;
+            nextCursor: string | null;
+            hasMore: boolean;
+        };
+        /** @enum {string} */
+        PropertyTimeZoneChangeKind: "created" | "unchanged" | "canonicalized" | "changed";
+        PropertyTimeZoneComplianceItemDto: {
+            /** Format: uuid */
+            propertyId: string;
+            name: string | null;
+            code: string | null;
+            timeZoneId: string | null;
+            timeZoneStatus: components["schemas"]["PropertyTimeZoneStatus"];
+            canonicalTimeZoneId: string | null;
+            status: components["schemas"]["PropertyStatus"];
+            processingStatus: components["schemas"]["PropertyProcessingStatus"];
+            operatingCountryCode: string | null;
+            /** Format: int64 */
+            version: number;
+            correctionAllowed: boolean;
+        };
+        PropertyTimeZoneCompliancePageDto: {
+            catalogVersion: string | null;
+            /** Format: date-time */
+            observedAtUtc: string;
+            properties: components["schemas"]["PropertyTimeZoneComplianceItemDto"][] | null;
+            nextCursor: string | null;
+            hasMore: boolean;
+        };
+        PropertyTimeZoneCountryDto: {
+            code: string | null;
+            name: string | null;
+        };
+        PropertyTimeZoneRecoveryDto: {
+            receipt: components["schemas"]["SetPropertyTimeZoneReceiptDto"];
+            currentTimeZoneId: string | null;
+            currentTimeZoneStatus: components["schemas"]["PropertyTimeZoneStatus"];
+            currentCanonicalTimeZoneId: string | null;
+            /** Format: date-time */
+            currentTimeZoneObservedAtUtc: string;
+            /** Format: int64 */
+            currentVersion: number;
+        };
+        /** @enum {string} */
+        PropertyTimeZoneStatus: "canonical" | "alias" | "legacy" | "unrecognized" | "runtime-unavailable";
         PropertyUpdateRequest: {
             /** Format: uuid */
             operationId: string;
@@ -13714,6 +14100,33 @@ export interface components {
             newPassword: string | null;
             refreshToken: string | null;
             currentPassword: string | null;
+        };
+        SetPropertyTimeZoneReceiptDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            operationId: string;
+            changeKind: components["schemas"]["PropertyTimeZoneChangeKind"];
+            requestedTimeZoneId: string | null;
+            previousTimeZoneId: string | null;
+            timeZoneId: string | null;
+            timeZoneStatus: components["schemas"]["PropertyTimeZoneStatus"];
+            catalogVersion: string | null;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: int64 */
+            version: number;
+            actorId: string | null;
+            /** Format: date-time */
+            completedAtUtc: string;
+        };
+        SetPropertyTimeZoneRequest: {
+            /** Format: uuid */
+            operationId: string;
+            timeZoneId: string | null;
+            confirmed: boolean;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         SignOutRequest: {
             refreshToken: string | null;
