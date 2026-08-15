@@ -6,14 +6,10 @@ import {
   type DataRightsAction,
   type DataRightsOperationKind,
 } from "./dataRightsWorkflow";
-
-export type PrivacyRequestConfirmation =
-  | "reject-verification"
-  | "approve"
-  | "deny"
-  | "execute-restriction"
-  | "execute-removal"
-  | "cancel";
+import type {
+  DataRightsConfirmationAction,
+  DataRightsConfirmationSnapshot,
+} from "./dataRightsConfirmation";
 
 export function PrivacyRequestActions({
   actions,
@@ -30,15 +26,22 @@ export function PrivacyRequestActions({
 }: {
   actions: DataRightsAction[];
   operationKind: DataRightsOperationKind;
-  confirmation: PrivacyRequestConfirmation | null;
+  confirmation: DataRightsConfirmationSnapshot | null;
   denialReason: string;
   destructiveConfirmation: string;
   pending: boolean;
-  onConfirmationChange: (value: PrivacyRequestConfirmation | null) => void;
+  onConfirmationChange: (value: DataRightsConfirmationAction | null) => void;
   onDenialReasonChange: (value: string) => void;
   onDestructiveConfirmationChange: (value: string) => void;
-  onPerform: (suffix: string, body?: Record<string, unknown>) => void;
-  onExecute: (operationKind: DataRightsOperationKind) => void;
+  onPerform: (
+    suffix: string,
+    body?: Record<string, unknown>,
+    expectedVersion?: number,
+  ) => void;
+  onExecute: (
+    operationKind: DataRightsOperationKind,
+    expectedVersion?: number,
+  ) => void;
 }) {
   if (actions.length === 0) return null;
 
@@ -174,13 +177,13 @@ export function PrivacyRequestActions({
 
       {confirmation && (
         <div className={`mt-4 rounded-lg border p-4 ${
-          confirmation === "execute-restriction"
+          confirmation.action === "execute-restriction"
             ? "border-primary/30 bg-primary/8"
             : "border-warning/30 bg-warning/8"
         }`}>
           <ConfirmationPanel
-            confirmation={confirmation}
-            operationKind={operationKind}
+            confirmation={confirmation.action}
+            operationKind={confirmation.operationKind}
             denialReason={denialReason}
             destructiveConfirmation={destructiveConfirmation}
             pending={pending}
@@ -188,19 +191,34 @@ export function PrivacyRequestActions({
             onDestructiveConfirmationChange={onDestructiveConfirmationChange}
             onCancel={() => onConfirmationChange(null)}
             onConfirm={() => {
-              if (confirmation === "reject-verification") {
-                onPerform("/requester-verification", { verified: false });
-              } else if (confirmation === "approve") {
-                onPerform("/decision/outcome", { decision: 1, reason: 1 });
-              } else if (confirmation === "deny") {
-                onPerform("/decision/outcome", {
-                  decision: 2,
-                  reason: Number(denialReason) as DataRightsDecisionReason,
-                });
-              } else if (confirmation === "cancel") {
-                onPerform("/cancel");
+              if (confirmation.action === "reject-verification") {
+                onPerform(
+                  "/requester-verification",
+                  { verified: false },
+                  confirmation.caseVersion,
+                );
+              } else if (confirmation.action === "approve") {
+                onPerform(
+                  "/decision/outcome",
+                  { decision: 1, reason: 1 },
+                  confirmation.caseVersion,
+                );
+              } else if (confirmation.action === "deny") {
+                onPerform(
+                  "/decision/outcome",
+                  {
+                    decision: 2,
+                    reason: Number(denialReason) as DataRightsDecisionReason,
+                  },
+                  confirmation.caseVersion,
+                );
+              } else if (confirmation.action === "cancel") {
+                onPerform("/cancel", {}, confirmation.caseVersion);
               } else {
-                onExecute(operationKind);
+                onExecute(
+                  confirmation.operationKind,
+                  confirmation.caseVersion,
+                );
               }
             }}
           />
@@ -221,7 +239,7 @@ function ConfirmationPanel({
   onCancel,
   onConfirm,
 }: {
-  confirmation: PrivacyRequestConfirmation;
+  confirmation: DataRightsConfirmationAction;
   operationKind: DataRightsOperationKind;
   denialReason: string;
   destructiveConfirmation: string;
@@ -292,7 +310,7 @@ function ConfirmationPanel({
 }
 
 function confirmationTitle(
-  confirmation: PrivacyRequestConfirmation,
+  confirmation: DataRightsConfirmationAction,
   operationKind: DataRightsOperationKind,
 ): string {
   if (confirmation === "reject-verification") return "Record failed identity verification?";
@@ -314,7 +332,7 @@ function confirmationTitle(
 }
 
 function confirmationDescription(
-  confirmation: PrivacyRequestConfirmation,
+  confirmation: DataRightsConfirmationAction,
   operationKind: DataRightsOperationKind,
 ): string {
   if (confirmation === "reject-verification") {

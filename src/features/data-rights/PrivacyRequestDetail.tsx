@@ -29,8 +29,13 @@ import { PrivacyRequestCorrection } from "./PrivacyRequestCorrection";
 import { PrivacyRequestExport } from "./PrivacyRequestExport";
 import {
   PrivacyRequestActions,
-  type PrivacyRequestConfirmation,
 } from "./PrivacyRequestActions";
+import {
+  createDataRightsConfirmation,
+  isDataRightsConfirmationCurrent,
+  type DataRightsConfirmationAction,
+  type DataRightsConfirmationSnapshot,
+} from "./dataRightsConfirmation";
 import {
   availableDataRightsActions,
   dataRightsCaseNeedsLiveRefresh,
@@ -66,7 +71,8 @@ export function PrivacyRequestDetail({
 }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
-  const [confirmation, setConfirmation] = useState<PrivacyRequestConfirmation | null>(null);
+  const [confirmation, setConfirmation] =
+    useState<DataRightsConfirmationSnapshot | null>(null);
   const [denialReason, setDenialReason] = useState("3");
   const [destructiveConfirmation, setDestructiveConfirmation] = useState("");
   const [restrictionExecution, setRestrictionExecution] =
@@ -116,6 +122,22 @@ export function PrivacyRequestDetail({
   const actions = useMemo(
     () => dataRightsCase ? availableDataRightsActions(dataRightsCase, capabilities) : [],
     [capabilities, dataRightsCase],
+  );
+  const visibleActions = useMemo(
+    () => actions.filter((action) =>
+      action !== "generate-export" && action !== "execute-correction"),
+    [actions],
+  );
+  const activeConfirmation = useMemo(
+    () => confirmation && dataRightsCase && isDataRightsConfirmationCurrent(
+      confirmation,
+      dataRightsCase,
+      operationKind,
+      visibleActions,
+    )
+      ? confirmation
+      : null,
+    [confirmation, dataRightsCase, operationKind, visibleActions],
   );
 
   const updateCase = useCallback(async (updated: DataRightsCase) => {
@@ -168,6 +190,7 @@ export function PrivacyRequestDetail({
     ),
     onSuccess: async (updated) => {
       setConfirmation(null);
+      setDestructiveConfirmation("");
       await updateCase(updated);
     },
     onError: async () => {
@@ -176,10 +199,10 @@ export function PrivacyRequestDetail({
   });
   const executeMutation = useMutation({
     mutationFn: ({
-      currentCase,
+      expectedVersion,
       fingerprint,
     }: {
-      currentCase: DataRightsCase;
+      expectedVersion: number;
       fingerprint: string;
     }) => {
       if (!operationAttempt.current || operationAttempt.current.fingerprint !== fingerprint) {
@@ -192,7 +215,7 @@ export function PrivacyRequestDetail({
         method: "POST",
         body: JSON.stringify({
           idempotencyKey: operationAttempt.current.idempotencyKey,
-          expectedVersion: currentCase.version,
+          expectedVersion,
         }),
       });
     },
@@ -209,10 +232,10 @@ export function PrivacyRequestDetail({
   });
   const restrictionMutation = useMutation({
     mutationFn: ({
-      currentCase,
+      expectedVersion,
       fingerprint,
     }: {
-      currentCase: DataRightsCase;
+      expectedVersion: number;
       fingerprint: string;
     }) => {
       if (!operationAttempt.current || operationAttempt.current.fingerprint !== fingerprint) {
@@ -225,7 +248,7 @@ export function PrivacyRequestDetail({
         method: "POST",
         body: JSON.stringify({
           idempotencyKey: operationAttempt.current.idempotencyKey,
-          expectedVersion: currentCase.version,
+          expectedVersion,
         }),
       });
     },
@@ -251,6 +274,13 @@ export function PrivacyRequestDetail({
   }, [caseId, scopeKey]);
 
   useEffect(() => {
+    if (!confirmation || activeConfirmation) return;
+    setConfirmation(null);
+    setDenialReason("3");
+    setDestructiveConfirmation("");
+  }, [activeConfirmation, confirmation]);
+
+  useEffect(() => {
     const workItems = execution.data?.workItems;
     if (!workItems?.length || dataRightsExecutionBatchNeedsLiveRefresh(workItems)) return;
     const terminalKey = workItems
@@ -262,29 +292,57 @@ export function PrivacyRequestDetail({
     void refreshAffectedProjectionState();
   }, [execution.data?.workItems, refreshAffectedProjectionState]);
 
-  function perform(suffix: string, body: Record<string, unknown> = {}) {
+  function perform(
+    suffix: string,
+    body: Record<string, unknown> = {},
+    expectedVersion?: number,
+  ) {
     if (!dataRightsCase) return;
     actionMutation.mutate({
       suffix,
-      body: { ...body, expectedVersion: dataRightsCase.version },
+      body: {
+        ...body,
+        expectedVersion: expectedVersion ?? dataRightsCase.version,
+      },
     });
   }
 
-  function execute(selectedOperation: DataRightsOperationKind) {
+  function execute(
+    selectedOperation: DataRightsOperationKind,
+    expectedVersion?: number,
+  ) {
     if (!dataRightsCase) return;
+    const reviewedVersion = expectedVersion ?? dataRightsCase.version;
     const fingerprint =
-      `${selectedOperation}:${dataRightsCase.id}:${dataRightsCase.version}`;
+      `${selectedOperation}:${dataRightsCase.id}:${reviewedVersion}`;
     if (selectedOperation.startsWith("restriction")) {
       restrictionMutation.mutate({
-        currentCase: dataRightsCase,
+        expectedVersion: reviewedVersion,
         fingerprint,
       });
       return;
     }
     executeMutation.mutate({
-      currentCase: dataRightsCase,
+      expectedVersion: reviewedVersion,
       fingerprint,
     });
+  }
+
+  function changeConfirmation(
+    action: DataRightsConfirmationAction | null,
+  ) {
+    setDenialReason("3");
+    setDestructiveConfirmation("");
+    if (!action || !dataRightsCase || !visibleActions.includes(action)) {
+      setConfirmation(null);
+      return;
+    }
+
+    setConfirmation(createDataRightsConfirmation(
+      action,
+      dataRightsCase,
+      operationKind,
+    ));
   }
 
   return (
@@ -383,10 +441,9 @@ export function PrivacyRequestDetail({
               )}
 
               <PrivacyRequestActions
-                actions={actions.filter((action) =>
-                  action !== "generate-export" && action !== "execute-correction")}
+                actions={visibleActions}
                 operationKind={operationKind}
-                confirmation={confirmation}
+                confirmation={activeConfirmation}
                 denialReason={denialReason}
                 destructiveConfirmation={destructiveConfirmation}
                 pending={
@@ -394,7 +451,7 @@ export function PrivacyRequestDetail({
                   executeMutation.isPending ||
                   restrictionMutation.isPending
                 }
-                onConfirmationChange={setConfirmation}
+                onConfirmationChange={changeConfirmation}
                 onDenialReasonChange={setDenialReason}
                 onDestructiveConfirmationChange={setDestructiveConfirmation}
                 onPerform={perform}
