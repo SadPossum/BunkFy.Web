@@ -94,6 +94,35 @@ describe("privacy request workflow", () => {
     }), allCapabilities)).not.toContain("review");
   });
 
+  it("requires a selected target for current restriction-release cases", () => {
+    const currentRelease = {
+      status: 2,
+      requestedOperations: DATA_RIGHTS_RESTRICTION,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_RELEASE,
+      selectedSubjectCount: 1,
+      restrictionTargetingContractVersion: 1,
+    } satisfies Partial<DataRightsCase>;
+
+    expect(availableDataRightsActions(dataRightsCase({
+      ...currentRelease,
+      restrictionReleaseTarget: null,
+    }), allCapabilities)).not.toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      ...currentRelease,
+      restrictionReleaseTarget: {
+        ownerKey: "guests",
+        ownerOperationId: "8d000000-0000-0000-0000-000000000020",
+        ownerOperationVersion: 4,
+        selectedAtUtc: "2026-08-15T12:00:00Z",
+      },
+    }), allCapabilities)).toContain("review");
+    expect(availableDataRightsActions(dataRightsCase({
+      ...currentRelease,
+      restrictionTargetingContractVersion: null,
+      restrictionReleaseTarget: null,
+    }), allCapabilities)).toContain("review");
+  });
+
   it("requires exactly one selected subject before correction review", () => {
     expect(availableDataRightsActions(dataRightsCase({
       status: 2,
@@ -183,6 +212,13 @@ describe("privacy request workflow", () => {
       ...allCapabilities,
       restrict: false,
     })).toEqual([]);
+    expect(dataRightsRequestLabel({ ...approved, type: 3 }))
+      .toBe("Limit staff data processing");
+    expect(dataRightsRequestLabel({
+      ...approved,
+      type: 3,
+      restrictionDirective: DATA_RIGHTS_RESTRICTION_RELEASE,
+    })).toBe("Release staff processing limit");
   });
 
   it("uses a dedicated capability and action for correction execution", () => {
@@ -322,6 +358,9 @@ function dataRightsCase(overrides: Partial<DataRightsCase>): DataRightsCase {
     lastChangedAtUtc: "2026-07-25T10:00:00Z",
     approvalEvidence: null,
     responseDeadlineEvidence: null,
+    restrictionTargetingContractVersion: null,
+    restrictionReleaseTarget: null,
+    restrictionExecutionProof: null,
     ...overrides,
   };
 }

@@ -275,8 +275,16 @@ export function dataRightsRequestLabel(
       ? "Correct staff data"
       : "Correct guest data";
   }
-  if (operationKind === "restriction-apply") return "Limit guest data processing";
-  if (operationKind === "restriction-release") return "Release guest processing limit";
+  if (operationKind === "restriction-apply") {
+    return Number(dataRightsCase.type) === 3
+      ? "Limit staff data processing"
+      : "Limit guest data processing";
+  }
+  if (operationKind === "restriction-release") {
+    return Number(dataRightsCase.type) === 3
+      ? "Release staff processing limit"
+      : "Release guest processing limit";
+  }
   if (operationKind === "removal") {
     return Number(dataRightsCase.type) === 3
       ? "Staff data removal"
@@ -345,7 +353,12 @@ export function availableDataRightsActions(
       isDataRightsCorrection(dataRightsCase)
       ? dataRightsCase.selectedSubjectCount === 1
       : dataRightsCase.selectedSubjectCount > 0;
-    if (selectionReady && capabilities.review) {
+    const targetSelected = dataRightsOperationKind(dataRightsCase) !== "restriction-release" ||
+      dataRightsCase.restrictionTargetingContractVersion === null ||
+      dataRightsCase.restrictionTargetingContractVersion === undefined ||
+      (dataRightsCase.restrictionReleaseTarget !== null &&
+        dataRightsCase.restrictionReleaseTarget !== undefined);
+    if (selectionReady && targetSelected && capabilities.review) {
       actions.push("review");
     }
   }

@@ -19,7 +19,11 @@ import {
   type DataRightsDiscoveryLookupKind,
   type DataRightsDiscoveryOwner,
 } from "./dataRightsDiscoveryAttempt";
-import { isDataRightsRestriction } from "./dataRightsWorkflow";
+import { PrivacyRequestRestrictionTarget } from "./PrivacyRequestRestrictionTarget";
+import {
+  dataRightsOperationKind,
+  isDataRightsRestriction,
+} from "./dataRightsWorkflow";
 
 const ownerOptions = [
   { value: "guests", label: "Guest record" },
@@ -35,6 +39,8 @@ export function PrivacyRequestDiscovery({
   selectedLoading,
   onCaseUpdated,
   refreshSelected,
+  refreshCase,
+  onRestrictionTargetCurrentChange,
 }: {
   basePath: string;
   scopeKind: "guest" | "staff";
@@ -43,9 +49,15 @@ export function PrivacyRequestDiscovery({
   selectedLoading: boolean;
   onCaseUpdated: (updated: DataRightsCase) => Promise<void>;
   refreshSelected: () => Promise<unknown>;
+  refreshCase: () => Promise<unknown>;
+  onRestrictionTargetCurrentChange: (current: boolean) => void;
 }) {
   const { request } = useSession();
   const restriction = isDataRightsRestriction(dataRightsCase);
+  const targetBoundRelease =
+    dataRightsOperationKind(dataRightsCase) === "restriction-release" &&
+    dataRightsCase.restrictionTargetingContractVersion !== null &&
+    dataRightsCase.restrictionTargetingContractVersion !== undefined;
   const singleSubject = scopeKind === "staff" || restriction;
   const [ownerKey, setOwnerKey] = useState<DataRightsDiscoveryOwner>(
     scopeKind === "staff" ? "staff" : restriction ? "guests" : "reservations",
@@ -262,6 +274,16 @@ export function PrivacyRequestDiscovery({
             </div>
           ))}
         </div>
+      )}
+
+      {targetBoundRelease && dataRightsCase.selectedSubjectCount === 1 && (
+        <PrivacyRequestRestrictionTarget
+          basePath={basePath}
+          dataRightsCase={dataRightsCase}
+          onCaseUpdated={onCaseUpdated}
+          refreshCase={refreshCase}
+          onCurrentChange={onRestrictionTargetCurrentChange}
+        />
       )}
 
       {singleSubject && dataRightsCase.selectedSubjectCount === 1

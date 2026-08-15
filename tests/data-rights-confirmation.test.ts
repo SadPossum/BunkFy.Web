@@ -29,6 +29,8 @@ describe("Data Rights confirmation", () => {
       caseStatus: 5,
       selectedSubjectCount: 1,
       operationKind: "removal",
+      restrictionTargetId: null,
+      restrictionTargetVersion: null,
     });
   });
 
@@ -83,6 +85,39 @@ describe("Data Rights confirmation", () => {
     )).toBe(false);
   });
 
+  it("invalidates a confirmation when the reviewed restriction target changes", () => {
+    const releaseCase = {
+      ...dataRightsCase,
+      restrictionReleaseTarget: {
+        ownerKey: "guests",
+        ownerOperationId: "8d000000-0000-0000-0000-000000000020",
+        ownerOperationVersion: 4,
+        selectedAtUtc: "2026-08-15T12:00:00Z",
+      },
+    };
+    const confirmation = createDataRightsConfirmation(
+      "execute-restriction",
+      releaseCase,
+      "restriction-release",
+    );
+
+    expect(confirmation.restrictionTargetId).toBe(
+      releaseCase.restrictionReleaseTarget.ownerOperationId,
+    );
+    expect(isDataRightsConfirmationCurrent(
+      confirmation,
+      {
+        ...releaseCase,
+        restrictionReleaseTarget: {
+          ...releaseCase.restrictionReleaseTarget,
+          ownerOperationVersion: 5,
+        },
+      },
+      "restriction-release",
+      ["execute-restriction"],
+    )).toBe(false);
+  });
+
   it("pins rendering and submission to the reviewed version", () => {
     const detail = readFileSync(join(
       process.cwd(),
@@ -102,6 +137,7 @@ describe("Data Rights confirmation", () => {
     expect(detail).toContain("isDataRightsConfirmationCurrent");
     expect(detail).toContain("confirmation={activeConfirmation}");
     expect(detail).toContain("expectedVersion ?? dataRightsCase.version");
+    expect(detail).toContain("dataRightsCase.restrictionExecutionProof");
     expect(actionsSource).toContain("confirmation.caseVersion");
     expect(actionsSource).not.toContain("confirmation={confirmation}");
   });

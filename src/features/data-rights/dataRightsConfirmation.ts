@@ -19,6 +19,8 @@ export type DataRightsConfirmationSnapshot = {
   caseStatus: DataRightsCase["status"];
   selectedSubjectCount: number;
   operationKind: DataRightsOperationKind;
+  restrictionTargetId: string | null;
+  restrictionTargetVersion: number | null;
 };
 
 export function createDataRightsConfirmation(
@@ -33,6 +35,10 @@ export function createDataRightsConfirmation(
     caseStatus: dataRightsCase.status,
     selectedSubjectCount: dataRightsCase.selectedSubjectCount,
     operationKind,
+    restrictionTargetId:
+      dataRightsCase.restrictionReleaseTarget?.ownerOperationId ?? null,
+    restrictionTargetVersion:
+      dataRightsCase.restrictionReleaseTarget?.ownerOperationVersion ?? null,
   };
 }
 
@@ -47,5 +53,9 @@ export function isDataRightsConfirmationCurrent(
     confirmation.caseStatus === dataRightsCase.status &&
     confirmation.selectedSubjectCount === dataRightsCase.selectedSubjectCount &&
     confirmation.operationKind === operationKind &&
+    confirmation.restrictionTargetId ===
+      (dataRightsCase.restrictionReleaseTarget?.ownerOperationId ?? null) &&
+    confirmation.restrictionTargetVersion ===
+      (dataRightsCase.restrictionReleaseTarget?.ownerOperationVersion ?? null) &&
     actions.includes(confirmation.action);
 }

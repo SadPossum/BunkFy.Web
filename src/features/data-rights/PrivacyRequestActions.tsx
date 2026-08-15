@@ -10,6 +10,7 @@ import type {
   DataRightsConfirmationAction,
   DataRightsConfirmationSnapshot,
 } from "./dataRightsConfirmation";
+import { shortRestrictionTargetId } from "./dataRightsRestrictionTarget";
 
 export function PrivacyRequestActions({
   actions,
@@ -186,6 +187,8 @@ export function PrivacyRequestActions({
             operationKind={confirmation.operationKind}
             denialReason={denialReason}
             destructiveConfirmation={destructiveConfirmation}
+            restrictionTargetId={confirmation.restrictionTargetId}
+            restrictionTargetVersion={confirmation.restrictionTargetVersion}
             pending={pending}
             onDenialReasonChange={onDenialReasonChange}
             onDestructiveConfirmationChange={onDestructiveConfirmationChange}
@@ -233,6 +236,8 @@ function ConfirmationPanel({
   operationKind,
   denialReason,
   destructiveConfirmation,
+  restrictionTargetId,
+  restrictionTargetVersion,
   pending,
   onDenialReasonChange,
   onDestructiveConfirmationChange,
@@ -243,6 +248,8 @@ function ConfirmationPanel({
   operationKind: DataRightsOperationKind;
   denialReason: string;
   destructiveConfirmation: string;
+  restrictionTargetId: string | null;
+  restrictionTargetVersion: number | null;
   pending: boolean;
   onDenialReasonChange: (value: string) => void;
   onDestructiveConfirmationChange: (value: string) => void;
@@ -256,10 +263,20 @@ function ConfirmationPanel({
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning-content" />
         <div>
           <p className="text-sm font-semibold">
-            {confirmationTitle(confirmation, operationKind)}
+            {confirmationTitle(
+              confirmation,
+              operationKind,
+              restrictionTargetId,
+              restrictionTargetVersion,
+            )}
           </p>
           <p className="mt-1 text-xs leading-5 text-base-content/55">
-            {confirmationDescription(confirmation, operationKind)}
+            {confirmationDescription(
+              confirmation,
+              operationKind,
+              restrictionTargetId,
+              restrictionTargetVersion,
+            )}
           </p>
         </div>
       </div>
@@ -312,13 +329,19 @@ function ConfirmationPanel({
 function confirmationTitle(
   confirmation: DataRightsConfirmationAction,
   operationKind: DataRightsOperationKind,
+  restrictionTargetId: string | null,
+  restrictionTargetVersion: number | null,
 ): string {
   if (confirmation === "reject-verification") return "Record failed identity verification?";
   if (confirmation === "approve") {
     if (operationKind === "export") return "Approve this protected data export?";
     if (operationKind === "correction") return "Approve correction of the selected record?";
     if (operationKind === "restriction-apply") return "Approve a processing limit?";
-    if (operationKind === "restriction-release") return "Approve releasing the processing limit?";
+    if (operationKind === "restriction-release") {
+      return restrictionTargetLabel(restrictionTargetId, restrictionTargetVersion)
+        ? `Approve releasing target ${restrictionTargetLabel(restrictionTargetId, restrictionTargetVersion)}?`
+        : "Approve releasing the processing limit?";
+    }
     return "Approve permanent data removal?";
   }
   if (confirmation === "deny") return "Deny this privacy request?";
@@ -326,7 +349,7 @@ function confirmationTitle(
   if (confirmation === "execute-restriction") {
     return operationKind === "restriction-release"
       ? "Release the active processing limit?"
-      : "Apply a processing limit to this guest?";
+      : "Apply a processing limit to this record?";
   }
   return "Permanently remove the selected personal data?";
 }
@@ -334,7 +357,10 @@ function confirmationTitle(
 function confirmationDescription(
   confirmation: DataRightsConfirmationAction,
   operationKind: DataRightsOperationKind,
+  restrictionTargetId: string | null,
+  restrictionTargetVersion: number | null,
 ): string {
+  const target = restrictionTargetLabel(restrictionTargetId, restrictionTargetVersion);
   if (confirmation === "reject-verification") {
     return "The request cannot continue after verification is recorded as failed.";
   }
@@ -346,10 +372,12 @@ function confirmationDescription(
       return "Approval is pinned to one selected record and revision. An authorized operator must then enter the corrected values through the owning module.";
     }
     if (operationKind === "restriction-apply") {
-      return "The approval is pinned to one Guest Record and one record revision. Existing processing limits remain independently effective.";
+      return "The approval is pinned to one selected owner record and revision. Existing processing limits remain independently effective.";
     }
     if (operationKind === "restriction-release") {
-      return "The approval is pinned to one Guest Record. Execution fails closed unless exactly one active processing limit can be released.";
+      return target
+        ? `The approval is pinned to target ${target}. Releasing it may leave another independent processing restriction active.`
+        : "This legacy request can continue only when the owner still has exactly one unambiguous active processing restriction.";
     }
     return "Policy eligibility is checked by the server. A different authorized staff member must execute the approved request.";
   }
@@ -361,10 +389,21 @@ function confirmationDescription(
   }
   if (confirmation === "execute-restriction") {
     return operationKind === "restriction-release"
-      ? "BunkFy releases only one unambiguous active obligation and records a durable owner receipt."
-      : "BunkFy adds a reversible obligation in the Guests module and records a durable owner receipt.";
+      ? target
+        ? `BunkFy releases only target ${target} and records a durable owner receipt. Another independent restriction may remain active.`
+        : "BunkFy releases only the one unambiguous legacy obligation and records a durable owner receipt."
+      : "BunkFy adds a reversible obligation in the owning module and records a durable owner receipt.";
   }
   return "This is irreversible on ordinary product surfaces. Recent authentication and a different executor are enforced by the server.";
+}
+
+function restrictionTargetLabel(
+  restrictionTargetId: string | null,
+  restrictionTargetVersion: number | null,
+): string | null {
+  return restrictionTargetId && restrictionTargetVersion
+    ? `${shortRestrictionTargetId(restrictionTargetId)} v${restrictionTargetVersion}`
+    : null;
 }
 
 function approvalLabel(operationKind: DataRightsOperationKind): string {

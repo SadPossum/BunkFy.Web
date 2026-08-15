@@ -2382,6 +2382,94 @@
         }
       }
     },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction/release-targets": {
+      "get": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRestrictionReleaseTargetListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction/release-target": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectDataRightsRestrictionReleaseTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction": {
       "post": {
         "tags": [
@@ -3294,6 +3382,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DataRightsExecutionDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data-rights/tenant/cases/{caseId}/restriction/release-targets": {
+      "get": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsRestrictionReleaseTargetListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data-rights/tenant/cases/{caseId}/restriction/release-target": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectDataRightsRestrictionReleaseTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsCaseDto"
                 }
               }
             }
@@ -13951,6 +14109,17 @@
           },
           "responseDeadlineEvidence": {
             "$ref": "#/components/schemas/DataRightsResponseDeadlineEvidence"
+          },
+          "restrictionTargetingContractVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "restrictionReleaseTarget": {
+            "$ref": "#/components/schemas/DataRightsRestrictionReleaseTargetDto"
+          },
+          "restrictionExecutionProof": {
+            "$ref": "#/components/schemas/DataRightsRestrictionExecutionProofDto"
           }
         },
         "additionalProperties": false
@@ -14719,6 +14888,70 @@
           "completedAtUtc": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsRestrictionReleaseTargetCandidateDto": {
+        "type": "object",
+        "properties": {
+          "ownerOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerOperationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sourceCaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appliedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsRestrictionReleaseTargetDto": {
+        "type": "object",
+        "properties": {
+          "ownerKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerOperationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "selectedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DataRightsRestrictionReleaseTargetListResponse": {
+        "type": "object",
+        "properties": {
+          "caseVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataRightsRestrictionReleaseTargetCandidateDto"
+            },
+            "nullable": true
+          },
+          "limitReached": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -19910,6 +20143,24 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SelectDataRightsRestrictionReleaseTargetRequest": {
+        "type": "object",
+        "properties": {
+          "ownerOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerOperationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false

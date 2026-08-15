@@ -504,13 +504,32 @@ export type DataRightsResponseDeadlineEvidence = NonNullableFields<
   | "ruleReference"
   | "timeZoneId"
 >;
+export type DataRightsRestrictionReleaseTarget = NonNullableFields<
+  Schema<"DataRightsRestrictionReleaseTargetDto">,
+  "ownerKey"
+>;
+export type DataRightsRestrictionReleaseTargetCandidate =
+  Schema<"DataRightsRestrictionReleaseTargetCandidateDto">;
+export type DataRightsRestrictionReleaseTargetListResponse = Omit<
+  Schema<"DataRightsRestrictionReleaseTargetListResponse">,
+  "targets"
+> & {
+  targets: DataRightsRestrictionReleaseTargetCandidate[];
+};
+export type DataRightsRestrictionExecutionProof =
+  Schema<"DataRightsRestrictionExecutionProofDto">;
 
 export type DataRightsCase = Omit<
   Schema<"DataRightsCaseDto">,
-  "approvalEvidence" | "responseDeadlineEvidence"
+  | "approvalEvidence"
+  | "responseDeadlineEvidence"
+  | "restrictionReleaseTarget"
+  | "restrictionExecutionProof"
 > & {
   approvalEvidence: Schema<"DataRightsApprovalEvidence"> | null;
   responseDeadlineEvidence: DataRightsResponseDeadlineEvidence | null;
+  restrictionReleaseTarget: DataRightsRestrictionReleaseTarget | null;
+  restrictionExecutionProof: DataRightsRestrictionExecutionProof | null;
 };
 export type DataRightsCaseSummary = Schema<"DataRightsCaseSummaryDto">;
 export type DataRightsCaseListResponse = Omit<Schema<"DataRightsCaseListResponse">, "items"> & {
@@ -556,8 +575,6 @@ export type DataRightsExecution = Omit<
   workItems: DataRightsExecutionWorkItem[];
 };
 export type DataRightsExportArtifact = Schema<"DataRightsExportArtifactDto">;
-export type DataRightsRestrictionExecutionProof =
-  Schema<"DataRightsRestrictionExecutionProofDto">;
 export type DataRightsRestrictionExecution = Omit<
   Schema<"DataRightsRestrictionExecutionDto">,
   "case" | "proof"

@@ -7,6 +7,7 @@ import {
   PencilLine,
   Search,
   ShieldCheck,
+  Target,
   TriangleAlert,
   UserCheck,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import {
   type DataRightsConfirmationAction,
   type DataRightsConfirmationSnapshot,
 } from "./dataRightsConfirmation";
+import { shortRestrictionTargetId } from "./dataRightsRestrictionTarget";
 import {
   availableDataRightsActions,
   dataRightsCaseNeedsLiveRefresh,
@@ -77,6 +79,10 @@ export function PrivacyRequestDetail({
   const [destructiveConfirmation, setDestructiveConfirmation] = useState("");
   const [restrictionExecution, setRestrictionExecution] =
     useState<DataRightsRestrictionExecution | null>(null);
+  const [validatedRestrictionTarget, setValidatedRestrictionTarget] = useState<{
+    caseId: string;
+    caseVersion: number;
+  } | null>(null);
   const operationAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
   const observedTerminalExecution = useRef<string | null>(null);
   const scopeKey = dataRightsScopeKey(scope);
@@ -123,10 +129,23 @@ export function PrivacyRequestDetail({
     () => dataRightsCase ? availableDataRightsActions(dataRightsCase, capabilities) : [],
     [capabilities, dataRightsCase],
   );
+  const restrictionTargetValidationRequired = Boolean(
+    dataRightsCase &&
+    operationKind === "restriction-release" &&
+    dataRightsCase.restrictionTargetingContractVersion !== null &&
+    dataRightsCase.restrictionTargetingContractVersion !== undefined,
+  );
+  const restrictionTargetCurrent = Boolean(
+    dataRightsCase &&
+    validatedRestrictionTarget?.caseId === dataRightsCase.id &&
+    validatedRestrictionTarget.caseVersion === dataRightsCase.version,
+  );
   const visibleActions = useMemo(
     () => actions.filter((action) =>
-      action !== "generate-export" && action !== "execute-correction"),
-    [actions],
+      action !== "generate-export" &&
+      action !== "execute-correction" &&
+      !(action === "review" && restrictionTargetValidationRequired && !restrictionTargetCurrent)),
+    [actions, restrictionTargetCurrent, restrictionTargetValidationRequired],
   );
   const activeConfirmation = useMemo(
     () => confirmation && dataRightsCase && isDataRightsConfirmationCurrent(
@@ -144,6 +163,17 @@ export function PrivacyRequestDetail({
     queryClient.setQueryData(["data-rights-case", scopeKey, updated.id], updated);
     await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
   }, [queryClient, scopeKey]);
+
+  const updateRestrictionTargetCurrent = useCallback((current: boolean) => {
+    if (!current || !dataRightsCase) {
+      setValidatedRestrictionTarget(null);
+      return;
+    }
+    setValidatedRestrictionTarget({
+      caseId: dataRightsCase.id,
+      caseVersion: dataRightsCase.version,
+    });
+  }, [dataRightsCase]);
 
   const refreshCaseState = useCallback(async () => {
     await Promise.all([
@@ -376,6 +406,8 @@ export function PrivacyRequestDetail({
                   selectedLoading={selected.isLoading}
                   onCaseUpdated={updateCase}
                   refreshSelected={() => selected.refetch()}
+                  refreshCase={() => caseQuery.refetch()}
+                  onRestrictionTargetCurrentChange={updateRestrictionTargetCurrent}
                 />
               )}
 
@@ -407,6 +439,10 @@ export function PrivacyRequestDetail({
                       )
                       : null}
                 </section>
+              )}
+
+              {status !== "discovery" && operationKind === "restriction-release" && (
+                <RestrictionTargetSummary dataRightsCase={dataRightsCase} />
               )}
 
               {operationKind === "export" &&
@@ -488,6 +524,11 @@ function RequestSummary({
   restrictionExecution: DataRightsRestrictionExecution | null;
   scopeKind: DataRightsRequestScope["kind"];
 }) {
+  const restrictionProof = restrictionExecution?.proof ??
+    dataRightsCase.restrictionExecutionProof;
+  const restrictionOutcome = restrictionProof
+    ? restrictionOutcomeSummary(restrictionProof.directive, restrictionProof.effectiveRestricted)
+    : null;
   return (
     <section className="rounded-lg bg-base-200 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -535,22 +576,80 @@ function RequestSummary({
           </div>
         </div>
       )}
-      {restrictionExecution && (
+      {restrictionProof && restrictionOutcome && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-4 text-sm">
           <div>
-            <p className="font-semibold">Processing limit receipt</p>
+            <p className="font-semibold">{restrictionOutcome.title}</p>
             <p className="mt-1 text-xs text-base-content/50">
-              Owner revision {restrictionExecution.proof.resultingOwnerRevision} -
-              projection revision {restrictionExecution.proof.resultingProjectionRevision}
+              {restrictionOutcome.description} Owner revision {restrictionProof.resultingOwnerRevision} -
+              projection revision {restrictionProof.resultingProjectionRevision}.
             </p>
           </div>
-          <StatusBadge
-            status={restrictionExecution.proof.effectiveRestricted ? "Applied" : "Released"}
-          />
+          <StatusBadge status={restrictionOutcome.status} />
         </div>
       )}
     </section>
   );
+}
+
+function RestrictionTargetSummary({ dataRightsCase }: { dataRightsCase: DataRightsCase }) {
+  const target = dataRightsCase.restrictionReleaseTarget;
+  return (
+    <section className="border-t border-base-300 pt-5">
+      <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
+        <Target size={17} className="text-primary" />
+        Reviewed processing limit
+      </h3>
+      {target
+        ? (
+          <dl className="mt-3 grid gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:grid-cols-3">
+            <DeadlineCoordinate
+              label="Target"
+              value={shortRestrictionTargetId(target.ownerOperationId)}
+            />
+            <DeadlineCoordinate
+              label="Owner version"
+              value={String(target.ownerOperationVersion)}
+            />
+            <DeadlineCoordinate
+              label="Selected"
+              value={formatDateTime(target.selectedAtUtc)}
+            />
+          </dl>
+        )
+        : (
+          <p className="mt-3 rounded-lg border border-warning/25 bg-warning/8 px-4 py-3 text-sm text-base-content/65">
+            This legacy release case predates target binding. It can release only one
+            unambiguous active processing restriction.
+          </p>
+        )}
+    </section>
+  );
+}
+
+function restrictionOutcomeSummary(
+  directive: number,
+  effectiveRestricted: boolean,
+): { title: string; description: string; status: string } {
+  if (directive === 2 && effectiveRestricted) {
+    return {
+      title: "Selected restriction released",
+      description: "Another processing restriction remains active.",
+      status: "Still restricted",
+    };
+  }
+  if (directive === 2) {
+    return {
+      title: "Restriction released",
+      description: "No other active processing restriction remains for this owner record.",
+      status: "Released",
+    };
+  }
+  return {
+    title: "Processing restriction applied",
+    description: "The selected owner record remains processing-restricted.",
+    status: "Applied",
+  };
 }
 
 function ResponseDeadlineSummary({ dataRightsCase }: { dataRightsCase: DataRightsCase }) {

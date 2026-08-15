@@ -2676,6 +2676,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction/release-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsRestrictionReleaseTargetListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction/release-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SelectDataRightsRestrictionReleaseTargetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/restriction": {
         parameters: {
             query?: never;
@@ -3524,6 +3604,84 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["DataRightsExecutionDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/tenant/cases/{caseId}/restriction/release-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsRestrictionReleaseTargetListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/tenant/cases/{caseId}/restriction/release-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SelectDataRightsRestrictionReleaseTargetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsCaseDto"];
                     };
                 };
             };
@@ -11853,6 +12011,10 @@ export interface components {
             lastChangedAtUtc: string;
             approvalEvidence: components["schemas"]["DataRightsApprovalEvidence"];
             responseDeadlineEvidence: components["schemas"]["DataRightsResponseDeadlineEvidence"];
+            /** Format: int32 */
+            restrictionTargetingContractVersion: number | null;
+            restrictionReleaseTarget: components["schemas"]["DataRightsRestrictionReleaseTargetDto"];
+            restrictionExecutionProof: components["schemas"]["DataRightsRestrictionExecutionProofDto"];
         };
         DataRightsCaseListResponse: {
             items: components["schemas"]["DataRightsCaseSummaryDto"][] | null;
@@ -12160,6 +12322,31 @@ export interface components {
             effectiveRestricted: boolean;
             /** Format: date-time */
             completedAtUtc: string;
+        };
+        DataRightsRestrictionReleaseTargetCandidateDto: {
+            /** Format: uuid */
+            ownerOperationId: string;
+            /** Format: int64 */
+            ownerOperationVersion: number;
+            /** Format: uuid */
+            sourceCaseId: string;
+            /** Format: date-time */
+            appliedAtUtc: string;
+        };
+        DataRightsRestrictionReleaseTargetDto: {
+            ownerKey: string | null;
+            /** Format: uuid */
+            ownerOperationId: string;
+            /** Format: int64 */
+            ownerOperationVersion: number;
+            /** Format: date-time */
+            selectedAtUtc: string;
+        };
+        DataRightsRestrictionReleaseTargetListResponse: {
+            /** Format: int64 */
+            caseVersion: number;
+            targets: components["schemas"]["DataRightsRestrictionReleaseTargetCandidateDto"][] | null;
+            limitReached: boolean;
         };
         /**
          * Format: int32
@@ -14083,6 +14270,14 @@ export interface components {
             expectedVersion: number;
             /** Format: int32 */
             replacementLifetimeHours: number | null;
+        };
+        SelectDataRightsRestrictionReleaseTargetRequest: {
+            /** Format: uuid */
+            ownerOperationId: string;
+            /** Format: int64 */
+            ownerOperationVersion: number;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         SelectDataRightsSubjectRequest: {
             coordinate: components["schemas"]["DataRightsSubjectCoordinate"];
