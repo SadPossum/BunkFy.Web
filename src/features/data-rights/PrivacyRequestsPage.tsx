@@ -8,7 +8,7 @@ import {
   TriangleAlert,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import type {
   DataRightsCase,
@@ -61,6 +61,10 @@ import {
   type DataRightsOperationKind,
   type DataRightsRequestScope,
 } from "./dataRightsWorkflow";
+import {
+  resolveDataRightsCaseCreateAttempt,
+  type DataRightsCaseCreateAttempt,
+} from "./dataRightsCaseCreateAttempt";
 import { PrivacyRequestDetail } from "./PrivacyRequestDetail";
 
 const PAGE_SIZE = 20;
@@ -456,6 +460,7 @@ function CreatePrivacyRequestModal({
   onCreated: (created: DataRightsCase) => Promise<void>;
 }) {
   const { request } = useSession();
+  const createAttempt = useRef<DataRightsCaseCreateAttempt | null>(null);
   const [purpose, setPurpose] = useState<DataRightsOperationKind>("export");
   const [relationship, setRelationship] = useState("1");
   const operationKind = purpose;
@@ -471,27 +476,45 @@ function CreatePrivacyRequestModal({
     : operationKind === "restriction-release"
       ? DATA_RIGHTS_RESTRICTION_RELEASE
       : 0;
+  const requesterRelationship = Number(relationship) as DataRightsRequesterRelationship;
+  const scopeKey = dataRightsScopeKey(scope);
   const mutation = useMutation({
-    mutationFn: () => request<DataRightsCase>(
-      dataRightsCasesPath(scope),
-      {
-        method: "POST",
-        body: JSON.stringify({
+    mutationFn: () => {
+      createAttempt.current = resolveDataRightsCaseCreateAttempt(
+        createAttempt.current,
+        {
+          scopeKey,
           requestedOperations,
           restrictionDirective,
-          requesterRelationship: Number(relationship) as DataRightsRequesterRelationship,
-        }),
-      },
-    ),
-    onSuccess: onCreated,
+          requesterRelationship,
+        },
+      );
+      return request<DataRightsCase>(
+        dataRightsCasesPath(scope),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            operationId: createAttempt.current.operationId,
+            requestedOperations,
+            restrictionDirective,
+            requesterRelationship,
+          }),
+        },
+      );
+    },
+    onSuccess: async (created) => {
+      await onCreated(created);
+      createAttempt.current = null;
+    },
   });
 
   useEffect(() => {
     if (!open) return;
+    createAttempt.current = null;
     setPurpose("export");
     setRelationship("1");
     mutation.reset();
-  }, [open, scope.kind]);
+  }, [open, scopeKey]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

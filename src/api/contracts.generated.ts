@@ -11299,6 +11299,8 @@ export interface components {
             secretReference: string | null;
         };
         CreateDataRightsCaseRequest: {
+            /** Format: uuid */
+            operationId: string;
             requestedOperations: components["schemas"]["DataRightsOperation"];
             restrictionDirective: components["schemas"]["DataRightsRestrictionDirective"];
             requesterRelationship: components["schemas"]["DataRightsRequesterRelationship"];

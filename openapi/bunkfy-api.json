@@ -13046,6 +13046,10 @@
       "CreateDataRightsCaseRequest": {
         "type": "object",
         "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "requestedOperations": {
             "$ref": "#/components/schemas/DataRightsOperation"
           },
