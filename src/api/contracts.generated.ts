@@ -11909,7 +11909,8 @@ export interface components {
             approvalRevision: number;
             subject: components["schemas"]["DataRightsSubjectCoordinate"];
             fieldPolicyKey: string | null;
-            executedBy: string | null;
+            claimedBy: string | null;
+            isCurrentActor: boolean;
             /** Format: date-time */
             startedAtUtc: string;
             /** Format: date-time */

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { ApiError } from "../src/api/client";
 import type {
   DataRightsCorrectionExecutionDetails,
@@ -10,7 +12,9 @@ import {
   buildGuestCorrectionRequest,
   buildReservationCorrectionRequest,
   buildWorkspaceStaffOnboardingCorrectionRequest,
+  canEditCorrectionClaim,
   correctionCaseStatus,
+  correctionClaimAction,
   correctionClaimExpired,
   correctionErrorMessage,
   correctionExecutionStatus,
@@ -23,6 +27,7 @@ import {
   workspaceStaffOnboardingCorrectionTargetPath,
   workspaceStaffOnboardingCorrectionValues,
 } from "../src/features/data-rights/dataRightsCorrectionWorkflow";
+import { CorrectionClaimWindow } from "../src/features/data-rights/PrivacyRequestCorrection";
 
 describe("data-rights correction operator workflow", () => {
   it("builds a Guest owner request bound to the claim and approved revision", () => {
@@ -136,6 +141,50 @@ describe("data-rights correction operator workflow", () => {
       .toBe(false);
   });
 
+  it("keeps active claims exclusive and offers the correct recovery action", () => {
+    const activeAt = Date.parse("2026-07-27T12:05:00Z");
+    const expiredAt = Date.parse("2026-07-27T12:10:00Z");
+    const foreignExecution = { ...guestExecution, isCurrentActor: false };
+
+    expect(canEditCorrectionClaim(guestExecution, activeAt)).toBe(true);
+    expect(canEditCorrectionClaim(foreignExecution, activeAt)).toBe(false);
+    expect(correctionClaimAction(guestExecution, activeAt)).toBe("none");
+    expect(correctionClaimAction(foreignExecution, activeAt)).toBe("none");
+
+    expect(canEditCorrectionClaim(guestExecution, expiredAt)).toBe(false);
+    expect(canEditCorrectionClaim(foreignExecution, expiredAt)).toBe(false);
+    expect(correctionClaimAction(guestExecution, expiredAt)).toBe("renew");
+    expect(correctionClaimAction(foreignExecution, expiredAt)).toBe("takeover");
+    expect(correctionClaimAction(
+      { ...guestExecution, status: 2 },
+      expiredAt,
+    )).toBe("none");
+  });
+
+  it("renders a foreign claim as held until its takeover window opens", () => {
+    const foreignExecution = { ...guestExecution, isCurrentActor: false };
+    const active = renderToStaticMarkup(createElement(CorrectionClaimWindow, {
+      execution: foreignExecution,
+      expired: false,
+      action: "none",
+      renewing: false,
+      onRenew: () => undefined,
+    }));
+    const expired = renderToStaticMarkup(createElement(CorrectionClaimWindow, {
+      execution: foreignExecution,
+      expired: true,
+      action: "takeover",
+      renewing: false,
+      onRenew: () => undefined,
+    }));
+
+    expect(active).toContain("Correction claim held by another operator");
+    expect(active).toContain("operator-b");
+    expect(active).not.toContain("Take over window");
+    expect(expired).toContain("Editing window available for takeover");
+    expect(expired).toContain("Take over window");
+  });
+
   it("never exposes server detail or entered values in correction errors", () => {
     const sensitive = new ApiError(
       "Maya Chen and maya@example.test caused a conflict",
@@ -152,6 +201,23 @@ describe("data-rights correction operator workflow", () => {
     );
     expect(correctionErrorMessage(sensitive)).not.toContain("Maya");
     expect(correctionErrorMessage(unknown)).not.toContain("Late arrival");
+  });
+
+  it("distinguishes unavailable correction owners from invalid composition", () => {
+    expect(correctionErrorMessage(new ApiError(
+      "owner unavailable",
+      503,
+      "DataRights.CorrectionOwnerUnavailable",
+    ))).toBe(
+      "The correction owner is temporarily unavailable. Wait a moment and try again.",
+    );
+    expect(correctionErrorMessage(new ApiError(
+      "duplicate owner",
+      500,
+      "DataRights.CorrectionOwnerCatalogInvalid",
+    ))).toBe(
+      "Correction processing is not configured correctly. Contact a system administrator.",
+    );
   });
 });
 
@@ -202,7 +268,8 @@ const guestExecution: DataRightsCorrectionExecutionDetails = {
     recordVersion: 12,
   },
   fieldPolicyKey: "guests.profile.correction.v1",
-  executedBy: "operator-b",
+  claimedBy: "operator-b",
+  isCurrentActor: true,
   startedAtUtc: "2026-07-27T12:00:00Z",
   expiresAtUtc: "2026-07-27T12:10:00Z",
   status: 1,

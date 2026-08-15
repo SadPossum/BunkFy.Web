@@ -14096,9 +14096,12 @@
             "type": "string",
             "nullable": true
           },
-          "executedBy": {
+          "claimedBy": {
             "type": "string",
             "nullable": true
+          },
+          "isCurrentActor": {
+            "type": "boolean"
           },
           "startedAtUtc": {
             "type": "string",

@@ -216,8 +216,36 @@ export function correctionClaimExpired(
   );
 }
 
+export type CorrectionClaimAction = "none" | "renew" | "takeover";
+
+export function correctionClaimAction(
+  execution: DataRightsCorrectionExecutionDetails | undefined,
+  now: number,
+): CorrectionClaimAction {
+  if (!execution || !correctionClaimExpired(execution, now)) return "none";
+  return execution.isCurrentActor ? "renew" : "takeover";
+}
+
+export function canEditCorrectionClaim(
+  execution: DataRightsCorrectionExecutionDetails | undefined,
+  now: number,
+): boolean {
+  return Boolean(
+    execution &&
+    execution.isCurrentActor &&
+    correctionExecutionStatus(execution.status) === "claimed" &&
+    !correctionClaimExpired(execution, now),
+  );
+}
+
 export function correctionErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.code === "DataRights.CorrectionOwnerUnavailable") {
+      return "The correction owner is temporarily unavailable. Wait a moment and try again.";
+    }
+    if (error.code === "DataRights.CorrectionOwnerCatalogInvalid") {
+      return "Correction processing is not configured correctly. Contact a system administrator.";
+    }
     if (
       error.code === "DataRights.CorrectionExecutionConflict" ||
       error.code === "DataRights.VersionConflict" ||

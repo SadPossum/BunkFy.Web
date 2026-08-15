@@ -23,7 +23,9 @@ import { GuestCorrectionForm } from "./GuestCorrectionForm";
 import { ReservationCorrectionForm } from "./ReservationCorrectionForm";
 import { WorkspaceStaffOnboardingCorrectionForm } from "./WorkspaceStaffOnboardingCorrectionForm";
 import {
+  canEditCorrectionClaim,
   correctionCaseStatus,
+  correctionClaimAction,
   correctionClaimExpired,
   correctionExecutionStatus,
   isSelectedCorrectionRevisionCurrent,
@@ -71,6 +73,8 @@ export function PrivacyRequestCorrection({
   const execution = correction.data;
   const completed = correctionExecutionStatus(execution?.status) === "completed";
   const expired = correctionClaimExpired(execution, now);
+  const claimAction = correctionClaimAction(execution, now);
+  const canEdit = canEditCorrectionClaim(execution, now);
   const start = useMutation({
     mutationFn: (existing?: DataRightsCorrectionExecutionDetails) =>
       request<DataRightsCorrectionExecution>(`${basePath}/correction`, {
@@ -93,10 +97,17 @@ export function PrivacyRequestCorrection({
   }, [dataRightsCase.id]);
 
   useEffect(() => {
-    if (!execution || completed) return;
-    const interval = window.setInterval(() => setNow(Date.now()), 15_000);
-    return () => window.clearInterval(interval);
-  }, [completed, execution]);
+    if (!execution || completed || expired) return;
+    const delay = Math.max(
+      0,
+      new Date(execution.expiresAtUtc).getTime() - Date.now(),
+    );
+    const timeout = window.setTimeout(
+      () => setNow(Date.now()),
+      delay + 25,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [completed, execution, expired]);
 
   useEffect(() => {
     if (status === "completed" && canExecute) void correction.refetch();
@@ -175,19 +186,20 @@ export function PrivacyRequestCorrection({
               ? <CorrectionCompletion execution={execution} />
               : (
                 <div className="mt-4 space-y-4">
-                  <ClaimWindow
+                  <CorrectionClaimWindow
                     execution={execution}
                     expired={expired}
+                    action={claimAction}
                     renewing={start.isPending}
                     onRenew={() => start.mutate(execution)}
                   />
                   {appliedReceipt
                     ? <CompletionPending receipt={appliedReceipt} />
-                    : (
+                    : canEdit && (
                       <CorrectionOwnerEditor
                         propertyId={propertyId}
                         execution={execution}
-                        disabled={expired}
+                        disabled={false}
                         onApplied={ownerApplied}
                       />
                     )}
@@ -241,17 +253,36 @@ function CorrectionStart({
   );
 }
 
-function ClaimWindow({
+export function CorrectionClaimWindow({
   execution,
   expired,
+  action,
   renewing,
   onRenew,
 }: {
   execution: DataRightsCorrectionExecutionDetails;
   expired: boolean;
+  action: "none" | "renew" | "takeover";
   renewing: boolean;
   onRenew: () => void;
 }) {
+  const ownedByCurrentActor = execution.isCurrentActor;
+  const ownerReference = execution.claimedBy || "another operator";
+  const title = expired
+    ? ownedByCurrentActor
+      ? "Your editing window expired"
+      : "Editing window available for takeover"
+    : ownedByCurrentActor
+      ? "Your correction claim is active"
+      : "Correction claim held by another operator";
+  const detail = expired
+    ? ownedByCurrentActor
+      ? "Renew with recent authentication before submitting corrected values."
+      : `The claim held by ${ownerReference} has expired. Take it over with recent authentication to continue.`
+    : ownedByCurrentActor
+      ? `Your editing window is available until ${formatDateTime(execution.expiresAtUtc)}.`
+      : `Claimed by ${ownerReference} until ${formatDateTime(execution.expiresAtUtc)}. Editing is unavailable until the claim expires.`;
+
   return (
     <div className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
       expired
@@ -262,16 +293,14 @@ function ClaimWindow({
         <Clock3 size={18} className={`mt-0.5 shrink-0 ${expired ? "text-warning" : "text-primary"}`} />
         <div>
           <p className="text-sm font-semibold">
-            {expired ? "Editing window expired" : "Correction claim active"}
+            {title}
           </p>
-          <p className="mt-1 text-xs leading-5 text-base-content/55">
-            {expired
-              ? "Renew with recent authentication before submitting corrected values."
-              : `Available until ${formatDateTime(execution.expiresAtUtc)}.`}
+          <p className="mt-1 max-w-2xl break-words text-xs leading-5 text-base-content/55">
+            {detail}
           </p>
         </div>
       </div>
-      {expired && (
+      {action !== "none" && (
         <button
           type="button"
           className="btn btn-primary btn-sm shrink-0"
@@ -281,7 +310,7 @@ function ClaimWindow({
           {renewing
             ? <span className="loading loading-spinner loading-xs" />
             : <RefreshCw size={15} />}
-          Renew window
+          {action === "renew" ? "Renew window" : "Take over window"}
         </button>
       )}
     </div>
