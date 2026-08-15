@@ -2846,6 +2846,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/export/{artifactId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    caseId: string;
+                    artifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RetryDataRightsExportRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExportArtifactDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/export/{artifactId}/download": {
         parameters: {
             query?: never;
@@ -3636,6 +3679,48 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["RequestDataRightsExportRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRightsExportArtifactDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-rights/tenant/cases/{caseId}/export/{artifactId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    caseId: string;
+                    artifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RetryDataRightsExportRequest"];
                 };
             };
             responses: {
@@ -13436,6 +13521,12 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             cascadeBeds: boolean;
+        };
+        RetryDataRightsExportRequest: {
+            /** Format: int64 */
+            expectedCaseVersion: number;
+            /** Format: int64 */
+            expectedArtifactVersion: number;
         };
         RetryRetirementRequest: {
             /** Format: uuid */

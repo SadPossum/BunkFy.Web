@@ -12,6 +12,12 @@ import {
   dataRightsExportStatusKey,
   dataRightsExportStatusLabel,
 } from "./dataRightsWorkflow";
+import {
+  dataRightsExportGenerationRequest,
+  resolveDataRightsExportGenerationAttempt,
+  type DataRightsExportGenerationAttempt,
+  type DataRightsExportGenerationIntent,
+} from "./dataRightsExportGenerationAttempt";
 
 export function PrivacyRequestExport({
   basePath,
@@ -34,7 +40,7 @@ export function PrivacyRequestExport({
   const [stepUpError, setStepUpError] = useState<unknown>(null);
   const [showPasswordStepUp, setShowPasswordStepUp] = useState(false);
   const [downloadNeedsMfa, setDownloadNeedsMfa] = useState(false);
-  const generationAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
+  const generationAttempt = useRef<DataRightsExportGenerationAttempt | null>(null);
   const observedTerminal = useRef<string | null>(null);
   const artifactQueryKey = ["data-rights-export", scopeKey, dataRightsCase.id] as const;
   const artifact = useQuery({
@@ -54,30 +60,22 @@ export function PrivacyRequestExport({
     refetchIntervalInBackground: false,
   });
   const generation = useMutation({
-    mutationFn: () => {
-      const fingerprint = [
-        dataRightsCase.id,
-        dataRightsCase.decisionRevision ?? "none",
-        dataRightsCase.selectedSubjectCount,
-      ].join(":");
-      if (
-        !generationAttempt.current ||
-        generationAttempt.current.fingerprint !== fingerprint
-      ) {
-        generationAttempt.current = {
-          fingerprint,
-          idempotencyKey: crypto.randomUUID(),
-        };
-      }
-      return request<DataRightsExportArtifact>(`${basePath}/export`, {
+    mutationFn: (intent: DataRightsExportGenerationIntent) => {
+      generationAttempt.current = resolveDataRightsExportGenerationAttempt(
+        generationAttempt.current,
+        intent,
+      );
+      const generationRequest = dataRightsExportGenerationRequest(
+        basePath,
+        generationAttempt.current,
+      );
+      return request<DataRightsExportArtifact>(generationRequest.path, {
         method: "POST",
-        body: JSON.stringify({
-          idempotencyKey: generationAttempt.current.idempotencyKey,
-          expectedVersion: dataRightsCase.version,
-        }),
+        body: JSON.stringify(generationRequest.body),
       });
     },
     onSuccess: (result) => {
+      generationAttempt.current = null;
       setPassword("");
       setShowPasswordStepUp(false);
       setStepUpError(null);
@@ -86,6 +84,8 @@ export function PrivacyRequestExport({
     onError: (error) => {
       if (isInsufficientAuthenticationError(error)) {
         setShowPasswordStepUp(true);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: artifactQueryKey });
       }
     },
   });
@@ -136,8 +136,13 @@ export function PrivacyRequestExport({
     setStepUpError(null);
     try {
       await stepUpWithPassword(password);
+      if (!generationAttempt.current) {
+        throw new Error("The export generation attempt is no longer available.");
+      }
+
+      const intent = generationAttempt.current.intent;
       generation.reset();
-      generation.mutate();
+      generation.mutate(intent);
     } catch (error) {
       setStepUpError(error);
     }
@@ -154,6 +159,13 @@ export function PrivacyRequestExport({
     !isInsufficientAuthenticationError(downloadArtifact.error)
     ? downloadArtifact.error
     : null;
+  const createIntent: DataRightsExportGenerationIntent = {
+    kind: "create",
+    caseId: dataRightsCase.id,
+    decisionRevision: dataRightsCase.decisionRevision,
+    selectedSubjectCount: dataRightsCase.selectedSubjectCount,
+    expectedCaseVersion: dataRightsCase.version,
+  };
 
   return (
     <section className="border-t border-base-300 pt-5">
@@ -190,7 +202,7 @@ export function PrivacyRequestExport({
                   type="button"
                   className="btn btn-primary btn-sm"
                   disabled={busy}
-                  onClick={() => generation.mutate()}
+                  onClick={() => generation.mutate(createIntent)}
                 >
                   <FileCheck2 size={15} />
                   Generate export
@@ -205,7 +217,7 @@ export function PrivacyRequestExport({
               action={<span className="loading loading-spinner loading-sm text-primary" />}
             />
           )}
-          {status === "failed" && (
+          {status === "failed" && current && (
             <ExportAction
               title="Generation did not finish"
               description="Retry keeps the approved case scope and creates no second artifact."
@@ -214,7 +226,13 @@ export function PrivacyRequestExport({
                   type="button"
                   className="btn btn-primary btn-sm"
                   disabled={generation.isPending}
-                  onClick={() => generation.mutate()}
+                  onClick={() => generation.mutate({
+                    kind: "retry",
+                    caseId: dataRightsCase.id,
+                    artifactId: current.id,
+                    expectedCaseVersion: dataRightsCase.version,
+                    expectedArtifactVersion: current.version,
+                  })}
                 >
                   <RefreshCw size={15} />
                   Retry generation
@@ -264,7 +282,9 @@ export function PrivacyRequestExport({
           <div className="flex items-start gap-3">
             <KeyRound size={18} className="mt-0.5 shrink-0 text-warning-content" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Confirm your password to generate this export</p>
+              <p className="text-sm font-semibold">
+                Confirm your password to {generationAttempt.current?.intent.kind === "retry" ? "retry" : "generate"} this export
+              </p>
               <p className="mt-1 text-xs leading-5 text-base-content/55">
                 Generation requires a recent privileged sign-in.
               </p>
@@ -283,7 +303,7 @@ export function PrivacyRequestExport({
                   className="btn btn-primary btn-sm"
                   disabled={!password || generation.isPending}
                 >
-                  Confirm and generate
+                  Confirm and {generationAttempt.current?.intent.kind === "retry" ? "retry" : "generate"}
                 </button>
               </div>
             </div>

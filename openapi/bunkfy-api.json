@@ -2603,6 +2603,64 @@
         }
       }
     },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/export/{artifactId}/retry": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "artifactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryDataRightsExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsExportArtifactDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/export/{artifactId}/download": {
       "get": {
         "tags": [
@@ -3400,6 +3458,55 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RequestDataRightsExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsExportArtifactDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data-rights/tenant/cases/{caseId}/export/{artifactId}/retry": {
+      "post": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "artifactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryDataRightsExportRequest"
               }
             }
           },
@@ -18738,6 +18845,20 @@
           },
           "cascadeBeds": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetryDataRightsExportRequest": {
+        "type": "object",
+        "properties": {
+          "expectedCaseVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedArtifactVersion": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
