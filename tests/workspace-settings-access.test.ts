@@ -12,6 +12,7 @@ describe("workspace settings access", () => {
       profilesManage: true,
       staffOnboardingManage: true,
       retentionRead: true,
+      retentionRetry: false,
     });
 
     expect(access.canReadMembers).toBe(false);
@@ -25,6 +26,7 @@ describe("workspace settings access", () => {
       profilesManage: false,
       staffOnboardingManage: false,
       retentionRead: false,
+      retentionRetry: false,
     });
 
     expect(access.canReadRoles).toBe(true);
@@ -39,6 +41,7 @@ describe("workspace settings access", () => {
       profilesManage: false,
       staffOnboardingManage: true,
       retentionRead: false,
+      retentionRetry: false,
     });
     const delegatedManager = resolveWorkspaceSettingsCapabilities({
       owner: false,
@@ -46,6 +49,7 @@ describe("workspace settings access", () => {
       profilesManage: false,
       staffOnboardingManage: true,
       retentionRead: false,
+      retentionRetry: false,
     });
 
     expect(withoutProfiles.canManageInvites).toBe(false);
@@ -60,8 +64,32 @@ describe("workspace settings access", () => {
       profilesManage: false,
       staffOnboardingManage: false,
       retentionRead: false,
+      retentionRetry: false,
     });
 
     expect(Object.values(access).every(Boolean)).toBe(true);
+  });
+
+  it("separates retention visibility from recovery authority", () => {
+    const reader = resolveWorkspaceSettingsCapabilities({
+      owner: false,
+      profilesRead: false,
+      profilesManage: false,
+      staffOnboardingManage: false,
+      retentionRead: true,
+      retentionRetry: false,
+    });
+    const operator = resolveWorkspaceSettingsCapabilities({
+      owner: false,
+      profilesRead: false,
+      profilesManage: false,
+      staffOnboardingManage: false,
+      retentionRead: true,
+      retentionRetry: true,
+    });
+
+    expect(reader.canReadRetention).toBe(true);
+    expect(reader.canRetryRetention).toBe(false);
+    expect(operator.canRetryRetention).toBe(true);
   });
 });

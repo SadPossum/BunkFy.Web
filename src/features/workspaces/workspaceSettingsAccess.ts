@@ -11,6 +11,7 @@ export type WorkspaceSettingsCapabilities = {
   canManageRoles: boolean;
   canManageInvites: boolean;
   canReadRetention: boolean;
+  canRetryRetention: boolean;
 };
 
 export function resolveWorkspaceSettingsCapabilities({
@@ -19,12 +20,14 @@ export function resolveWorkspaceSettingsCapabilities({
   profilesManage,
   staffOnboardingManage,
   retentionRead,
+  retentionRetry,
 }: {
   owner: boolean;
   profilesRead: boolean;
   profilesManage: boolean;
   staffOnboardingManage: boolean;
   retentionRead: boolean;
+  retentionRetry: boolean;
 }): WorkspaceSettingsCapabilities {
   return {
     canReadMembers: owner,
@@ -32,6 +35,7 @@ export function resolveWorkspaceSettingsCapabilities({
     canManageRoles: owner || profilesManage,
     canManageInvites: owner || (staffOnboardingManage && profilesRead),
     canReadRetention: owner || retentionRead,
+    canRetryRetention: owner || retentionRetry,
   };
 }
 

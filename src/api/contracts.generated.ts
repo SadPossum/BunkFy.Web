@@ -9515,6 +9515,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/retention/runs/{runId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RetryRetentionScheduleRequest"];
+                };
+            };
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RetentionRunRetryReceiptDto"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Locked */
+                423: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/staff/me": {
         parameters: {
             query?: never;
@@ -14024,6 +14110,29 @@ export interface components {
          * @enum {integer}
          */
         RetentionExecutionStatus: 0 | 1 | 2 | 3 | 4 | 5;
+        RetentionRunRetryReceiptDto: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: int64 */
+            evidenceVersion: number;
+            /** Format: int32 */
+            attempt: number;
+            status: components["schemas"]["RetentionRunRetryStatus"];
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            scheduledAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+            failureCode: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RetentionRunRetryStatus: 1 | 2 | 3;
         RetentionScheduleHealthDto: {
             ownerKey: string | null;
             dataClassKey: string | null;
@@ -14032,6 +14141,8 @@ export interface components {
             propertyId: string | null;
             /** Format: int32 */
             executionPolicyVersion: number;
+            /** Format: int64 */
+            evidenceVersion: number;
             status: components["schemas"]["RetentionExecutionStatus"];
             /** Format: uuid */
             lastRunId: string | null;
@@ -14053,6 +14164,7 @@ export interface components {
             outcomeCode: string | null;
             /** Format: date-time */
             holdReviewDueAtUtc: string | null;
+            retry: components["schemas"]["RetentionRunRetryReceiptDto"];
         };
         RetentionScheduleHealthListResponse: {
             items: components["schemas"]["RetentionScheduleHealthDto"][] | null;
@@ -14101,6 +14213,18 @@ export interface components {
             expectedCaseVersion: number;
             /** Format: int64 */
             expectedArtifactVersion: number;
+        };
+        RetryRetentionScheduleRequest: {
+            confirmed: boolean;
+            ownerKey: string | null;
+            dataClassKey: string | null;
+            targetScopeKind: components["schemas"]["RetentionTargetScopeKind"];
+            /** Format: uuid */
+            propertyId: string | null;
+            /** Format: int32 */
+            executionPolicyVersion: number;
+            /** Format: int64 */
+            evidenceVersion: number;
         };
         RetryRetirementRequest: {
             /** Format: uuid */

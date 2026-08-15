@@ -50,6 +50,7 @@ export function WorkspaceSettingsPage() {
       { permission: permissions.accessProfilesManage, scope: tenantScope },
       { permission: permissions.workspaceStaffOnboardingManage, scope: tenantScope },
       { permission: permissions.retentionRead, scope: tenantScope },
+      { permission: permissions.retentionRetry, scope: tenantScope },
     ]
     : []);
   const permissionsLoading = !owner && permissionAccess.isLoading;
@@ -62,6 +63,7 @@ export function WorkspaceSettingsPage() {
       tenantScope,
     ),
     retentionRead: permissionAccess.allows(permissions.retentionRead, tenantScope),
+    retentionRetry: permissionAccess.allows(permissions.retentionRetry, tenantScope),
   });
   const members = useQuery({
     queryKey: ["organizations", workspace?.organizationId, "members", memberPage],
@@ -168,7 +170,9 @@ export function WorkspaceSettingsPage() {
               onMembershipChanged={refreshWorkspace}
             />
           )}
-          {tab === "retention" && capabilities.canReadRetention && <RetentionHealthSettings />}
+          {tab === "retention" && capabilities.canReadRetention && (
+            <RetentionHealthSettings canRetry={capabilities.canRetryRetention} />
+          )}
         </div>
       </section>
     </div>

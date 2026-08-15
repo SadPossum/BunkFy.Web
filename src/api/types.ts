@@ -197,12 +197,28 @@ export type IssueWorkspaceEnrollmentLinkRequest =
   Schema<"IssueWorkspaceEnrollmentLinkRequest">;
 
 export type RetentionExecutionStatus = Schema<"RetentionExecutionStatus">;
+export type RetentionRunRetryStatus = Schema<"RetentionRunRetryStatus">;
 export type RetentionTargetScopeKind = Schema<"RetentionTargetScopeKind">;
 
-export type RetentionScheduleHealth = NonNullableFields<
-  Schema<"RetentionScheduleHealthDto">,
+export type RetentionRunRetryReceipt = NonNullableFields<
+  Schema<"RetentionRunRetryReceiptDto">,
+  "requestId" | "runId"
+>;
+
+export type RetryRetentionScheduleRequest = NonNullableFields<
+  Schema<"RetryRetentionScheduleRequest">,
   "ownerKey" | "dataClassKey"
 >;
+
+export type RetentionScheduleHealth = Omit<
+  NonNullableFields<
+    Schema<"RetentionScheduleHealthDto">,
+    "ownerKey" | "dataClassKey"
+  >,
+  "retry"
+> & {
+  retry: RetentionRunRetryReceipt | null;
+};
 
 export type RetentionScheduleHealthSummary =
   Schema<"RetentionScheduleHealthSummaryDto">;

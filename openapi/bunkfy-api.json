@@ -9862,6 +9862,96 @@
         }
       }
     },
+    "/api/retention/runs/{runId}/retry": {
+      "post": {
+        "tags": [
+          "Retention"
+        ],
+        "parameters": [
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryRetentionScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionRunRetryReceiptDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/staff/me": {
       "get": {
         "tags": [
@@ -19500,6 +19590,58 @@
         "type": "integer",
         "format": "int32"
       },
+      "RetentionRunRetryReceiptDto": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "evidenceVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RetentionRunRetryStatus"
+          },
+          "requestedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scheduledAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetentionRunRetryStatus": {
+        "enum": [
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "RetentionScheduleHealthDto": {
         "type": "object",
         "properties": {
@@ -19522,6 +19664,10 @@
           "executionPolicyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "evidenceVersion": {
+            "type": "integer",
+            "format": "int64"
           },
           "status": {
             "$ref": "#/components/schemas/RetentionExecutionStatus"
@@ -19575,6 +19721,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "retry": {
+            "$ref": "#/components/schemas/RetentionRunRetryReceiptDto"
           }
         },
         "additionalProperties": false
@@ -19691,6 +19840,39 @@
             "format": "int64"
           },
           "expectedArtifactVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetryRetentionScheduleRequest": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "ownerKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "dataClassKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetScopeKind": {
+            "$ref": "#/components/schemas/RetentionTargetScopeKind"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "executionPolicyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evidenceVersion": {
             "type": "integer",
             "format": "int64"
           }

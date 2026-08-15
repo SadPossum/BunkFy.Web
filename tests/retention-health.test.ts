@@ -3,6 +3,9 @@ import type { RetentionScheduleHealth } from "../src/api/types";
 import {
   humanizeRetentionKey,
   retentionNeedsAttention,
+  retentionOutcomeGuidance,
+  retentionRetryFailureGuidance,
+  retentionRetryStatusLabel,
   retentionStatusLabel,
   summarizeRetentionHealth,
 } from "../src/features/workspaces/retentionHealth";
@@ -17,6 +20,7 @@ function schedule(
     targetScopeKind: 1,
     propertyId: null,
     executionPolicyVersion: 1,
+    evidenceVersion: 0,
     status,
     lastRunId: null,
     lastStartedAtUtc: null,
@@ -29,11 +33,14 @@ function schedule(
     lastRemainingCount: null,
     outcomeCode: null,
     holdReviewDueAtUtc: null,
+    retry: null,
   };
 }
 
 describe("retention health", () => {
-  it("treats overdue, blocked and failed schedules as attention", () => {
+  it("treats missing evidence, overdue, blocked and failed schedules as attention", () => {
+    expect(retentionNeedsAttention(schedule(0))).toBe(true);
+    expect(retentionNeedsAttention(schedule(1))).toBe(true);
     expect(retentionNeedsAttention(schedule(3, true))).toBe(true);
     expect(retentionNeedsAttention(schedule(4))).toBe(true);
     expect(retentionNeedsAttention(schedule(5))).toBe(true);
@@ -50,12 +57,24 @@ describe("retention health", () => {
       total: 4,
       healthy: 1,
       running: 1,
-      needsAttention: 1,
+      needsAttention: 2,
     });
   });
 
   it("maps stable codes to readable labels", () => {
     expect(retentionStatusLabel(4)).toBe("blocked");
     expect(humanizeRetentionKey("raw-source-evidence")).toBe("Raw Source Evidence");
+  });
+
+  it("keeps stable codes while providing operator guidance", () => {
+    const failed = {
+      ...schedule(5),
+      outcomeCode: "retention.owner-timeout",
+    };
+
+    expect(retentionOutcomeGuidance(failed)).toContain("did not finish in time");
+    expect(retentionRetryStatusLabel(2)).toBe("accepted");
+    expect(retentionRetryFailureGuidance("task-run-state-changed"))
+      .toContain("changed before the retry");
   });
 });
