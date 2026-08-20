@@ -8995,6 +8995,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reservations/properties/{propertyId}/operations-snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    LocalDate?: string;
+                    UpcomingLimit?: number;
+                };
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationOperationsSnapshotDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations/properties/{propertyId}": {
         parameters: {
             query?: never;
@@ -9104,6 +9144,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reservations/properties/{propertyId}/stay-amendments/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    cursorOutcome?: components["schemas"]["ReservationStayAmendmentOutcome"];
+                    cursorUpdatedAtUtc?: string;
+                    cursorOperationId?: string;
+                    cursorReservationId?: string;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    propertyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationStayAmendmentRecoveryPageDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reservations/properties/{propertyId}/{reservationId}": {
         parameters: {
             query?: never;
@@ -9176,6 +9259,72 @@ export interface paths {
             };
         };
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reservations/properties/{propertyId}/{reservationId}/stay-amendments/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    reservationId: string;
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationStayAmendmentReceiptDto"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    reservationId: string;
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AmendReservationStayRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationStayAmendmentReceiptDto"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -9261,6 +9410,49 @@ export interface paths {
             };
         };
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reservations/properties/{propertyId}/{reservationId}/stay-amendments/{operationId}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    reservationId: string;
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReconcileReservationStayAmendmentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReservationStayAmendmentReceiptDto"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -11551,6 +11743,19 @@ export interface components {
         AdapterTypeCapabilityListResponse: {
             adapterTypes: components["schemas"]["AdapterTypeCapabilityDto"][] | null;
         };
+        AmendReservationStayRequest: {
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
+            inventoryUnitIds: string[] | null;
+            /** Format: int64 */
+            expectedDetailsRevision: number;
+        };
         ApplyGuestProcessingRestrictionRequest: {
             /** Format: uuid */
             idempotencyKey: string;
@@ -13703,6 +13908,10 @@ export interface components {
             /** Format: int64 */
             expectedDetailsRevision: number;
         };
+        ReconcileReservationStayAmendmentRequest: {
+            /** Format: int64 */
+            expectedOperationVersion: number;
+        };
         RecordDataRightsDecisionRequest: {
             decision: components["schemas"]["DataRightsDecisionOutcome"];
             reason: components["schemas"]["DataRightsDecisionReason"];
@@ -14084,6 +14293,48 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        ReservationOperationsAttentionCountsDto: {
+            pendingAllocation: components["schemas"]["ReservationOperationsCountDto"];
+            allocationRejected: components["schemas"]["ReservationOperationsCountDto"];
+            cancellationPending: components["schemas"]["ReservationOperationsCountDto"];
+            noShowPending: components["schemas"]["ReservationOperationsCountDto"];
+            checkoutPending: components["schemas"]["ReservationOperationsCountDto"];
+            arrivalBeforeLocalDateStillConfirmed: components["schemas"]["ReservationOperationsCountDto"];
+            departureBeforeLocalDateStillInHouse: components["schemas"]["ReservationOperationsCountDto"];
+            total: components["schemas"]["ReservationOperationsCountDto"];
+        };
+        ReservationOperationsCohortCountsDto: {
+            confirmedArrivalsOnLocalDate: components["schemas"]["ReservationOperationsCountDto"];
+            scheduledDeparturesOnLocalDate: components["schemas"]["ReservationOperationsCountDto"];
+            currentlyInHouse: components["schemas"]["ReservationOperationsCountDto"];
+        };
+        ReservationOperationsCountDto: {
+            /** Format: int64 */
+            reservationCount: number;
+            /** Format: int64 */
+            guestCount: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ReservationOperationsDateSource: 0 | 1 | 2;
+        ReservationOperationsSnapshotDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: date */
+            localDate: string;
+            timeZoneId: string | null;
+            dateSource: components["schemas"]["ReservationOperationsDateSource"];
+            /** Format: date-time */
+            observedAtUtc: string;
+            cohorts: components["schemas"]["ReservationOperationsCohortCountsDto"];
+            attention: components["schemas"]["ReservationOperationsAttentionCountsDto"];
+            upcoming: components["schemas"]["ReservationListItemDto"][] | null;
+            /** Format: int32 */
+            upcomingLimit: number;
+            hasMoreUpcoming: boolean;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -14094,6 +14345,85 @@ export interface components {
          * @enum {integer}
          */
         ReservationStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ReservationStayAmendmentOutcome: 0 | 1 | 2 | 3 | 4;
+        ReservationStayAmendmentReceiptDto: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            reservationId: string;
+            target: components["schemas"]["ReservationStayAmendmentTargetDto"];
+            outcome: components["schemas"]["ReservationStayAmendmentOutcome"];
+            /** Format: int64 */
+            expectedDetailsRevision: number;
+            /** Format: int64 */
+            operationVersion: number;
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+            /** Format: int64 */
+            resultingDetailsRevision: number | null;
+            /** Format: int64 */
+            resultingReservationVersion: number | null;
+            rejectionReason: components["schemas"]["InventoryAllocationRejectionReason"];
+            /** Format: int32 */
+            reconciliationCount: number;
+            /** Format: date-time */
+            lastReconciledAtUtc: string | null;
+            recoveryEligible: boolean;
+            /** Format: date-time */
+            nextRecoveryEligibleAtUtc: string | null;
+        };
+        ReservationStayAmendmentRecoveryCursorDto: {
+            outcome: components["schemas"]["ReservationStayAmendmentOutcome"];
+            /** Format: date-time */
+            updatedAtUtc: string;
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            reservationId: string;
+        };
+        ReservationStayAmendmentRecoveryItemDto: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            reservationId: string;
+            outcome: components["schemas"]["ReservationStayAmendmentOutcome"];
+            /** Format: int64 */
+            operationVersion: number;
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string;
+            recoveryEligible: boolean;
+            /** Format: date-time */
+            nextRecoveryEligibleAtUtc: string | null;
+        };
+        ReservationStayAmendmentRecoveryPageDto: {
+            operations: components["schemas"]["ReservationStayAmendmentRecoveryItemDto"][] | null;
+            nextCursor: components["schemas"]["ReservationStayAmendmentRecoveryCursorDto"];
+        };
+        ReservationStayAmendmentTargetDto: {
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            /** Format: time */
+            expectedArrivalTime: string | null;
+            /** Format: time */
+            expectedDepartureTime: string | null;
+            inventoryUnitIds: string[] | null;
+        };
         ResetConnectionCheckpointRequest: {
             /** Format: uuid */
             operationId: string;

@@ -9240,6 +9240,52 @@
         }
       }
     },
+    "/api/reservations/properties/{propertyId}/operations-snapshot": {
+      "get": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "LocalDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "UpcomingLimit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationOperationsSnapshotDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reservations/properties/{propertyId}": {
       "post": {
         "tags": [
@@ -9388,6 +9434,75 @@
         }
       }
     },
+    "/api/reservations/properties/{propertyId}/stay-amendments/recovery": {
+      "get": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursorOutcome",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ReservationStayAmendmentOutcome"
+            }
+          },
+          {
+            "name": "cursorUpdatedAtUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursorOperationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursorReservationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationStayAmendmentRecoveryPageDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reservations/properties/{propertyId}/{reservationId}": {
       "get": {
         "tags": [
@@ -9475,6 +9590,110 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReservationDetailsHistoryListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reservations/properties/{propertyId}/{reservationId}/stay-amendments/{operationId}": {
+      "get": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationStayAmendmentReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendReservationStayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationStayAmendmentReceiptDto"
                 }
               }
             }
@@ -9573,6 +9792,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reservations/properties/{propertyId}/{reservationId}/stay-amendments/{operationId}/reconcile": {
+      "post": {
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileReservationStayAmendmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationStayAmendmentReceiptDto"
                 }
               }
             }
@@ -12647,6 +12924,42 @@
               "$ref": "#/components/schemas/AdapterTypeCapabilityDto"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AmendReservationStayRequest": {
+        "type": "object",
+        "properties": {
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "inventoryUnitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "expectedDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -18540,6 +18853,16 @@
         },
         "additionalProperties": false
       },
+      "ReconcileReservationStayAmendmentRequest": {
+        "type": "object",
+        "properties": {
+          "expectedOperationVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "RecordDataRightsDecisionRequest": {
         "type": "object",
         "properties": {
@@ -19525,6 +19848,119 @@
         },
         "additionalProperties": false
       },
+      "ReservationOperationsAttentionCountsDto": {
+        "type": "object",
+        "properties": {
+          "pendingAllocation": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "allocationRejected": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "cancellationPending": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "noShowPending": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "checkoutPending": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "arrivalBeforeLocalDateStillConfirmed": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "departureBeforeLocalDateStillInHouse": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "total": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationOperationsCohortCountsDto": {
+        "type": "object",
+        "properties": {
+          "confirmedArrivalsOnLocalDate": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "scheduledDeparturesOnLocalDate": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          },
+          "currentlyInHouse": {
+            "$ref": "#/components/schemas/ReservationOperationsCountDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationOperationsCountDto": {
+        "type": "object",
+        "properties": {
+          "reservationCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "guestCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationOperationsDateSource": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ReservationOperationsSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "timeZoneId": {
+            "type": "string",
+            "nullable": true
+          },
+          "dateSource": {
+            "$ref": "#/components/schemas/ReservationOperationsDateSource"
+          },
+          "observedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cohorts": {
+            "$ref": "#/components/schemas/ReservationOperationsCohortCountsDto"
+          },
+          "attention": {
+            "$ref": "#/components/schemas/ReservationOperationsAttentionCountsDto"
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReservationListItemDto"
+            },
+            "nullable": true
+          },
+          "upcomingLimit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMoreUpcoming": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReservationSourceKind": {
         "enum": [
           0,
@@ -19550,6 +19986,202 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "ReservationStayAmendmentOutcome": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ReservationStayAmendmentReceiptDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ReservationStayAmendmentTargetDto"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReservationStayAmendmentOutcome"
+          },
+          "expectedDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requestedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "resultingDetailsRevision": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "resultingReservationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "rejectionReason": {
+            "$ref": "#/components/schemas/InventoryAllocationRejectionReason"
+          },
+          "reconciliationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastReconciledAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "recoveryEligible": {
+            "type": "boolean"
+          },
+          "nextRecoveryEligibleAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationStayAmendmentRecoveryCursorDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/ReservationStayAmendmentOutcome"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationStayAmendmentRecoveryItemDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReservationStayAmendmentOutcome"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requestedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recoveryEligible": {
+            "type": "boolean"
+          },
+          "nextRecoveryEligibleAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationStayAmendmentRecoveryPageDto": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReservationStayAmendmentRecoveryItemDto"
+            },
+            "nullable": true
+          },
+          "nextCursor": {
+            "$ref": "#/components/schemas/ReservationStayAmendmentRecoveryCursorDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReservationStayAmendmentTargetDto": {
+        "type": "object",
+        "properties": {
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedArrivalTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "expectedDepartureTime": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "inventoryUnitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "ResetConnectionCheckpointRequest": {
         "type": "object",
