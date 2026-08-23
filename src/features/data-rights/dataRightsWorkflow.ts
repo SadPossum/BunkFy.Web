@@ -5,6 +5,7 @@ import type {
   DataRightsExecutionWorkItem,
   DataRightsExecutionWorkItemStatus,
   DataRightsExportArtifactStatus,
+  DataRightsSelectedSubjectsResponse,
 } from "../../api/types";
 
 export type DataRightsRequestScope =
@@ -215,6 +216,34 @@ export function dataRightsCasesPath(scope: DataRightsRequestScope): string {
     : `/api/data-rights/properties/${scope.propertyId}/cases`;
 }
 
+export function dataRightsSelectedEvidencePath(
+  scope: DataRightsRequestScope,
+  caseId: string,
+  capabilities: Pick<DataRightsCapabilities, "discover" | "review">,
+): string | null {
+  const basePath = `${dataRightsCasesPath(scope)}/${caseId}`;
+  if (capabilities.review) return `${basePath}/review-evidence`;
+  if (capabilities.discover) return `${basePath}/subjects`;
+  return null;
+}
+
+export function isDataRightsSelectedEvidenceCurrent(
+  dataRightsCase: Pick<DataRightsCase, "selectedSubjectCount" | "version">,
+  evidence: DataRightsSelectedSubjectsResponse | undefined,
+): boolean {
+  return evidence?.caseVersion === dataRightsCase.version &&
+    evidence.subjects.length === dataRightsCase.selectedSubjectCount;
+}
+
+export function dataRightsActionRequiresReviewEvidence(
+  action: DataRightsAction,
+): boolean {
+  return action === "review" ||
+    action === "begin-decision" ||
+    action === "approve" ||
+    action === "deny";
+}
+
 export function dataRightsCaseHasOperation(
   dataRightsCase: Pick<DataRightsCase, "requestedOperations">,
   operation: number,
@@ -345,8 +374,8 @@ export function availableDataRightsActions(
     }
   }
 
-  if (status === "discovery" && capabilities.discover) {
-    actions.push("discover-subject");
+  if (status === "discovery") {
+    if (capabilities.discover) actions.push("discover-subject");
     const selectionReady =
       Number(dataRightsCase.type) === 3 ||
       isDataRightsRestriction(dataRightsCase) ||

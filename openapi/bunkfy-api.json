@@ -2149,6 +2149,45 @@
         }
       }
     },
+    "/api/data-rights/properties/{propertyId}/cases/{caseId}/review-evidence": {
+      "get": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsSelectedSubjectsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data-rights/properties/{propertyId}/cases/{caseId}/subjects/discover": {
       "post": {
         "tags": [
@@ -3172,6 +3211,36 @@
       }
     },
     "/api/data-rights/tenant/cases/{caseId}/subjects": {
+      "get": {
+        "tags": [
+          "Data rights"
+        ],
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRightsSelectedSubjectsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data-rights/tenant/cases/{caseId}/review-evidence": {
       "get": {
         "tags": [
           "Data rights"

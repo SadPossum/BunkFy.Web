@@ -7,11 +7,14 @@ import {
   DATA_RIGHTS_RESTRICTION_APPLY,
   DATA_RIGHTS_RESTRICTION_RELEASE,
   availableDataRightsActions,
+  dataRightsActionRequiresReviewEvidence,
   dataRightsCaseNeedsLiveRefresh,
   dataRightsExportNeedsLiveRefresh,
   dataRightsExportStatusLabel,
   dataRightsRequestLabel,
   dataRightsRequesterLabel,
+  dataRightsSelectedEvidencePath,
+  isDataRightsSelectedEvidenceCurrent,
   dataRightsCaseStatusLabel,
   dataRightsExecutionBatchNeedsLiveRefresh,
   dataRightsExecutionNeedsLiveRefresh,
@@ -21,6 +24,7 @@ import {
   dataRightsResponseDeadlineState,
   dataRightsScopeKey,
   shortDataRightsCaseId,
+  type DataRightsAction,
   type DataRightsCapabilities,
 } from "../src/features/data-rights/dataRightsWorkflow";
 
@@ -71,6 +75,71 @@ describe("privacy request workflow", () => {
       status: 2,
       selectedSubjectCount: 3,
     }), allCapabilities)).toEqual(["discover-subject", "review", "cancel"]);
+  });
+
+  it("lets a reviewer advance selected scope without subject discovery", () => {
+    const reviewOnly = {
+      ...allCapabilities,
+      discover: false,
+    };
+
+    expect(availableDataRightsActions(dataRightsCase({
+      status: 2,
+      selectedSubjectCount: 1,
+    }), reviewOnly)).toEqual(["review", "cancel"]);
+  });
+
+  it("chooses the least-privileged selected evidence route", () => {
+    const scope = { kind: "guest", propertyId: "property-1" } as const;
+    expect(dataRightsSelectedEvidencePath(scope, "case-1", {
+      discover: true,
+      review: true,
+    })).toBe(
+      "/api/data-rights/properties/property-1/cases/case-1/review-evidence",
+    );
+    expect(dataRightsSelectedEvidencePath({ kind: "staff" }, "case-2", {
+      discover: true,
+      review: false,
+    })).toBe("/api/data-rights/tenant/cases/case-2/subjects");
+    expect(dataRightsSelectedEvidencePath(scope, "case-1", {
+      discover: false,
+      review: false,
+    })).toBeNull();
+  });
+
+  it("requires version-matched and complete selected evidence for review actions", () => {
+    const currentCase = dataRightsCase({
+      selectedSubjectCount: 1,
+      version: 7,
+    });
+    const evidence = {
+      caseVersion: 7,
+      subjects: [{
+        ownerKey: "guests",
+        recordType: "guest-record",
+        recordId: "00000000-0000-0000-0000-000000000001",
+        recordVersion: 4,
+        selectedAtUtc: "2026-08-23T10:00:00Z",
+      }],
+    };
+
+    expect(isDataRightsSelectedEvidenceCurrent(currentCase, evidence)).toBe(true);
+    expect(isDataRightsSelectedEvidenceCurrent(currentCase, {
+      ...evidence,
+      caseVersion: 6,
+    })).toBe(false);
+    expect(isDataRightsSelectedEvidenceCurrent(currentCase, {
+      ...evidence,
+      subjects: [],
+    })).toBe(false);
+    const reviewActions: DataRightsAction[] = [
+      "review",
+      "begin-decision",
+      "approve",
+      "deny",
+    ];
+    expect(reviewActions.every(dataRightsActionRequiresReviewEvidence)).toBe(true);
+    expect(dataRightsActionRequiresReviewEvidence("cancel")).toBe(false);
   });
 
   it("requires exactly one selected subject before restriction review", () => {

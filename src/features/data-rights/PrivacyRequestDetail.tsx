@@ -40,6 +40,7 @@ import {
 import { shortRestrictionTargetId } from "./dataRightsRestrictionTarget";
 import {
   availableDataRightsActions,
+  dataRightsActionRequiresReviewEvidence,
   dataRightsCaseNeedsLiveRefresh,
   dataRightsCaseStatusKey,
   dataRightsCaseStatusLabel,
@@ -51,7 +52,9 @@ import {
   dataRightsResponseDeadlineRightLabel,
   dataRightsResponseDeadlineState,
   dataRightsRequesterLabel,
+  dataRightsSelectedEvidencePath,
   dataRightsScopeKey,
+  isDataRightsSelectedEvidenceCurrent,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
   type DataRightsOperationKind,
@@ -102,14 +105,23 @@ export function PrivacyRequestDetail({
   const operationKind = dataRightsCase
     ? dataRightsOperationKind(dataRightsCase)
     : "other";
+  const selectedEvidencePath = caseId
+    ? dataRightsSelectedEvidencePath(scope, caseId, capabilities)
+    : null;
   const selected = useQuery({
-    queryKey: ["data-rights-subjects", scopeKey, caseId],
-    queryFn: () => request<DataRightsSelectedSubjectsResponse>(`${basePath}/subjects`),
+    queryKey: [
+      "data-rights-subjects",
+      scopeKey,
+      caseId,
+      dataRightsCase?.version,
+      selectedEvidencePath,
+    ],
+    queryFn: () => request<DataRightsSelectedSubjectsResponse>(selectedEvidencePath!),
     enabled: Boolean(
       caseId &&
       dataRightsCase &&
       dataRightsCase.selectedSubjectCount > 0 &&
-      capabilities.discover,
+      selectedEvidencePath,
     ),
   });
   const execution = useQuery({
@@ -129,6 +141,29 @@ export function PrivacyRequestDetail({
     () => dataRightsCase ? availableDataRightsActions(dataRightsCase, capabilities) : [],
     [capabilities, dataRightsCase],
   );
+  const selectedEvidenceCurrent = Boolean(
+    dataRightsCase &&
+    !selected.error &&
+    isDataRightsSelectedEvidenceCurrent(dataRightsCase, selected.data),
+  );
+  const selectedEvidenceRequired = actions.some(dataRightsActionRequiresReviewEvidence);
+  let selectedEvidenceError: Error | null = null;
+  if (selectedEvidenceRequired &&
+      (!dataRightsCase || dataRightsCase.selectedSubjectCount <= 0)) {
+    selectedEvidenceError = new Error(
+      "This privacy request has no selected records to review.",
+    );
+  } else if (selectedEvidenceRequired && !selectedEvidencePath) {
+    selectedEvidenceError = new Error(
+      "This permission profile cannot read the selected records required for review.",
+    );
+  } else if (selectedEvidencePath && selected.error) {
+    selectedEvidenceError = selected.error;
+  } else if (selectedEvidencePath && selected.data && !selectedEvidenceCurrent) {
+    selectedEvidenceError = new Error(
+      "Refresh the selected records before continuing this privacy request.",
+    );
+  }
   const restrictionTargetValidationRequired = Boolean(
     dataRightsCase &&
     operationKind === "restriction-release" &&
@@ -144,8 +179,14 @@ export function PrivacyRequestDetail({
     () => actions.filter((action) =>
       action !== "generate-export" &&
       action !== "execute-correction" &&
+      !(dataRightsActionRequiresReviewEvidence(action) && !selectedEvidenceCurrent) &&
       !(action === "review" && restrictionTargetValidationRequired && !restrictionTargetCurrent)),
-    [actions, restrictionTargetCurrent, restrictionTargetValidationRequired],
+    [
+      actions,
+      restrictionTargetCurrent,
+      restrictionTargetValidationRequired,
+      selectedEvidenceCurrent,
+    ],
   );
   const activeConfirmation = useMemo(
     () => confirmation && dataRightsCase && isDataRightsConfirmationCurrent(
@@ -411,14 +452,14 @@ export function PrivacyRequestDetail({
                 />
               )}
 
-              {status !== "discovery" &&
-                dataRightsCase.selectedSubjectCount > 0 &&
-                capabilities.discover && (
+              {dataRightsCase.selectedSubjectCount > 0 &&
+                selectedEvidencePath &&
+                (status !== "discovery" || !capabilities.discover) && (
                 <section className="border-t border-base-300 pt-5">
                   <h3 className="font-display text-lg font-semibold">Selected records</h3>
                   {selected.isLoading
                     ? <p className="mt-3 text-sm text-base-content/50">Loading selections...</p>
-                    : selected.data?.subjects.length
+                    : selectedEvidenceCurrent && selected.data?.subjects.length
                       ? (
                         <div className="mt-3 divide-y divide-base-300 rounded-lg bg-base-200 px-4">
                           {selected.data.subjects.map((subject) => (
@@ -439,6 +480,14 @@ export function PrivacyRequestDetail({
                       )
                       : null}
                 </section>
+              )}
+
+              {selectedEvidenceError && (
+                <ErrorState
+                  title="Review evidence unavailable"
+                  error={selectedEvidenceError}
+                  retry={selectedEvidencePath ? () => void selected.refetch() : undefined}
+                />
               )}
 
               {status !== "discovery" && operationKind === "restriction-release" && (
