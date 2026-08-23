@@ -1,9 +1,23 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import { ApiError } from "../../api/client";
 import type { NotificationBroadcastItem, NotificationBroadcastListResponse, NotificationHistoryItem, NotificationHistoryListResponse } from "../../api/types";
 import { operationalNotificationQueryKeys } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
+import {
+  notificationInboxQueryKey,
+  notificationScopeKey,
+  notificationStreamRetryDelay,
+  notificationSummaryQueryKey,
+} from "./notificationSourceAuthority";
 
 type NotificationsContextValue = { unreadCount: number; isLoading: boolean; refresh: () => Promise<void> };
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -13,21 +27,26 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const historySequence = useRef(0);
   const broadcastSequence = useRef(0);
+  const scopeKey = notificationScopeKey(session);
   const history = useQuery({
-    queryKey: ["notifications", "history", "unread-summary", session?.tenantId],
+    queryKey: notificationSummaryQueryKey(scopeKey, "history"),
     queryFn: () => request<NotificationHistoryListResponse>("/api/notifications?page=1&pageSize=1"),
+    enabled: Boolean(scopeKey),
     refetchInterval: 60_000,
   });
   const broadcasts = useQuery({
-    queryKey: ["notifications", "broadcasts", "unread-summary", session?.tenantId],
+    queryKey: notificationSummaryQueryKey(scopeKey, "broadcasts"),
     queryFn: () => request<NotificationBroadcastListResponse>("/api/notifications/broadcasts?page=1&pageSize=1"),
+    enabled: Boolean(scopeKey),
     refetchInterval: 60_000,
   });
+  const historySeeded = history.data !== undefined;
+  const broadcastsSeeded = broadcasts.data !== undefined;
 
   useEffect(() => {
     historySequence.current = 0;
     broadcastSequence.current = 0;
-  }, [session?.tenantId]);
+  }, [scopeKey]);
 
   useEffect(() => {
     const sequence = history.data?.items[0]?.streamSequence;
@@ -38,23 +57,36 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (sequence != null) broadcastSequence.current = Math.max(broadcastSequence.current, sequence);
   }, [broadcasts.data]);
 
+  const invalidateHistory = useCallback((item: NotificationHistoryItem) => {
+    const invalidations = [
+      queryClient.invalidateQueries({
+        queryKey: notificationInboxQueryKey(scopeKey, "history"),
+      }),
+    ];
+    for (const queryKey of operationalNotificationQueryKeys(item)) {
+      invalidations.push(queryClient.invalidateQueries({ queryKey }));
+    }
+    void Promise.all(invalidations);
+  }, [queryClient, scopeKey]);
+  const invalidateBroadcasts = useCallback((_item: NotificationBroadcastItem) => {
+    void queryClient.invalidateQueries({
+      queryKey: notificationInboxQueryKey(scopeKey, "broadcasts"),
+    });
+  }, [queryClient, scopeKey]);
+
   useEffect(() => {
-    if (!session || !history.isSuccess || !broadcasts.isSuccess) return;
+    if (!scopeKey || !historySeeded) return;
     const controller = new AbortController();
-    const invalidateHistory = (item: NotificationHistoryItem) => {
-      const invalidations = [queryClient.invalidateQueries({ queryKey: ["notifications", "history"] })];
-      for (const queryKey of operationalNotificationQueryKeys(item)) {
-        invalidations.push(queryClient.invalidateQueries({ queryKey }));
-      }
-      void Promise.all(invalidations);
-    };
-    const invalidateBroadcasts = (_item: NotificationBroadcastItem) => {
-      void queryClient.invalidateQueries({ queryKey: ["notifications", "broadcasts"] });
-    };
     void keepStreaming("/api/notifications/history/stream", historySequence, stream, controller.signal, invalidateHistory);
+    return () => controller.abort();
+  }, [historySeeded, invalidateHistory, scopeKey, stream]);
+
+  useEffect(() => {
+    if (!scopeKey || !broadcastsSeeded) return;
+    const controller = new AbortController();
     void keepStreaming("/api/notifications/broadcasts/stream", broadcastSequence, stream, controller.signal, invalidateBroadcasts);
     return () => controller.abort();
-  }, [broadcasts.isSuccess, history.isSuccess, queryClient, session, stream]);
+  }, [broadcastsSeeded, invalidateBroadcasts, scopeKey, stream]);
 
   const value = useMemo<NotificationsContextValue>(() => ({
     unreadCount: (history.data?.unreadCount ?? 0) + (broadcasts.data?.unreadCount ?? 0),
@@ -71,14 +103,19 @@ export function useNotifications() {
 }
 
 async function keepStreaming<T extends { streamSequence?: number }>(path: string, sequence: React.RefObject<number>, open: (path: string, signal: AbortSignal) => Promise<Response>, signal: AbortSignal, onItem: (item: T) => void) {
+  let retryAttempt = 0;
   while (!signal.aborted) {
+    let connectedAt: number | null = null;
     try {
       const response = await open(`${path}?afterSequence=${sequence.current}`, signal);
+      connectedAt = Date.now();
       await consumeSse(response, sequence, signal, onItem);
     } catch (error) {
       if (signal.aborted || !shouldRetryNotificationStream(error)) return;
     }
-    await waitForRetry(signal);
+    if (connectedAt !== null && Date.now() - connectedAt >= 30_000) retryAttempt = 0;
+    await waitForRetry(signal, notificationStreamRetryDelay(retryAttempt));
+    retryAttempt = Math.min(5, retryAttempt + 1);
   }
 }
 
@@ -118,10 +155,17 @@ async function consumeSse<T extends { streamSequence?: number }>(response: Respo
   }
 }
 
-function waitForRetry(signal: AbortSignal) {
+function waitForRetry(signal: AbortSignal, delay: number) {
   return new Promise<void>((resolve) => {
     if (signal.aborted) return resolve();
-    const timer = window.setTimeout(resolve, 3_000);
-    signal.addEventListener("abort", () => { window.clearTimeout(timer); resolve(); }, { once: true });
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }

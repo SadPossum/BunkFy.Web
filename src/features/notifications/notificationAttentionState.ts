@@ -2,8 +2,9 @@ import {
   notificationItemId,
   type NotificationInboxItem,
 } from "./notificationReadState";
+import type { NotificationInboxKind } from "./notificationSourceAuthority";
 
-export type NotificationInboxKind = "history" | "broadcasts";
+export type { NotificationInboxKind } from "./notificationSourceAuthority";
 
 export function notificationAttentionKey(
   kind: NotificationInboxKind,

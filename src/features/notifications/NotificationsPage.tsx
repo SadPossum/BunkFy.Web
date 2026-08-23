@@ -4,8 +4,6 @@ import {
   ArrowUpRight,
   Bell,
   CheckCheck,
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
   Info,
   Megaphone,
@@ -22,7 +20,17 @@ import type {
   NotificationHistoryListResponse,
   NotificationSeverity,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
+import { PaginationBar } from "../../components/ui/PaginationBar";
 import {
   EmptyState,
   ErrorState,
@@ -37,7 +45,6 @@ import {
   captureNotificationAttention,
   dismissNotificationAttention,
   notificationAttentionKey,
-  type NotificationInboxKind,
 } from "./notificationAttentionState";
 import {
   decrementNotificationUnreadCountLocally,
@@ -46,9 +53,33 @@ import {
   type NotificationInboxItem,
   type NotificationInboxResponse,
 } from "./notificationReadState";
+import {
+  notificationDetailQueryKey,
+  notificationInboxPath,
+  notificationInboxQueryKey,
+  notificationItemMatches,
+  notificationListQueryKey,
+  notificationListQueryPrefix,
+  notificationReadAllowed,
+  notificationScopeKey,
+  notificationSummaryQueryKey,
+  type NotificationInboxKind,
+} from "./notificationSourceAuthority";
 
 const PAGE_SIZE = 25;
 type InboxTab = "personal" | "broadcasts";
+
+type NotificationReadCandidate = {
+  scopeKey: string;
+  kind: NotificationInboxKind;
+  item: NotificationInboxItem;
+  sourceCurrent: boolean;
+};
+
+type MarkAllSubmission = {
+  scopeKey: string;
+  kind: NotificationInboxKind;
+};
 
 export function NotificationsPage() {
   const { request, session } = useSession();
@@ -59,57 +90,134 @@ export function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [attentionIds, setAttentionIds] = useState<ReadonlySet<string>>(() => new Set());
   const pendingReadIds = useRef(new Set<string>());
-  const attentionScope = `${session?.username ?? "anonymous"}:${session?.tenantId ?? "global"}`;
-
-  useEffect(() => setPage(1), [tab, unreadOnly]);
-  useEffect(() => setAttentionIds(new Set()), [attentionScope]);
-
+  const scopeKey = notificationScopeKey(session);
+  const previousScopeKeyRef = useRef(scopeKey);
+  const selectedPersonalId = searchParams.get("notification");
+  const selectedBroadcastId = selectedPersonalId
+    ? null
+    : searchParams.get("broadcast");
   const kind: NotificationInboxKind = tab === "personal" ? "history" : "broadcasts";
-  const path = tab === "personal" ? "/api/notifications" : "/api/notifications/broadcasts";
+  const path = notificationInboxPath(kind);
   const query = useQuery({
-    queryKey: ["notifications", kind, "list", page, unreadOnly],
+    queryKey: notificationListQueryKey(scopeKey, kind, page, unreadOnly),
     queryFn: () => request<NotificationHistoryListResponse | NotificationBroadcastListResponse>(
       `${path}?page=${page}&pageSize=${PAGE_SIZE}&unreadOnly=${unreadOnly}`,
     ),
+    enabled: Boolean(scopeKey),
   });
-  const markAll = useMutation({
-    mutationFn: () => request<MarkAllNotificationsReadResponse>(`${path}/read-all`, { method: "POST" }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["notifications", kind] });
+  const listSource = createCompositeSource({
+    label: tab === "personal" ? "Personal notifications" : "Announcements",
+    hasData: query.data !== undefined,
+    isLoading: query.isLoading,
+    error: query.error,
+    isFetching: query.isFetching,
+    refetch: () => query.refetch(),
+  });
+  const listCurrent = compositeSourceCurrent(listSource);
+  const listUsable = compositeSourceUsable(listSource.state);
+  const items = listUsable ? query.data?.items ?? [] : [];
+
+  const markAll = useMutation<MarkAllNotificationsReadResponse, Error, MarkAllSubmission>({
+    mutationFn: ({ scopeKey: targetScopeKey, kind: targetKind }) => {
+      const authorityCurrent = targetKind === kind &&
+        notificationReadAllowed(scopeKey, targetScopeKey, listCurrent);
+      if (!authorityCurrent) {
+        throw new Error("Current notification inbox evidence could not be confirmed. Refresh and try again.");
+      }
+      return request<MarkAllNotificationsReadResponse>(
+        `${notificationInboxPath(targetKind)}/read-all`,
+        { method: "POST" },
+      );
+    },
+    onSuccess: async (_response, submission) => {
+      await queryClient.invalidateQueries({
+        queryKey: notificationInboxQueryKey(submission.scopeKey, submission.kind),
+      });
+    },
+    onError: async (_error, submission) => {
+      await queryClient.invalidateQueries({
+        queryKey: notificationInboxQueryKey(submission.scopeKey, submission.kind),
+      });
     },
   });
 
-  const acknowledgeVisible = useCallback((item: NotificationInboxItem) => {
-    if (item.readAtUtc) return;
+  const acknowledgeVisible = useCallback((candidate: NotificationReadCandidate) => {
+    if (candidate.item.readAtUtc || !notificationReadAllowed(
+      scopeKey,
+      candidate.scopeKey,
+      candidate.sourceCurrent,
+    )) return;
 
-    const id = notificationItemId(item);
-    const token = `${kind}:${id}`;
+    const id = notificationItemId(candidate.item);
+    const token = `${candidate.scopeKey}:${candidate.kind}:${id}`;
     const readAtUtc = new Date().toISOString();
     const updateResponse = (current: NotificationInboxResponse | undefined) =>
       markNotificationReadLocally(current, id, readAtUtc);
 
-    queryClient.setQueryData<NotificationInboxResponse>(
-      ["notifications", kind, "list", page, unreadOnly],
+    queryClient.setQueriesData<NotificationInboxResponse>(
+      { queryKey: notificationListQueryPrefix(candidate.scopeKey, candidate.kind) },
       updateResponse,
     );
     queryClient.setQueryData<NotificationInboxItem>(
-      ["notifications", kind, "detail", id],
+      notificationDetailQueryKey(candidate.scopeKey, candidate.kind, id),
       (current) => current && !current.readAtUtc ? { ...current, readAtUtc } : current,
     );
 
     if (pendingReadIds.current.has(token)) return;
     pendingReadIds.current.add(token);
-    queryClient.setQueriesData<NotificationInboxResponse>(
-      { queryKey: ["notifications", kind, "unread-summary"] },
+    queryClient.setQueryData<NotificationInboxResponse>(
+      notificationSummaryQueryKey(candidate.scopeKey, candidate.kind),
       (current) => decrementNotificationUnreadCountLocally(current, id, readAtUtc),
     );
-    void request<void>(`${path}/${id}/read`, { method: "POST" })
+    void request<void>(`${notificationInboxPath(candidate.kind)}/${id}/read`, { method: "POST" })
       .then(() => pendingReadIds.current.delete(token))
       .catch(() => {
         pendingReadIds.current.delete(token);
-        void queryClient.invalidateQueries({ queryKey: ["notifications", kind] });
+        void queryClient.invalidateQueries({
+          queryKey: notificationInboxQueryKey(candidate.scopeKey, candidate.kind),
+        });
       });
-  }, [kind, page, path, queryClient, request, unreadOnly]);
+  }, [queryClient, request, scopeKey]);
+
+  const acknowledgeVisibleInList = useCallback((item: NotificationInboxItem) => {
+    acknowledgeVisible({
+      scopeKey,
+      kind,
+      item,
+      sourceCurrent: listCurrent && notificationItemMatches(items, item),
+    });
+  }, [acknowledgeVisible, items, kind, listCurrent, scopeKey]);
+
+  useEffect(() => setPage(1), [tab, unreadOnly]);
+  useEffect(() => setAttentionIds(new Set()), [scopeKey]);
+
+  useEffect(() => {
+    if (selectedPersonalId) setTab("personal");
+    else if (selectedBroadcastId) setTab("broadcasts");
+  }, [selectedBroadcastId, selectedPersonalId]);
+
+  useEffect(() => {
+    const previousScopeKey = previousScopeKeyRef.current;
+    if (scopeKey) previousScopeKeyRef.current = scopeKey;
+    if (!previousScopeKey || !scopeKey || previousScopeKey === scopeKey) return;
+
+    setTab("personal");
+    setUnreadOnly(false);
+    setPage(1);
+    setAttentionIds(new Set());
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("notification");
+      next.delete("broadcast");
+      return next;
+    }, { replace: true });
+  }, [scopeKey, setSearchParams]);
+
+  useEffect(() => {
+    if (listCurrent && query.data && page > 1 && query.data.items.length === 0) {
+      setPage((current) => Math.max(1, current - 1));
+    }
+  }, [listCurrent, page, query.data]);
 
   function select(item: NotificationInboxItem | null) {
     const next = new URLSearchParams(searchParams);
@@ -119,13 +227,11 @@ export function NotificationsPage() {
     setSearchParams(next, { replace: true });
   }
 
-  const items = query.data?.items ?? [];
   useEffect(() => {
+    if (!listCurrent) return;
     setAttentionIds((current) => captureNotificationAttention(current, kind, items));
-  }, [items, kind]);
+  }, [items, kind, listCurrent]);
 
-  const selectedPersonalId = searchParams.get("notification");
-  const selectedBroadcastId = searchParams.get("broadcast");
   useEffect(() => {
     const key = selectedPersonalId
       ? notificationAttentionKey("history", selectedPersonalId)
@@ -141,22 +247,33 @@ export function NotificationsPage() {
     select(item);
   }
 
+  const markAllTargetsCurrentInbox = markAll.variables?.scopeKey === scopeKey &&
+    markAll.variables.kind === kind;
+  const markAllPending = markAll.isPending && markAllTargetsCurrentInbox;
+  const markAllError = markAllTargetsCurrentInbox
+    ? markAll.error
+    : null;
+
   return <>
     <PageHeader
       eyebrow="Live workspace"
       title="Notifications"
       description="Stay on top of operational events and workspace announcements."
-      action={(query.data?.unreadCount ?? 0) > 0 ? (
+      action={listUsable && (query.data?.unreadCount ?? 0) > 0 ? (
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() => markAll.mutate()}
-          disabled={markAll.isPending}
+          onClick={() => markAll.mutate({ scopeKey, kind })}
+          disabled={markAllPending || !listCurrent}
         >
           <CheckCheck size={17} />
           Mark all read
         </button>
       ) : undefined}
+    />
+    <CompositeSourceNotice
+      sources={[listSource]}
+      title="Notification inbox is delayed"
     />
     <section className="card border border-base-300 bg-base-100 shadow-sm">
       <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -169,20 +286,27 @@ export function NotificationsPage() {
             { value: "broadcasts", label: "Announcements", icon: <Megaphone size={15} /> },
           ]}
         />
-        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-          <input
-            className="toggle toggle-primary toggle-sm"
-            type="checkbox"
-            checked={unreadOnly}
-            onChange={(event) => setUnreadOnly(event.target.checked)}
-          />
-          Unread only
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          {listUsable && (
+            <span className="text-xs font-medium text-base-content/45">
+              {query.data?.unreadCount ?? 0} unread
+            </span>
+          )}
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <input
+              className="toggle toggle-primary toggle-sm"
+              type="checkbox"
+              checked={unreadOnly}
+              onChange={(event) => setUnreadOnly(event.target.checked)}
+            />
+            Unread only
+          </label>
+        </div>
       </div>
-      {query.isLoading ? (
+      {listSource.state === "loading" ? (
         <LoadingState label="Loading notifications" />
-      ) : query.error ? (
-        <div className="p-6"><ErrorState error={query.error} retry={() => void query.refetch()} /></div>
+      ) : !listUsable ? (
+        <CompositeSourceFallback state={listSource.state} label="notification inbox" />
       ) : !items.length ? (
         <div className="p-6">
           <EmptyState
@@ -199,47 +323,35 @@ export function NotificationsPage() {
               item={item}
               attention={attentionIds.has(notificationAttentionKey(kind, notificationItemId(item)))}
               onOpen={() => open(item)}
-              onVisible={acknowledgeVisible}
+              onVisible={acknowledgeVisibleInList}
             />
           ))}
         </div>
-        <div className="flex items-center justify-between border-t border-base-300 px-4 py-3 sm:px-6">
-          <p className="text-xs text-base-content/45">
-            {query.data?.totalCount ?? items.length} total · {query.data?.unreadCount ?? 0} unread
-          </p>
-          <div className="join">
-            <button
-              className="btn btn-sm join-item"
-              disabled={page === 1}
-              onClick={() => setPage((current) => current - 1)}
-              aria-label="Previous notifications"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              className="btn btn-sm join-item"
-              disabled={page * PAGE_SIZE >= (query.data?.totalCount ?? 0)}
-              onClick={() => setPage((current) => current + 1)}
-              aria-label="Next notifications"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        <PaginationBar
+          page={page}
+          pageSize={PAGE_SIZE}
+          itemCount={items.length}
+          itemLabel={tab === "personal" ? "notification" : "announcement"}
+          totalCount={query.data?.totalCount}
+          disabled={!listCurrent}
+          onPageChange={setPage}
+        />
       </>}
-      {markAll.error && (
-        <div className="border-t border-base-300 p-4"><ErrorState error={markAll.error} /></div>
+      {markAllError && (
+        <div className="border-t border-base-300 p-4"><ErrorState error={markAllError} /></div>
       )}
     </section>
     <NotificationDetail
       kind="personal"
-      id={searchParams.get("notification")}
+      scopeKey={scopeKey}
+      id={selectedPersonalId}
       onClose={() => select(null)}
       onVisible={acknowledgeVisible}
     />
     <NotificationDetail
       kind="broadcast"
-      id={searchParams.get("broadcast")}
+      scopeKey={scopeKey}
+      id={selectedBroadcastId}
       onClose={() => select(null)}
       onVisible={acknowledgeVisible}
     />
@@ -300,27 +412,40 @@ function NotificationRow({ item, attention, onOpen, onVisible }: {
   );
 }
 
-function NotificationDetail({ kind, id, onClose, onVisible }: {
+function NotificationDetail({ kind, scopeKey, id, onClose, onVisible }: {
   kind: "personal" | "broadcast";
+  scopeKey: string;
   id: string | null;
   onClose: () => void;
-  onVisible: (item: NotificationInboxItem) => void;
+  onVisible: (candidate: NotificationReadCandidate) => void;
 }) {
   const { request } = useSession();
   const navigate = useNavigate();
   const inboxKind: NotificationInboxKind = kind === "personal" ? "history" : "broadcasts";
-  const base = kind === "personal" ? "/api/notifications" : "/api/notifications/broadcasts";
+  const base = notificationInboxPath(inboxKind);
   const item = useQuery({
-    queryKey: ["notifications", inboxKind, "detail", id],
+    queryKey: notificationDetailQueryKey(scopeKey, inboxKind, id),
     queryFn: () => request<NotificationHistoryItem | NotificationBroadcastItem>(`${base}/${id}`),
-    enabled: Boolean(id),
+    enabled: Boolean(scopeKey && id),
   });
-  const data = item.data;
+  const detailSource = createCompositeSource({
+    label: kind === "personal" ? "Notification detail" : "Announcement detail",
+    hasData: item.data !== undefined,
+    isLoading: item.isLoading,
+    error: item.error,
+    isFetching: item.isFetching,
+    refetch: () => item.refetch(),
+  });
+  const detailCurrent = compositeSourceCurrent(detailSource);
+  const detailUsable = compositeSourceUsable(detailSource.state);
+  const data = detailUsable ? item.data : undefined;
   const destination = kind === "personal" && data ? notificationDestination(data) : null;
 
   useEffect(() => {
-    if (data && !data.readAtUtc) onVisible(data);
-  }, [data, onVisible]);
+    if (data && !data.readAtUtc && detailCurrent) {
+      onVisible({ scopeKey, kind: inboxKind, item: data, sourceCurrent: true });
+    }
+  }, [data, detailCurrent, inboxKind, onVisible, scopeKey]);
 
   function openAffectedItem() {
     if (!destination) return;
@@ -330,15 +455,19 @@ function NotificationDetail({ kind, id, onClose, onVisible }: {
 
   return (
     <Modal
-      open={Boolean(id)}
+      open={Boolean(scopeKey && id)}
       title={data?.title || (kind === "personal" ? "Notification" : "Announcement")}
       description={data ? `${humanize(data.module)} · ${formatDateTime(data.occurredAtUtc)}` : "Loading message"}
       onClose={onClose}
     >
-      {item.isLoading ? (
+      <CompositeSourceNotice
+        sources={[detailSource]}
+        title="Notification detail is delayed"
+      />
+      {detailSource.state === "loading" ? (
         <LoadingState label="Loading message" />
-      ) : item.error ? (
-        <ErrorState error={item.error} retry={() => void item.refetch()} />
+      ) : !detailUsable ? (
+        <CompositeSourceFallback state={detailSource.state} label="notification detail" />
       ) : data ? (
         <div className="space-y-5">
           <div className="flex items-center justify-between rounded-2xl bg-base-200 p-4">
@@ -347,7 +476,11 @@ function NotificationDetail({ kind, id, onClose, onVisible }: {
               <div>
                 <p className="font-semibold capitalize">{notificationSeverityLabel(data.severity)}</p>
                 <p className="mt-1 text-xs text-base-content/50">
-                  {data.readAtUtc ? `Read ${formatDateTime(data.readAtUtc)}` : "Opening message"}
+                  {data.readAtUtc
+                    ? `Read ${formatDateTime(data.readAtUtc)}`
+                    : detailCurrent
+                      ? "Opening message"
+                      : "Unread in the last loaded snapshot"}
                 </p>
               </div>
             </div>
