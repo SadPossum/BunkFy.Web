@@ -34,7 +34,10 @@ import {
   type SessionIdentity,
 } from "./singleFlightRefresh";
 import { useQueryClient } from "@tanstack/react-query";
-import { isMultiFactorChallenge } from "../features/auth/authenticationFlow";
+import {
+  isMultiFactorChallenge,
+  type ExternalAuthenticationIntent,
+} from "../features/auth/authenticationFlow";
 
 const STORAGE_KEY = "bunkfy.session.identity.v2";
 const EXTERNAL_AUTH_KEY = "bunkfy.auth.external.pending.v1";
@@ -74,7 +77,9 @@ type SessionContextValue = {
   completeExternalAuthentication: (
     code: string,
     provider: string,
+    intent: ExternalAuthenticationIntent | null,
   ) => Promise<ExternalAuthenticationCompletion>;
+  cancelExternalAuthentication: () => void;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   stepUpWithPassword: (password: string) => Promise<void>;
@@ -262,6 +267,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const beginExternalSignIn = useCallback(
     async (provider: string) => {
+      clearPendingExternalAuth();
       const returnUrl = externalReturnUrl("sign-in");
       const challenge = await apiRequest<ExternalAuthenticationChallenge>(
         `/api/auth/external/${encodeURIComponent(provider)}/sign-in/challenge`,
@@ -284,6 +290,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (provider: string) => {
       const active = sessionRef.current;
       if (!active) throw new Error("You are signed out.");
+      clearPendingExternalAuth();
       const returnUrl = externalReturnUrl("link");
       const challenge = await request<ExternalAuthenticationChallenge>(
         `/api/auth/external/${encodeURIComponent(provider)}/link/challenge`,
@@ -299,14 +306,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const completeExternalAuthentication = useCallback(
-    (code: string, provider: string) => {
+    (
+      code: string,
+      provider: string,
+      intent: ExternalAuthenticationIntent | null,
+    ) => {
       if (externalCompletionRef.current) return externalCompletionRef.current;
 
       const completion = (async (): Promise<ExternalAuthenticationCompletion> => {
-        const pending = readPendingExternalAuth();
+        const pending = readPendingExternalAuth(
+          intent ? { intent, provider } : null,
+        );
         if (
           !pending ||
-          pending.provider.toLowerCase() !== provider.toLowerCase()
+          pending.provider.toLowerCase() !== provider.toLowerCase() ||
+          (intent !== null && pending.intent !== intent)
         ) {
           throw new Error(
             "The external sign-in state is missing or does not match this provider.",
@@ -387,6 +401,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [request, setSession],
   );
+
+  const cancelExternalAuthentication = useCallback(() => {
+    clearPendingExternalAuth();
+  }, []);
 
   const download = useCallback(
     async (path: string, options: RequestInit = {}) => {
@@ -547,6 +565,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       beginExternalSignIn,
       beginExternalLink,
       completeExternalAuthentication,
+      cancelExternalAuthentication,
       logout,
       logoutAll,
       stepUpWithPassword,
@@ -560,6 +579,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activateTotp,
       beginExternalLink,
       beginExternalSignIn,
+      cancelExternalAuthentication,
       completeMultiFactorSignIn,
       completeExternalAuthentication,
       disableTotp,
@@ -617,7 +637,7 @@ function writeSessionIdentity(session: SessionIdentity | null) {
 }
 
 type PendingExternalAuth = {
-  intent: "sign-in" | "link";
+  intent: ExternalAuthenticationIntent;
   provider: string;
 };
 
@@ -648,14 +668,17 @@ function writePendingExternalAuth(pending: PendingExternalAuth) {
   }
 }
 
-function readPendingExternalAuth(): PendingExternalAuth | null {
+function readPendingExternalAuth(
+  fallback: PendingExternalAuth | null,
+): PendingExternalAuth | null {
   try {
     const raw = sessionStorage.getItem(EXTERNAL_AUTH_KEY);
     if (raw) {
       const candidate = JSON.parse(raw) as Partial<PendingExternalAuth>;
       if (
         (candidate.intent === "sign-in" || candidate.intent === "link") &&
-        typeof candidate.provider === "string"
+        typeof candidate.provider === "string" &&
+        candidate.provider.trim().length > 0
       ) {
         return candidate as PendingExternalAuth;
       }
@@ -664,12 +687,7 @@ function readPendingExternalAuth(): PendingExternalAuth | null {
     // Fall through to the callback metadata.
   }
 
-  const parameters = new URLSearchParams(window.location.search);
-  const intent = parameters.get("intent");
-  const provider = parameters.get("provider");
-  return (intent === "sign-in" || intent === "link") && provider
-    ? { intent, provider }
-    : null;
+  return fallback?.provider.trim() ? fallback : null;
 }
 
 function clearPendingExternalAuth() {

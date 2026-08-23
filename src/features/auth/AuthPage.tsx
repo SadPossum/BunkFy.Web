@@ -1,20 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Building2,
   CalendarCheck2,
   Eye,
   EyeOff,
   KeyRound,
+  LoaderCircle,
+  RotateCcw,
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { apiRequest, resolveApiBaseUrl } from "../../api/client";
+import { apiRequest } from "../../api/client";
 import type {
   AuthSelfRegistration,
   ExternalAuthenticationProviderList,
   MultiFactorChallenge,
   MultiFactorCodeType,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSourceState,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
 import { BrandMark } from "../../components/ui/BrandMark";
 import { StaffProfileFields } from "../workspaces/StaffProfileFields";
@@ -24,6 +33,11 @@ import {
   type StaffProfileDraft,
 } from "../workspaces/staffOnboarding";
 import { MultiFactorChallengeForm } from "./MultiFactorChallengeForm";
+import {
+  externalProviderAllowed,
+  passwordRegistrationAllowed,
+  publicAuthenticationErrorMessage,
+} from "./authenticationFlow";
 
 export function AuthPage({ invitation = false }: { invitation?: boolean }) {
   const {
@@ -49,8 +63,9 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     queryFn: () =>
       apiRequest<ExternalAuthenticationProviderList>(
         "/api/auth/external/providers",
-      ),
+    ),
     staleTime: 5 * 60_000,
+    retry: false,
   });
   const selfRegistration = useQuery({
     queryKey: ["auth", "self-registration"],
@@ -61,21 +76,47 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     staleTime: 5 * 60_000,
     retry: false,
   });
+  const providerSource = createCompositeSource({
+    label: "External sign-in options",
+    hasData: providers.data !== undefined,
+    isLoading: providers.isLoading,
+    error: providers.error,
+    isFetching: providers.isFetching,
+    refetch: () => providers.refetch(),
+  });
+  const registrationSource = createCompositeSource({
+    label: "Account registration policy",
+    hasData: selfRegistration.data !== undefined,
+    isLoading: selfRegistration.isLoading,
+    error: selfRegistration.error,
+    isFetching: selfRegistration.isFetching,
+    refetch: () => selfRegistration.refetch(),
+  });
+  const providerSourceCurrent = compositeSourceCurrent(providerSource);
+  const registrationSourceCurrent = compositeSourceCurrent(registrationSource);
   const passwordRegistrationEnabled =
     selfRegistration.data?.passwordEnabled === true;
+  const passwordRegistrationAvailable = passwordRegistrationAllowed(
+    registrationSourceCurrent,
+    selfRegistration.data,
+  );
+  const providerCodes = compositeSourceUsable(providerSource.state)
+    ? providers.data?.providers ?? []
+    : [];
+  const showProviderSection = providerCodes.length > 0 || !providerSourceCurrent;
 
   useEffect(() => {
-    if (!selfRegistration.isLoading && selfRegistration.data && !passwordRegistrationEnabled && mode === "register") {
+    if (registrationSourceCurrent && selfRegistration.data && !passwordRegistrationEnabled && mode === "register") {
       setMode("login");
     }
-  }, [mode, passwordRegistrationEnabled, selfRegistration.data, selfRegistration.isLoading]);
+  }, [mode, passwordRegistrationEnabled, registrationSourceCurrent, selfRegistration.data]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError("");
-    if (mode === "register" && !passwordRegistrationEnabled) {
-      setError("Self-registration is not enabled for this workspace.");
+    if (mode === "register" && !passwordRegistrationAvailable) {
+      setError("Refresh account registration availability before creating an account.");
       setSubmitting(false);
       return;
     }
@@ -92,6 +133,20 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     }
 
     try {
+      if (mode === "register") {
+        const latest = await selfRegistration.refetch();
+        const latestCurrent = !latest.isFetching && latest.error == null;
+        if (!passwordRegistrationAllowed(latestCurrent, latest.data)) {
+          if (latest.error) {
+            setError("Account registration availability could not be confirmed. Try again.");
+          } else {
+            setMode("login");
+            setError("Password registration is no longer available. Sign in or ask your workspace administrator.");
+          }
+          return;
+        }
+      }
+
       const username = String(data.get("username") ?? "").trim();
       const credentials = {
         username,
@@ -115,9 +170,12 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
         await register(credentials);
       }
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Authentication failed.",
-      );
+      setError(publicAuthenticationErrorMessage(
+        cause,
+        mode === "login"
+          ? "Email or password was not accepted."
+          : "The account could not be created. Review the details and try again.",
+      ));
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +196,10 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
         multiFactor.username,
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Verification failed.");
+      setError(publicAuthenticationErrorMessage(
+        cause,
+        "The verification code was not accepted. Check it and try again.",
+      ));
     } finally {
       setSubmitting(false);
     }
@@ -148,18 +209,23 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     setExternalSubmitting(provider);
     setError("");
     try {
+      const latest = await providers.refetch();
+      const latestCurrent = !latest.isFetching && latest.error == null;
+      if (!externalProviderAllowed(latestCurrent, latest.data, provider)) {
+        throw new Error(latest.error
+          ? "External sign-in options could not be refreshed. Try again."
+          : "That external sign-in option is no longer available.");
+      }
       await beginExternalSignIn(provider);
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "External authentication could not start.",
-      );
+      setError(publicAuthenticationErrorMessage(
+        cause,
+        "External authentication could not start.",
+      ));
+    } finally {
       setExternalSubmitting(null);
     }
   }
-
-  const providerCodes = providers.data?.providers ?? [];
   return (
     <main className="auth-grid min-h-screen bg-base-200 p-3 sm:p-5">
       <section className="relative hidden overflow-hidden bg-primary p-10 text-primary-content lg:flex lg:flex-col lg:justify-between">
@@ -235,116 +301,197 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
             />
           ) : (
             <>
-          <form className="mt-8 space-y-5" onSubmit={submit}>
-            <label className="form-control block">
-              <span className="label-text mb-1.5 block text-sm font-semibold">
-                Email
-              </span>
-              <input
-                name="username"
-                type="email"
-                className="input input-bordered h-12 w-full bg-base-100"
-                placeholder="you@example.com"
-                autoComplete="email"
-                required
-              />
-            </label>
-            <PasswordField
-              name="password"
-              label="Password"
-              show={showPassword}
-              autoComplete={
-                mode === "login" ? "current-password" : "new-password"
-              }
-              onToggle={() => setShowPassword((value) => !value)}
-            />
-            {mode === "register" && (
-              <PasswordField
-                name="confirmPassword"
-                label="Confirm password"
-                show={showPassword}
-                autoComplete="new-password"
-              />
-            )}
-            {invitation && mode === "register" && (
-              <div className="border-t border-base-300 pt-5">
-                <h3 className="font-display text-lg font-semibold">Your staff profile</h3>
-                <p className="mb-4 mt-1 text-sm leading-6 text-base-content/50">
-                  These details will appear to your workspace team.
-                </p>
-                <StaffProfileFields value={staffProfile} onChange={setStaffProfile} compact />
-              </div>
-            )}
-            {error && (
-              <div className="alert alert-error py-3 text-sm">
-                <span>{error}</span>
-              </div>
-            )}
-            <button
-              className="btn btn-primary h-12 w-full text-base"
-              disabled={submitting || externalSubmitting !== null}
-            >
-              {submitting && (
-                <span className="loading loading-spinner loading-sm" />
+              <form className="mt-8 space-y-5" onSubmit={submit}>
+                <label className="form-control block">
+                  <span className="label-text mb-1.5 block text-sm font-semibold">
+                    Email
+                  </span>
+                  <input
+                    name="username"
+                    type="email"
+                    className="input input-bordered h-12 w-full bg-base-100"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    required
+                  />
+                </label>
+                <PasswordField
+                  name="password"
+                  label="Password"
+                  show={showPassword}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  onToggle={() => setShowPassword((value) => !value)}
+                />
+                {mode === "register" && (
+                  <PasswordField
+                    name="confirmPassword"
+                    label="Confirm password"
+                    show={showPassword}
+                    autoComplete="new-password"
+                  />
+                )}
+                {invitation && mode === "register" && (
+                  <div className="border-t border-base-300 pt-5">
+                    <h3 className="font-display text-lg font-semibold">Your staff profile</h3>
+                    <p className="mb-4 mt-1 text-sm leading-6 text-base-content/50">
+                      These details will appear to your workspace team.
+                    </p>
+                    <StaffProfileFields
+                      value={staffProfile}
+                      onChange={setStaffProfile}
+                      compact
+                    />
+                  </div>
+                )}
+                {error && (
+                  <div className="alert alert-error py-3 text-sm">
+                    <span>{error}</span>
+                  </div>
+                )}
+                <button
+                  className="btn btn-primary h-12 w-full text-base text-white"
+                  disabled={
+                    submitting ||
+                    externalSubmitting !== null ||
+                    (mode === "register" && !passwordRegistrationAvailable)
+                  }
+                >
+                  {submitting && (
+                    <span className="loading loading-spinner loading-sm" />
+                  )}
+                  {mode === "login" ? "Sign in" : "Create account"}
+                </button>
+              </form>
+
+              {showProviderSection && (
+                <div className="mt-6">
+                  <div className="divider text-xs uppercase text-base-content/35">
+                    or
+                  </div>
+                  {!providerSourceCurrent && (
+                    <AuthSourceNotice
+                      state={providerSource.state}
+                      refreshing={providerSource.isFetching}
+                      loadingLabel="Checking external sign-in options"
+                      title="External sign-in options are delayed"
+                      description="Password sign-in remains available. Refresh before choosing a provider."
+                      onRetry={() => void providers.refetch()}
+                    />
+                  )}
+                  {providerCodes.length > 0 && (
+                    <div className="mt-3 grid gap-2">
+                      {providerCodes.map((provider) => (
+                        <button
+                          key={provider}
+                          type="button"
+                          className="btn btn-outline h-12"
+                          disabled={
+                            !providerSourceCurrent ||
+                            externalSubmitting !== null ||
+                            submitting
+                          }
+                          onClick={() => void continueWithProvider(provider)}
+                        >
+                          {externalSubmitting === provider ? (
+                            <span className="loading loading-spinner loading-sm" />
+                          ) : (
+                            <KeyRound size={17} />
+                          )}
+                          Continue with {providerLabel(provider)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-              {mode === "login" ? "Sign in" : "Create account"}
-            </button>
-          </form>
 
-          {providerCodes.length > 0 && (
-            <div className="mt-6">
-              <div className="divider text-xs uppercase text-base-content/35">
-                or
-              </div>
-              <div className="grid gap-2">
-                {providerCodes.map((provider) => (
+              {registrationSourceCurrent && passwordRegistrationEnabled ? (
+                <p className="mt-6 text-center text-sm text-base-content/55">
+                  {mode === "login"
+                    ? "New to BunkFy?"
+                    : "Already have an account?"}{" "}
                   <button
-                    key={provider}
                     type="button"
-                    className="btn btn-outline h-12"
-                    disabled={externalSubmitting !== null || submitting}
-                    onClick={() => void continueWithProvider(provider)}
+                    className="link link-primary font-semibold no-underline hover:underline"
+                    onClick={() => {
+                      setMode(mode === "login" ? "register" : "login");
+                      setError("");
+                    }}
                   >
-                    {externalSubmitting === provider ? (
-                      <span className="loading loading-spinner loading-sm" />
-                    ) : (
-                      <KeyRound size={17} />
-                    )}
-                    Continue with {providerLabel(provider)}
+                    {mode === "login" ? "Register" : "Sign in"}
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {passwordRegistrationEnabled ? (
-            <p className="mt-6 text-center text-sm text-base-content/55">
-              {mode === "login"
-                ? "New to BunkFy?"
-                : "Already have an account?"}{" "}
-              <button
-                className="link link-primary font-semibold no-underline hover:underline"
-                onClick={() => {
-                  setMode(mode === "login" ? "register" : "login");
-                  setError("");
-                }}
-              >
-                {mode === "login" ? "Register" : "Sign in"}
-              </button>
-            </p>
-          ) : (
-            <p className="mt-6 text-center text-sm text-base-content/45">
-              Need access? Ask a workspace administrator.
-            </p>
-          )}
+                </p>
+              ) : registrationSourceCurrent ? (
+                <p className="mt-6 text-center text-sm text-base-content/45">
+                  Password registration is not available. Sign in with an existing account
+                  {providerCodes.length > 0 ? " or an available provider" : ""}.
+                </p>
+              ) : (
+                <div className="mt-6">
+                  <AuthSourceNotice
+                    state={registrationSource.state}
+                    refreshing={registrationSource.isFetching}
+                    loadingLabel="Checking account registration"
+                    title="Registration availability is delayed"
+                    description="Password sign-in remains available. Refresh before creating an account."
+                    onRetry={() => void selfRegistration.refetch()}
+                  />
+                </div>
+              )}
             </>
           )}
-          <p className="mt-10 text-center text-xs text-base-content/35">
-            Connected to {resolveApiBaseUrl()}
-          </p>
         </div>
       </section>
     </main>
+  );
+}
+
+function AuthSourceNotice({
+  state,
+  refreshing,
+  loadingLabel,
+  title,
+  description,
+  onRetry,
+}: {
+  state: CompositeSourceState;
+  refreshing: boolean;
+  loadingLabel: string;
+  title: string;
+  description: string;
+  onRetry: () => void;
+}) {
+  if (state === "loading" || (state === "ready" && refreshing)) {
+    return (
+      <div
+        className="flex items-center justify-center gap-2 py-3 text-sm text-base-content/50"
+        role="status"
+      >
+        <LoaderCircle className="animate-spin text-primary" size={17} />
+        {loadingLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="alert items-start border border-warning/25 bg-warning/8 text-base-content">
+      <AlertTriangle className="mt-0.5 shrink-0 text-warning-content" size={18} />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-base-content/60">{description}</p>
+      </div>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm shrink-0"
+        disabled={refreshing}
+        onClick={onRetry}
+      >
+        <RotateCcw className={refreshing ? "animate-spin" : ""} size={15} />
+        Retry
+      </button>
+    </div>
   );
 }
 

@@ -59,7 +59,11 @@ describe("frontend repository foundation", () => {
     expect(nginx).toContain("add_header Strict-Transport-Security \"max-age=31536000\" always;");
     expect(nginx).toContain("add_header X-Content-Type-Options nosniff always;");
     expect(nginx).toContain("add_header X-Frame-Options DENY always;");
-    expect(nginx).toContain("add_header Referrer-Policy strict-origin-when-cross-origin always;");
+    expect(nginx).toContain("add_header Referrer-Policy no-referrer always;");
+    expect(nginx).toContain("location = /auth/complete {");
+    expect(nginx).toContain("access_log off;");
+    const html = readFileSync(join(repositoryRoot, "index.html"), "utf8");
+    expect(html).toContain('<meta name="referrer" content="no-referrer" />');
   });
 
   it("keeps tenant-aware auth and API boundaries explicit", () => {

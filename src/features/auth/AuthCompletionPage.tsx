@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, LoaderCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   MultiFactorChallenge,
   MultiFactorCodeType,
@@ -7,11 +7,16 @@ import type {
 import { useSession } from "../../app/session";
 import { BrandMark } from "../../components/ui/BrandMark";
 import { MultiFactorChallengeForm } from "./MultiFactorChallengeForm";
+import {
+  parseExternalAuthenticationCallback,
+  publicAuthenticationErrorMessage,
+} from "./authenticationFlow";
 
 export function AuthCompletionPage() {
   const {
     completeExternalAuthentication,
     completeMultiFactorSignIn,
+    cancelExternalAuthentication,
     isRestoring,
     session,
   } = useSession();
@@ -22,24 +27,37 @@ export function AuthCompletionPage() {
     challenge: MultiFactorChallenge;
     username: string;
   } | null>(null);
-  const parameters = new URLSearchParams(window.location.search);
-  const code = parameters.get("code") || "";
-  const provider = parameters.get("provider") || "";
-  const providerError = parameters.get("error");
+  const [callback] = useState(() =>
+    parseExternalAuthenticationCallback(window.location.search));
+
+  useLayoutEffect(() => {
+    if (!window.location.search && !window.location.hash) return;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      window.location.pathname,
+    );
+  }, []);
 
   useEffect(() => {
     if (isRestoring || started.current) return;
     started.current = true;
-    if (providerError) {
+    if (callback.providerRejected) {
+      cancelExternalAuthentication();
       setError("The external provider did not complete authentication.");
       return;
     }
-    if (!code || !provider) {
+    if (!callback.code || !callback.provider) {
+      cancelExternalAuthentication();
       setError("The external authentication response is incomplete.");
       return;
     }
 
-    void completeExternalAuthentication(code, provider)
+    void completeExternalAuthentication(
+      callback.code,
+      callback.provider,
+      callback.intent,
+    )
       .then((completion) => {
         if (completion.kind === "redirect") {
           window.location.replace(completion.destination);
@@ -51,18 +69,17 @@ export function AuthCompletionPage() {
         });
       })
       .catch((cause) => {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "External authentication failed.",
-        );
+        cancelExternalAuthentication();
+        setError(publicAuthenticationErrorMessage(
+          cause,
+          "External authentication could not be completed. Start again from BunkFy.",
+        ));
       });
   }, [
-    code,
+    callback,
+    cancelExternalAuthentication,
     completeExternalAuthentication,
     isRestoring,
-    provider,
-    providerError,
   ]);
 
   async function completeMultiFactor(
@@ -81,9 +98,10 @@ export function AuthCompletionPage() {
       );
       window.location.replace("/");
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Verification failed.",
-      );
+      setError(publicAuthenticationErrorMessage(
+        cause,
+        "The verification code was not accepted. Check it and try again.",
+      ));
       setSubmitting(false);
     }
   }
@@ -115,7 +133,10 @@ export function AuthCompletionPage() {
               error={error}
               submitting={submitting}
               onSubmit={completeMultiFactor}
-              onCancel={() => window.location.replace("/")}
+              onCancel={() => {
+                cancelExternalAuthentication();
+                window.location.replace("/");
+              }}
             />
           </div>
         ) : error ? (
@@ -130,6 +151,7 @@ export function AuthCompletionPage() {
             <a
               className="btn btn-primary mt-6 w-full"
               href={session ? "/account" : "/"}
+              onClick={cancelExternalAuthentication}
             >
               Return to BunkFy
             </a>
