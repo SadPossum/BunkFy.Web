@@ -12,7 +12,7 @@ function sourceFile(name: string): string {
   return readFileSync(
     join(repositoryRoot, "src", "features", "workspaces", name),
     "utf8",
-  );
+  ).replaceAll("\r\n", "\n");
 }
 
 function source(state: "loading" | "ready" | "stale" | "unavailable", isFetching = false) {
