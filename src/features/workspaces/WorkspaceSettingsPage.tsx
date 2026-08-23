@@ -22,6 +22,7 @@ import { PageHeader } from "../../components/ui/primitives";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { WorkspaceInvitesSettings } from "./WorkspaceInvitesSettings";
 import { WorkspaceMembersSettings } from "./WorkspaceMembersSettings";
+import { useWorkspaceCatalogueSource } from "./WorkspaceCatalogueNotice";
 import { RetentionHealthSettings } from "./RetentionHealthSettings";
 import { WorkspaceRolesSettings } from "./WorkspaceRolesSettings";
 import {
@@ -51,6 +52,8 @@ export function WorkspaceSettingsPage() {
   } = useWorkspace();
   const [tab, setTab] = useState<WorkspaceSettingsTab>("general");
   const [memberPage, setMemberPage] = useState(1);
+  const workspaceSource = useWorkspaceCatalogueSource();
+  const workspaceAuthorityCurrent = compositeSourceCurrent(workspaceSource);
   const workspace = selectedWorkspace?.organization;
   const owner = isOwner(selectedWorkspace?.membership.role);
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
@@ -72,8 +75,8 @@ export function WorkspaceSettingsPage() {
     isFetching: permissionAccess.isFetching,
     refetch: permissionAccess.refetch,
   });
-  const permissionAuthorityCurrent = owner || Boolean(
-    permissionSource && compositeSourceCurrent(permissionSource),
+  const permissionAuthorityCurrent = workspaceAuthorityCurrent && (
+    owner || Boolean(permissionSource && compositeSourceCurrent(permissionSource))
   );
   const propertySource = createCompositeSource({
     label: "Property directory",
@@ -140,9 +143,9 @@ export function WorkspaceSettingsPage() {
         title={workspace.name}
         description={`Manage team access and workspace identity for ${workspace.slug}.`}
         action={(
-          <span className={`badge h-8 gap-2 border-0 px-3 font-semibold text-white ${owner ? "bg-primary" : "bg-neutral"}`}>
+          <span className={`badge h-8 gap-2 border-0 px-3 font-semibold text-white ${owner && workspaceAuthorityCurrent ? "bg-primary" : owner ? "bg-warning-content" : "bg-neutral"}`}>
             <ShieldCheck size={15} />
-            {owner ? "Owner" : "Member"}
+            {owner ? workspaceAuthorityCurrent ? "Owner" : "Owner snapshot" : "Member"}
           </span>
         )}
       />
@@ -179,7 +182,8 @@ export function WorkspaceSettingsPage() {
             <GeneralSettings
               key={workspace.organizationId}
               workspace={workspace}
-              canManage={owner}
+              owner={owner}
+              authorityCurrent={workspaceAuthorityCurrent}
               onSaved={refetchWorkspaces}
             />
           )}
@@ -192,6 +196,7 @@ export function WorkspaceSettingsPage() {
               properties={properties}
               propertySource={propertySource}
               memberSource={memberSource}
+              authorityCurrent={workspaceAuthorityCurrent}
               page={memberPage}
               pageSize={MEMBERS_PAGE_SIZE}
               hasMore={members.data?.hasMore}
@@ -227,14 +232,17 @@ export function WorkspaceSettingsPage() {
 
 function GeneralSettings({
   workspace,
-  canManage,
+  owner,
+  authorityCurrent,
   onSaved,
 }: {
   workspace: Organization;
-  canManage: boolean;
+  owner: boolean;
+  authorityCurrent: boolean;
   onSaved: () => Promise<void>;
 }) {
   const { request } = useSession();
+  const canManage = owner && authorityCurrent;
   const [name, setName] = useState(workspace.name);
   const [slug, setSlug] = useState(workspace.slug);
   const updateAttempt = useRef<WorkspaceUpdateAttempt | null>(null);
@@ -291,7 +299,10 @@ function GeneralSettings({
       </div>
       {!canManage && (
         <div className="mt-5 flex items-start gap-3 rounded-lg bg-base-200/70 p-4 text-sm text-base-content/60">
-          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />Workspace identity can only be changed by the owner.
+          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
+          {owner
+            ? "Refresh the workspace list before changing workspace identity."
+            : "Workspace identity can only be changed by the owner."}
         </div>
       )}
       {update.error && <SettingsError error={update.error} />}

@@ -31,6 +31,7 @@ import {
   type StaffProfileDraft,
 } from "./staffOnboarding";
 import { waitForWorkspaceAccess } from "./workspaceAccess";
+import { WorkspaceCatalogueNotice } from "./WorkspaceCatalogueNotice";
 import {
   clearPreservedWorkspaceJoinSecret,
   isWorkspaceStaffOnboardingExpired,
@@ -403,6 +404,10 @@ export function JoinWorkspacePage() {
             Sign out
           </button>
         </div>
+        <WorkspaceCatalogueNotice
+          className="mt-5"
+          title="Your existing workspace list is delayed"
+        />
         <div className="mt-6 flex items-center gap-3 text-primary">
           {data ? <Building2 size={26} /> : <Link2 size={26} />}
           <p className="text-xs font-bold uppercase">

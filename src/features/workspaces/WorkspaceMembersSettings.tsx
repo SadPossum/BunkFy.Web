@@ -36,6 +36,7 @@ export function WorkspaceMembersSettings({
   properties,
   propertySource,
   memberSource,
+  authorityCurrent,
   page,
   pageSize,
   hasMore,
@@ -49,6 +50,7 @@ export function WorkspaceMembersSettings({
   properties: Property[];
   propertySource: CompositeSource;
   memberSource: CompositeSource;
+  authorityCurrent: boolean;
   page: number;
   pageSize: number;
   hasMore: boolean | undefined;
@@ -78,15 +80,16 @@ export function WorkspaceMembersSettings({
   const membersUsable = compositeSourceUsable(memberSource.state);
   const profilesUsable = compositeSourceUsable(profileSource.state);
   const membersCurrent = compositeSourceCurrent(memberSource);
-  const accessDirectoriesCurrent = workspaceAccessSourcesCurrent([
+  const accessDirectoriesCurrent = authorityCurrent && workspaceAccessSourcesCurrent([
     memberSource,
     profileSource,
     propertySource,
   ]) && !profiles.data?.hasMore;
+  const transferAuthorityCurrent = authorityCurrent && membersCurrent;
   const transfer = useMutation({
     mutationFn: (membership: OrganizationMembership) => {
-      if (!membersCurrent) {
-        throw new Error("Refresh workspace members before transferring ownership.");
+      if (!transferAuthorityCurrent) {
+        throw new Error("Refresh workspace and member data before transferring ownership.");
       }
       return request(`/api/organizations/${workspace.organizationId}/ownership/transfer`, {
         method: "POST",
@@ -190,7 +193,7 @@ export function WorkspaceMembersSettings({
                           transfer.reset();
                           setTransferTargetSubjectId(membership.subjectId);
                         }}
-                        disabled={transfer.isPending || !membersCurrent}
+                        disabled={transfer.isPending || !transferAuthorityCurrent}
                       >
                         <ShieldCheck size={15} />Make owner
                       </button>
@@ -250,9 +253,9 @@ export function WorkspaceMembersSettings({
             You will lose owner-only workspace controls immediately. The new owner can manage members,
             invitations, roles, retention settings, and future ownership changes.
           </p>
-          {!membersCurrent && (
+          {!transferAuthorityCurrent && (
             <div className="alert alert-warning mt-4 py-3 text-sm">
-              Refresh workspace members before confirming this ownership change.
+              Refresh workspace and member data before confirming this ownership change.
             </div>
           )}
           {transfer.error && <SettingsError error={transfer.error} />}
@@ -264,7 +267,7 @@ export function WorkspaceMembersSettings({
               type="button"
               className="btn btn-primary min-w-36 text-white"
               onClick={() => transfer.mutate(transferTarget)}
-              disabled={transfer.isPending || !membersCurrent}
+              disabled={transfer.isPending || !transferAuthorityCurrent}
             >
               {transfer.isPending && <span className="loading loading-spinner loading-sm" />}
               Transfer ownership

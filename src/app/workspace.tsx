@@ -14,13 +14,16 @@ import type {
   Property,
 } from "../api/types";
 import { loadAllProperties } from "../features/properties/propertiesApi";
+import { reconcileSelectedWorkspaceId } from "../features/workspaces/workspaceCatalogue";
 import { useSession } from "./session";
 
 const WORKSPACE_STORAGE_KEY = "bunkfy.workspace.current.v1";
 
 type WorkspaceValue = {
   workspaces: OrganizationMembershipSummary[];
+  workspacesLoaded: boolean;
   workspacesLoading: boolean;
+  workspacesFetching: boolean;
   workspacesError: unknown;
   selectedWorkspace: OrganizationMembershipSummary | null;
   selectedWorkspaceId: string;
@@ -50,20 +53,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     queryFn: () => request<OrganizationListResponse>("/api/organizations?page=1&pageSize=100"),
   });
   const workspaces = workspacesQuery.data?.items ?? [];
+  const workspaceCatalogueCurrent = Boolean(
+    workspacesQuery.data !== undefined &&
+      !workspacesQuery.error &&
+      !workspacesQuery.isFetching,
+  );
 
   useEffect(() => {
-    if (workspacesQuery.isLoading) return;
-    const selectedExists = workspaces.some(
-      (item) => item.organization.organizationId === selectedWorkspaceId,
+    if (!workspaceCatalogueCurrent) return;
+    const nextId = reconcileSelectedWorkspaceId(
+      selectedWorkspaceId,
+      workspaces.map((item) => item.organization.organizationId),
+      true,
     );
-    const nextId = selectedExists
-      ? selectedWorkspaceId
-      : workspaces[0]?.organization.organizationId ?? "";
     if (nextId !== selectedWorkspaceId) setSelectedWorkspaceIdState(nextId);
     selectWorkspace(nextId);
     if (nextId) localStorage.setItem(WORKSPACE_STORAGE_KEY, nextId);
     else localStorage.removeItem(WORKSPACE_STORAGE_KEY);
-  }, [selectWorkspace, selectedWorkspaceId, workspaces, workspacesQuery.isLoading]);
+  }, [
+    selectWorkspace,
+    selectedWorkspaceId,
+    workspaceCatalogueCurrent,
+    workspaces,
+  ]);
 
   const setSelectedWorkspaceId = useCallback(
     (id: string) => {
@@ -108,7 +120,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const value = useMemo<WorkspaceValue>(
     () => ({
       workspaces,
+      workspacesLoaded: workspacesQuery.data !== undefined,
       workspacesLoading: workspacesQuery.isLoading,
+      workspacesFetching: workspacesQuery.isFetching,
       workspacesError: workspacesQuery.error,
       selectedWorkspace:
         workspaces.find(
@@ -143,7 +157,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectedWorkspaceId,
       setSelectedWorkspaceId,
       workspaces,
+      workspacesQuery.data,
       workspacesQuery.error,
+      workspacesQuery.isFetching,
       workspacesQuery.isLoading,
       workspacesQuery.refetch,
     ],

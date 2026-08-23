@@ -1,12 +1,18 @@
-import { Bell, Blocks, Building2, Cable, CalendarDays, Gauge, LogOut, Menu, Settings2, ShieldCheck, UserRoundCog, UsersRound, X } from "lucide-react";
+import { AlertTriangle, Bell, Blocks, Building2, Cable, CalendarDays, Gauge, LoaderCircle, LogOut, Menu, Settings2, ShieldCheck, UserRoundCog, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router";
+import {
+  compositeSourceNeedsRetry,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { useNotifications } from "../../features/notifications/notifications";
+import { useWorkspaceCatalogueSource } from "../../features/workspaces/WorkspaceCatalogueNotice";
 import { navigationItemAllowed, navigationScopes } from "./navigationAccess";
 import { BrandMark } from "../ui/BrandMark";
+import { CompositeSourceNotice } from "../ui/CompositeSourceNotice";
 import { InitialAvatar } from "../ui/primitives";
 import { SelectPicker } from "../ui/SelectPicker";
 
@@ -27,6 +33,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { session, logout } = useSession();
   const {
     properties,
+    propertiesLoaded,
+    propertiesLoading,
+    propertiesFetching,
+    propertiesError,
+    refetchProperties,
     selectedPropertyId,
     setSelectedPropertyId,
     selectedWorkspace,
@@ -51,6 +62,46 @@ export function AppShell({ children }: { children: ReactNode }) {
     }),
   ).values()];
   const navigationAccess = usePermissions(navigationChecks);
+  const workspaceSource = useWorkspaceCatalogueSource();
+  const scopeReady = Boolean(
+    selectedWorkspaceId && session?.tenantId === selectedWorkspaceId,
+  );
+  const propertySource = createCompositeSource({
+    label: "Property list",
+    hasData: propertiesLoaded,
+    isLoading: propertiesLoading,
+    error: propertiesError,
+    isFetching: propertiesFetching,
+    refetch: refetchProperties,
+  });
+  const navigationSource = createCompositeSource({
+    label: "Navigation access",
+    hasData: navigationAccess.hasData,
+    isLoading: navigationAccess.isLoading,
+    error: navigationAccess.error,
+    isFetching: navigationAccess.isFetching,
+    refetch: navigationAccess.refetch,
+  });
+  const canReadPropertyDirectory = navigationAccess.hasData &&
+    navigationScopes("tenant-or-property", tenantScope, propertyScope).some(
+      (scope) => navigationAccess.allows(permissions.propertiesRead, scope),
+    );
+  const shellSources = [
+    workspaceSource,
+    ...(scopeReady ? [navigationSource] : []),
+    ...(scopeReady && canReadPropertyDirectory ? [propertySource] : []),
+  ];
+  const shellDelayed = shellSources.some((source) =>
+    compositeSourceNeedsRetry(source.state),
+  );
+  const shellRefreshing = !shellDelayed && shellSources.some(
+    (source) => source.isFetching,
+  );
+  const shellStatusLabel = shellDelayed
+    ? "Workspace updates delayed"
+    : shellRefreshing
+      ? "Refreshing workspace"
+      : "Live workspace";
   const visibleNavigation = navigation.filter((item) => navigationItemAllowed(
     item.required,
     scopesForNavigationItem(item),
@@ -138,7 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ]}
               />
             </div>
-            <div>
+            {canReadPropertyDirectory && <div>
               <p className="text-xs font-medium text-base-content/40">Current property</p>
               <SelectPicker
                 className="mt-1 max-w-52"
@@ -150,9 +201,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 placeholder="No property yet"
                 options={properties.map((property) => ({ value: property.propertyId, label: property.name }))}
               />
-            </div>
+            </div>}
           </div>
-          <div className="lg:hidden">
+          {canReadPropertyDirectory && <div className="lg:hidden">
             <SelectPicker
               className="w-40"
               size="sm"
@@ -162,10 +213,29 @@ export function AppShell({ children }: { children: ReactNode }) {
               placeholder="No property"
               options={properties.map((property) => ({ value: property.propertyId, label: property.name }))}
             />
+          </div>}
+          <div className="flex items-center gap-2">
+            <NavLink to="/notifications" className="btn btn-circle btn-ghost btn-sm relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}>
+              <Bell size={18} />
+              {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.6rem] font-bold leading-4 text-primary-content">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+            </NavLink>
+            <div className="flex items-center gap-2" role="status" aria-label={shellStatusLabel}>
+              <span className="hidden text-xs font-semibold text-base-content/45 sm:inline">{shellStatusLabel}</span>
+              {shellDelayed
+                ? <AlertTriangle className="text-warning" size={17} aria-hidden="true" />
+                : shellRefreshing
+                  ? <LoaderCircle className="animate-spin text-primary" size={17} aria-hidden="true" />
+                  : <span className="status-dot" aria-hidden="true" />}
+            </div>
           </div>
-          <div className="flex items-center gap-2"><NavLink to="/notifications" className="btn btn-circle btn-ghost btn-sm relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}><Bell size={18} />{unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.6rem] font-bold leading-4 text-primary-content">{unreadCount > 99 ? "99+" : unreadCount}</span>}</NavLink><div className="flex items-center gap-2" role="status" aria-label="Workspace connected"><span className="hidden text-xs font-semibold text-base-content/45 sm:inline">Live workspace</span><span className="status-dot" aria-hidden="true" /></div></div>
         </header>
-        <main className="mx-auto max-w-[1480px] p-4 sm:p-8">{children}</main>
+        <main className="mx-auto max-w-[1480px] p-4 sm:p-8">
+          <CompositeSourceNotice
+            sources={shellSources}
+            title="Some workspace data is delayed"
+          />
+          {children}
+        </main>
       </div>
     </div>
   );

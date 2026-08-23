@@ -16,6 +16,7 @@ import {
   resolveWorkspaceCreationAttempt,
   type WorkspaceCreationAttempt,
 } from "./workspaceCreationAttempt";
+import { WorkspaceCatalogueNotice } from "./WorkspaceCatalogueNotice";
 
 export function WorkspaceOnboardingPage() {
   const navigate = useNavigate();
@@ -86,6 +87,10 @@ export function WorkspaceOnboardingPage() {
             Sign out
           </button>
         </div>
+        <WorkspaceCatalogueNotice
+          className="mt-8"
+          title="Your existing workspace list is delayed"
+        />
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_30rem] lg:items-start">
           <section>
             <p className="text-xs font-bold uppercase text-primary">Workspace setup</p>
