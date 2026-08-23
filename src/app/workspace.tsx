@@ -97,24 +97,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     enabled: workspaceScopeReady,
   });
   const properties = propertiesQuery.data?.properties ?? [];
+  const propertyCatalogueCurrent = Boolean(
+    propertiesQuery.data !== undefined &&
+      !propertiesQuery.error &&
+      !propertiesQuery.isFetching,
+  );
 
   useEffect(() => {
     setSelectedPropertyIdState(localStorage.getItem(propertyStorageKey) ?? "");
   }, [propertyStorageKey]);
 
   useEffect(() => {
-    if (!selectedPropertyId && properties[0]) setSelectedPropertyIdState(properties[0].propertyId);
-    if (
-      selectedPropertyId &&
-      properties.length &&
-      !properties.some((property) => property.propertyId === selectedPropertyId)
-    ) {
+    if (!propertyCatalogueCurrent) return;
+    const selectedStillExists = properties.some(
+      (property) => property.propertyId === selectedPropertyId,
+    );
+    if (!selectedPropertyId || !selectedStillExists) {
       setSelectedPropertyIdState(properties[0]?.propertyId ?? "");
     }
-  }, [properties, selectedPropertyId]);
+  }, [properties, propertyCatalogueCurrent, selectedPropertyId]);
 
   useEffect(() => {
     if (selectedPropertyId) localStorage.setItem(propertyStorageKey, selectedPropertyId);
+    else localStorage.removeItem(propertyStorageKey);
   }, [propertyStorageKey, selectedPropertyId]);
 
   const value = useMemo<WorkspaceValue>(

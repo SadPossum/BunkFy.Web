@@ -7,9 +7,11 @@ import {
 import { LoadingState } from "./primitives";
 
 export function CompositeSourceNotice({
+  className = "mb-4",
   sources,
   title = "Some data is delayed",
 }: {
+  className?: string;
   sources: CompositeSource[];
   title?: string;
 }) {
@@ -19,7 +21,7 @@ export function CompositeSourceNotice({
   const retrying = affectedSources.some((source) => source.isFetching);
   return (
     <div
-      className="alert mb-4 flex-col items-stretch gap-3 border border-warning/25 bg-warning/10 text-base-content sm:flex-row sm:items-center"
+      className={`alert flex-col items-stretch gap-3 border border-warning/25 bg-warning/10 text-base-content sm:flex-row sm:items-center ${className}`}
       role="status"
     >
       <AlertTriangle className="shrink-0 self-start text-warning sm:self-auto" size={19} />

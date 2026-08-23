@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BedDouble, Building2, Edit3, Layers3, MapPin, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, BedDouble, Building2, Edit3, Layers3, MapPin, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import type {
@@ -15,12 +15,18 @@ import type {
   TopologyRetirement,
 } from "../../api/types";
 import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, topologyRetirementNeedsLiveRefresh } from "../../app/liveUpdates";
 import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
-import { EmptyState, ErrorState, FormActions, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import { EmptyState, ErrorState, FormActions, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
@@ -31,6 +37,12 @@ import {
   timeZoneLabel,
 } from "./propertyFormOptions";
 import { loadAllBeds, loadAllRooms } from "./propertiesApi";
+import {
+  bedRecordIsCurrent,
+  propertiesMutationAllowed,
+  propertyRecordMatches,
+  roomRecordIsCurrent,
+} from "./propertiesMutationAuthority";
 import {
   resolveBedMutationAttempt,
   type BedMutationAttempt,
@@ -115,26 +127,62 @@ export function PropertiesPage() {
       { permission: permissions.inventoryRetire, scope: propertyScope },
     ] : []),
   ]);
-  const canCreateProperty = access.allows(permissions.propertiesManage, tenantScope);
-  const canManageProperty = access.allows(permissions.propertiesManage, propertyScope);
-  const canManageRooms = access.allows(permissions.roomsManage, propertyScope);
-  const canManageBeds = access.allows(permissions.bedsManage, propertyScope);
-  const canRetireInventory = access.allows(permissions.inventoryRetire, propertyScope);
+  const mayCreateProperty = access.allows(permissions.propertiesManage, tenantScope);
+  const mayManageProperty = access.allows(permissions.propertiesManage, propertyScope);
+  const mayManageRooms = access.allows(permissions.roomsManage, propertyScope);
+  const mayManageBeds = access.allows(permissions.bedsManage, propertyScope);
+  const mayRetireInventory = access.allows(permissions.inventoryRetire, propertyScope);
+  const permissionSource = createCompositeSource({
+    label: "Property permissions",
+    hasData: access.hasData,
+    isLoading: access.isLoading,
+    error: access.error,
+    isFetching: access.isFetching,
+    refetch: access.refetch,
+  });
+  const propertySource = createCompositeSource({
+    label: "Property directory",
+    hasData: workspace.propertiesLoaded,
+    isLoading: workspace.propertiesLoading,
+    error: workspace.propertiesError,
+    isFetching: workspace.propertiesFetching,
+    refetch: workspace.refetchProperties,
+  });
 
   const rooms = useQuery({
     queryKey: ["rooms", selectedPropertyId],
     queryFn: (context) => loadAllRooms(request, selectedPropertyId, context.signal),
     enabled: Boolean(selectedPropertyId),
   });
-  const roomItems = rooms.data?.rooms ?? [];
+  const roomSource = createCompositeSource({
+    label: "Room directory",
+    hasData: rooms.data !== undefined,
+    isLoading: rooms.isLoading,
+    error: rooms.error,
+    isFetching: rooms.isFetching,
+    refetch: () => rooms.refetch(),
+  });
+  const roomsUsable = compositeSourceUsable(roomSource.state);
+  const roomItems = roomsUsable ? rooms.data?.rooms ?? [] : [];
   const selectedRoom = roomItems.find((room) => room.roomId === selectedRoomId) ?? roomItems[0] ?? null;
   const beds = useQuery({
     queryKey: ["beds", selectedPropertyId, selectedRoom?.roomId],
     queryFn: (context) => loadAllBeds(request, selectedPropertyId, selectedRoom!.roomId, context.signal),
     enabled: Boolean(selectedPropertyId && selectedRoom),
   });
-  const bedItems = beds.data?.beds ?? emptyBeds;
-  const focusedResourceId = useTransientResourceFocus(Boolean(rooms.data && (!targetBedId || beds.data)));
+  const bedSource = createCompositeSource({
+    label: "Bed directory",
+    hasData: beds.data !== undefined,
+    isLoading: beds.isLoading,
+    error: beds.error,
+    isFetching: beds.isFetching,
+    refetch: () => beds.refetch(),
+  });
+  const bedsUsable = compositeSourceUsable(bedSource.state);
+  const bedItems = bedsUsable ? beds.data?.beds ?? emptyBeds : emptyBeds;
+  const focusedResourceId = useTransientResourceFocus(
+    roomsUsable && (!targetBedId || bedsUsable),
+  );
   const focusedRoomId = focusedResourceId === targetRoomId ? targetRoomId : null;
   const focusedBedId = focusedResourceId === targetBedId ? targetBedId : null;
   const retirementProcess = useQuery({
@@ -149,6 +197,48 @@ export function PropertiesPage() {
       : false,
     refetchIntervalInBackground: false,
   });
+  const retirementSource = retirementOutcome ? createCompositeSource({
+    label: "Retirement status",
+    hasData: retirementProcess.data !== undefined,
+    isLoading: retirementProcess.isLoading,
+    error: retirementProcess.error,
+    isFetching: retirementProcess.isFetching,
+    refetch: () => retirementProcess.refetch(),
+  }) : null;
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const propertyCurrent = compositeSourceCurrent(propertySource);
+  const roomsCurrent = compositeSourceCurrent(roomSource);
+  const bedsCurrent = compositeSourceCurrent(bedSource);
+  const retirementCurrent = Boolean(
+    retirementSource && compositeSourceCurrent(retirementSource),
+  );
+  const mutationEvidence = {
+    permissionsCurrent,
+    propertyCurrent,
+    roomsCurrent,
+    bedsCurrent,
+    retirementCurrent,
+  };
+  const canCreateProperty = mayCreateProperty &&
+    propertiesMutationAllowed("create-property", mutationEvidence);
+  const canUpdateProperty = mayManageProperty &&
+    propertiesMutationAllowed("update-property", mutationEvidence);
+  const canCreateRoom = mayManageRooms &&
+    propertiesMutationAllowed("create-room", mutationEvidence);
+  const canUpdateRoom = mayManageRooms &&
+    propertiesMutationAllowed("update-room", mutationEvidence);
+  const canCreateBed = mayManageBeds &&
+    propertiesMutationAllowed("create-bed", mutationEvidence);
+  const canUpdateBed = mayManageBeds &&
+    propertiesMutationAllowed("update-bed", mutationEvidence);
+  const canRetireProperty = mayManageProperty &&
+    propertiesMutationAllowed("update-property", mutationEvidence);
+  const canRetireRoom = mayRetireInventory &&
+    propertiesMutationAllowed("update-room", mutationEvidence);
+  const canRetireBed = mayRetireInventory &&
+    propertiesMutationAllowed("update-bed", mutationEvidence);
+  const canControlRetirement = mayRetireInventory &&
+    propertiesMutationAllowed("control-retirement", mutationEvidence);
 
   useEffect(() => {
     const updated = retirementProcess.data;
@@ -165,18 +255,38 @@ export function PropertiesPage() {
   }, [queryClient, retirementOutcome, retirementProcess.data, selectedPropertyId, workspace]);
 
   useEffect(() => {
+    propertyCreateAttempt.current = null;
+    propertyUpdateAttempt.current = null;
+    roomMutationAttempt.current = null;
+    bedMutationAttempt.current = null;
+    retirementRequestAttempt.current = null;
+    retirementRetryAttempt.current = null;
+    retirementCancellationAttempt.current = null;
+    propertyRetirementAttempt.current = null;
+    setPropertyForm(null);
+    setRoomForm(null);
+    setBedForm(null);
+    setRetirementTarget(null);
+    setRetirementOutcome(null);
+    setSelectedRoomId("");
+  }, [selectedPropertyId]);
+
+  useEffect(() => {
+    if (!roomsCurrent) return;
     if (targetRoomId && roomItems.some((room) => room.roomId === targetRoomId)) {
       setSelectedRoomId(targetRoomId);
       return;
     }
     if (roomItems.length && !roomItems.some((room) => room.roomId === selectedRoomId)) setSelectedRoomId(roomItems[0].roomId);
     if (!roomItems.length) setSelectedRoomId("");
-  }, [roomItems, selectedRoomId, targetRoomId]);
+  }, [roomItems, roomsCurrent, selectedRoomId, targetRoomId]);
 
   const invalidateProperty = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["properties"] }),
       queryClient.invalidateQueries({ queryKey: ["rooms", selectedPropertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["beds", selectedPropertyId] }),
+      queryClient.invalidateQueries({ queryKey: ["property-processing", selectedPropertyId] }),
       queryClient.invalidateQueries({ queryKey: ["inventory-rooms", selectedPropertyId] }),
     ]);
     await workspace.refetchProperties();
@@ -184,6 +294,12 @@ export function PropertiesPage() {
 
   const propertyMutation = useMutation({
     mutationFn: async (input: PropertyMutationInput) => {
+      requireMutationAuthority(
+        input.property
+          ? canUpdateProperty && propertyRecordMatches(selectedProperty, input.property)
+          : canCreateProperty,
+        "Refresh property access and directory data before saving this property.",
+      );
       if (input.property) {
         propertyUpdateAttempt.current = resolvePropertyUpdateAttempt(
           propertyUpdateAttempt.current,
@@ -241,6 +357,12 @@ export function PropertiesPage() {
   }
   const roomMutation = useMutation({
     mutationFn: async (input: { room?: Room; name: string; buildingLabel: string; floorLabel: string }) => {
+      requireMutationAuthority(
+        input.room
+          ? canUpdateRoom && roomRecordIsCurrent(roomItems, input.room)
+          : canCreateRoom,
+        "Refresh property access and topology data before saving this room.",
+      );
       roomMutationAttempt.current = resolveRoomMutationAttempt(
         roomMutationAttempt.current,
         {
@@ -285,6 +407,12 @@ export function PropertiesPage() {
   }
   const bedMutation = useMutation({
     mutationFn: async (input: BedMutationInput) => {
+      requireMutationAuthority(
+        input.bed
+          ? canUpdateBed && bedRecordIsCurrent(bedItems, selectedRoom, input.bed)
+          : canCreateBed,
+        "Refresh property access, rooms, and beds before saving this change.",
+      );
       if (!selectedRoom) throw new Error("Choose a room before adding beds.");
       bedMutationAttempt.current = resolveBedMutationAttempt(
         bedMutationAttempt.current,
@@ -333,6 +461,15 @@ export function PropertiesPage() {
   }
   const retireMutation = useMutation<TopologyRetirement | void, Error, RetirementMutationInput>({
     mutationFn: async ({ target, reason }) => {
+      const targetCurrent = target.kind === "property"
+        ? canRetireProperty && propertyRecordMatches(selectedProperty, target.entity)
+        : target.kind === "room"
+          ? canRetireRoom && roomRecordIsCurrent(roomItems, target.entity)
+          : canRetireBed && bedRecordIsCurrent(bedItems, selectedRoom, target.entity);
+      requireMutationAuthority(
+        targetCurrent,
+        "Refresh property access and topology data before starting retirement.",
+      );
       if (target.kind === "bed") {
         retirementRequestAttempt.current = resolveTopologyRetirementRequestAttempt(
           retirementRequestAttempt.current,
@@ -391,6 +528,10 @@ export function PropertiesPage() {
 
   const retryRetirementMutation = useMutation<TopologyRetirement, Error, RetirementRetryInput>({
     mutationFn: async ({ target, outcome }) => {
+      requireMutationAuthority(
+        canControlRetirement,
+        "Refresh property access and retirement status before retrying finalization.",
+      );
       retirementRetryAttempt.current = resolveTopologyRetirementRetryAttempt(
         retirementRetryAttempt.current,
         {
@@ -427,6 +568,10 @@ export function PropertiesPage() {
 
   const cancelRetirementMutation = useMutation<TopologyRetirement, Error, RetirementCancellationInput>({
     mutationFn: async ({ target, outcome, reason }) => {
+      requireMutationAuthority(
+        canControlRetirement,
+        "Refresh property access and retirement status before stopping retirement.",
+      );
       retirementCancellationAttempt.current = resolveTopologyRetirementCancellationAttempt(
         retirementCancellationAttempt.current,
         {
@@ -466,6 +611,31 @@ export function PropertiesPage() {
   const retirementNeedsAuthentication =
     Boolean(retirementTarget) &&
     isInsufficientAuthenticationError(retireMutation.error);
+  const propertyCatalogueUsable = compositeSourceUsable(propertySource.state);
+  const topologySources = selectedRoom ? [roomSource, bedSource] : [roomSource];
+  const propertyFormCanSubmit = propertyForm?.property
+    ? canUpdateProperty && propertyRecordMatches(selectedProperty, propertyForm.property)
+    : canCreateProperty;
+  const roomFormCanSubmit = roomForm?.room
+    ? canUpdateRoom && roomRecordIsCurrent(roomItems, roomForm.room)
+    : canCreateRoom;
+  const bedFormCanSubmit = bedForm?.bed
+    ? canUpdateBed && bedRecordIsCurrent(bedItems, selectedRoom, bedForm.bed)
+    : canCreateBed;
+  const retirementTargetMatchesCurrentSource = retirementTarget?.kind === "property"
+    ? propertyRecordMatches(selectedProperty, retirementTarget.entity)
+    : retirementTarget?.kind === "room"
+      ? roomRecordIsCurrent(roomItems, retirementTarget.entity)
+      : retirementTarget?.kind === "bed"
+        ? bedRecordIsCurrent(bedItems, selectedRoom, retirementTarget.entity)
+        : false;
+  const canConfirmRetirement = retirementTarget?.kind === "property"
+    ? canRetireProperty && retirementTargetMatchesCurrentSource
+    : retirementTarget?.kind === "room"
+      ? canRetireRoom && retirementTargetMatchesCurrentSource
+      : retirementTarget?.kind === "bed"
+        ? canRetireBed && retirementTargetMatchesCurrentSource
+        : false;
 
   function retryRetirementAfterAuthentication() {
     const input = retireMutation.variables;
@@ -486,61 +656,224 @@ export function PropertiesPage() {
     setRetirementTarget(null);
   }
 
-  if (workspace.propertiesLoading) return <LoadingState />;
-  if (workspace.propertiesError) return <ErrorState error={workspace.propertiesError} />;
-
   return (
     <>
-      <PageHeader eyebrow="Setup" title="Properties" description="Keep each hostel’s physical layout accurate so availability and reservations stay trustworthy." action={canCreateProperty ? <button className="btn btn-primary" onClick={() => setPropertyForm({})}><Plus size={17} />New property</button> : undefined} />
+      <PageHeader
+        eyebrow="Setup"
+        title="Properties"
+        description="Keep each hostel’s physical layout accurate so availability and reservations stay trustworthy."
+        action={canCreateProperty ? (
+          <button className="btn btn-primary" onClick={() => setPropertyForm({})}>
+            <Plus size={17} />New property
+          </button>
+        ) : undefined}
+      />
+      <CompositeSourceNotice
+        sources={[permissionSource, propertySource]}
+        title="Some property context is delayed"
+      />
 
-      {!workspace.properties.length ? <EmptyState icon={<Building2 />} title="No properties yet" description="Create your first hostel property to begin adding rooms and beds." action={canCreateProperty ? <button className="btn btn-primary" onClick={() => setPropertyForm({})}><Plus size={17} />Add property</button> : undefined} /> : (
+      {!propertyCatalogueUsable ? (
+        <div className="card border border-base-300 bg-base-100 shadow-sm">
+          <CompositeSourceFallback state={propertySource.state} label="properties" />
+        </div>
+      ) : !workspace.properties.length ? (
+        <EmptyState
+          icon={<Building2 />}
+          title="No properties yet"
+          description="Create your first hostel property to begin adding rooms and beds."
+          action={canCreateProperty ? (
+            <button className="btn btn-primary" onClick={() => setPropertyForm({})}>
+              <Plus size={17} />Add property
+            </button>
+          ) : undefined}
+        />
+      ) : (
         <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-3">
             {workspace.properties.map((property) => (
-              <button key={property.propertyId} onClick={() => workspace.setSelectedPropertyId(property.propertyId)} className={`w-full rounded-2xl border p-4 text-left transition ${property.propertyId === selectedPropertyId ? "border-primary bg-primary text-primary-content shadow-md" : "border-base-300 bg-base-100 hover:border-primary/35"}`}>
-                <div className="flex items-start justify-between gap-3"><div className={`grid size-10 place-items-center rounded-xl ${property.propertyId === selectedPropertyId ? "bg-primary-content/10" : "bg-primary/10 text-primary"}`}><Building2 size={19} /></div><StatusBadge status={property.status} surface={property.propertyId === selectedPropertyId ? "dark" : "light"} /></div>
+              <button
+                key={property.propertyId}
+                onClick={() => workspace.setSelectedPropertyId(property.propertyId)}
+                className={`w-full rounded-2xl border p-4 text-left transition ${property.propertyId === selectedPropertyId ? "border-primary bg-primary text-primary-content shadow-md" : "border-base-300 bg-base-100 hover:border-primary/35"}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className={`grid size-10 place-items-center rounded-xl ${property.propertyId === selectedPropertyId ? "bg-primary-content/10" : "bg-primary/10 text-primary"}`}>
+                    <Building2 size={19} />
+                  </div>
+                  <StatusBadge status={property.status} surface={property.propertyId === selectedPropertyId ? "dark" : "light"} />
+                </div>
                 <h2 className="mt-4 font-display text-lg font-semibold">{property.name}</h2>
                 <p className={`mt-1 text-xs ${property.propertyId === selectedPropertyId ? "text-primary-content/55" : "text-base-content/45"}`}>{property.code} · {property.timeZoneId}</p>
               </button>
             ))}
           </aside>
 
-          {selectedProperty && <section className="min-w-0 space-y-6">
-            <div className="card border border-base-300 bg-base-100 shadow-sm"><div className="card-body gap-5 p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex items-center gap-3"><h2 className="font-display text-2xl font-semibold">{selectedProperty.name}</h2><StatusBadge status={selectedProperty.status} /></div><p className="mt-2 flex items-center gap-2 text-sm text-base-content/50"><MapPin size={15} />{selectedProperty.timeZoneId} · Code {selectedProperty.code}</p></div>{canManageProperty && <div className="flex gap-2"><button className="btn btn-sm btn-ghost" onClick={() => setPropertyForm({ property: selectedProperty })}><Edit3 size={16} />Edit</button><button className="btn btn-sm btn-ghost text-error" onClick={() => setRetirementTarget({ kind: "property", entity: selectedProperty })}><Trash2 size={16} />Retire</button></div>}</div></div></div>
-
-            <PropertyProcessingPanel
-              property={selectedProperty}
-              canManage={canManageProperty}
-              onChanged={invalidateProperty}
-            />
-
-            <div className="card border border-base-300 bg-base-100 shadow-sm">
-              <div className="flex items-center justify-between border-b border-base-300 px-5 py-5 sm:px-6"><div><h2 className="font-display text-xl font-semibold">Rooms & beds</h2><p className="mt-1 text-sm text-base-content/50">The physical topology used by inventory.</p></div>{canManageRooms && <button className="btn btn-sm btn-primary" onClick={() => setRoomForm({})}><Plus size={16} />Add room</button>}</div>
-              {rooms.isLoading ? <LoadingState label="Loading rooms" /> : rooms.error ? <div className="p-6"><ErrorState error={rooms.error} /></div> : !roomItems.length ? <div className="p-6"><EmptyState icon={<Layers3 />} title="No rooms configured" description="Add the first room, then assign beds or sell it as a whole room." action={canManageRooms ? <button className="btn btn-sm btn-primary" onClick={() => setRoomForm({})}>Add room</button> : undefined} /></div> : (
-                <div className="grid min-h-[430px] md:grid-cols-[280px_1fr]">
-                  <div className="border-b border-base-300 p-3 md:border-b-0 md:border-r">
-                    {roomItems.map((room) => <button key={room.roomId} onClick={() => setSelectedRoomId(room.roomId)} className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${selectedRoom?.roomId === room.roomId ? "bg-base-200" : "hover:bg-base-200/60"} ${focusedRoomId === room.roomId ? focusedResourceClass : ""}`}><div className="grid size-9 place-items-center rounded-lg bg-secondary/15 text-secondary"><BedDouble size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{room.name}</p><p className="truncate text-xs text-base-content/40">{[room.buildingLabel, room.floorLabel].filter(Boolean).join(" · ") || "No location labels"}</p></div><MoreHorizontal size={16} className="text-base-content/30" /></button>)}
+          {selectedProperty && (
+            <section className="min-w-0 space-y-6">
+              <div className="card border border-base-300 bg-base-100 shadow-sm">
+                <div className="card-body gap-5 p-5 sm:p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h2 className="font-display text-2xl font-semibold">{selectedProperty.name}</h2>
+                        <StatusBadge status={selectedProperty.status} />
+                      </div>
+                      <p className="mt-2 flex items-center gap-2 text-sm text-base-content/50">
+                        <MapPin size={15} />{selectedProperty.timeZoneId} · Code {selectedProperty.code}
+                      </p>
+                    </div>
+                    {(canUpdateProperty || canRetireProperty) && (
+                      <div className="flex gap-2">
+                        {canUpdateProperty && (
+                          <button className="btn btn-sm btn-ghost" onClick={() => setPropertyForm({ property: selectedProperty })}>
+                            <Edit3 size={16} />Edit
+                          </button>
+                        )}
+                        {canRetireProperty && (
+                          <button className="btn btn-sm btn-ghost text-error" onClick={() => setRetirementTarget({ kind: "property", entity: selectedProperty })}>
+                            <Trash2 size={16} />Retire
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {selectedRoom && <div className="p-5 sm:p-6"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-display text-xl font-semibold">{selectedRoom.name}</h3><StatusBadge status={selectedRoom.status} /></div><p className="mt-1 text-sm text-base-content/45">{[selectedRoom.buildingLabel, selectedRoom.floorLabel].filter(Boolean).join(" · ") || "No building or floor label"}</p></div>{canManageRooms && <div className="dropdown dropdown-end"><button tabIndex={0} className="btn btn-circle btn-ghost btn-sm" aria-label={`Actions for ${selectedRoom.name}`}><MoreHorizontal size={18} /></button><ul tabIndex={0} className="menu dropdown-content z-10 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"><li><button onClick={() => setRoomForm({ room: selectedRoom })}><Edit3 size={15} />Edit room</button></li>{canRetireInventory && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "room", entity: selectedRoom })}><Trash2 size={15} />Retire</button></li>}</ul></div>}</div>
-                    <div className="my-5 flex items-center justify-between"><p className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Beds</p>{canManageBeds && <button className="btn btn-sm btn-outline" onClick={() => setBedForm({})}><Plus size={15} />Add bed</button>}</div>
-                    {beds.isLoading ? <LoadingState label="Loading beds" /> : beds.error ? <ErrorState error={beds.error} /> : !bedItems.length ? <EmptyState icon={<BedDouble />} title="No beds in this room" description="Add beds for bed-level sales, or configure the room for room-level inventory." action={canManageBeds ? <button className="btn btn-sm btn-primary" onClick={() => setBedForm({})}>Add beds</button> : undefined} /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{bedItems.map((bed) => <div key={bed.bedId} className={`rounded-xl border border-base-300 p-4 ${focusedBedId === bed.bedId ? focusedResourceClass : ""}`}><div className="flex items-start justify-between"><div className="grid size-9 place-items-center rounded-lg bg-accent/15 text-accent-content"><BedDouble size={17} /></div>{canManageBeds && <div className="dropdown dropdown-end"><button tabIndex={0} className="btn btn-circle btn-ghost btn-xs" aria-label={`Actions for ${bed.label}`}><MoreHorizontal size={15} /></button><ul tabIndex={0} className="menu dropdown-content z-10 w-36 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"><li><button onClick={() => setBedForm({ bed })}>Edit</button></li>{canRetireInventory && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "bed", entity: bed, roomId: selectedRoom.roomId })}>Retire</button></li>}</ul></div>}</div><p className="mt-3 font-semibold">{bed.label}</p><div className="mt-2"><StatusBadge status={bed.status} /></div></div>)}</div>}
-                  </div>}
                 </div>
-              )}
-            </div>
-          </section>}
+              </div>
+
+              <PropertyProcessingPanel
+                property={selectedProperty}
+                canManage={mayManageProperty}
+                permissionsCurrent={permissionsCurrent}
+                propertyCurrent={propertyCurrent}
+                onChanged={invalidateProperty}
+              />
+
+              <div className="card border border-base-300 bg-base-100 shadow-sm">
+                <div className="flex items-center justify-between border-b border-base-300 px-5 py-5 sm:px-6">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold">Rooms & beds</h2>
+                    <p className="mt-1 text-sm text-base-content/50">The physical topology used by inventory.</p>
+                  </div>
+                  {canCreateRoom && (
+                    <button className="btn btn-sm btn-primary" onClick={() => setRoomForm({})}>
+                      <Plus size={16} />Add room
+                    </button>
+                  )}
+                </div>
+                <CompositeSourceNotice
+                  className="mx-5 mt-5 sm:mx-6"
+                  sources={topologySources}
+                  title="Some topology data is delayed"
+                />
+                {!roomsUsable ? (
+                  <CompositeSourceFallback state={roomSource.state} label="rooms" />
+                ) : !roomItems.length ? (
+                  <div className="p-6">
+                    <EmptyState
+                      icon={<Layers3 />}
+                      title="No rooms configured"
+                      description="Add the first room, then assign beds or sell it as a whole room."
+                      action={canCreateRoom ? (
+                        <button className="btn btn-sm btn-primary" onClick={() => setRoomForm({})}>Add room</button>
+                      ) : undefined}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid min-h-[430px] md:grid-cols-[280px_1fr]">
+                    <div className="border-b border-base-300 p-3 md:border-b-0 md:border-r">
+                      {roomItems.map((room) => (
+                        <button
+                          key={room.roomId}
+                          onClick={() => setSelectedRoomId(room.roomId)}
+                          className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${selectedRoom?.roomId === room.roomId ? "bg-base-200" : "hover:bg-base-200/60"} ${focusedRoomId === room.roomId ? focusedResourceClass : ""}`}
+                        >
+                          <div className="grid size-9 place-items-center rounded-lg bg-secondary/15 text-secondary"><BedDouble size={17} /></div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{room.name}</p>
+                            <p className="truncate text-xs text-base-content/40">{[room.buildingLabel, room.floorLabel].filter(Boolean).join(" · ") || "No location labels"}</p>
+                          </div>
+                          <MoreHorizontal size={16} className="text-base-content/30" />
+                        </button>
+                      ))}
+                    </div>
+                    {selectedRoom && (
+                      <div className="p-5 sm:p-6">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-display text-xl font-semibold">{selectedRoom.name}</h3>
+                              <StatusBadge status={selectedRoom.status} />
+                            </div>
+                            <p className="mt-1 text-sm text-base-content/45">{[selectedRoom.buildingLabel, selectedRoom.floorLabel].filter(Boolean).join(" · ") || "No building or floor label"}</p>
+                          </div>
+                          {(canUpdateRoom || canRetireRoom) && (
+                            <div className="dropdown dropdown-end">
+                              <button tabIndex={0} className="btn btn-circle btn-ghost btn-sm" aria-label={`Actions for ${selectedRoom.name}`}><MoreHorizontal size={18} /></button>
+                              <ul tabIndex={0} className="menu dropdown-content z-10 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+                                {canUpdateRoom && <li><button onClick={() => setRoomForm({ room: selectedRoom })}><Edit3 size={15} />Edit room</button></li>}
+                                {canRetireRoom && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "room", entity: selectedRoom })}><Trash2 size={15} />Retire</button></li>}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                        <div className="my-5 flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Beds</p>
+                          {canCreateBed && <button className="btn btn-sm btn-outline" onClick={() => setBedForm({})}><Plus size={15} />Add bed</button>}
+                        </div>
+                        {!bedsUsable ? (
+                          <CompositeSourceFallback state={bedSource.state} label="beds" />
+                        ) : !bedItems.length ? (
+                          <EmptyState
+                            icon={<BedDouble />}
+                            title="No beds in this room"
+                            description="Add beds for bed-level sales, or configure the room for room-level inventory."
+                            action={canCreateBed ? <button className="btn btn-sm btn-primary" onClick={() => setBedForm({})}>Add beds</button> : undefined}
+                          />
+                        ) : (
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {bedItems.map((bed) => (
+                              <div key={bed.bedId} className={`rounded-xl border border-base-300 p-4 ${focusedBedId === bed.bedId ? focusedResourceClass : ""}`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="grid size-9 place-items-center rounded-lg bg-accent/15 text-accent-content"><BedDouble size={17} /></div>
+                                  {(canUpdateBed || canRetireBed) && (
+                                    <div className="dropdown dropdown-end">
+                                      <button tabIndex={0} className="btn btn-circle btn-ghost btn-xs" aria-label={`Actions for ${bed.label}`}><MoreHorizontal size={15} /></button>
+                                      <ul tabIndex={0} className="menu dropdown-content z-10 w-36 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+                                        {canUpdateBed && <li><button onClick={() => setBedForm({ bed })}>Edit</button></li>}
+                                        {canRetireBed && <li><button className="text-error" onClick={() => setRetirementTarget({ kind: "bed", entity: bed, roomId: selectedRoom.roomId })}>Retire</button></li>}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="mt-3 font-semibold">{bed.label}</p>
+                                <div className="mt-2"><StatusBadge status={bed.status} /></div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
         </div>
       )}
 
-      <PropertyForm state={(propertyForm?.property ? canManageProperty : canCreateProperty) ? propertyForm : null} mutation={propertyMutation} onClose={closePropertyForm} />
-      <RoomForm state={canManageRooms ? roomForm : null} mutation={roomMutation} onClose={closeRoomForm} />
-      <BedForm state={canManageBeds ? bedForm : null} existingBeds={bedItems} mutation={bedMutation} onClose={closeBedForm} />
+      <PropertyForm state={propertyForm} canSubmit={propertyFormCanSubmit} mutation={propertyMutation} onClose={closePropertyForm} />
+      <RoomForm state={roomForm} canSubmit={roomFormCanSubmit} mutation={roomMutation} onClose={closeRoomForm} />
+      <BedForm state={bedForm} canSubmit={bedFormCanSubmit} existingBeds={bedItems} mutation={bedMutation} onClose={closeBedForm} />
       <TopologyRetirementModal
         target={retirementTarget}
         outcome={retirementProcess.data ?? retirementOutcome}
+        canConfirm={canConfirmRetirement}
+        canRetry={canControlRetirement}
+        canCancel={canControlRetirement}
         pending={retireMutation.isPending}
-        error={retirementNeedsAuthentication ? null : retireMutation.error}
-        authenticationPrompt={retirementNeedsAuthentication ? (
+        error={retirementNeedsAuthentication && canConfirmRetirement ? null : retireMutation.error}
+        authenticationPrompt={retirementNeedsAuthentication && canConfirmRetirement ? (
           <RecentAuthenticationPrompt
             error={retireMutation.error}
             title={`Confirm your password to retire this ${retirementTarget?.kind ?? "topology"}`}
@@ -553,16 +886,16 @@ export function PropertiesPage() {
         retryError={retryRetirementMutation.error}
         cancellationPending={cancelRetirementMutation.isPending}
         cancellationError={cancelRetirementMutation.error}
-        onConfirm={(reason) => retirementTarget && retireMutation.mutate({ target: retirementTarget, reason })}
+        onConfirm={(reason) => canConfirmRetirement && retirementTarget && retireMutation.mutate({ target: retirementTarget, reason })}
         onRefresh={() => void retirementProcess.refetch()}
         onRetry={() => {
-          if (retirementTarget?.kind === "bed" || retirementTarget?.kind === "room") {
+          if (canControlRetirement && (retirementTarget?.kind === "bed" || retirementTarget?.kind === "room")) {
             const outcome = retirementProcess.data ?? retirementOutcome;
             if (outcome) retryRetirementMutation.mutate({ target: retirementTarget, outcome });
           }
         }}
         onCancelRetirement={(reason) => {
-          if (retirementTarget?.kind === "bed" || retirementTarget?.kind === "room") {
+          if (canControlRetirement && (retirementTarget?.kind === "bed" || retirementTarget?.kind === "room")) {
             const outcome = retirementProcess.data ?? retirementOutcome;
             if (outcome) cancelRetirementMutation.mutate({ target: retirementTarget, outcome, reason });
           }
@@ -573,22 +906,138 @@ export function PropertiesPage() {
   );
 }
 
-function PropertyForm({ state, mutation, onClose }: { state: PropertyFormState; mutation: ReturnType<typeof useMutation<PropertyMutationReceipt, Error, PropertyMutationInput>>; onClose: () => void }) {
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ property: state?.property, name: String(data.get("name")), code: String(data.get("code")).toUpperCase(), timeZoneId: String(data.get("timeZoneId")) }); }
-  return <Modal open={Boolean(state)} title={state?.property ? "Edit property" : "New property"} description="Property details are shared across topology, inventory and reservations." onClose={onClose}><form onSubmit={submit} className="space-y-4"><Input label="Property name" name="name" defaultValue={state?.property?.name} placeholder="Harbour House Hostel" /><div className="grid gap-4 sm:grid-cols-2"><Input label="Short code" name="code" defaultValue={state?.property?.code} placeholder="HBR" maxLength={16} /><TimeZoneSelect defaultValue={state?.property?.timeZoneId} /></div>{mutation.error && <ErrorState error={mutation.error} title="Couldn't save the property" />}<FormActions submitting={mutation.isPending} submitLabel={state?.property ? "Save changes" : "Create property"} onCancel={onClose} /></form></Modal>;
+function requireMutationAuthority(allowed: boolean, message: string): void {
+  if (!allowed) throw new Error(message);
 }
 
-function RoomForm({ state, mutation, onClose }: { state: RoomFormState; mutation: ReturnType<typeof useMutation<RoomMutationReceipt, Error, { room?: Room; name: string; buildingLabel: string; floorLabel: string }>>; onClose: () => void }) {
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ room: state?.room, name: String(data.get("name")), buildingLabel: String(data.get("buildingLabel")), floorLabel: String(data.get("floorLabel")) }); }
-  return <Modal open={Boolean(state)} title={state?.room ? "Edit room" : "Add room"} description="Use labels your staff will recognize at a glance." onClose={onClose}><form onSubmit={submit} className="space-y-4"><Input label="Room name or number" name="name" defaultValue={state?.room?.name} placeholder="Room 204" /><div className="grid gap-4 sm:grid-cols-2"><Input label="Building (optional)" name="buildingLabel" defaultValue={state?.room?.buildingLabel ?? ""} placeholder="Main building" required={false} /><Input label="Floor (optional)" name="floorLabel" defaultValue={state?.room?.floorLabel ?? ""} placeholder="Second floor" required={false} /></div>{mutation.error && <ErrorState error={mutation.error} />}<FormActions submitting={mutation.isPending} submitLabel={state?.room ? "Save room" : "Add room"} onCancel={onClose} /></form></Modal>;
+function PropertyForm({ state, canSubmit, mutation, onClose }: {
+  state: PropertyFormState;
+  canSubmit: boolean;
+  mutation: ReturnType<typeof useMutation<PropertyMutationReceipt, Error, PropertyMutationInput>>;
+  onClose: () => void;
+}) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    const data = new FormData(event.currentTarget);
+    mutation.mutate({
+      property: state?.property,
+      name: String(data.get("name")),
+      code: String(data.get("code")).toUpperCase(),
+      timeZoneId: String(data.get("timeZoneId")),
+    });
+  }
+
+  return (
+    <Modal
+      open={Boolean(state)}
+      title={state?.property ? "Edit property" : "New property"}
+      description="Property details are shared across topology, inventory and reservations."
+      onClose={onClose}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {!canSubmit && state && <MutationAuthorityNotice label="property" />}
+        <Input label="Property name" name="name" defaultValue={state?.property?.name} placeholder="Harbour House Hostel" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input label="Short code" name="code" defaultValue={state?.property?.code} placeholder="HBR" maxLength={16} />
+          <TimeZoneSelect defaultValue={state?.property?.timeZoneId} />
+        </div>
+        {mutation.error && <ErrorState error={mutation.error} title="Couldn't save the property" />}
+        <FormActions
+          submitting={mutation.isPending}
+          disabled={!canSubmit}
+          submitLabel={state?.property ? "Save changes" : "Create property"}
+          onCancel={onClose}
+        />
+      </form>
+    </Modal>
+  );
 }
 
-function BedForm({ state, existingBeds, mutation, onClose }: { state: BedFormState; existingBeds: Bed[]; mutation: ReturnType<typeof useMutation<BedMutationResult, Error, BedMutationInput>>; onClose: () => void }) {
+function RoomForm({ state, canSubmit, mutation, onClose }: {
+  state: RoomFormState;
+  canSubmit: boolean;
+  mutation: ReturnType<typeof useMutation<RoomMutationReceipt, Error, {
+    room?: Room;
+    name: string;
+    buildingLabel: string;
+    floorLabel: string;
+  }>>;
+  onClose: () => void;
+}) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    const data = new FormData(event.currentTarget);
+    mutation.mutate({
+      room: state?.room,
+      name: String(data.get("name")),
+      buildingLabel: String(data.get("buildingLabel")),
+      floorLabel: String(data.get("floorLabel")),
+    });
+  }
+
+  return (
+    <Modal
+      open={Boolean(state)}
+      title={state?.room ? "Edit room" : "Add room"}
+      description="Use labels your staff will recognize at a glance."
+      onClose={onClose}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {!canSubmit && state && <MutationAuthorityNotice label="room" />}
+        <Input label="Room name or number" name="name" defaultValue={state?.room?.name} placeholder="Room 204" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input label="Building (optional)" name="buildingLabel" defaultValue={state?.room?.buildingLabel ?? ""} placeholder="Main building" required={false} />
+          <Input label="Floor (optional)" name="floorLabel" defaultValue={state?.room?.floorLabel ?? ""} placeholder="Second floor" required={false} />
+        </div>
+        {mutation.error && <ErrorState error={mutation.error} title="Couldn't save the room" />}
+        <FormActions
+          submitting={mutation.isPending}
+          disabled={!canSubmit}
+          submitLabel={state?.room ? "Save room" : "Add room"}
+          onCancel={onClose}
+        />
+      </form>
+    </Modal>
+  );
+}
+
+function BedForm({ state, canSubmit, existingBeds, mutation, onClose }: {
+  state: BedFormState;
+  canSubmit: boolean;
+  existingBeds: Bed[];
+  mutation: ReturnType<typeof useMutation<BedMutationResult, Error, BedMutationInput>>;
+  onClose: () => void;
+}) {
   const editing = Boolean(state?.bed);
-  return <Modal open={Boolean(state)} title={editing ? "Edit bed" : "Add beds"} description={editing ? "Keep the label short and easy to find in the room." : "Choose how many beds the room has, then customize any labels you need."} onClose={onClose}>{state && <BedFormFields state={state} existingBeds={existingBeds} mutation={mutation} onClose={onClose} />}</Modal>;
+  return (
+    <Modal
+      open={Boolean(state)}
+      title={editing ? "Edit bed" : "Add beds"}
+      description={editing ? "Keep the label short and easy to find in the room." : "Choose how many beds the room has, then customize any labels you need."}
+      onClose={onClose}
+    >
+      {state && (
+        <BedFormFields
+          state={state}
+          canSubmit={canSubmit}
+          existingBeds={existingBeds}
+          mutation={mutation}
+          onClose={onClose}
+        />
+      )}
+    </Modal>
+  );
 }
 
-function BedFormFields({ state, existingBeds, mutation, onClose }: { state: NonNullable<BedFormState>; existingBeds: Bed[]; mutation: ReturnType<typeof useMutation<BedMutationResult, Error, BedMutationInput>>; onClose: () => void }) {
+function BedFormFields({ state, canSubmit, existingBeds, mutation, onClose }: {
+  state: NonNullable<BedFormState>;
+  canSubmit: boolean;
+  existingBeds: Bed[];
+  mutation: ReturnType<typeof useMutation<BedMutationResult, Error, BedMutationInput>>;
+  onClose: () => void;
+}) {
   const existingLabels = useMemo(
     () => existingBeds.filter((bed) => bed.bedId !== state?.bed?.bedId).map((bed) => bed.label),
     [existingBeds, state?.bed?.bedId],
@@ -611,6 +1060,7 @@ function BedFormFields({ state, existingBeds, mutation, onClose }: { state: NonN
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmit) return;
     const normalizedLabels = labels.map((label) => label.trim());
     if (normalizedLabels.some((label) => !label)) {
       setFormError("Every bed needs a label.");
@@ -630,7 +1080,47 @@ function BedFormFields({ state, existingBeds, mutation, onClose }: { state: NonN
   }
 
   const editing = Boolean(state?.bed);
-  return <form onSubmit={submit} className="space-y-4">{!editing && <label className="form-control block max-w-40"><span className="label-text mb-1.5 block text-sm font-semibold">Number of beds</span><input className="input input-bordered w-full" type="number" min={1} max={50} value={count} onChange={(event) => changeCount(Number(event.target.value))} /></label>}<div><div className="mb-3"><p className="text-sm font-semibold">{editing ? "Bed label" : "Bed labels"}</p>{!editing && <p className="mt-1 text-xs text-base-content/50">Numbered automatically. Edit only the labels you want to change.</p>}</div><div className="grid gap-3 sm:max-h-64 sm:grid-cols-2 sm:overflow-y-auto sm:pr-1">{labels.map((label, index) => <label key={index} className="form-control block"><span className="label-text mb-1.5 block text-xs font-semibold">{editing ? "Label" : `Bed ${index + 1}`}</span><input className="input input-bordered w-full" value={label} maxLength={128} onChange={(event) => changeLabel(index, event.target.value)} required /></label>)}</div></div>{(formError || mutation.error) && <ErrorState error={formError || mutation.error} title={editing ? "Couldn't save the bed" : "Couldn't add the beds"} />}<FormActions submitting={mutation.isPending} submitLabel={editing ? "Save bed" : count === 1 ? "Add bed" : `Add ${count} beds`} onCancel={onClose} /></form>;
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      {!canSubmit && <MutationAuthorityNotice label="bed directory" />}
+      {!editing && (
+        <label className="form-control block max-w-40">
+          <span className="label-text mb-1.5 block text-sm font-semibold">Number of beds</span>
+          <input className="input input-bordered w-full" type="number" min={1} max={50} value={count} onChange={(event) => changeCount(Number(event.target.value))} />
+        </label>
+      )}
+      <div>
+        <div className="mb-3">
+          <p className="text-sm font-semibold">{editing ? "Bed label" : "Bed labels"}</p>
+          {!editing && <p className="mt-1 text-xs text-base-content/50">Numbered automatically. Edit only the labels you want to change.</p>}
+        </div>
+        <div className="grid gap-3 sm:max-h-64 sm:grid-cols-2 sm:overflow-y-auto sm:pr-1">
+          {labels.map((label, index) => (
+            <label key={index} className="form-control block">
+              <span className="label-text mb-1.5 block text-xs font-semibold">{editing ? "Label" : `Bed ${index + 1}`}</span>
+              <input className="input input-bordered w-full" value={label} maxLength={128} onChange={(event) => changeLabel(index, event.target.value)} required />
+            </label>
+          ))}
+        </div>
+      </div>
+      {(formError || mutation.error) && <ErrorState error={formError || mutation.error} title={editing ? "Couldn't save the bed" : "Couldn't add the beds"} />}
+      <FormActions
+        submitting={mutation.isPending}
+        disabled={!canSubmit}
+        submitLabel={editing ? "Save bed" : count === 1 ? "Add bed" : `Add ${count} beds`}
+        onCancel={onClose}
+      />
+    </form>
+  );
+}
+
+function MutationAuthorityNotice({ label }: { label: string }) {
+  return (
+    <div className="alert border border-warning/25 bg-warning/10 text-base-content" role="status">
+      <AlertTriangle size={18} className="text-warning-content" />
+      <p className="text-sm">Refresh property access and current {label} data before saving.</p>
+    </div>
+  );
 }
 
 function TimeZoneSelect({ defaultValue }: { defaultValue?: string }) {

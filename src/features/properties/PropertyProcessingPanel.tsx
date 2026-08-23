@@ -10,16 +10,21 @@ import type {
   PropertyProcessingState,
 } from "../../api/types";
 import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
 import {
   ErrorState,
   FormActions,
-  LoadingState,
   Modal,
   ModalActions,
   StatusBadge,
 } from "../../components/ui/primitives";
 import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
   availableCountryPolicies,
@@ -31,6 +36,7 @@ import {
   propertyProcessingMessage,
   type PropertyProcessingActivationInput,
 } from "./propertyProcessing";
+import { propertiesMutationAllowed } from "./propertiesMutationAuthority";
 import {
   resolvePropertyActivationAttempt,
   resolvePropertySimpleLifecycleAttempt,
@@ -40,10 +46,18 @@ import {
 type PropertyProcessingPanelProps = {
   property: Property;
   canManage: boolean;
+  permissionsCurrent: boolean;
+  propertyCurrent: boolean;
   onChanged: () => Promise<void> | void;
 };
 
-export function PropertyProcessingPanel({ property, canManage, onChanged }: PropertyProcessingPanelProps) {
+export function PropertyProcessingPanel({
+  property,
+  canManage,
+  permissionsCurrent,
+  propertyCurrent,
+  onChanged,
+}: PropertyProcessingPanelProps) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const [activationOpen, setActivationOpen] = useState(false);
@@ -60,6 +74,60 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
     enabled: canManage,
     staleTime: 60_000,
   });
+  const processingSource = createCompositeSource({
+    label: "Processing status",
+    hasData: processing.data !== undefined,
+    isLoading: processing.isLoading,
+    error: processing.error,
+    isFetching: processing.isFetching,
+    refetch: () => processing.refetch(),
+  });
+  const policySource = createCompositeSource({
+    label: "Country policies",
+    hasData: policies.data !== undefined,
+    isLoading: policies.isLoading,
+    error: policies.error,
+    isFetching: policies.isFetching,
+    refetch: () => policies.refetch(),
+  });
+  const processingUsable = compositeSourceUsable(processingSource.state);
+  const policiesUsable = compositeSourceUsable(policySource.state);
+  const state = processingUsable ? processing.data : undefined;
+  const binding = state?.governancePolicy ?? null;
+  const selectablePolicies = policiesUsable
+    ? availableCountryPolicies(policies.data?.items ?? [])
+    : [];
+  const canActivate = canManage && propertiesMutationAllowed("activate-processing", {
+    permissionsCurrent,
+    propertyCurrent,
+    processingCurrent: compositeSourceCurrent(processingSource),
+    policiesCurrent: compositeSourceCurrent(policySource),
+  });
+  const canSuspend = canManage && state?.configuredStatus === "enabled" &&
+    propertiesMutationAllowed("suspend-processing", {
+      permissionsCurrent,
+      propertyCurrent,
+      processingCurrent: compositeSourceCurrent(processingSource),
+    });
+  const governanceSources = [
+    processingSource,
+    ...(canManage ? [policySource] : []),
+  ];
+
+  useEffect(() => {
+    activationAttempt.current = null;
+    suspensionAttempt.current = null;
+    setActivationOpen(false);
+    setSuspensionOpen(false);
+  }, [property.propertyId]);
+
+  useEffect(() => {
+    if (!permissionsCurrent || canManage) return;
+    activationAttempt.current = null;
+    suspensionAttempt.current = null;
+    setActivationOpen(false);
+    setSuspensionOpen(false);
+  }, [canManage, permissionsCurrent]);
 
   async function refreshProperty() {
     await Promise.all([
@@ -70,6 +138,10 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
 
   const activation = useMutation({
     mutationFn: (input: PropertyProcessingActivationInput) => {
+      requireProcessingAuthority(
+        canActivate,
+        "Refresh property access, processing status, and country policies before configuring data processing.",
+      );
       activationAttempt.current = resolvePropertyActivationAttempt(
         activationAttempt.current,
         property.propertyId,
@@ -94,6 +166,10 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
   });
   const suspension = useMutation({
     mutationFn: (expectedVersion: number) => {
+      requireProcessingAuthority(
+        canSuspend,
+        "Refresh property access and processing status before suspending data processing.",
+      );
       suspensionAttempt.current = resolvePropertySimpleLifecycleAttempt(
         suspensionAttempt.current,
         "processing-suspension",
@@ -128,23 +204,30 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
     activation.mutate(input);
   }
 
-  if (processing.isLoading) {
-    return <div className="card border border-base-300 bg-base-100 shadow-sm"><LoadingState label="Checking data processing" /></div>;
-  }
-  if (processing.error || !processing.data) {
-    return <div className="card border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6"><ErrorState error={processing.error} retry={() => void processing.refetch()} title="Couldn't check data processing" /></div>;
+  if (!processingUsable || !state) {
+    return (
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <CompositeSourceNotice
+          className="mx-5 mt-5 sm:mx-6"
+          sources={governanceSources}
+          title="Data-processing context is delayed"
+        />
+        <CompositeSourceFallback state={processingSource.state} label="data processing" />
+      </section>
+    );
   }
 
-  const state = processing.data;
-  const binding = state.governancePolicy;
-  const selectablePolicies = availableCountryPolicies(policies.data?.items ?? []);
-  const canSuspend = canManage && state.configuredStatus === "enabled";
   const needsAttention = state.effectiveStatus === "expired" || state.effectiveStatus === "revoked";
 
   return (
     <>
       <section className={`card border bg-base-100 shadow-sm ${needsAttention ? "border-warning/45" : "border-base-300"}`}>
         <div className="card-body gap-5 p-5 sm:p-6">
+          <CompositeSourceNotice
+            className=""
+            sources={governanceSources}
+            title="Data-processing context is delayed"
+          />
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 gap-3">
               <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${needsAttention ? "bg-warning/15 text-warning-content" : state.effectiveStatus === "enabled" ? "bg-success/15 text-success" : "bg-base-200 text-base-content/55"}`}>
@@ -169,7 +252,7 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
                 )}
                 <button
                   className="btn btn-sm btn-primary"
-                  disabled={policies.isLoading || selectablePolicies.length === 0}
+                  disabled={!canActivate || selectablePolicies.length === 0}
                   onClick={() => setActivationOpen(true)}
                 >
                   <RotateCcw size={15} />
@@ -181,10 +264,7 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
 
           {binding && <PolicyBindingDetails binding={binding} />}
 
-          {canManage && policies.error && (
-            <ErrorState error={policies.error} retry={() => void policies.refetch()} title="Couldn't load configured policies" />
-          )}
-          {canManage && !policies.isLoading && !policies.error && selectablePolicies.length === 0 && (
+          {canManage && compositeSourceCurrent(policySource) && selectablePolicies.length === 0 && (
             <div className="alert border border-base-300 bg-base-200/65 text-base-content">
               <Database size={18} className="text-base-content/50" />
               <div>
@@ -201,9 +281,10 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
         property={property}
         processing={state}
         policies={selectablePolicies}
+        authorityCurrent={canActivate}
         pending={activation.isPending}
-        error={activationNeedsAuthentication ? null : activation.error}
-        authenticationPrompt={activationNeedsAuthentication ? (
+        error={activationNeedsAuthentication && canActivate ? null : activation.error}
+        authenticationPrompt={activationNeedsAuthentication && canActivate ? (
           <RecentAuthenticationPrompt
             error={activation.error}
             title="Confirm your password to enable data processing"
@@ -216,11 +297,12 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
           activation.reset();
           setActivationOpen(false);
         }}
-        onSubmit={(input) => activation.mutate(input)}
+        onSubmit={(input) => canActivate && activation.mutate(input)}
       />
       <SuspendProcessingModal
         open={suspensionOpen}
         state={state}
+        authorityCurrent={canSuspend}
         pending={suspension.isPending}
         error={suspension.error}
         onClose={() => {
@@ -228,7 +310,7 @@ export function PropertyProcessingPanel({ property, canManage, onChanged }: Prop
           suspension.reset();
           setSuspensionOpen(false);
         }}
-        onConfirm={() => suspension.mutate(state.propertyVersion)}
+        onConfirm={() => canSuspend && suspension.mutate(state.propertyVersion)}
       />
     </>
   );
@@ -253,11 +335,12 @@ function PolicyCoordinate({ label, value }: { label: string; value: string }) {
   return <div className="min-w-0"><dt className="text-xs font-semibold uppercase tracking-[0.12em] text-base-content/40">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div>;
 }
 
-function PolicyActivationModal({ open, property, processing, policies, pending, error, authenticationPrompt, onClose, onSubmit }: {
+function PolicyActivationModal({ open, property, processing, policies, authorityCurrent, pending, error, authenticationPrompt, onClose, onSubmit }: {
   open: boolean;
   property: Property;
   processing: PropertyProcessingState;
   policies: CountryPolicy[];
+  authorityCurrent: boolean;
   pending: boolean;
   error: unknown;
   authenticationPrompt: ReactNode;
@@ -314,7 +397,7 @@ function PolicyActivationModal({ open, property, processing, policies, pending, 
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedPolicy || !selectedRetention || !confirmed || accepted.size !== selectedPolicy.requiredAcknowledgements.length) return;
+    if (!authorityCurrent || !selectedPolicy || !selectedRetention || !confirmed || accepted.size !== selectedPolicy.requiredAcknowledgements.length) return;
     onSubmit(buildPropertyProcessingActivation(
       selectedPolicy,
       dataRegionId,
@@ -325,12 +408,21 @@ function PolicyActivationModal({ open, property, processing, policies, pending, 
   }
 
   const acknowledgementsComplete = Boolean(selectedPolicy) && accepted.size === selectedPolicy.requiredAcknowledgements.length;
-  const canSubmit = Boolean(selectedPolicy && selectedRetention && dataRegionId && transferProfileId && confirmed && acknowledgementsComplete);
+  const canSubmit = authorityCurrent && Boolean(selectedPolicy && selectedRetention && dataRegionId && transferProfileId && confirmed && acknowledgementsComplete);
 
   return (
     <Modal open={open} title={processing.governancePolicy ? "Change country policy" : "Configure data processing"} description={`Choose the deployment policy coordinates for ${property.name}.`} onClose={onClose} size="lg">
-      {!selectedPolicy ? <div className="py-8"><LoadingState label="No usable policy available" /></div> : authenticationPrompt ? (
+      {!selectedPolicy ? (
+        <div className="space-y-4 py-4">
+          {!authorityCurrent && <ProcessingAuthorityNotice />}
+          <div className="alert border border-base-300 bg-base-200/65 text-base-content">
+            <Database size={18} className="text-base-content/50" />
+            <p className="text-sm">No current country policy is available for this property.</p>
+          </div>
+        </div>
+      ) : authenticationPrompt ? (
         <div className="space-y-4">
+          {!authorityCurrent && <ProcessingAuthorityNotice />}
           {authenticationPrompt}
           <ModalActions>
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
@@ -338,6 +430,7 @@ function PolicyActivationModal({ open, property, processing, policies, pending, 
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-5">
+          {!authorityCurrent && <ProcessingAuthorityNotice />}
           <PickerField label="Country policy">
             <SelectPicker
               className="w-full"
@@ -404,9 +497,10 @@ function PolicyActivationModal({ open, property, processing, policies, pending, 
   );
 }
 
-function SuspendProcessingModal({ open, state, pending, error, onClose, onConfirm }: {
+function SuspendProcessingModal({ open, state, authorityCurrent, pending, error, onClose, onConfirm }: {
   open: boolean;
   state: PropertyProcessingState;
+  authorityCurrent: boolean;
   pending: boolean;
   error: unknown;
   onClose: () => void;
@@ -419,7 +513,8 @@ function SuspendProcessingModal({ open, state, pending, error, onClose, onConfir
 
   return (
     <Modal open={open} title="Suspend data processing" description="Pause new guest, reservation and adapter writes for this property." onClose={onClose}>
-      <form onSubmit={(event) => { event.preventDefault(); if (confirmed) onConfirm(); }} className="space-y-4">
+      <form onSubmit={(event) => { event.preventDefault(); if (authorityCurrent && confirmed) onConfirm(); }} className="space-y-4">
+        {!authorityCurrent && <ProcessingAuthorityNotice />}
         <div className="alert border border-warning/25 bg-warning/10 text-base-content">
           <ShieldAlert size={19} className="text-warning-content" />
           <p className="text-sm leading-5">Existing records are retained for authorized operations and cleanup. Resume requires a currently accepted country policy.</p>
@@ -429,9 +524,18 @@ function SuspendProcessingModal({ open, state, pending, error, onClose, onConfir
           <span className="text-sm leading-5">I understand that new property-scoped personal-data processing will be blocked.</span>
         </label>
         {error != null && <ErrorState error={error} title="Couldn't suspend data processing" />}
-        <FormActions submitting={pending} disabled={!confirmed || state.configuredStatus !== "enabled"} submitLabel="Suspend processing" onCancel={onClose} />
+        <FormActions submitting={pending} disabled={!authorityCurrent || !confirmed || state.configuredStatus !== "enabled"} submitLabel="Suspend processing" onCancel={onClose} />
       </form>
     </Modal>
+  );
+}
+
+function ProcessingAuthorityNotice() {
+  return (
+    <div className="alert border border-warning/25 bg-warning/10 text-base-content" role="status">
+      <ShieldAlert size={18} className="text-warning-content" />
+      <p className="text-sm">Refresh property access and processing context before making this change.</p>
+    </div>
   );
 }
 
@@ -457,4 +561,8 @@ function countryLabel(code: string): string {
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+}
+
+function requireProcessingAuthority(allowed: boolean, message: string): void {
+  if (!allowed) throw new Error(message);
 }

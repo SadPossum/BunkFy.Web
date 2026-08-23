@@ -12,6 +12,9 @@ export type RetirementTarget =
 export function TopologyRetirementModal({
   target,
   outcome,
+  canConfirm,
+  canRetry,
+  canCancel,
   pending,
   error,
   authenticationPrompt,
@@ -28,6 +31,9 @@ export function TopologyRetirementModal({
 }: {
   target: RetirementTarget | null;
   outcome: TopologyRetirement | null;
+  canConfirm: boolean;
+  canRetry: boolean;
+  canCancel: boolean;
   pending: boolean;
   error: Error | null;
   authenticationPrompt?: ReactNode;
@@ -70,6 +76,7 @@ export function TopologyRetirementModal({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canConfirm) return;
     onConfirm(reason.trim());
   }
 
@@ -98,6 +105,8 @@ export function TopologyRetirementModal({
         <RetirementOutcome
           outcome={outcome}
           targetKind={target.kind}
+          canRetry={canRetry}
+          canCancel={canCancel}
           retryPending={retryPending}
           cancellationPending={cancellationPending}
           refreshError={refreshError}
@@ -111,6 +120,7 @@ export function TopologyRetirementModal({
       ) : authenticationPrompt ? (
         <div className="space-y-4">
           {warning}
+          {!canConfirm && <RetirementAuthorityNotice />}
           {authenticationPrompt}
           <ModalActions>
             <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Cancel</button>
@@ -119,6 +129,7 @@ export function TopologyRetirementModal({
       ) : (
         <form onSubmit={submit} className="space-y-4">
           {warning}
+          {!canConfirm && <RetirementAuthorityNotice />}
           {isInventoryRetirement && (
             <label className="form-control block">
               <span className="label-text mb-1.5 block text-sm font-semibold">Reason</span>
@@ -135,7 +146,7 @@ export function TopologyRetirementModal({
           {error && <ErrorState error={error} title={`Couldn't retire ${label}`} />}
           <ModalActions>
             <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-error btn-sm min-w-24 text-white sm:btn-md" disabled={pending || (isInventoryRetirement && !reason.trim())}>
+            <button type="submit" className="btn btn-error btn-sm min-w-24 text-white sm:btn-md" disabled={!canConfirm || pending || (isInventoryRetirement && !reason.trim())}>
               {pending ? <span className="loading loading-spinner loading-sm" /> : <Trash2 size={17} />}
               Retire
             </button>
@@ -149,6 +160,8 @@ export function TopologyRetirementModal({
 function RetirementOutcome({
   outcome,
   targetKind,
+  canRetry,
+  canCancel,
   retryPending,
   cancellationPending,
   refreshError,
@@ -161,6 +174,8 @@ function RetirementOutcome({
 }: {
   outcome: TopologyRetirement;
   targetKind: RetirementTarget["kind"];
+  canRetry: boolean;
+  canCancel: boolean;
   retryPending: boolean;
   cancellationPending: boolean;
   refreshError: Error | null;
@@ -230,6 +245,7 @@ function RetirementOutcome({
         </div>
       )}
       {refreshError && <ErrorState error={refreshError} retry={onRefresh} title="Couldn't refresh retirement status" />}
+      {((rejected && !canRetry) || (draining && !canCancel)) && <RetirementAuthorityNotice />}
       {retryError && <ErrorState error={retryError} title="Couldn't retry finalization" />}
       {draining && confirmingCancellation ? (
         <section className="rounded-lg border border-warning/30 bg-warning/10 p-4">
@@ -270,7 +286,7 @@ function RetirementOutcome({
               type="button"
               className="btn btn-error btn-sm text-white sm:btn-md"
               onClick={() => onCancelRetirement(cancellationReason.trim())}
-              disabled={cancellationPending || !cancellationReason.trim()}
+              disabled={!canCancel || cancellationPending || !cancellationReason.trim()}
             >
               {cancellationPending && <span className="loading loading-spinner loading-sm" />}
               Stop retirement
@@ -280,11 +296,20 @@ function RetirementOutcome({
       ) : (
         <ModalActions>
           {!canceled && affectedReservationsPath && <Link className="btn btn-outline btn-sm w-full sm:btn-md sm:w-auto" to={affectedReservationsPath} onClick={onClose}>Open reservations</Link>}
-          {draining && <button type="button" className="btn btn-outline btn-sm text-error sm:btn-md" onClick={() => setConfirmingCancellation(true)}><RotateCcw size={16} />Stop retirement</button>}
-          {rejected && <button type="button" className="btn btn-primary btn-sm sm:btn-md" onClick={onRetry} disabled={retryPending}>{retryPending && <span className="loading loading-spinner loading-sm" />}Try finalization again</button>}
+          {draining && <button type="button" className="btn btn-outline btn-sm text-error sm:btn-md" onClick={() => setConfirmingCancellation(true)} disabled={!canCancel}><RotateCcw size={16} />Stop retirement</button>}
+          {rejected && <button type="button" className="btn btn-primary btn-sm sm:btn-md" onClick={onRetry} disabled={!canRetry || retryPending}>{retryPending && <span className="loading loading-spinner loading-sm" />}Try finalization again</button>}
           <button type="button" className={`btn btn-sm sm:btn-md ${rejected ? "btn-ghost" : "btn-primary"}`} onClick={onClose}>Done</button>
         </ModalActions>
       )}
+    </div>
+  );
+}
+
+function RetirementAuthorityNotice() {
+  return (
+    <div className="alert border border-warning/25 bg-warning/10 text-base-content" role="status">
+      <AlertTriangle className="text-warning-content" size={18} />
+      <p className="text-sm">Refresh property access and retirement status before continuing. If the room, bed, or property changed, close and reopen this action.</p>
     </div>
   );
 }
