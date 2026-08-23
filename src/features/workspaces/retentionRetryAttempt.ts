@@ -1,4 +1,5 @@
 import type {
+  RetentionRunRetryReceipt,
   RetentionScheduleHealth,
   RetentionTargetScopeKind,
   RetryRetentionScheduleRequest,
@@ -52,16 +53,31 @@ export function isRetentionRetryIntentCurrent(
 ): boolean {
   return Boolean(
     schedule &&
+    retentionRetryIntentMatchesSchedule(intent, schedule) &&
     schedule.status === 5 &&
     schedule.lastRunId === intent.runId &&
-    schedule.ownerKey === intent.ownerKey &&
-    schedule.dataClassKey === intent.dataClassKey &&
-    schedule.targetScopeKind === intent.targetScopeKind &&
-    schedule.propertyId === intent.propertyId &&
-    schedule.executionPolicyVersion === intent.executionPolicyVersion &&
     schedule.evidenceVersion === intent.evidenceVersion &&
     (schedule.lastCompletedAtUtc ?? schedule.lastStartedAtUtc) === intent.evidenceAtUtc,
   );
+}
+
+export function retentionRetryIntentMatchesSchedule(
+  intent: RetentionRetryIntent,
+  schedule: RetentionScheduleHealth,
+): boolean {
+  return schedule.ownerKey === intent.ownerKey &&
+    schedule.dataClassKey === intent.dataClassKey &&
+    schedule.targetScopeKind === intent.targetScopeKind &&
+    schedule.propertyId === intent.propertyId &&
+    schedule.executionPolicyVersion === intent.executionPolicyVersion;
+}
+
+export function retentionRetryReceiptMatchesIntent(
+  intent: RetentionRetryIntent,
+  receipt: RetentionRunRetryReceipt,
+): boolean {
+  return receipt.runId === intent.runId &&
+    receipt.evidenceVersion === intent.evidenceVersion;
 }
 
 export function retentionRetryIntentKey(intent: RetentionRetryIntent): string {

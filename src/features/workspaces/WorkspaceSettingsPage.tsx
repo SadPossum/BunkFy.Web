@@ -136,6 +136,12 @@ export function WorkspaceSettingsPage() {
     await refetchWorkspaces();
   }
 
+  async function refreshRetentionAuthority() {
+    const refreshes: Promise<unknown>[] = [workspaceSource.refetch()];
+    if (permissionSource) refreshes.push(permissionSource.refetch());
+    await Promise.all(refreshes);
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -221,7 +227,10 @@ export function WorkspaceSettingsPage() {
           )}
           {tab === "retention" && capabilities.canReadRetention && (
             <RetentionHealthSettings
-              canRetry={capabilities.canRetryRetention && permissionAuthorityCurrent}
+              key={`${workspace.organizationId}:${session?.username.trim().toLowerCase() ?? ""}`}
+              canRetry={capabilities.canRetryRetention}
+              authorityCurrent={permissionAuthorityCurrent}
+              onRefreshAuthority={refreshRetentionAuthority}
             />
           )}
         </div>

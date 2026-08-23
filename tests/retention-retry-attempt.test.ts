@@ -5,6 +5,8 @@ import {
   createRetentionRetryRequest,
   isRetentionRetryIntentCurrent,
   retentionRetryIntentKey,
+  retentionRetryIntentMatchesSchedule,
+  retentionRetryReceiptMatchesIntent,
 } from "../src/features/workspaces/retentionRetryAttempt";
 
 const runId = "f0379ccf-588e-40b6-a61e-13aa14f05a43";
@@ -78,5 +80,46 @@ describe("retention retry attempt", () => {
       schedule({ lastRunId: "e39dcddb-ad1e-4240-9bfe-a7729c44fa25" }),
     )).toBe(false);
     expect(retentionRetryIntentKey(intent)).toContain(`${runId}:12`);
+  });
+
+  it("distinguishes the logical schedule from its advancing run evidence", () => {
+    const intent = createRetentionRetryIntent(schedule())!;
+    const advanced = schedule({
+      status: 2,
+      evidenceVersion: 13,
+      lastRunId: "e39dcddb-ad1e-4240-9bfe-a7729c44fa25",
+    });
+
+    expect(retentionRetryIntentMatchesSchedule(intent, advanced)).toBe(true);
+    expect(isRetentionRetryIntentCurrent(intent, advanced)).toBe(false);
+    expect(retentionRetryIntentMatchesSchedule(
+      intent,
+      schedule({ executionPolicyVersion: 5 }),
+    )).toBe(false);
+  });
+
+  it("accepts only a receipt for the captured run and evidence version", () => {
+    const intent = createRetentionRetryIntent(schedule())!;
+    const receipt = {
+      requestId: "34d9740d-8d17-4ea8-9d56-4ec7ec5f204c",
+      runId,
+      evidenceVersion: 12,
+      attempt: 1,
+      status: 2,
+      requestedAtUtc: "2026-08-15T10:02:00Z",
+      scheduledAtUtc: "2026-08-15T10:02:01Z",
+      completedAtUtc: null,
+      failureCode: null,
+    } as const;
+
+    expect(retentionRetryReceiptMatchesIntent(intent, receipt)).toBe(true);
+    expect(retentionRetryReceiptMatchesIntent(intent, {
+      ...receipt,
+      evidenceVersion: 13,
+    })).toBe(false);
+    expect(retentionRetryReceiptMatchesIntent(intent, {
+      ...receipt,
+      runId: "e39dcddb-ad1e-4240-9bfe-a7729c44fa25",
+    })).toBe(false);
   });
 });

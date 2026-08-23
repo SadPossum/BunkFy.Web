@@ -8,17 +8,25 @@ import {
   PauseCircle,
   RotateCcw,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   RetentionRunRetryReceipt,
   RetentionScheduleHealth,
   RetentionScheduleHealthListResponse,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import {
   EmptyState,
-  ErrorState,
   LoadingState,
   StatusBadge,
 } from "../../components/ui/primitives";
@@ -36,8 +44,18 @@ import {
   createRetentionRetryIntent,
   createRetentionRetryRequest,
   isRetentionRetryIntentCurrent,
+  retentionRetryIntentKey,
+  retentionRetryReceiptMatchesIntent,
   type RetentionRetryIntent,
 } from "./retentionRetryAttempt";
+import {
+  retentionOperatorScopeKey,
+  retentionRetryAllowed,
+  retentionRetryConvergencePending,
+  retentionSchedulesQueryKey,
+  retentionSchedulesQueryPrefix,
+  retentionSourceChangedError,
+} from "./retentionSourceAuthority";
 
 const CONVERGENCE_REFRESH_MS = 2_000;
 const CONVERGENCE_WINDOW_MS = 30_000;
@@ -47,16 +65,32 @@ const PAGE_SIZE = 25;
 
 type RetryConvergence = {
   requestId: string;
+  intent: RetentionRetryIntent;
   until: number;
 };
 
-export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
+type RetrySubmission = {
+  intent: RetentionRetryIntent;
+  operatorScopeKey: string;
+  page: number;
+};
+
+export function RetentionHealthSettings({
+  canRetry,
+  authorityCurrent,
+  onRefreshAuthority,
+}: {
+  canRetry: boolean;
+  authorityCurrent: boolean;
+  onRefreshAuthority: () => Promise<unknown>;
+}) {
   const { request, session } = useSession();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [retryIntent, setRetryIntent] = useState<RetentionRetryIntent | null>(null);
   const [convergence, setConvergence] = useState<RetryConvergence | null>(null);
-  const queryKey = ["retention", "schedules", session?.tenantId, page] as const;
+  const operatorScopeKey = retentionOperatorScopeKey(session);
+  const queryKey = retentionSchedulesQueryKey(operatorScopeKey, page);
   const schedules = useQuery({
     queryKey,
     queryFn: () => request<RetentionScheduleHealthListResponse>(
@@ -66,65 +100,165 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
       if (convergence && convergence.until > Date.now()) return CONVERGENCE_REFRESH_MS;
 
       const data = query.state.data;
-      const retryPending = data?.items.some((item) => item.retry?.status === 1) ?? false;
+      const retryPending = data?.items.some((item) =>
+        item.retry?.status === 1 || item.retry?.status === 2) ?? false;
       return (data?.summary.running ?? 0) > 0 || retryPending
         ? RUNNING_REFRESH_MS
         : IDLE_REFRESH_MS;
     },
     refetchIntervalInBackground: false,
+    enabled: Boolean(operatorScopeKey),
   });
+  const scheduleSource = createCompositeSource({
+    label: "Retention schedule health",
+    hasData: schedules.data !== undefined,
+    isLoading: schedules.isLoading,
+    error: schedules.error,
+    isFetching: schedules.isFetching,
+    refetch: () => schedules.refetch(),
+  });
+  const scheduleSourceCurrent = compositeSourceCurrent(scheduleSource);
+  const scheduleSourceUsable = compositeSourceUsable(scheduleSource.state);
+  const response = scheduleSourceUsable ? schedules.data : undefined;
+  const items = useMemo(() => response?.items ?? [], [response?.items]);
+  const summary = response?.summary ?? summarizeRetentionHealth(items);
+  const retryPermissionCurrent = canRetry && authorityCurrent;
+  const authorityRef = useRef({
+    operatorScopeKey,
+    page,
+    retryPermissionCurrent,
+    scheduleSourceCurrent,
+    items,
+    retryIntent,
+  });
+  authorityRef.current = {
+    operatorScopeKey,
+    page,
+    retryPermissionCurrent,
+    scheduleSourceCurrent,
+    items,
+    retryIntent,
+  };
   const retry = useMutation({
-    mutationFn: (intent: RetentionRetryIntent) => request<RetentionRunRetryReceipt>(
-      `/api/retention/runs/${intent.runId}/retry`,
-      {
-        method: "POST",
-        body: JSON.stringify(createRetentionRetryRequest(intent)),
-      },
-    ),
-    onSuccess: (receipt, intent) => {
-      queryClient.setQueryData<RetentionScheduleHealthListResponse>(queryKey, (current) =>
-        current
+    mutationFn: (submission: RetrySubmission) => {
+      const current = authorityRef.current;
+      const schedule = current.items.find((item) =>
+        isRetentionRetryIntentCurrent(submission.intent, item));
+      if (current.page !== submission.page || !retentionRetryAllowed({
+        activeOperatorScopeKey: current.operatorScopeKey,
+        candidateOperatorScopeKey: submission.operatorScopeKey,
+        retryPermissionCurrent: current.retryPermissionCurrent,
+        scheduleSourceCurrent: current.scheduleSourceCurrent,
+        intent: submission.intent,
+        schedule,
+      })) {
+        throw retentionSourceChangedError();
+      }
+      return request<RetentionRunRetryReceipt>(
+        `/api/retention/runs/${submission.intent.runId}/retry`,
+        {
+          method: "POST",
+          body: JSON.stringify(createRetentionRetryRequest(submission.intent)),
+        },
+      );
+    },
+    onSuccess: (receipt, submission) => {
+      const current = authorityRef.current;
+      const schedule = current.items.find((item) =>
+        isRetentionRetryIntentCurrent(submission.intent, item));
+      if (!retentionRetryReceiptMatchesIntent(submission.intent, receipt) ||
+        current.page !== submission.page || !retentionRetryAllowed({
+          activeOperatorScopeKey: current.operatorScopeKey,
+          candidateOperatorScopeKey: submission.operatorScopeKey,
+          retryPermissionCurrent: current.retryPermissionCurrent,
+          scheduleSourceCurrent: current.scheduleSourceCurrent,
+          intent: submission.intent,
+          schedule,
+        })) {
+        void queryClient.invalidateQueries({
+          queryKey: retentionSchedulesQueryPrefix(submission.operatorScopeKey),
+        });
+        return;
+      }
+      const submittedQueryKey = retentionSchedulesQueryKey(
+        submission.operatorScopeKey,
+        submission.page,
+      );
+      queryClient.setQueryData<RetentionScheduleHealthListResponse>(submittedQueryKey, (cached) =>
+        cached
           ? {
-            ...current,
-            items: current.items.map((item) =>
-              isRetentionRetryIntentCurrent(intent, item)
+            ...cached,
+            items: cached.items.map((item) =>
+              isRetentionRetryIntentCurrent(submission.intent, item)
                 ? { ...item, retry: receipt }
                 : item),
           }
-          : current,
+          : cached,
       );
-      setRetryIntent(null);
-      setConvergence(receipt.status === 1
-        ? { requestId: receipt.requestId, until: Date.now() + CONVERGENCE_WINDOW_MS }
+      if (current.retryIntent && retentionRetryIntentKey(current.retryIntent) ===
+        retentionRetryIntentKey(submission.intent)) {
+        setRetryIntent(null);
+      }
+      setConvergence(receipt.status === 1 || receipt.status === 2
+        ? {
+          requestId: receipt.requestId,
+          intent: submission.intent,
+          until: Date.now() + CONVERGENCE_WINDOW_MS,
+        }
         : null);
     },
-    onSettled: async () => {
-      await schedules.refetch();
+    onSettled: async (_data, _error, submission) => {
+      await queryClient.invalidateQueries({
+        queryKey: retentionSchedulesQueryKey(
+          submission.operatorScopeKey,
+          submission.page,
+        ),
+      });
     },
   });
-  const items = schedules.data?.items ?? [];
-  const summary = schedules.data?.summary ?? summarizeRetentionHealth(items);
   const currentRetrySchedule = retryIntent
     ? items.find((item) => isRetentionRetryIntentCurrent(retryIntent, item))
     : undefined;
+  const retryIntentCurrent = Boolean(
+    retryIntent && currentRetrySchedule &&
+    retentionRetryAllowed({
+      activeOperatorScopeKey: operatorScopeKey,
+      candidateOperatorScopeKey: operatorScopeKey,
+      retryPermissionCurrent,
+      scheduleSourceCurrent,
+      intent: retryIntent,
+      schedule: currentRetrySchedule,
+    }),
+  );
+  const activeRetryKey = retryIntent ? retentionRetryIntentKey(retryIntent) : null;
+  const submittedRetryKey = retry.variables
+    ? retentionRetryIntentKey(retry.variables.intent)
+    : null;
+  const retryStateCurrent = activeRetryKey !== null && activeRetryKey === submittedRetryKey;
 
   useEffect(() => {
     setPage(1);
     setRetryIntent(null);
     setConvergence(null);
-  }, [session?.tenantId]);
+  }, [operatorScopeKey]);
 
   useEffect(() => {
-    if (!schedules.isFetching && page > 1 && schedules.data?.items.length === 0) {
+    if (scheduleSourceCurrent && page > 1 && items.length === 0) {
+      setRetryIntent(null);
+      setConvergence(null);
       setPage((currentPage) => Math.max(1, currentPage - 1));
     }
-  }, [page, schedules.data?.items.length, schedules.isFetching]);
+  }, [items.length, page, scheduleSourceCurrent]);
 
   useEffect(() => {
     if (!convergence) return;
 
-    const receipt = items.find((item) => item.retry?.requestId === convergence.requestId)?.retry;
-    if (receipt && receipt.status !== 1) {
+    if (!retentionRetryConvergencePending({
+      intent: convergence.intent,
+      requestId: convergence.requestId,
+      schedules: items,
+      scheduleSourceCurrent,
+    })) {
       setConvergence(null);
       return;
     }
@@ -135,7 +269,7 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
       Math.max(0, convergence.until - Date.now()),
     );
     return () => window.clearTimeout(timeout);
-  }, [convergence, items]);
+  }, [convergence, items, scheduleSourceCurrent]);
 
   function closeRetry() {
     setRetryIntent(null);
@@ -144,7 +278,17 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
 
   function refreshRetryEvidence() {
     retry.reset();
-    void schedules.refetch();
+    void Promise.allSettled([
+      schedules.refetch(),
+      onRefreshAuthority(),
+    ]);
+  }
+
+  function changePage(nextPage: number) {
+    setRetryIntent(null);
+    setConvergence(null);
+    retry.reset();
+    setPage(nextPage);
   }
 
   return (
@@ -161,17 +305,31 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
         </div>
       </div>
 
-      {schedules.isLoading && <LoadingState label="Loading retention health" />}
-      {schedules.error && (
-        <div className="mt-5">
-          <ErrorState
-            error={schedules.error}
-            retry={() => void schedules.refetch()}
-            title="Retention health is unavailable"
-          />
-        </div>
+      <CompositeSourceNotice
+        className="mt-5"
+        sources={[scheduleSource]}
+        title="Retention health is delayed"
+      />
+      {scheduleSource.state === "loading" && (
+        <LoadingState label="Loading retention health" />
       )}
-      {!schedules.isLoading && !schedules.error && items.length === 0 && (
+      {scheduleSource.state !== "loading" && !scheduleSourceUsable && (
+        <CompositeSourceFallback
+          state={scheduleSource.state}
+          label="retention health"
+        />
+      )}
+      {scheduleSourceUsable && items.length === 0 && !scheduleSourceCurrent && (
+        scheduleSource.state === "ready" && schedules.isFetching
+          ? <LoadingState label="Refreshing retention health" />
+          : (
+            <CompositeSourceFallback
+              state={scheduleSource.state}
+              label="current retention health"
+            />
+          )
+      )}
+      {scheduleSourceUsable && items.length === 0 && scheduleSourceCurrent && (
         <div className="mt-5">
           <EmptyState
             icon={<Clock3 />}
@@ -180,7 +338,7 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
           />
         </div>
       )}
-      {!schedules.isLoading && !schedules.error && items.length > 0 && (
+      {scheduleSourceUsable && items.length > 0 && (
         <>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <HealthMetric
@@ -214,7 +372,8 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
                 <ScheduleRow
                   key={scheduleKey(item)}
                   item={item}
-                  canRetry={canRetry}
+                  canRetry={retryPermissionCurrent && scheduleSourceCurrent}
+                  retryMutationPending={retry.isPending}
                   onRetry={(intent) => {
                     retry.reset();
                     setRetryIntent(intent);
@@ -227,9 +386,9 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
               pageSize={PAGE_SIZE}
               itemCount={items.length}
               itemLabel="schedule"
-              hasMore={schedules.data?.hasMore}
-              disabled={schedules.isFetching}
-              onPageChange={setPage}
+              hasMore={response?.hasMore}
+              disabled={!scheduleSourceCurrent}
+              onPageChange={changePage}
             />
           </div>
         </>
@@ -237,11 +396,11 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
 
       <RetentionRetryModal
         intent={retryIntent}
-        current={Boolean(currentRetrySchedule)}
-        error={retry.error}
-        submitting={retry.isPending}
+        current={retryIntentCurrent}
+        error={retryStateCurrent ? retry.error : null}
+        submitting={retryStateCurrent && retry.isPending}
         onClose={closeRetry}
-        onConfirm={(intent) => retry.mutate(intent)}
+        onConfirm={(intent) => retry.mutate({ intent, operatorScopeKey, page })}
         onRefresh={refreshRetryEvidence}
       />
     </section>
@@ -251,10 +410,12 @@ export function RetentionHealthSettings({ canRetry }: { canRetry: boolean }) {
 function ScheduleRow({
   item,
   canRetry,
+  retryMutationPending,
   onRetry,
 }: {
   item: RetentionScheduleHealth;
   canRetry: boolean;
+  retryMutationPending: boolean;
   onRetry: (intent: RetentionRetryIntent) => void;
 }) {
   const status = retentionStatusLabel(item.status);
@@ -263,7 +424,7 @@ function ScheduleRow({
   const guidance = retentionOutcomeGuidance(item);
   const intent = createRetentionRetryIntent(item);
   const retryInFlight = item.retry?.status === 1 || item.retry?.status === 2;
-  const retryAvailable = canRetry && intent && !retryInFlight;
+  const retryAvailable = canRetry && intent && !retryInFlight && !retryMutationPending;
 
   return (
     <article className={`grid gap-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] sm:items-start ${attention ? "bg-warning/5 px-3" : ""}`}>
@@ -348,28 +509,25 @@ function ScheduleRow({
 
 function RetryState({ receipt }: { receipt: RetentionRunRetryReceipt }) {
   const status = retentionRetryStatusLabel(receipt.status);
-  const pending = receipt.status === 1;
+  const queued = receipt.status === 1;
+  const accepted = receipt.status === 2;
   const failed = receipt.status === 3;
   return (
     <div
       className={`mt-3 flex max-w-2xl items-start gap-2 rounded-lg border px-3 py-2.5 ${
         failed
           ? "border-error/20 bg-error/5"
-          : pending
-            ? "border-info/20 bg-info/5"
-            : "border-success/20 bg-success/5"
+          : "border-info/20 bg-info/5"
       }`}
       role="status"
     >
       {failed
         ? <AlertTriangle className="mt-0.5 shrink-0 text-error" size={16} />
-        : pending
-          ? <Clock3 className="mt-0.5 shrink-0 text-info" size={16} />
-          : <CheckCircle2 className="mt-0.5 shrink-0 text-success" size={16} />}
+        : <Clock3 className="mt-0.5 shrink-0 text-info" size={16} />}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-semibold">
-            {pending ? "Retry queued" : failed ? "Retry failed" : "Retry scheduled"}
+            {queued ? "Retry queued" : accepted ? "Retry accepted" : "Retry failed"}
           </p>
           <StatusBadge status={status} />
           {receipt.attempt > 1 && (
@@ -377,11 +535,11 @@ function RetryState({ receipt }: { receipt: RetentionRunRetryReceipt }) {
           )}
         </div>
         <p className="mt-1 text-xs leading-5 text-base-content/60">
-          {pending
+          {queued
             ? "The worker will apply this request without blocking the page."
             : failed
               ? retentionRetryFailureGuidance(receipt.failureCode)
-              : "The task service accepted the retry. Execution evidence will update separately."}
+              : "The task service accepted the retry. Retention work is still in progress until schedule evidence advances."}
         </p>
         {receipt.failureCode && (
           <p className="mt-1 font-mono text-xs text-base-content/45">

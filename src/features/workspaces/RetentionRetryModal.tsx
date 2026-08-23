@@ -61,15 +61,16 @@ export function RetentionRetryModal({
             <div className="alert border border-warning/25 bg-warning/8 text-base-content">
               <AlertTriangle size={18} className="text-warning-content" />
               <div>
-                <p className="font-semibold">This schedule changed</p>
+                <p className="font-semibold">Retry authority or schedule changed</p>
                 <p className="text-sm text-base-content/60">
-                  Refresh the latest evidence before deciding whether another retry is needed.
+                  Refresh current permissions and schedule evidence before deciding whether
+                  another retry is needed.
                 </p>
               </div>
             </div>
           )}
 
-          {needsAuthentication && (
+          {needsAuthentication && current && (
             <RecentAuthenticationPrompt
               error={error}
               title="Confirm your password to retry this run"
