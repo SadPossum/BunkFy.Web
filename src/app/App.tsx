@@ -9,6 +9,10 @@ import { WorkspaceProvider } from "./workspace";
 import { WorkspaceGate } from "../features/workspaces/WorkspaceGate";
 import { WorkspaceOnboardingPage } from "../features/workspaces/WorkspaceOnboardingPage";
 import { preserveWorkspaceJoinSecret } from "../features/workspaces/workspaceJoin";
+import {
+  RenderErrorBoundary,
+  RouteRenderFailure,
+} from "./RenderErrorBoundary";
 
 const AccountPage = lazy(() =>
   import("../features/account/AccountPage").then((module) => ({
@@ -95,32 +99,37 @@ export function App() {
       <WorkspaceGate>
         <NotificationsProvider>
           <AppShell>
-            <Suspense
-              fallback={
-                <div
-                  className="grid min-h-64 place-items-center"
-                  aria-busy="true"
-                >
-                  <span className="loading loading-spinner loading-md text-primary" />
-                </div>
-              }
+            <RenderErrorBoundary
+              fallback={<RouteRenderFailure />}
+              resetKey={location.key}
             >
-              <Routes>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/properties" element={<PropertiesPage />} />
-                <Route path="/privacy-requests" element={<PrivacyRequestsPage />} />
-                <Route path="/inventory" element={<InventoryPage />} />
-                <Route path="/integrations" element={<IntegrationsPage />} />
-                <Route path="/notifications" element={<NotificationsPage />} />
-                <Route path="/account" element={<AccountPage />} />
-                <Route path="/workspace" element={<WorkspaceSettingsPage />} />
-                <Route path="/workspace/new" element={<WorkspaceOnboardingPage />} />
-                <Route path="/reservations" element={<ReservationsPage />} />
-                <Route path="/guests" element={<GuestsPage />} />
-                <Route path="/staff" element={<StaffPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
+              <Suspense
+                fallback={
+                  <div
+                    className="grid min-h-64 place-items-center"
+                    aria-busy="true"
+                  >
+                    <span className="loading loading-spinner loading-md text-primary" />
+                  </div>
+                }
+              >
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/properties" element={<PropertiesPage />} />
+                  <Route path="/privacy-requests" element={<PrivacyRequestsPage />} />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route path="/integrations" element={<IntegrationsPage />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
+                  <Route path="/account" element={<AccountPage />} />
+                  <Route path="/workspace" element={<WorkspaceSettingsPage />} />
+                  <Route path="/workspace/new" element={<WorkspaceOnboardingPage />} />
+                  <Route path="/reservations" element={<ReservationsPage />} />
+                  <Route path="/guests" element={<GuestsPage />} />
+                  <Route path="/staff" element={<StaffPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </RenderErrorBoundary>
           </AppShell>
         </NotificationsProvider>
       </WorkspaceGate>
