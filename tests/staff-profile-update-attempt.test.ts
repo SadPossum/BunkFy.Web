@@ -13,6 +13,7 @@ const payload: StaffProfileUpdatePayload = {
   legalName: "Maya Q. Chen",
   workEmail: "maya@example.test",
   workPhone: "+44 20 1234 5678",
+  employeeNumber: "EMP-42",
   jobTitle: "Manager",
   department: "Operations",
 };
@@ -59,6 +60,13 @@ describe("staff profile update attempt", () => {
       { ...payload, jobTitle: "Supervisor" },
       () => "operation-2",
     );
+    const changedEmployeeNumber = await resolveStaffProfileUpdateAttempt(
+      first,
+      "member-1",
+      4,
+      { ...payload, employeeNumber: "EMP-43" },
+      () => "operation-employee-number",
+    );
     const newVersion = await resolveStaffProfileUpdateAttempt(
       first,
       "member-1",
@@ -75,6 +83,7 @@ describe("staff profile update attempt", () => {
     );
 
     expect(changed.operationId).toBe("operation-2");
+    expect(changedEmployeeNumber.operationId).toBe("operation-employee-number");
     expect(newVersion.operationId).toBe("operation-3");
     expect(newTarget.operationId).toBe("operation-4");
   });

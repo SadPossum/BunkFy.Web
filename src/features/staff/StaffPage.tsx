@@ -1,53 +1,83 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, BriefcaseBusiness, Building2, ChevronRight, CircleUserRound, Edit3, KeyRound, Link2, Mail, Phone, Plus, Search, ShieldAlert, Unlink2, UserRoundCheck, UserRoundMinus, UserRoundX, UsersRound } from "lucide-react";
-import { useDeferredValue, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  ChevronRight,
+  Plus,
+  Search,
+  ShieldAlert,
+  UsersRound,
+} from "lucide-react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { staffStatusLabel, staffStatusValue } from "../../api/labels";
-import type { Property, StaffDirectoryAssignment, StaffDirectoryListResponse, StaffDirectoryMember, StaffMember, StaffMemberMutationReceipt, StaffPropertyAssignment, StaffStatus } from "../../api/types";
-import { permissions, propertyAccessScope, tenantAccessScope, usePermissions } from "../../app/permissions";
-import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
+import type {
+  StaffDirectoryListResponse,
+  StaffDirectoryListItem,
+  StaffDirectoryMember,
+} from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
+import {
+  permissions,
+  propertyAccessScope,
+  tenantAccessScope,
+  usePermissions,
+} from "../../app/permissions";
+import {
+  focusedResourceClass,
+  useTargetProperty,
+  useTransientResourceFocus,
+} from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
-import { EmptyState, ErrorState, FormActions, InitialAvatar, InlineFormActions, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
-import { DatePicker } from "../../components/ui/DatePicker";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { PaginationBar } from "../../components/ui/PaginationBar";
+import {
+  EmptyState,
+  InitialAvatar,
+  LoadingState,
+  Modal,
+  PageHeader,
+  StatusBadge,
+} from "../../components/ui/primitives";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import {
   resolveStaffCreateAttempt,
   type StaffCreateAttempt,
   type StaffCreatePayload,
 } from "./staffCreateAttempt";
-import {
-  resolveDurableStaffProfileUpdateAttempt,
-  type StaffProfileUpdateAttempt,
-} from "./staffProfileUpdateAttempt";
-import {
-  resolveStaffAuthSubjectChangeAttempt,
-  type StaffAuthSubjectChangeAttempt,
-} from "./staffAuthSubjectChangeAttempt";
-import {
-  resolveStaffAuthSubjectTransition,
-  type StaffAuthSubjectTransitionStatus,
-} from "./staffAuthSubjectTransition";
-import {
-  resolveStaffLifecycleAttempt,
-  type StaffLifecycleAttempt,
-} from "./staffLifecycleAttempt";
-import {
-  resolveStaffPropertyAssignmentAttempt,
-  type StaffPropertyAssignmentAttempt,
-  type StaffPropertyAssignmentAttemptInput,
-} from "./staffPropertyAssignmentAttempt";
+import { StaffDetail } from "./StaffDetail";
+import { staffMutationAllowed } from "./staffMutationAuthority";
+import { staffDetailTab } from "./staffPresentation";
+import { StaffProfileForm } from "./StaffProfileForm";
 
 const PAGE_SIZE = 30;
 const statusOptions = ["active", "suspended", "departed"] as const;
 type StaffStatusFilter = "all" | (typeof statusOptions)[number];
-type StaffDetailMember = StaffDirectoryMember | StaffMember;
-type StaffAssignment = StaffDirectoryAssignment | StaffPropertyAssignment;
+
+type CreateStaffSubmission = {
+  tenantId: string;
+  payload: StaffCreatePayload;
+};
 
 export function StaffPage() {
   const { request, session } = useSession();
-  const { properties, selectedProperty } = useWorkspace();
+  const workspace = useWorkspace();
+  const {
+    properties,
+    propertiesLoaded,
+    propertiesLoading,
+    propertiesFetching,
+    propertiesError,
+    refetchProperties,
+    selectedProperty,
+  } = workspace;
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   useTargetProperty(searchParams.get("property"));
@@ -56,226 +86,474 @@ export function StaffPage() {
   const [status, setStatus] = useState<StaffStatusFilter>("all");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
+  const tenantId = session?.tenantId ?? "";
+  const tenantIdRef = useRef(tenantId);
+  tenantIdRef.current = tenantId;
+  const previousTenantIdRef = useRef(tenantId);
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
-  const propertyScope = session && selectedProperty ? propertyAccessScope(session.tenantId, selectedProperty.propertyId) : "";
-  const access = usePermissions(tenantScope ? [
+  const propertyScope = session && selectedProperty
+    ? propertyAccessScope(session.tenantId, selectedProperty.propertyId)
+    : "";
+
+  const tenantAccess = usePermissions(tenantScope ? [
     { permission: permissions.staffRead, scope: tenantScope },
     { permission: permissions.staffSensitiveProfileRead, scope: tenantScope },
     { permission: permissions.staffCreate, scope: tenantScope },
     { permission: permissions.staffManage, scope: tenantScope },
     { permission: permissions.staffAccountLinksManage, scope: tenantScope },
     { permission: permissions.staffManageLifecycle, scope: tenantScope },
-    ...(propertyScope ? [{ permission: permissions.staffAssignProperties, scope: propertyScope }] : []),
   ] : []);
-  const canRead = access.allows(permissions.staffRead, tenantScope);
-  const canReadSensitive = access.allows(permissions.staffSensitiveProfileRead, tenantScope);
-  const canCreate = access.allows(permissions.staffCreate, tenantScope);
-  const canManage = access.allows(permissions.staffManage, tenantScope);
-  const canManageAccountLinks = access.allows(permissions.staffAccountLinksManage, tenantScope);
-  const canManageLifecycle = access.allows(permissions.staffManageLifecycle, tenantScope);
-  const canAssignCurrentProperty = Boolean(propertyScope && access.allows(permissions.staffAssignProperties, propertyScope));
-  const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+  const assignmentAccess = usePermissions(propertyScope ? [
+    { permission: permissions.staffAssignProperties, scope: propertyScope },
+  ] : []);
+  const mayRead = tenantAccess.allows(permissions.staffRead, tenantScope);
+  const mayReadSensitive = tenantAccess.allows(
+    permissions.staffSensitiveProfileRead,
+    tenantScope,
+  );
+  const mayCreate = tenantAccess.allows(permissions.staffCreate, tenantScope);
+  const mayManage = tenantAccess.allows(permissions.staffManage, tenantScope);
+  const mayManageAccountLinks = tenantAccess.allows(
+    permissions.staffAccountLinksManage,
+    tenantScope,
+  );
+  const mayManageLifecycle = tenantAccess.allows(
+    permissions.staffManageLifecycle,
+    tenantScope,
+  );
+  const mayAssignCurrentProperty = Boolean(
+    propertyScope &&
+      assignmentAccess.allows(permissions.staffAssignProperties, propertyScope),
+  );
+  const permissionSource = createCompositeSource({
+    label: "Staff permissions",
+    hasData: tenantAccess.hasData,
+    isLoading: tenantAccess.isLoading,
+    error: tenantAccess.error,
+    isFetching: tenantAccess.isFetching,
+    refetch: tenantAccess.refetch,
+  });
+  const assignmentPermissionSource = selectedProperty
+    ? createCompositeSource({
+        label: `${selectedProperty.name} assignment permission`,
+        hasData: assignmentAccess.hasData,
+        isLoading: assignmentAccess.isLoading,
+        error: assignmentAccess.error,
+        isFetching: assignmentAccess.isFetching,
+        refetch: assignmentAccess.refetch,
+      })
+    : null;
+  const propertySource = createCompositeSource({
+    label: "Property catalogue",
+    hasData: propertiesLoaded,
+    isLoading: propertiesLoading,
+    error: propertiesError,
+    isFetching: propertiesFetching,
+    refetch: refetchProperties,
+  });
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const permissionUsable = compositeSourceUsable(permissionSource.state);
+  const createAuthorityCurrent = mayRead && mayCreate && staffMutationAllowed(
+    "create",
+    { permissionsCurrent },
+  );
+
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(PAGE_SIZE),
+  });
   if (deferredSearch) params.set("search", deferredSearch);
   if (status !== "all") params.set("status", String(staffStatusValue(status)));
   const members = useQuery({
-    queryKey: ["staff-members", session?.tenantId, deferredSearch, status, page],
+    queryKey: ["staff-members", tenantId, deferredSearch, status, page],
     queryFn: () => request<StaffDirectoryListResponse>(`/api/staff/members?${params}`),
-    enabled: canRead,
+    enabled: Boolean(tenantId && mayRead),
   });
-  const focusedMemberId = useTransientResourceFocus(Boolean(members.data));
+  const directorySource = createCompositeSource({
+    label: "Staff directory",
+    hasData: members.data !== undefined,
+    isLoading: members.isLoading,
+    error: members.error,
+    isFetching: members.isFetching,
+    refetch: () => members.refetch(),
+  });
+  const directoryCurrent = compositeSourceCurrent(directorySource);
+  const directoryUsable = compositeSourceUsable(directorySource.state);
+  const items = directoryUsable ? members.data?.items ?? [] : [];
+  const focusedMemberId = useTransientResourceFocus(directoryUsable);
 
-  useEffect(() => { setPage(1); }, [deferredSearch, status]);
   useEffect(() => {
-    if (!members.isFetching && members.data && page > 1 && members.data.items.length === 0) {
+    setPage(1);
+  }, [deferredSearch, status]);
+
+  useEffect(() => {
+    if (directoryCurrent && members.data && page > 1 && members.data.items.length === 0) {
       setPage((current) => Math.max(1, current - 1));
     }
-  }, [members.data, members.isFetching, page]);
+  }, [directoryCurrent, members.data, page]);
+
+  useEffect(() => {
+    const previousTenantId = previousTenantIdRef.current;
+    if (tenantId) previousTenantIdRef.current = tenantId;
+    if (!previousTenantId || !tenantId || previousTenantId === tenantId) return;
+
+    setSearch("");
+    setStatus("all");
+    setPage(1);
+    setCreateOpen(false);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("member");
+      next.delete("section");
+      next.delete("focus");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams, tenantId]);
+
+  useEffect(() => {
+    if (!permissionsCurrent) return;
+    if (!mayRead || !mayCreate) setCreateOpen(false);
+    if (!mayRead) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("member");
+        next.delete("section");
+        return next;
+      }, { replace: true });
+    }
+  }, [mayCreate, mayRead, permissionsCurrent, setSearchParams]);
 
   function selectMember(id: string | null) {
     const next = new URLSearchParams(searchParams);
-    if (id) next.set("member", id); else next.delete("member");
+    if (id) next.set("member", id);
+    else next.delete("member");
     setSearchParams(next, { replace: true });
   }
 
-  if (access.isLoading) return <LoadingState label="Checking staff access" />;
-  if (access.error) return <ErrorState error={access.error} />;
-  if (!canRead) return <EmptyState icon={<ShieldAlert />} title="Staff access is restricted" description="Your account does not have permission to view staff profiles for this workspace." />;
+  async function handleCreated(
+    targetTenantId: string,
+    created: StaffDirectoryMember,
+  ) {
+    await queryClient.invalidateQueries({
+      queryKey: ["staff-members", targetTenantId],
+    });
+    if (tenantIdRef.current !== targetTenantId) return;
+    setCreateOpen(false);
+    selectMember(created.staffMemberId);
+  }
 
-  const items = members.data?.items ?? [];
   return (
     <>
-      <PageHeader eyebrow="Workspace team" title="Staff" description="Manage staff profiles, employment state, account links, and property assignments." action={canCreate ? <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} />Add staff member</button> : undefined} />
+      <PageHeader
+        eyebrow="Workspace team"
+        title="Staff"
+        description="Manage staff profiles, employment state, account links, and property assignments."
+        action={mayRead && mayCreate ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!createAuthorityCurrent}
+            onClick={() => {
+              if (createAuthorityCurrent) setCreateOpen(true);
+            }}
+          >
+            <Plus size={17} />Add staff member
+          </button>
+        ) : undefined}
+      />
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <SegmentedTabs
-            value={status}
-            ariaLabel="Staff status"
-            onValueChange={setStatus}
-            options={(["all", ...statusOptions] as const).map((option) => ({
-              value: option,
-              label: option === "all" ? "All staff" : capitalize(option),
-            }))}
+      {!permissionUsable || !mayRead ? permissionsCurrent && !mayRead ? (
+        <EmptyState
+          icon={<ShieldAlert />}
+          title="Staff access is restricted"
+          description="Your account does not have permission to view staff profiles for this workspace."
+        />
+      ) : (
+        <>
+          <CompositeSourceNotice sources={[permissionSource]} title="Staff access is delayed" />
+          <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
+            <CompositeSourceFallback state={permissionSource.state} label="Staff access" />
+          </section>
+        </>
+      ) : (
+        <>
+          <CompositeSourceNotice
+            sources={[permissionSource, directorySource]}
+            title="Staff data is delayed"
           />
-          <label className="input input-bordered input-sm flex w-full items-center gap-2 lg:w-72"><Search size={15} className="text-base-content/35" /><input className="grow" aria-label="Search staff" placeholder="Name" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-        </div>
+          <section className="card border border-base-300 bg-base-100 shadow-sm">
+            <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+              <SegmentedTabs
+                value={status}
+                ariaLabel="Staff status"
+                onValueChange={setStatus}
+                options={(["all", ...statusOptions] as const).map((option) => ({
+                  value: option,
+                  label: option === "all" ? "All staff" : capitalize(option),
+                }))}
+              />
+              <label className="input input-bordered input-sm flex w-full items-center gap-2 lg:w-72">
+                <Search size={15} className="text-base-content/35" />
+                <input
+                  className="grow"
+                  aria-label="Search staff"
+                  placeholder="Name"
+                  value={search}
+                  maxLength={256}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+                {members.isFetching && (
+                  <span className="loading loading-spinner loading-xs text-primary" aria-label="Updating Staff results" />
+                )}
+              </label>
+            </div>
 
-        {members.isLoading ? <LoadingState label="Loading staff" /> : members.error ? <div className="p-6"><ErrorState error={members.error} retry={() => void members.refetch()} /></div> : !items.length ? <div className="p-6"><EmptyState icon={<UsersRound />} title={search || status !== "all" ? "No staff members match" : "No staff profiles yet"} description={search || status !== "all" ? "Try another search or status." : "Create the first staff profile, then assign it to a property."} action={canCreate && !search && status === "all" ? <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>Add staff member</button> : undefined} /></div> : <>
-          <div className="hidden overflow-x-auto md:block"><table className="table"><thead><tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40"><th className="pl-6">Staff member</th><th>Role</th><th>Properties</th><th>Status</th><th className="pr-6" /></tr></thead><tbody>{items.map((member) => <tr key={member.staffMemberId} className={`cursor-pointer border-base-300 transition hover:bg-base-200/70 ${member.staffMemberId === focusedMemberId ? focusedResourceClass : ""}`} onClick={() => selectMember(member.staffMemberId)}><td className="pl-6"><StaffIdentity member={member} /></td><td><p className="text-sm font-medium">{member.jobTitle || "No job title"}</p><p className="mt-1 text-xs text-base-content/45">{member.department || "No department"}</p></td><td><span className="badge badge-ghost font-semibold">{member.currentPropertyCount} current</span></td><td><StatusBadge status={staffStatusLabel(member.status)} /></td><td className="pr-6 text-right"><button type="button" className="btn btn-circle btn-ghost btn-xs" onClick={(event) => { event.stopPropagation(); selectMember(member.staffMemberId); }} aria-label={`Open ${member.displayName}`}><ChevronRight size={17} /></button></td></tr>)}</tbody></table></div>
-          <div className="divide-y divide-base-300 md:hidden">{items.map((member) => <button key={member.staffMemberId} type="button" className={`block w-full p-5 text-left transition hover:bg-base-200 ${member.staffMemberId === focusedMemberId ? focusedResourceClass : ""}`} onClick={() => selectMember(member.staffMemberId)}><div className="flex items-start justify-between gap-3"><StaffIdentity member={member} /><StatusBadge status={staffStatusLabel(member.status)} /></div><div className="mt-4 flex items-center justify-between gap-3 text-xs text-base-content/50"><span>{member.jobTitle || member.department || "No role details"}</span><span>{member.currentPropertyCount} properties <ChevronRight className="inline" size={15} /></span></div></button>)}</div>
-          <PaginationBar page={page} pageSize={PAGE_SIZE} itemCount={items.length} itemLabel="staff member" hasMore={members.data?.hasMore} disabled={members.isFetching} onPageChange={setPage} />
-        </>}
-      </section>
+            {directorySource.state === "loading" ? (
+              <LoadingState label="Loading staff" />
+            ) : !directoryUsable ? (
+              <CompositeSourceFallback state={directorySource.state} label="Staff directory" />
+            ) : !items.length ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<UsersRound />}
+                  title={search || status !== "all" ? "No staff members match" : "No staff profiles yet"}
+                  description={search || status !== "all"
+                    ? "Try another search or status."
+                    : "Create the first staff profile, then assign it to a property."}
+                  action={mayCreate && !search && status === "all" ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      disabled={!createAuthorityCurrent}
+                      onClick={() => {
+                        if (createAuthorityCurrent) setCreateOpen(true);
+                      }}
+                    >
+                      Add staff member
+                    </button>
+                  ) : undefined}
+                />
+              </div>
+            ) : (
+              <StaffDirectory
+                items={items}
+                focusedMemberId={focusedMemberId}
+                onSelect={selectMember}
+              />
+            )}
 
-      <CreateStaffModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={async (created) => { await queryClient.invalidateQueries({ queryKey: ["staff-members"] }); setCreateOpen(false); selectMember(created.staffMemberId); }} />
-      <StaffDetail memberId={searchParams.get("member")} initialTab={staffDetailTab(searchParams.get("section"))} properties={properties} selectedProperty={selectedProperty} canReadSensitive={canReadSensitive} canManage={canManage} canManageAccountLinks={canManageAccountLinks} canManageLifecycle={canManageLifecycle} canAssignCurrentProperty={canAssignCurrentProperty} onClose={() => selectMember(null)} />
+            {directoryUsable && (
+              <PaginationBar
+                page={page}
+                pageSize={PAGE_SIZE}
+                itemCount={items.length}
+                itemLabel="staff member"
+                hasMore={members.data?.hasMore}
+                disabled={!directoryCurrent}
+                onPageChange={setPage}
+              />
+            )}
+          </section>
+        </>
+      )}
+
+      <CreateStaffModal
+        key={tenantId}
+        tenantId={tenantId}
+        open={permissionUsable && mayRead && createOpen}
+        permissionSource={permissionSource}
+        authorityCurrent={createAuthorityCurrent}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleCreated}
+      />
+      {permissionUsable && mayRead && (
+        <StaffDetail
+          key={`${tenantId}:${searchParams.get("member") ?? "none"}`}
+          tenantId={tenantId}
+          memberId={searchParams.get("member")}
+          initialTab={staffDetailTab(searchParams.get("section"))}
+          properties={properties}
+          selectedProperty={selectedProperty}
+          propertySource={propertySource}
+          permissionSource={permissionSource}
+          assignmentPermissionSource={assignmentPermissionSource}
+          canReadSensitive={mayReadSensitive}
+          canManage={mayManage}
+          canManageAccountLinks={mayManageAccountLinks}
+          canManageLifecycle={mayManageLifecycle}
+          canAssignCurrentProperty={mayAssignCurrentProperty}
+          onClose={() => selectMember(null)}
+        />
+      )}
     </>
   );
 }
 
-function CreateStaffModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (member: StaffDirectoryMember) => Promise<void> }) {
+function CreateStaffModal({
+  tenantId,
+  open,
+  permissionSource,
+  authorityCurrent,
+  onClose,
+  onCreated,
+}: {
+  tenantId: string;
+  open: boolean;
+  permissionSource: CompositeSource;
+  authorityCurrent: boolean;
+  onClose: () => void;
+  onCreated: (tenantId: string, member: StaffDirectoryMember) => Promise<void>;
+}) {
   const { request } = useSession();
+  const queryClient = useQueryClient();
   const attempt = useRef<StaffCreateAttempt | null>(null);
-  const mutation = useMutation({
-    mutationFn: (payload: StaffCreatePayload) => {
+  const mutation = useMutation<StaffDirectoryMember, Error, CreateStaffSubmission>({
+    mutationFn: ({ tenantId: targetTenantId, payload }) => {
+      if (targetTenantId !== tenantId || !authorityCurrent) {
+        throw new Error("Current Staff create access could not be confirmed. Refresh and try again.");
+      }
       attempt.current = resolveStaffCreateAttempt(attempt.current, payload);
       return request<StaffDirectoryMember>("/api/staff/members", {
         method: "POST",
-        body: JSON.stringify({ ...payload, operationId: attempt.current.operationId }),
+        body: JSON.stringify({
+          ...payload,
+          operationId: attempt.current.operationId,
+        }),
       });
     },
-    onSuccess: async (created) => {
+    onSuccess: async (created, submission) => {
       attempt.current = null;
-      await onCreated(created);
+      await onCreated(submission.tenantId, created);
+    },
+    onError: async (_error, submission) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["staff-members", submission.tenantId],
+      });
     },
   });
+
   function close() {
     attempt.current = null;
     mutation.reset();
     onClose();
   }
-  return <Modal open={open} title="New staff member" description="Create the workspace profile first. Account links and property assignments can be added next." onClose={close}><StaffProfileForm submitting={mutation.isPending} error={mutation.error} submitLabel="Create staff member" onCancel={close} onSubmit={(payload) => mutation.mutate(payload)} /></Modal>;
-}
 
-function StaffDetail({ memberId, initialTab, properties, selectedProperty, canReadSensitive, canManage, canManageAccountLinks, canManageLifecycle, canAssignCurrentProperty, onClose }: { memberId: string | null; initialTab: "profile" | "assignments" | "account"; properties: Property[]; selectedProperty: Property | null; canReadSensitive: boolean; canManage: boolean; canManageAccountLinks: boolean; canManageLifecycle: boolean; canAssignCurrentProperty: boolean; onClose: () => void }) {
-  const { request } = useSession();
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"profile" | "assignments" | "account">(initialTab === "account" && !canReadSensitive ? "profile" : initialTab);
-  const [editing, setEditing] = useState(false);
-  const [lifecycleAction, setLifecycleAction] = useState<"suspend" | "resume" | "depart" | null>(null);
-  const profileAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
-  const authSubjectAttempt = useRef<StaffAuthSubjectChangeAttempt | null>(null);
-  const lifecycleAttempt = useRef<StaffLifecycleAttempt | null>(null);
-  useEffect(() => { setTab(initialTab === "account" && !canReadSensitive ? "profile" : initialTab); setEditing(false); setLifecycleAction(null); profileAttempt.current = null; authSubjectAttempt.current = null; lifecycleAttempt.current = null; }, [initialTab, memberId, canReadSensitive]);
-  const member = useQuery({ queryKey: ["staff-member", memberId, canReadSensitive ? "profile" : "directory"], queryFn: () => request<StaffDetailMember>(`/api/staff/members/${memberId}${canReadSensitive ? "/profile" : ""}`), enabled: Boolean(memberId) });
-  async function refresh() { await Promise.all([queryClient.invalidateQueries({ queryKey: ["staff-member", memberId] }), queryClient.invalidateQueries({ queryKey: ["staff-members"] })]); }
-  const profileMutation = useMutation({ mutationFn: async ({ item, payload }: { item: StaffMember; payload: StaffCreatePayload }) => {
-    profileAttempt.current = await resolveDurableStaffProfileUpdateAttempt(profileAttempt.current, item.staffMemberId, item.version, payload);
-    return request<StaffMemberMutationReceipt>(`/api/staff/members/${item.staffMemberId}`, { method: "PUT", body: JSON.stringify({ ...payload, operationId: profileAttempt.current.operationId, expectedVersion: profileAttempt.current.expectedVersion }) });
-  }, onSuccess: async () => { await refresh(); profileAttempt.current = null; setEditing(false); } });
-  const lifecycleMutation = useMutation({ mutationFn: async ({ item, action, reason, effectiveOn }: { item: StaffDetailMember; action: "suspend" | "resume" | "depart"; reason: string; effectiveOn: string }) => {
-    lifecycleAttempt.current = await resolveStaffLifecycleAttempt(lifecycleAttempt.current, item.staffMemberId, item.version, action, reason, effectiveOn);
-    const attempt = lifecycleAttempt.current;
-    return request<StaffMemberMutationReceipt>(`/api/staff/members/${item.staffMemberId}/${action}`, { method: "POST", body: JSON.stringify(action === "depart" ? { operationId: attempt.operationId, effectiveOn, reason, expectedVersion: attempt.expectedVersion } : { operationId: attempt.operationId, reason, expectedVersion: attempt.expectedVersion }) });
-  }, onSuccess: async () => { await refresh(); lifecycleAttempt.current = null; setLifecycleAction(null); } });
-  const authMutation = useMutation({ mutationFn: async ({ item, authSubjectId }: { item: StaffMember; authSubjectId: string | null }) => {
-    authSubjectAttempt.current = await resolveStaffAuthSubjectChangeAttempt(authSubjectAttempt.current, item.staffMemberId, item.version, authSubjectId);
-    return request<StaffMemberMutationReceipt>(`/api/staff/members/${item.staffMemberId}/auth-subject`, { method: "PUT", body: JSON.stringify({ authSubjectId, operationId: authSubjectAttempt.current.operationId, expectedVersion: authSubjectAttempt.current.expectedVersion }) });
-  }, onSuccess: async () => { await refresh(); authSubjectAttempt.current = null; } });
-  const item = member.data;
-  return <Modal open={Boolean(memberId)} size="lg" title={item?.displayName || "Staff profile"} description={item ? `${item.jobTitle || "Staff member"}${item.department ? ` / ${item.department}` : ""}` : "Loading staff profile"} onClose={onClose}>{member.isLoading ? <LoadingState label="Loading staff profile" /> : member.error ? <ErrorState error={member.error} retry={() => void member.refetch()} /> : item ? <div className="space-y-5">
-    <div className="flex flex-col gap-4 rounded-2xl bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><InitialAvatar name={item.displayName} variant="solid" /><div><p className="font-semibold">{item.displayName}</p><p className="text-xs text-base-content/50">{item.jobTitle || item.department || "Staff directory"}</p></div></div><div className="flex flex-wrap items-center gap-2"><StatusBadge status={staffStatusLabel(item.status)} />{canManageLifecycle && staffStatusKey(item.status) === "active" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLifecycleAction("suspend")}><UserRoundMinus size={15} />Suspend</button>}{canManageLifecycle && staffStatusKey(item.status) === "suspended" && <button type="button" className="btn btn-primary btn-sm" onClick={() => setLifecycleAction("resume")}><UserRoundCheck size={15} />Resume</button>}{canManageLifecycle && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-error" onClick={() => setLifecycleAction("depart")}><UserRoundX size={15} />Depart</button>}</div></div>
-    {lifecycleAction && <LifecyclePanel member={item} action={lifecycleAction} submitting={lifecycleMutation.isPending} error={lifecycleMutation.error} onCancel={() => { lifecycleAttempt.current = null; setLifecycleAction(null); lifecycleMutation.reset(); }} onConfirm={(reason, effectiveOn) => lifecycleMutation.mutate({ item, action: lifecycleAction, reason, effectiveOn })} />}
-    <SegmentedTabs
-      stretch
-      value={tab}
-      ariaLabel="Staff details"
-      onValueChange={setTab}
-      options={[
-        { value: "profile", label: "Profile", icon: <CircleUserRound size={15} /> },
-        { value: "assignments", label: "Assignments", icon: <Building2 size={15} /> },
-        ...(canReadSensitive ? [{ value: "account" as const, label: "Account", icon: <KeyRound size={15} /> }] : []),
-      ]}
-    />
-    {tab === "profile" && <section className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-semibold">Profile</h3><p className="mt-1 text-xs text-base-content/50">Workspace identity and role information.</p></div>{isFullStaffMember(item) && canManage && !editing && staffStatusKey(item.status) !== "departed" && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => setEditing(true)}><Edit3 size={15} />Edit</button>}</div>{editing && isFullStaffMember(item) ? <StaffProfileForm member={item} submitting={profileMutation.isPending} error={profileMutation.error} submitLabel="Save profile" onCancel={() => { profileAttempt.current = null; setEditing(false); profileMutation.reset(); }} onSubmit={(payload) => profileMutation.mutate({ item, payload })} /> : <ProfileDetails member={item} />}</section>}
-    {tab === "assignments" && <AssignmentsPanel member={item} properties={properties} selectedProperty={selectedProperty} canAssign={canAssignCurrentProperty} onUpdated={refresh} />}
-    {tab === "account" && isFullStaffMember(item) && <AccountLinkPanel member={item} canManageAccountLinks={canManageAccountLinks} canManageLifecycle={canManageLifecycle} submitting={authMutation.isPending} error={authMutation.error} onRequestSuspension={() => setLifecycleAction("suspend")} onSave={(authSubjectId) => authMutation.mutate({ item, authSubjectId })} />}
-    <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
-  </div> : null}</Modal>;
-}
-
-function ProfileDetails({ member }: { member: StaffDetailMember }) {
-  if (!isFullStaffMember(member)) {
-    return <div className="grid gap-3 sm:grid-cols-2"><InfoRow icon={<BriefcaseBusiness />} label="Job title" value={member.jobTitle || "Not provided"} /><InfoRow icon={<UsersRound />} label="Department" value={member.department || "Not provided"} /></div>;
-  }
-
-  return <div className="grid gap-3 sm:grid-cols-2"><InfoRow icon={<CircleUserRound />} label="Legal name" value={member.legalName || "Not provided"} /><InfoRow icon={<BadgeCheck />} label="Employee number" value={member.employeeNumber || "Not provided"} /><InfoRow icon={<Mail />} label="Work email" value={member.workEmail || "Not provided"} href={member.workEmail ? `mailto:${member.workEmail}` : undefined} /><InfoRow icon={<Phone />} label="Work phone" value={member.workPhone || "Not provided"} href={member.workPhone ? `tel:${member.workPhone}` : undefined} /><InfoRow icon={<BriefcaseBusiness />} label="Job title" value={member.jobTitle || "Not provided"} /><InfoRow icon={<UsersRound />} label="Department" value={member.department || "Not provided"} /></div>;
-}
-
-function StaffProfileForm({ member, submitting, error, submitLabel, onCancel, onSubmit }: { member?: StaffMember; submitting: boolean; error: unknown; submitLabel: string; onCancel: () => void; onSubmit: (payload: StaffCreatePayload) => void }) {
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); onSubmit({ displayName: String(data.get("displayName") ?? "").trim(), legalName: emptyToNull(data.get("legalName")), workEmail: emptyToNull(data.get("workEmail")), workPhone: emptyToNull(data.get("workPhone")), employeeNumber: emptyToNull(data.get("employeeNumber")), jobTitle: emptyToNull(data.get("jobTitle")), department: emptyToNull(data.get("department")) }); }
-  return <form className="space-y-4" onSubmit={submit}><TextField label="Display name" name="displayName" defaultValue={member?.displayName} maxLength={256} /><TextField label="Legal name (optional)" name="legalName" defaultValue={member?.legalName || ""} required={false} maxLength={256} /><div className="grid gap-4 sm:grid-cols-2"><TextField label="Work email" name="workEmail" type="email" defaultValue={member?.workEmail || ""} required={false} maxLength={320} /><TextField label="Work phone" name="workPhone" type="tel" defaultValue={member?.workPhone || ""} required={false} maxLength={64} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Employee number" name="employeeNumber" defaultValue={member?.employeeNumber || ""} required={false} maxLength={64} /><TextField label="Job title" name="jobTitle" defaultValue={member?.jobTitle || ""} required={false} maxLength={128} /></div><TextField label="Department" name="department" defaultValue={member?.department || ""} required={false} maxLength={128} />{Boolean(error) && <ErrorState error={error} />}{member ? <InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>{submitting && <span className="loading loading-spinner loading-xs" />}{submitLabel}</button></InlineFormActions> : <FormActions submitting={submitting} submitLabel={submitLabel} onCancel={onCancel} />}</form>;
-}
-
-function LifecyclePanel({ member, action, submitting, error, onCancel, onConfirm }: { member: StaffDetailMember; action: "suspend" | "resume" | "depart"; submitting: boolean; error: unknown; onCancel: () => void; onConfirm: (reason: string, effectiveOn: string) => void }) {
-  const today = utcDateKey(new Date()); const [reason, setReason] = useState(""); const [effectiveOn, setEffectiveOn] = useState(today); const copy = action === "suspend" ? { title: `Suspend ${member.displayName}?`, body: "They remain in staff records but should no longer be treated as active staff.", button: "Suspend staff member" } : action === "resume" ? { title: `Resume ${member.displayName}?`, body: "This returns the staff profile to active status.", button: "Resume staff member" } : { title: `Record ${member.displayName} as departed?`, body: "All current property assignments end on the effective date. This cannot be reversed from the UI.", button: "Record departure" };
-  return <section className="rounded-lg border border-warning/30 bg-warning/8 p-4"><div className="flex items-start gap-3"><ShieldAlert className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">{copy.title}</h3><p className="mt-1 text-sm leading-6 text-base-content/60">{copy.body}</p></div></div><div className={`mt-4 grid gap-4 ${action === "depart" ? "sm:grid-cols-[1fr_180px]" : ""}`}><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Reason</span><textarea className="textarea textarea-bordered min-h-20 w-full" value={reason} maxLength={1000} onChange={(event) => setReason(event.target.value)} placeholder="Add a clear operational reason" required /></label>{action === "depart" && <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Effective date</span><DatePicker className="w-full" value={effectiveOn} max={today} onChange={setEffectiveOn} ariaLabel="Effective date" required /></div>}</div>{Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="button" className={`btn btn-sm ${action === "resume" ? "btn-primary" : "btn-error"}`} onClick={() => onConfirm(reason.trim(), effectiveOn)} disabled={submitting || !reason.trim()}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.button}</button></InlineFormActions></section>;
-}
-
-function AssignmentsPanel({ member, properties, selectedProperty, canAssign, onUpdated }: { member: StaffDetailMember; properties: Property[]; selectedProperty: Property | null; canAssign: boolean; onUpdated: () => Promise<void> }) {
-  const today = utcDateKey(new Date());
-  const { request } = useSession(); const [mode, setMode] = useState<"idle" | "assign" | "unassign">("idle"); const assignmentAttempt = useRef<StaffPropertyAssignmentAttempt | null>(null); const currentAtSelected = member.assignments.find((assignment) => assignment.propertyId === selectedProperty?.propertyId && assignmentIsCurrent(assignment)); const hasPrimary = member.assignments.some((assignment) => assignmentIsCurrent(assignment) && assignment.isPrimary); const mutation = useMutation({ mutationFn: async (input: StaffPropertyAssignmentAttemptInput) => { const propertyId = selectedProperty?.propertyId; if (!propertyId) throw new Error("A property must be selected."); assignmentAttempt.current = await resolveStaffPropertyAssignmentAttempt(assignmentAttempt.current, member.staffMemberId, propertyId, member.version, input); const { action, ...payload } = input; return request<StaffMemberMutationReceipt>(`/api/staff/properties/${propertyId}/members/${member.staffMemberId}/${action}`, { method: action === "assignment" ? "PUT" : "POST", body: JSON.stringify({ ...payload, operationId: assignmentAttempt.current.operationId, expectedVersion: assignmentAttempt.current.expectedVersion }) }); }, onSuccess: async () => { assignmentAttempt.current = null; setMode("idle"); await onUpdated(); } });
-  useEffect(() => { assignmentAttempt.current = null; setMode("idle"); mutation.reset(); }, [member.staffMemberId, selectedProperty?.propertyId]);
-  function cancel() { assignmentAttempt.current = null; mutation.reset(); setMode("idle"); }
-  function assign(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ action: "assignment", propertyJobTitle: emptyToNull(data.get("propertyJobTitle")), isPrimary: data.get("isPrimary") === "on", effectiveFrom: String(data.get("effectiveFrom")) }); }
-  function unassign(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); mutation.mutate({ action: "unassign", effectiveTo: String(data.get("effectiveTo")), reason: String(data.get("reason") ?? "").trim() }); }
-  const ordered = [...member.assignments].sort((a, b) => Number(assignmentIsCurrent(b)) - Number(assignmentIsCurrent(a)) || b.effectiveFrom.localeCompare(a.effectiveFrom));
-  return <section className="space-y-4"><div className="rounded-2xl border border-base-300 p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display text-lg font-semibold">Property assignments</h3><p className="mt-1 text-xs text-base-content/50">Switch the current property in the top bar to manage another assignment.</p></div>{canAssign && selectedProperty && staffStatusKey(member.status) === "active" && mode === "idle" && <button type="button" className={`btn btn-sm ${currentAtSelected ? "btn-ghost text-error" : "btn-primary"}`} onClick={() => setMode(currentAtSelected ? "unassign" : "assign")}>{currentAtSelected ? <UserRoundMinus size={15} /> : <Plus size={15} />}{currentAtSelected ? `Unassign from ${selectedProperty.name}` : `Assign to ${selectedProperty.name}`}</button>}</div>
-    {mode === "assign" && selectedProperty && <form className="mt-4 rounded-lg bg-base-200 p-4" onSubmit={assign}><h4 className="font-semibold">Assign to {selectedProperty.name}</h4><div className="mt-4 grid gap-4 sm:grid-cols-2"><TextField label="Property job title" name="propertyJobTitle" defaultValue={member.jobTitle || ""} required={false} maxLength={128} /><div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Effective from</span><FormDatePicker name="effectiveFrom" defaultValue={today} max={today} ariaLabel="Effective from" /></div></div><label className={`mt-4 flex items-start gap-3 rounded-lg border border-base-300 bg-base-100 p-3 ${hasPrimary ? "opacity-60" : "cursor-pointer"}`}><input className="checkbox checkbox-primary checkbox-sm mt-0.5" type="checkbox" name="isPrimary" disabled={hasPrimary} /><span><span className="block text-sm font-semibold">Primary property</span><span className="block text-xs text-base-content/50">{hasPrimary ? "Another current assignment is already primary." : "Use this as the staff member’s main property."}</span></span></label>{mutation.error && <div className="mt-4"><ErrorState error={mutation.error} /></div>}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={cancel}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={mutation.isPending}>{mutation.isPending && <span className="loading loading-spinner loading-xs" />}Add assignment</button></InlineFormActions></form>}
-    {mode === "unassign" && selectedProperty && currentAtSelected && <form className="mt-4 rounded-lg border border-warning/25 bg-warning/8 p-4" onSubmit={unassign}><h4 className="font-semibold">End assignment at {selectedProperty.name}</h4><div className="mt-4 grid gap-4 sm:grid-cols-[180px_1fr]"><div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Effective through</span><FormDatePicker name="effectiveTo" min={currentAtSelected.effectiveFrom} max={today} defaultValue={today} ariaLabel="Effective through" /></div><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Reason</span><input className="input input-bordered w-full" name="reason" maxLength={1000} placeholder="Why this assignment is ending" required /></label></div>{mutation.error && <div className="mt-4"><ErrorState error={mutation.error} /></div>}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={cancel}>Cancel</button><button type="submit" className="btn btn-error btn-sm" disabled={mutation.isPending}>{mutation.isPending && <span className="loading loading-spinner loading-xs" />}End assignment</button></InlineFormActions></form>}
-  </div>{ordered.length ? <div className="space-y-3">{ordered.map((assignment) => <AssignmentCard key={assignment.assignmentId} assignment={assignment} property={properties.find((property) => property.propertyId === assignment.propertyId)} />)}</div> : <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><Building2 className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No property assignments</h3><p className="mt-1 text-sm text-base-content/50">Assign this staff member from the currently selected property.</p></div>}</section>;
-}
-
-function AssignmentCard({ assignment, property }: { assignment: StaffAssignment; property?: Property }) {
-  const current = assignmentIsCurrent(assignment);
-  const effectiveTo = isFullStaffAssignment(assignment) ? assignment.effectiveTo : null;
-  return <article className={`rounded-2xl border p-4 ${current ? "border-primary/20 bg-primary/5" : "border-base-300 bg-base-100"}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{property?.name || "Unknown property"}</h4>{assignment.isPrimary && <span className="badge border-0 bg-primary text-primary-content">Primary</span>}{!current && <span className="badge badge-ghost">Ended</span>}</div><p className="mt-1 text-sm text-base-content/55">{assignment.propertyJobTitle || "No property-specific title"}</p></div><p className="text-xs text-base-content/45">{formatDate(assignment.effectiveFrom)} / {effectiveTo ? formatDate(effectiveTo) : "Current"}</p></div></article>;
-}
-
-function AccountLinkPanel({ member, canManageAccountLinks, canManageLifecycle, submitting, error, onRequestSuspension, onSave }: { member: StaffMember; canManageAccountLinks: boolean; canManageLifecycle: boolean; submitting: boolean; error: unknown; onRequestSuspension: () => void; onSave: (value: string | null) => void }) {
-  const [value, setValue] = useState(member.authSubjectId || "");
-  useEffect(() => setValue(member.authSubjectId || ""), [member.authSubjectId]);
-  const transition = resolveStaffAuthSubjectTransition(
-    staffStatusKey(member.status),
-    Boolean(member.authSubjectId),
-    canManageAccountLinks,
-    canManageLifecycle,
+  return (
+    <Modal
+      open={open}
+      title="New staff member"
+      description="Create the workspace profile first. Account links and property assignments can be added next."
+      onClose={close}
+    >
+      <StaffProfileForm
+        submitting={mutation.isPending}
+        error={mutation.error}
+        submitLabel="Create staff member"
+        sources={[permissionSource]}
+        authorityCurrent={authorityCurrent}
+        authorityMessage="Current Staff create permission is refreshing or unavailable. The form remains read-only until it recovers."
+        onCancel={close}
+        onSubmit={(payload) => {
+          if (authorityCurrent) mutation.mutate({ tenantId, payload });
+        }}
+      />
+    </Modal>
   );
-  const normalizedValue = value.trim();
-
-  return <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
-    <div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><KeyRound size={19} /></div><div><h3 className="font-display text-lg font-semibold">Sign-in account link</h3><p className="mt-1 text-sm leading-6 text-base-content/55">Connect the employment profile to one BunkFy account.</p></div></div>
-    <label className="form-control mt-5 block"><span className="label-text mb-1.5 block text-sm font-semibold">Sign-in account ID</span><input className="input input-bordered w-full font-mono text-sm" value={value} maxLength={256} disabled={!transition.canEdit} placeholder="Not linked" onChange={(event) => setValue(event.target.value)} /></label>
-    <div className={`mt-4 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${transition.attention ? "border-warning/30 bg-warning/8" : "border-base-300 bg-base-200"}`}><p className="text-sm leading-6 text-base-content/65">{transition.guidance}</p>{transition.canRequestSuspension && <button type="button" className="btn btn-ghost btn-sm shrink-0" onClick={onRequestSuspension}><UserRoundMinus size={15} />Suspend first</button>}</div>
-    {Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}
-    {(transition.canClear || transition.canEdit) && <InlineFormActions>
-      {transition.canClear && <button type="button" className="btn btn-error btn-sm" onClick={() => onSave(null)} disabled={submitting}><Unlink2 size={15} />Clear account link</button>}
-      {transition.canEdit && <button type="button" className="btn btn-primary btn-sm" onClick={() => onSave(normalizedValue)} disabled={submitting || !normalizedValue}>{submitting && <span className="loading loading-spinner loading-xs" />}<Link2 size={15} />Link account</button>}
-    </InlineFormActions>}
-  </section>;
 }
 
-function StaffIdentity({ member }: { member: Pick<StaffDirectoryMember, "displayName" | "jobTitle" | "department"> }) { return <div className="flex min-w-0 items-center gap-3"><InitialAvatar name={member.displayName} size="sm" /><div className="min-w-0"><p className="truncate font-semibold">{member.displayName}</p><p className="mt-1 truncate text-xs text-base-content/45">{member.jobTitle || member.department || "Staff directory"}</p></div></div>; }
-function InfoRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) { return <div className="flex items-start gap-3 rounded-xl border border-base-300 p-4"><span className="mt-0.5 text-primary">{icon}</span><div className="min-w-0"><p className="text-xs text-base-content/40">{label}</p>{href ? <a className="mt-1 block truncate text-sm font-semibold text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 truncate text-sm font-semibold">{value}</p>}</div></div>; }
-function TextField({ label, name, type = "text", defaultValue, required = true, maxLength }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; maxLength?: number }) { return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue} required={required} maxLength={maxLength} /></label>; }
-function FormDatePicker({ name, defaultValue, min, max, ariaLabel }: { name: string; defaultValue: string; min?: string; max?: string; ariaLabel: string }) { const [value, setValue] = useState(defaultValue); return <DatePicker className="w-full" name={name} value={value} min={min} max={max} onChange={setValue} ariaLabel={ariaLabel} required />; }
-function isFullStaffMember(member: StaffDetailMember): member is StaffMember { return "createdAtUtc" in member; }
-function isFullStaffAssignment(assignment: StaffAssignment): assignment is StaffPropertyAssignment { return "assignedAtUtc" in assignment; }
-function assignmentIsCurrent(assignment: StaffAssignment) { return isFullStaffAssignment(assignment) ? assignment.isCurrent : true; }
-function staffStatusKey(status: StaffStatus): StaffAuthSubjectTransitionStatus { if (typeof status === "string") { const normalized = status.toLowerCase(); return normalized === "active" || normalized === "suspended" || normalized === "departed" ? normalized : "unknown"; } return ({ 1: "active", 2: "suspended", 3: "departed" } as Record<number, StaffAuthSubjectTransitionStatus>)[status] ?? "unknown"; }
-function staffDetailTab(value: string | null): "profile" | "assignments" | "account" { return value === "assignments" || value === "account" ? value : "profile"; }
-function emptyToNull(value: FormDataEntryValue | null) { return emptyStringToNull(String(value ?? "")); }
-function emptyStringToNull(value: string) { const normalized = value.trim(); return normalized || null; }
-function capitalize(value: string) { return value.slice(0, 1).toUpperCase() + value.slice(1); }
-function utcDateKey(date: Date) { return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`; }
-function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`)); }
+function StaffDirectory({
+  items,
+  focusedMemberId,
+  onSelect,
+}: {
+  items: StaffDirectoryListItem[];
+  focusedMemberId: string | null;
+  onSelect: (staffMemberId: string) => void;
+}) {
+  return (
+    <>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="table">
+          <thead>
+            <tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40">
+              <th className="pl-6">Staff member</th>
+              <th>Role</th>
+              <th>Properties</th>
+              <th>Status</th>
+              <th className="pr-6" />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((member) => (
+              <tr
+                key={member.staffMemberId}
+                className={`cursor-pointer border-base-300 transition hover:bg-base-200/70 ${member.staffMemberId === focusedMemberId ? focusedResourceClass : ""}`}
+                onClick={() => onSelect(member.staffMemberId)}
+              >
+                <td className="pl-6"><StaffIdentity member={member} /></td>
+                <td>
+                  <p className="text-sm font-medium">{member.jobTitle || "No job title"}</p>
+                  <p className="mt-1 text-xs text-base-content/45">{member.department || "No department"}</p>
+                </td>
+                <td><span className="badge badge-ghost font-semibold">{member.currentPropertyCount} current</span></td>
+                <td><StatusBadge status={staffStatusLabel(member.status)} /></td>
+                <td className="pr-6 text-right">
+                  <button
+                    type="button"
+                    className="btn btn-circle btn-ghost btn-xs"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSelect(member.staffMemberId);
+                    }}
+                    aria-label={`Open ${member.displayName}`}
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="divide-y divide-base-300 md:hidden">
+        {items.map((member) => (
+          <button
+            key={member.staffMemberId}
+            type="button"
+            className={`block w-full p-5 text-left transition hover:bg-base-200 ${member.staffMemberId === focusedMemberId ? focusedResourceClass : ""}`}
+            onClick={() => onSelect(member.staffMemberId)}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <StaffIdentity member={member} />
+              <StatusBadge status={staffStatusLabel(member.status)} />
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3 text-xs text-base-content/50">
+              <span>{member.jobTitle || member.department || "No role details"}</span>
+              <span>{member.currentPropertyCount} properties <ChevronRight className="inline" size={15} /></span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function StaffIdentity({
+  member,
+}: {
+  member: Pick<StaffDirectoryListItem, "displayName" | "jobTitle" | "department">;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <InitialAvatar name={member.displayName} size="sm" />
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{member.displayName}</p>
+        <p className="mt-1 truncate text-xs text-base-content/45">{member.jobTitle || member.department || "Staff directory"}</p>
+      </div>
+    </div>
+  );
+}
+
+function capitalize(value: string): string {
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
+}

@@ -13,7 +13,9 @@ const ONBOARDING_ATTEMPT_KEY = "bunkfy.onboarding.staff-profile-update.v2";
 export type StaffProfileUpdatePayload = Omit<
   StaffCreatePayload,
   "employeeNumber"
->;
+> & {
+  employeeNumber?: string | null;
+};
 
 export type StaffProfileUpdateAttempt = {
   staffMemberId: string;
@@ -132,7 +134,7 @@ async function staffProfileFingerprint(
     staffMemberId.toLowerCase(),
     staffCreateFingerprint({
       ...payload,
-      employeeNumber: null,
+      employeeNumber: payload.employeeNumber ?? null,
     }),
   ]);
 }
