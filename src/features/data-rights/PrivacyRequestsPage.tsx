@@ -23,6 +23,11 @@ import {
   usePermissions,
 } from "../../app/permissions";
 import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
+import {
   focusedResourceClass,
   useTargetProperty,
   useTransientResourceFocus,
@@ -30,6 +35,10 @@ import {
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { PaginationBar } from "../../components/ui/PaginationBar";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import {
@@ -65,6 +74,14 @@ import {
   resolveDataRightsCaseCreateAttempt,
   type DataRightsCaseCreateAttempt,
 } from "./dataRightsCaseCreateAttempt";
+import {
+  dataRightsCaseQueryKey,
+  dataRightsCasesQueryKey,
+  dataRightsMutationAllowed,
+  dataRightsOperatorScopeKey,
+  dataRightsSourceChangedError,
+  dataRightsSubmissionMatches,
+} from "./dataRightsSourceAuthority";
 import { PrivacyRequestDetail } from "./PrivacyRequestDetail";
 
 const PAGE_SIZE = 20;
@@ -119,37 +136,38 @@ export function PrivacyRequestsPage() {
   const propertyScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
     : "";
-  const accessChecks = session
+  const activePermissionScope = scopeKind === "staff" ? tenantScope : propertyScope;
+  const activeAccess = usePermissions(session && activePermissionScope
     ? [
-      ...permissionCodes.map((permission) => ({ permission, scope: tenantScope })),
-      ...(propertyScope
-        ? permissionCodes.map((permission) => ({ permission, scope: propertyScope }))
-        : []),
-      { permission: permissions.dataRightsErase, scope: tenantScope },
-      ...(propertyScope
-        ? [{ permission: permissions.dataRightsRestrict, scope: propertyScope }]
+      ...permissionCodes.map((permission) => ({
+        permission,
+        scope: activePermissionScope,
+      })),
+      ...(scopeKind === "guest"
+        ? [{ permission: permissions.dataRightsRestrict, scope: activePermissionScope }]
         : []),
     ]
-    : [];
-  const access = usePermissions(accessChecks);
-  const activePermissionScope = scopeKind === "staff" ? tenantScope : propertyScope;
+    : []);
+  const eraseAccess = usePermissions(session && tenantScope
+    ? [{ permission: permissions.dataRightsErase, scope: tenantScope }]
+    : []);
   const capabilities: DataRightsCapabilities = {
-    read: access.allows(permissions.dataRightsRead, activePermissionScope),
-    create: access.allows(permissions.dataRightsCreate, activePermissionScope),
-    discover: access.allows(permissions.dataRightsDiscover, activePermissionScope),
-    review: access.allows(permissions.dataRightsReview, activePermissionScope),
-    decide: access.allows(permissions.dataRightsDecide, activePermissionScope),
+    read: activeAccess.allows(permissions.dataRightsRead, activePermissionScope),
+    create: activeAccess.allows(permissions.dataRightsCreate, activePermissionScope),
+    discover: activeAccess.allows(permissions.dataRightsDiscover, activePermissionScope),
+    review: activeAccess.allows(permissions.dataRightsReview, activePermissionScope),
+    decide: activeAccess.allows(permissions.dataRightsDecide, activePermissionScope),
     execute: scopeKind === "guest" &&
-      access.allows(permissions.dataRightsExecute, propertyScope),
-    manage: access.allows(permissions.dataRightsManage, activePermissionScope),
-    export: access.allows(permissions.dataRightsExport, activePermissionScope),
-    downloadExport: access.allows(
+      activeAccess.allows(permissions.dataRightsExecute, propertyScope),
+    manage: activeAccess.allows(permissions.dataRightsManage, activePermissionScope),
+    export: activeAccess.allows(permissions.dataRightsExport, activePermissionScope),
+    downloadExport: activeAccess.allows(
       permissions.dataRightsDownloadExport,
       activePermissionScope,
     ),
     restrict: scopeKind === "guest" &&
-      access.allows(permissions.dataRightsRestrict, propertyScope),
-    erase: access.allows(permissions.dataRightsErase, tenantScope),
+      activeAccess.allows(permissions.dataRightsRestrict, propertyScope),
+    erase: eraseAccess.allows(permissions.dataRightsErase, tenantScope),
   };
   const scope = useMemo<DataRightsRequestScope | null>(
     () => scopeKind === "staff"
@@ -160,24 +178,64 @@ export function PrivacyRequestsPage() {
     [scopeKind, selectedPropertyId],
   );
   const scopeKey = scope ? dataRightsScopeKey(scope) : "guest:none";
+  const operatorScopeKey = dataRightsOperatorScopeKey(session);
+  const activeScopeRef = useRef({ operatorScopeKey, scopeKey });
+  activeScopeRef.current = { operatorScopeKey, scopeKey };
+  const previousOperatorScopeKeyRef = useRef(operatorScopeKey);
+  const previousWorkflowScopeKeyRef = useRef(scopeKey);
   const casesPath = scope ? dataRightsCasesPath(scope) : "";
+  const permissionSource = createCompositeSource({
+    label: `${scopeKind === "staff" ? "Staff" : "Guest"} privacy permissions`,
+    hasData: activeAccess.hasData,
+    isLoading: activeAccess.isLoading,
+    error: activeAccess.error,
+    isFetching: activeAccess.isFetching,
+    refetch: activeAccess.refetch,
+  });
+  const erasePermissionSource = createCompositeSource({
+    label: "Privacy removal permission",
+    hasData: eraseAccess.hasData,
+    isLoading: eraseAccess.isLoading,
+    error: eraseAccess.error,
+    isFetching: eraseAccess.isFetching,
+    refetch: eraseAccess.refetch,
+  });
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const permissionUsable = compositeSourceUsable(permissionSource.state);
+  const createAuthorityCurrent = capabilities.create && dataRightsMutationAllowed(
+    "create-case",
+    { permissionsCurrent },
+  );
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(PAGE_SIZE),
   });
   if (status !== "all") params.set("status", status);
   const cases = useQuery({
-    queryKey: ["data-rights-cases", scopeKey, status, page],
+    queryKey: dataRightsCasesQueryKey(scopeKey, operatorScopeKey, status, page),
     queryFn: () => request<DataRightsCaseListResponse>(`${casesPath}?${params}`),
-    enabled: Boolean(scope && capabilities.read),
+    enabled: Boolean(operatorScopeKey && scope && capabilities.read),
     refetchInterval: (query) => query.state.data?.items.some((item) =>
       dataRightsCaseNeedsLiveRefresh(item.status))
       ? 5_000
       : false,
     refetchIntervalInBackground: false,
   });
-  const items = useMemo(() => cases.data?.items ?? [], [cases.data]);
-  const focusedCaseId = useTransientResourceFocus(Boolean(cases.data));
+  const casesSource = createCompositeSource({
+    label: "Privacy request queue",
+    hasData: cases.data !== undefined,
+    isLoading: cases.isLoading,
+    error: cases.error,
+    isFetching: cases.isFetching,
+    refetch: () => cases.refetch(),
+  });
+  const casesCurrent = compositeSourceCurrent(casesSource);
+  const casesUsable = compositeSourceUsable(casesSource.state);
+  const items = useMemo(
+    () => casesUsable ? cases.data?.items ?? [] : [],
+    [cases.data, casesUsable],
+  );
+  const focusedCaseId = useTransientResourceFocus(casesUsable);
 
   useEffect(() => {
     if ((targetScopeKind === "guest" || targetScopeKind === "staff") &&
@@ -198,10 +256,37 @@ export function PrivacyRequestsPage() {
   }, [scopeKey]);
 
   useEffect(() => {
-    if (items.length === 0 && page > 1 && !cases.isFetching) {
+    const previous = previousWorkflowScopeKeyRef.current;
+    if (previous === scopeKey) return;
+    previousWorkflowScopeKeyRef.current = scopeKey;
+    if (previous === "guest:none") return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("case");
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }, [scopeKey, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const previous = previousOperatorScopeKeyRef.current;
+    if (previous === operatorScopeKey) return;
+    previousOperatorScopeKeyRef.current = operatorScopeKey;
+    if (!previous) return;
+
+    setStatus("all");
+    setPage(1);
+    setCreateOpen(false);
+    const next = new URLSearchParams(searchParams);
+    next.delete("case");
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }, [operatorScopeKey, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (items.length === 0 && page > 1 && casesCurrent) {
       setPage((current) => Math.max(1, current - 1));
     }
-  }, [cases.isFetching, items.length, page]);
+  }, [casesCurrent, items.length, page]);
 
   function selectScope(value: "guest" | "staff") {
     setScopeKind(value);
@@ -234,12 +319,24 @@ export function PrivacyRequestsPage() {
           : "Coordinate guest corrections, exports, processing limits and separately approved data removal."}
         action={scope && capabilities.create
           ? (
-            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!createAuthorityCurrent}
+              onClick={() => {
+                if (createAuthorityCurrent) setCreateOpen(true);
+              }}
+            >
               <Plus size={17} />
               New request
             </button>
           )
           : undefined}
+      />
+
+      <CompositeSourceNotice
+        sources={[permissionSource]}
+        title="Privacy access is delayed"
       />
 
       <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
@@ -276,6 +373,14 @@ export function PrivacyRequestsPage() {
           />
         </div>
 
+        {capabilities.read && (
+          <CompositeSourceNotice
+            className="mx-4 mt-4 sm:mx-6"
+            sources={[casesSource]}
+            title="Privacy request results are delayed"
+          />
+        )}
+
         {scopeKind === "guest" && !selectedProperty
           ? (
             <div className="p-6">
@@ -286,7 +391,9 @@ export function PrivacyRequestsPage() {
               />
             </div>
           )
-          : !capabilities.read && !access.isLoading
+          : !permissionUsable
+            ? <CompositeSourceFallback state={permissionSource.state} label="privacy access" />
+          : permissionsCurrent && !capabilities.read
             ? (
               <div className="p-6">
                 <EmptyState
@@ -298,10 +405,14 @@ export function PrivacyRequestsPage() {
                 />
               </div>
             )
-            : cases.isLoading || access.isLoading
+            : !capabilities.read
+              ? <CompositeSourceFallback state={permissionSource.state} label="privacy access" />
+            : casesSource.state === "loading"
               ? <LoadingState label="Loading privacy requests" />
-              : cases.error
-                ? <div className="p-6"><ErrorState error={cases.error} retry={() => void cases.refetch()} /></div>
+              : !casesUsable
+                ? <CompositeSourceFallback state={casesSource.state} label="privacy requests" />
+                : items.length === 0 && !casesCurrent
+                  ? <CompositeSourceFallback state={casesSource.state} label="current privacy request results" />
                 : items.length === 0
                   ? (
                     <div className="p-6">
@@ -315,7 +426,14 @@ export function PrivacyRequestsPage() {
                           : "Choose another status to review the rest of the queue."}
                         action={scope && capabilities.create && status === "all"
                           ? (
-                            <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              disabled={!createAuthorityCurrent}
+                              onClick={() => {
+                                if (createAuthorityCurrent) setCreateOpen(true);
+                              }}
+                            >
                               Create request
                             </button>
                           )
@@ -341,7 +459,7 @@ export function PrivacyRequestsPage() {
                         itemCount={items.length}
                         itemLabel="request"
                         hasMore={cases.data?.hasMore}
-                        disabled={cases.isFetching}
+                        disabled={!casesCurrent}
                         onPageChange={setPage}
                       />
                     </>
@@ -351,11 +469,25 @@ export function PrivacyRequestsPage() {
       {scope && (
         <>
           <CreatePrivacyRequestModal
+            key={`${operatorScopeKey}:${scopeKey}`}
             open={createOpen}
             scope={scope}
+            operatorScopeKey={operatorScopeKey}
+            authorityCurrent={createAuthorityCurrent}
+            authoritySource={permissionSource}
             onClose={() => setCreateOpen(false)}
-            onCreated={async (created) => {
-              queryClient.setQueryData(["data-rights-case", scopeKey, created.id], created);
+            onCreated={async (created, submission) => {
+              const active = activeScopeRef.current;
+              if (!dataRightsSubmissionMatches(
+                active.operatorScopeKey,
+                active.scopeKey,
+                submission.operatorScopeKey,
+                submission.scopeKey,
+              )) return;
+              queryClient.setQueryData(
+                dataRightsCaseQueryKey(scopeKey, created.id, operatorScopeKey),
+                created,
+              );
               await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
               setCreateOpen(false);
               selectCase(created.id);
@@ -363,9 +495,13 @@ export function PrivacyRequestsPage() {
           />
 
           <PrivacyRequestDetail
+            key={`${operatorScopeKey}:${scopeKey}:${selectedCaseId ?? "closed"}`}
             scope={scope}
             caseId={selectedCaseId}
             capabilities={capabilities}
+            operatorScopeKey={operatorScopeKey}
+            permissionSource={permissionSource}
+            erasePermissionSource={erasePermissionSource}
             onClose={() => selectCase(null)}
           />
         </>
@@ -451,13 +587,22 @@ function ResponseDeadlineIndicator({ item }: { item: DataRightsCaseSummary }) {
 function CreatePrivacyRequestModal({
   open,
   scope,
+  operatorScopeKey,
+  authorityCurrent,
+  authoritySource,
   onClose,
   onCreated,
 }: {
   open: boolean;
   scope: DataRightsRequestScope;
+  operatorScopeKey: string;
+  authorityCurrent: boolean;
+  authoritySource: ReturnType<typeof createCompositeSource>;
   onClose: () => void;
-  onCreated: (created: DataRightsCase) => Promise<void>;
+  onCreated: (
+    created: DataRightsCase,
+    submission: { scopeKey: string; operatorScopeKey: string },
+  ) => Promise<void>;
 }) {
   const { request } = useSession();
   const createAttempt = useRef<DataRightsCaseCreateAttempt | null>(null);
@@ -478,32 +623,59 @@ function CreatePrivacyRequestModal({
       : 0;
   const requesterRelationship = Number(relationship) as DataRightsRequesterRelationship;
   const scopeKey = dataRightsScopeKey(scope);
+  const authorityRef = useRef({ authorityCurrent, operatorScopeKey, scopeKey });
+  authorityRef.current = { authorityCurrent, operatorScopeKey, scopeKey };
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (submission: {
+      scopeKey: string;
+      operatorScopeKey: string;
+      casesPath: string;
+      requestedOperations: number;
+      restrictionDirective: number;
+      requesterRelationship: DataRightsRequesterRelationship;
+    }) => {
+      const active = authorityRef.current;
+      if (!dataRightsMutationAllowed("create-case", {
+        permissionsCurrent: active.authorityCurrent,
+      }) || !dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) {
+        throw dataRightsSourceChangedError();
+      }
       createAttempt.current = resolveDataRightsCaseCreateAttempt(
         createAttempt.current,
         {
-          scopeKey,
-          requestedOperations,
-          restrictionDirective,
-          requesterRelationship,
+          scopeKey: submission.scopeKey,
+          requestedOperations: submission.requestedOperations,
+          restrictionDirective: submission.restrictionDirective,
+          requesterRelationship: submission.requesterRelationship,
         },
       );
       return request<DataRightsCase>(
-        dataRightsCasesPath(scope),
+        submission.casesPath,
         {
           method: "POST",
           body: JSON.stringify({
             operationId: createAttempt.current.operationId,
-            requestedOperations,
-            restrictionDirective,
-            requesterRelationship,
+            requestedOperations: submission.requestedOperations,
+            restrictionDirective: submission.restrictionDirective,
+            requesterRelationship: submission.requesterRelationship,
           }),
         },
       );
     },
-    onSuccess: async (created) => {
-      await onCreated(created);
+    onSuccess: async (created, submission) => {
+      const active = authorityRef.current;
+      if (!active.authorityCurrent || !dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      await onCreated(created, submission);
       createAttempt.current = null;
     },
   });
@@ -518,7 +690,15 @@ function CreatePrivacyRequestModal({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    mutation.mutate();
+    if (!authorityCurrent) return;
+    mutation.mutate({
+      scopeKey,
+      operatorScopeKey,
+      casesPath: dataRightsCasesPath(scope),
+      requestedOperations,
+      restrictionDirective,
+      requesterRelationship,
+    });
   }
 
   return (
@@ -529,6 +709,10 @@ function CreatePrivacyRequestModal({
       onClose={onClose}
     >
       <form className="space-y-5" onSubmit={submit}>
+        <CompositeSourceNotice
+          sources={[authoritySource]}
+          title="Privacy request creation is delayed"
+        />
         <label className="form-control block">
           <span className="label-text mb-1.5 block text-sm font-semibold">
             Request type
@@ -629,6 +813,7 @@ function CreatePrivacyRequestModal({
           submitting={mutation.isPending}
           submitLabel="Create request"
           onCancel={onClose}
+          disabled={!authorityCurrent}
         />
       </form>
     </Modal>

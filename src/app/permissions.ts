@@ -78,14 +78,16 @@ export function accessChecksMatchTenant(
 export function usePermissions(checks: AccessPermissionCheck[]) {
   const { request, session } = useSession();
   const keys = checks.map(({ permission, scope }) => `${permission}@${scope}`);
+  const subjectKey = session?.username.trim().toLowerCase() ?? "";
   const query = useQuery({
-    queryKey: ["access-permissions", session?.tenantId, ...keys],
+    queryKey: ["access-permissions", session?.tenantId, subjectKey, ...keys],
     queryFn: () => request<AccessPermissionEvaluationResponse>("/api/access/permissions/evaluate", {
       method: "POST",
       body: JSON.stringify({ checks }),
     }),
     enabled: Boolean(
-      session && checks.length && accessChecksMatchTenant(session.tenantId, checks),
+      session && subjectKey && checks.length &&
+      accessChecksMatchTenant(session.tenantId, checks),
     ),
     staleTime: 30_000,
   });

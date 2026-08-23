@@ -46,6 +46,7 @@ describe("workspace access authority recovery", () => {
 
     expect(permissions).toContain("hasData: query.data !== undefined");
     expect(permissions).toContain("isFetching: query.isFetching");
+    expect(permissions).toContain("session?.tenantId, subjectKey, ...keys");
     expect(workspace).toContain("propertiesLoaded: propertiesQuery.data !== undefined");
     expect(workspace).toContain("propertiesFetching: propertiesQuery.isFetching");
     expect(settings).toContain("const propertySource = createCompositeSource");

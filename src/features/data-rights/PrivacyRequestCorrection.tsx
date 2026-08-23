@@ -1,41 +1,43 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, PencilLine, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   DataRightsCase,
   DataRightsCorrectionExecution,
   DataRightsCorrectionExecutionDetails,
   DataRightsSelectedSubject,
-  GuestDataRightsCorrectionReceipt,
-  GuestDataRightsCorrectionRequest,
-  GuestProfile,
-  Reservation,
-  ReservationDataRightsCorrectionReceipt,
-  ReservationDataRightsCorrectionRequest,
-  WorkspaceStaffOnboardingDataRightsCorrectionReceipt,
-  WorkspaceStaffOnboardingDataRightsCorrectionRequest,
-  WorkspaceStaffOnboardingDataRightsCorrectionTarget,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { LoadingState, StatusBadge } from "../../components/ui/primitives";
 import { CorrectionError } from "./CorrectionFormFields";
-import { GuestCorrectionForm } from "./GuestCorrectionForm";
-import { ReservationCorrectionForm } from "./ReservationCorrectionForm";
-import { WorkspaceStaffOnboardingCorrectionForm } from "./WorkspaceStaffOnboardingCorrectionForm";
+import {
+  PrivacyRequestCorrectionOwnerEditor,
+  type AppliedCorrectionReceipt as AppliedReceipt,
+} from "./PrivacyRequestCorrectionOwnerEditor";
 import {
   canEditCorrectionClaim,
   correctionCaseStatus,
   correctionClaimAction,
   correctionClaimExpired,
   correctionExecutionStatus,
-  isSelectedCorrectionRevisionCurrent,
-  workspaceStaffOnboardingCorrectionTargetPath,
 } from "./dataRightsCorrectionWorkflow";
-
-type AppliedReceipt =
-  | GuestDataRightsCorrectionReceipt
-  | ReservationDataRightsCorrectionReceipt
-  | WorkspaceStaffOnboardingDataRightsCorrectionReceipt;
+import {
+  dataRightsCaseMatches,
+  dataRightsCorrectionQueryKey,
+  dataRightsMutationAllowed,
+  dataRightsSourceChangedError,
+  dataRightsSubmissionMatches,
+  type DataRightsCaseSnapshot,
+} from "./dataRightsSourceAuthority";
 
 export function PrivacyRequestCorrection({
   basePath,
@@ -45,6 +47,10 @@ export function PrivacyRequestCorrection({
   selectedSubject,
   canStart,
   canExecute,
+  operatorScopeKey,
+  permissionCurrent,
+  caseCurrent,
+  selectedEvidenceCurrent,
   onCaseUpdated,
 }: {
   basePath: string;
@@ -54,6 +60,10 @@ export function PrivacyRequestCorrection({
   selectedSubject: DataRightsSelectedSubject | undefined;
   canStart: boolean;
   canExecute: boolean;
+  operatorScopeKey: string;
+  permissionCurrent: boolean;
+  caseCurrent: boolean;
+  selectedEvidenceCurrent: boolean;
   onCaseUpdated: (updated: DataRightsCase) => Promise<void>;
 }) {
   const { request } = useSession();
@@ -61,7 +71,11 @@ export function PrivacyRequestCorrection({
   const [appliedReceipt, setAppliedReceipt] = useState<AppliedReceipt | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const status = correctionCaseStatus(dataRightsCase.status);
-  const correctionKey = ["data-rights-correction", scopeKey, dataRightsCase.id] as const;
+  const correctionKey = dataRightsCorrectionQueryKey(
+    scopeKey,
+    dataRightsCase.id,
+    operatorScopeKey,
+  );
   const correction = useQuery({
     queryKey: correctionKey,
     queryFn: () => request<DataRightsCorrectionExecutionDetails>(
@@ -70,23 +84,118 @@ export function PrivacyRequestCorrection({
     enabled: canExecute && ["executing", "completed"].includes(status),
     refetchOnWindowFocus: true,
   });
-  const execution = correction.data;
+  const correctionSource = createCompositeSource({
+    label: "Correction claim",
+    hasData: correction.data !== undefined,
+    isLoading: correction.isLoading,
+    error: correction.error,
+    isFetching: correction.isFetching,
+    refetch: () => correction.refetch(),
+  });
+  const correctionCurrent = compositeSourceCurrent(correctionSource);
+  const correctionUsable = compositeSourceUsable(correctionSource.state);
+  const execution = correctionUsable ? correction.data : undefined;
   const completed = correctionExecutionStatus(execution?.status) === "completed";
   const expired = correctionClaimExpired(execution, now);
   const claimAction = correctionClaimAction(execution, now);
   const canEdit = canEditCorrectionClaim(execution, now);
+  const authorityRef = useRef({
+    operatorScopeKey,
+    scopeKey,
+    permissionCurrent,
+    caseCurrent,
+    selectedEvidenceCurrent,
+    correctionCurrent,
+    dataRightsCase,
+    execution,
+  });
+  authorityRef.current = {
+    operatorScopeKey,
+    scopeKey,
+    permissionCurrent,
+    caseCurrent,
+    selectedEvidenceCurrent,
+    correctionCurrent,
+    dataRightsCase,
+    execution,
+  };
   const start = useMutation({
-    mutationFn: (existing?: DataRightsCorrectionExecutionDetails) =>
-      request<DataRightsCorrectionExecution>(`${basePath}/correction`, {
+    mutationFn: (submission: {
+      existing?: DataRightsCorrectionExecutionDetails;
+      basePath: string;
+      scopeKey: string;
+      operatorScopeKey: string;
+      caseSnapshot: DataRightsCaseSnapshot;
+    }) => {
+      const current = authorityRef.current;
+      const existingCurrent = !submission.existing || Boolean(
+        current.execution &&
+        current.execution.executionId === submission.existing.executionId &&
+        current.execution.version === submission.existing.version &&
+        current.execution.executionRevision === submission.existing.executionRevision,
+      );
+      const mutationKind = submission.existing
+        ? "claim-correction"
+        : "start-correction";
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot) ||
+        !existingCurrent || !dataRightsMutationAllowed(mutationKind, {
+          permissionsCurrent: current.permissionCurrent,
+          caseCurrent: current.caseCurrent,
+          selectedEvidenceCurrent: current.selectedEvidenceCurrent,
+          supportingSourceCurrent: submission.existing
+            ? current.correctionCurrent
+            : true,
+        })) {
+        throw dataRightsSourceChangedError();
+      }
+      return request<DataRightsCorrectionExecution>(`${submission.basePath}/correction`, {
         method: "POST",
         body: JSON.stringify({
-          executionId: existing?.executionId ?? crypto.randomUUID(),
-          expectedVersion: existing?.selectedCaseVersion ?? dataRightsCase.version,
+          executionId: submission.existing?.executionId ?? crypto.randomUUID(),
+          expectedVersion: submission.existing?.selectedCaseVersion ??
+            submission.caseSnapshot.version,
         }),
-      }),
-    onSuccess: async (result) => {
+      });
+    },
+    onSuccess: async (result, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      const mutationKind = submission.existing
+        ? "claim-correction"
+        : "start-correction";
+      if (!dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot) ||
+        !dataRightsMutationAllowed(mutationKind, {
+          permissionsCurrent: current.permissionCurrent,
+          caseCurrent: current.caseCurrent,
+          supportingSourceCurrent: submission.existing
+            ? current.correctionCurrent
+            : true,
+        })) {
+        await correction.refetch();
+        return;
+      }
       queryClient.setQueryData(correctionKey, result.execution);
       await onCaseUpdated(result.case);
+    },
+    onError: async (_error, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      await correction.refetch();
     },
   });
 
@@ -94,7 +203,7 @@ export function PrivacyRequestCorrection({
     setAppliedReceipt(null);
     setNow(Date.now());
     start.reset();
-  }, [dataRightsCase.id]);
+  }, [dataRightsCase.id, operatorScopeKey, scopeKey]);
 
   useEffect(() => {
     if (!execution || completed || expired) return;
@@ -110,8 +219,20 @@ export function PrivacyRequestCorrection({
   }, [completed, execution, expired]);
 
   useEffect(() => {
-    if (status === "completed" && canExecute) void correction.refetch();
-  }, [canExecute, status]);
+    if (status === "completed" && canExecute && permissionCurrent && caseCurrent) {
+      void correction.refetch();
+    }
+  }, [canExecute, caseCurrent, permissionCurrent, status]);
+
+  function startCorrection(existing?: DataRightsCorrectionExecutionDetails) {
+    start.mutate({
+      existing,
+      basePath,
+      scopeKey,
+      operatorScopeKey,
+      caseSnapshot: dataRightsCase,
+    });
+  }
 
   async function ownerApplied(receipt: AppliedReceipt) {
     setAppliedReceipt(receipt);
@@ -158,12 +279,25 @@ export function PrivacyRequestCorrection({
         {completed && <StatusBadge status="Completed" />}
       </div>
 
+      {canExecute && ["executing", "completed"].includes(status) && (
+        <CompositeSourceNotice
+          className="mt-4"
+          sources={[correctionSource]}
+          title="Correction claim is delayed"
+        />
+      )}
+
       {status === "approved" && (
         <CorrectionStart
           selectedSubject={selectedSubject}
-          canStart={canStart}
+          canStart={canStart && dataRightsMutationAllowed("start-correction", {
+            permissionsCurrent: permissionCurrent,
+            caseCurrent,
+            selectedEvidenceCurrent,
+            supportingSourceCurrent: true,
+          })}
           pending={start.isPending}
-          onStart={() => start.mutate(undefined)}
+          onStart={() => startCorrection()}
         />
       )}
 
@@ -176,10 +310,10 @@ export function PrivacyRequestCorrection({
       {canExecute && ["executing", "completed"].includes(status) && (
         correction.isLoading
           ? <LoadingState label="Loading correction claim" />
-          : correction.error || !execution
+          : !correctionUsable || !execution
             ? (
               <div className="mt-4">
-                <CorrectionError error={correction.error} retry={() => void correction.refetch()} />
+                <CompositeSourceFallback state={correctionSource.state} label="correction claim" />
               </div>
             )
             : completed
@@ -191,15 +325,28 @@ export function PrivacyRequestCorrection({
                     expired={expired}
                     action={claimAction}
                     renewing={start.isPending}
-                    onRenew={() => start.mutate(execution)}
+                    authorityCurrent={dataRightsMutationAllowed("claim-correction", {
+                      permissionsCurrent: permissionCurrent,
+                      caseCurrent,
+                      supportingSourceCurrent: correctionCurrent,
+                    })}
+                    onRenew={() => startCorrection(execution)}
                   />
                   {appliedReceipt
                     ? <CompletionPending receipt={appliedReceipt} />
                     : canEdit && (
-                      <CorrectionOwnerEditor
+                      <PrivacyRequestCorrectionOwnerEditor
                         propertyId={propertyId}
                         execution={execution}
-                        disabled={false}
+                        disabled={!dataRightsMutationAllowed("apply-correction", {
+                          permissionsCurrent: permissionCurrent,
+                          caseCurrent,
+                          selectedEvidenceCurrent,
+                          supportingSourceCurrent: correctionCurrent,
+                        })}
+                        operatorScopeKey={operatorScopeKey}
+                        scopeKey={scopeKey}
+                        caseSnapshot={dataRightsCase}
                         onApplied={ownerApplied}
                       />
                     )}
@@ -258,12 +405,14 @@ export function CorrectionClaimWindow({
   expired,
   action,
   renewing,
+  authorityCurrent = true,
   onRenew,
 }: {
   execution: DataRightsCorrectionExecutionDetails;
   expired: boolean;
   action: "none" | "renew" | "takeover";
   renewing: boolean;
+  authorityCurrent?: boolean;
   onRenew: () => void;
 }) {
   const ownedByCurrentActor = execution.isCurrentActor;
@@ -304,7 +453,7 @@ export function CorrectionClaimWindow({
         <button
           type="button"
           className="btn btn-primary btn-sm shrink-0"
-          disabled={renewing}
+          disabled={renewing || !authorityCurrent}
           onClick={onRenew}
         >
           {renewing
@@ -313,171 +462,6 @@ export function CorrectionClaimWindow({
           {action === "renew" ? "Renew window" : "Take over window"}
         </button>
       )}
-    </div>
-  );
-}
-
-function CorrectionOwnerEditor({
-  propertyId,
-  execution,
-  disabled,
-  onApplied,
-}: {
-  propertyId?: string;
-  execution: DataRightsCorrectionExecutionDetails;
-  disabled: boolean;
-  onApplied: (receipt: AppliedReceipt) => Promise<void>;
-}) {
-  const { request } = useSession();
-  const ownerKey = execution.subject.ownerKey;
-  const recordId = execution.subject.recordId;
-  const guest = useQuery({
-    queryKey: ["guest-detail", propertyId, recordId],
-    queryFn: () => request<GuestProfile>(`/api/guests/properties/${propertyId}/${recordId}`),
-    enabled: ownerKey === "guests" && Boolean(propertyId),
-  });
-  const reservation = useQuery({
-    queryKey: ["reservation", propertyId, recordId],
-    queryFn: () => request<Reservation>(
-      `/api/reservations/properties/${propertyId}/${recordId}`,
-    ),
-    enabled: ownerKey === "reservations" && Boolean(propertyId),
-  });
-  const workspaceStaffOnboarding = useQuery({
-    queryKey: [
-      "workspace-staff-onboarding",
-      "data-rights-correction",
-      execution.executionId,
-      recordId,
-      execution.subject.recordVersion,
-    ],
-    queryFn: () =>
-      request<WorkspaceStaffOnboardingDataRightsCorrectionTarget>(
-        workspaceStaffOnboardingCorrectionTargetPath(execution),
-      ),
-    enabled:
-      ownerKey === "workspaces" &&
-      execution.subject.recordType === "staff-onboarding",
-  });
-  const guestCorrection = useMutation({
-    mutationFn: (body: GuestDataRightsCorrectionRequest) =>
-      request<GuestDataRightsCorrectionReceipt>(
-        `/api/guests/properties/${propertyId}/data-rights-corrections`,
-        { method: "POST", body: JSON.stringify(body) },
-      ),
-    onSuccess: onApplied,
-  });
-  const reservationCorrection = useMutation({
-    mutationFn: (body: ReservationDataRightsCorrectionRequest) =>
-      request<ReservationDataRightsCorrectionReceipt>(
-        `/api/reservations/properties/${propertyId}/data-rights-corrections`,
-        { method: "POST", body: JSON.stringify(body) },
-      ),
-    onSuccess: onApplied,
-  });
-  const workspaceStaffOnboardingCorrection = useMutation({
-    mutationFn: (
-      body: WorkspaceStaffOnboardingDataRightsCorrectionRequest,
-    ) =>
-      request<WorkspaceStaffOnboardingDataRightsCorrectionReceipt>(
-        "/api/workspace-staff-enrollment/data-rights-corrections",
-        { method: "POST", body: JSON.stringify(body) },
-      ),
-    onSuccess: onApplied,
-  });
-
-  if (ownerKey === "guests") {
-    if (guest.isLoading) return <LoadingState label="Loading Guest Record" />;
-    if (guest.error || !guest.data) {
-      return <CorrectionError error={guest.error} retry={() => void guest.refetch()} />;
-    }
-    if (!isSelectedCorrectionRevisionCurrent(guest.data.version, execution)) {
-      return <StaleRecord />;
-    }
-    return (
-      <GuestCorrectionForm
-        key={`${guest.data.guestId}:${guest.data.version}`}
-        profile={guest.data}
-        execution={execution}
-        disabled={disabled}
-        pending={guestCorrection.isPending}
-        error={guestCorrection.error}
-        onSubmit={(body) => guestCorrection.mutate(body)}
-      />
-    );
-  }
-
-  if (ownerKey === "reservations") {
-    if (reservation.isLoading) return <LoadingState label="Loading reservation" />;
-    if (reservation.error || !reservation.data) {
-      return (
-        <CorrectionError
-          error={reservation.error}
-          retry={() => void reservation.refetch()}
-        />
-      );
-    }
-    if (!isSelectedCorrectionRevisionCurrent(reservation.data.version, execution)) {
-      return <StaleRecord />;
-    }
-    return (
-      <ReservationCorrectionForm
-        key={`${reservation.data.reservationId}:${reservation.data.version}`}
-        reservation={reservation.data}
-        execution={execution}
-        disabled={disabled}
-        pending={reservationCorrection.isPending}
-        error={reservationCorrection.error}
-        onSubmit={(body) => reservationCorrection.mutate(body)}
-      />
-    );
-  }
-
-  if (
-    ownerKey === "workspaces" &&
-    execution.subject.recordType === "staff-onboarding"
-  ) {
-    if (workspaceStaffOnboarding.isLoading) {
-      return <LoadingState label="Loading Staff enrollment profile" />;
-    }
-    if (
-      workspaceStaffOnboarding.error ||
-      !workspaceStaffOnboarding.data
-    ) {
-      return (
-        <CorrectionError
-          error={workspaceStaffOnboarding.error}
-          retry={() => void workspaceStaffOnboarding.refetch()}
-        />
-      );
-    }
-    if (
-      !isSelectedCorrectionRevisionCurrent(
-        workspaceStaffOnboarding.data.version,
-        execution,
-      )
-    ) {
-      return <StaleRecord />;
-    }
-    return (
-      <WorkspaceStaffOnboardingCorrectionForm
-        key={`${workspaceStaffOnboarding.data.applicationId}:${
-          workspaceStaffOnboarding.data.version
-        }`}
-        target={workspaceStaffOnboarding.data}
-        execution={execution}
-        disabled={disabled}
-        pending={workspaceStaffOnboardingCorrection.isPending}
-        error={workspaceStaffOnboardingCorrection.error}
-        onSubmit={(body) =>
-          workspaceStaffOnboardingCorrection.mutate(body)}
-      />
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm">
-      The selected record owner does not provide an operator correction editor.
     </div>
   );
 }
@@ -521,15 +505,6 @@ function CorrectionCompletion({
           </p>
         )}
       </div>
-    </div>
-  );
-}
-
-function StaleRecord() {
-  return (
-    <div className="rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm">
-      This record changed after it was selected. The approved revision cannot be
-      edited; review the request again before correcting current data.
     </div>
   );
 }

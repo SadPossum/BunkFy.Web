@@ -19,6 +19,7 @@ export function PrivacyRequestActions({
   denialReason,
   destructiveConfirmation,
   pending,
+  authorityCurrent,
   onConfirmationChange,
   onDenialReasonChange,
   onDestructiveConfirmationChange,
@@ -31,6 +32,7 @@ export function PrivacyRequestActions({
   denialReason: string;
   destructiveConfirmation: string;
   pending: boolean;
+  authorityCurrent: boolean;
   onConfirmationChange: (value: DataRightsConfirmationAction | null) => void;
   onDenialReasonChange: (value: string) => void;
   onDestructiveConfirmationChange: (value: string) => void;
@@ -60,7 +62,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onPerform("/requester-verification", { verified: true })}
             >
               <UserCheck size={15} />
@@ -71,7 +73,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-ghost"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onConfirmationChange("reject-verification")}
             >
               Unable to verify
@@ -81,7 +83,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onPerform("/controller-routing")}
             >
               <Route size={15} />
@@ -92,7 +94,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onPerform("/discovery")}
             >
               <Search size={15} />
@@ -103,7 +105,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onPerform("/review")}
             >
               <ShieldCheck size={15} />
@@ -114,7 +116,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onPerform("/decision")}
             >
               Begin decision
@@ -124,7 +126,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onConfirmationChange("approve")}
             >
               {approvalLabel(operationKind)}
@@ -134,7 +136,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-ghost"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onConfirmationChange("deny")}
             >
               Deny request
@@ -144,7 +146,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onConfirmationChange("execute-restriction")}
             >
               <ShieldCheck size={15} />
@@ -157,7 +159,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-error text-white"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onConfirmationChange("execute-removal")}
             >
               Remove personal data
@@ -167,7 +169,7 @@ export function PrivacyRequestActions({
             <button
               type="button"
               className="btn btn-sm btn-ghost text-error"
-              disabled={pending}
+              disabled={pending || !authorityCurrent}
               onClick={() => onConfirmationChange("cancel")}
             >
               Cancel request
@@ -190,10 +192,12 @@ export function PrivacyRequestActions({
             restrictionTargetId={confirmation.restrictionTargetId}
             restrictionTargetVersion={confirmation.restrictionTargetVersion}
             pending={pending}
+            authorityCurrent={authorityCurrent}
             onDenialReasonChange={onDenialReasonChange}
             onDestructiveConfirmationChange={onDestructiveConfirmationChange}
             onCancel={() => onConfirmationChange(null)}
             onConfirm={() => {
+              if (!authorityCurrent) return;
               if (confirmation.action === "reject-verification") {
                 onPerform(
                   "/requester-verification",
@@ -239,6 +243,7 @@ function ConfirmationPanel({
   restrictionTargetId,
   restrictionTargetVersion,
   pending,
+  authorityCurrent,
   onDenialReasonChange,
   onDestructiveConfirmationChange,
   onCancel,
@@ -251,6 +256,7 @@ function ConfirmationPanel({
   restrictionTargetId: string | null;
   restrictionTargetVersion: number | null;
   pending: boolean;
+  authorityCurrent: boolean;
   onDenialReasonChange: (value: string) => void;
   onDestructiveConfirmationChange: (value: string) => void;
   onCancel: () => void;
@@ -315,7 +321,7 @@ function ConfirmationPanel({
         <button
           type="button"
           className={`btn btn-sm ${destructive ? "btn-error text-white" : "btn-primary"}`}
-          disabled={pending || (destructive && destructiveConfirmation !== "REMOVE")}
+          disabled={!authorityCurrent || pending || (destructive && destructiveConfirmation !== "REMOVE")}
           onClick={onConfirm}
         >
           {pending && <span className="loading loading-spinner loading-sm" />}

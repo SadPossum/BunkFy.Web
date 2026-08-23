@@ -8,8 +8,13 @@ import type {
   DataRightsSubjectCandidate,
   DataRightsSubjectDiscoveryResponse,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { ErrorState } from "../../components/ui/primitives";
 import {
   createDataRightsDiscoveryAttempt,
@@ -24,6 +29,13 @@ import {
   dataRightsOperationKind,
   isDataRightsRestriction,
 } from "./dataRightsWorkflow";
+import {
+  dataRightsCaseMatches,
+  dataRightsMutationAllowed,
+  dataRightsSourceChangedError,
+  dataRightsSubmissionMatches,
+  type DataRightsCaseSnapshot,
+} from "./dataRightsSourceAuthority";
 
 const ownerOptions = [
   { value: "guests", label: "Guest record" },
@@ -37,6 +49,10 @@ export function PrivacyRequestDiscovery({
   dataRightsCase,
   selected,
   selectedLoading,
+  selectedSource,
+  authorityCurrent,
+  operatorScopeKey,
+  scopeKey,
   onCaseUpdated,
   refreshSelected,
   refreshCase,
@@ -47,12 +63,17 @@ export function PrivacyRequestDiscovery({
   dataRightsCase: DataRightsCase;
   selected: DataRightsSelectedSubjectsResponse | undefined;
   selectedLoading: boolean;
+  selectedSource: CompositeSource;
+  authorityCurrent: boolean;
+  operatorScopeKey: string;
+  scopeKey: string;
   onCaseUpdated: (updated: DataRightsCase) => Promise<void>;
   refreshSelected: () => Promise<unknown>;
   refreshCase: () => Promise<unknown>;
   onRestrictionTargetCurrentChange: (current: boolean) => void;
 }) {
   const { request } = useSession();
+  const selectedSourceCurrent = compositeSourceCurrent(selectedSource);
   const restriction = isDataRightsRestriction(dataRightsCase);
   const targetBoundRelease =
     dataRightsOperationKind(dataRightsCase) === "restriction-release" &&
@@ -84,6 +105,20 @@ export function PrivacyRequestDiscovery({
   };
   const discoveryCriteriaRef = useRef(discoveryCriteria);
   discoveryCriteriaRef.current = discoveryCriteria;
+  const authorityRef = useRef({
+    authorityCurrent,
+    operatorScopeKey,
+    scopeKey,
+    dataRightsCase,
+    selectedSourceCurrent,
+  });
+  authorityRef.current = {
+    authorityCurrent,
+    operatorScopeKey,
+    scopeKey,
+    dataRightsCase,
+    selectedSourceCurrent,
+  };
   const visibleDiscovery = discoveryResult &&
       isDataRightsDiscoveryAttemptCurrent(
         discoveryResult.attempt,
@@ -94,21 +129,39 @@ export function PrivacyRequestDiscovery({
     : null;
   const candidates = visibleDiscovery?.candidates ?? [];
   const discover = useMutation({
-    mutationFn: ({
-      attempt,
-      controller,
-    }: {
+    mutationFn: (submission: {
       attempt: DataRightsDiscoveryAttempt;
       controller: AbortController;
-    }) => request<DataRightsSubjectDiscoveryResponse>(
-      `${basePath}/subjects/discover`,
-      {
+      operatorScopeKey: string;
+      scopeKey: string;
+      basePath: string;
+      caseSnapshot: DataRightsCaseSnapshot;
+    }) => {
+      const { attempt, controller } = submission;
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot) ||
+        !dataRightsMutationAllowed("discovery", {
+          permissionsCurrent: current.authorityCurrent,
+          caseCurrent: current.authorityCurrent,
+        })) {
+        throw dataRightsSourceChangedError();
+      }
+      return request<DataRightsSubjectDiscoveryResponse>(
+        `${submission.basePath}/subjects/discover`,
+        {
         method: "POST",
         body: JSON.stringify(attempt.request),
         signal: controller.signal,
-      },
-    ),
-    onSuccess: (response, { attempt, controller }) => {
+        },
+      );
+    },
+    onSuccess: (response, submission) => {
+      const { attempt, controller } = submission;
       if (discoveryController.current === controller) {
         discoveryController.current = null;
       }
@@ -116,11 +169,20 @@ export function PrivacyRequestDiscovery({
         attempt,
         discoveryCriteriaRef.current,
         discoveryGeneration.current,
-      )) return;
+      ) || !dataRightsSubmissionMatches(
+        authorityRef.current.operatorScopeKey,
+        authorityRef.current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(
+        authorityRef.current.dataRightsCase,
+        submission.caseSnapshot,
+      ) || !authorityRef.current.authorityCurrent) return;
       setDiscoveryError(null);
       setDiscoveryResult({ attempt, response });
     },
-    onError: (error, { attempt, controller }) => {
+    onError: (error, submission) => {
+      const { attempt, controller } = submission;
       if (discoveryController.current === controller) {
         discoveryController.current = null;
       }
@@ -128,45 +190,135 @@ export function PrivacyRequestDiscovery({
         attempt,
         discoveryCriteriaRef.current,
         discoveryGeneration.current,
+      ) || !dataRightsSubmissionMatches(
+        authorityRef.current.operatorScopeKey,
+        authorityRef.current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
       )) return;
       setDiscoveryError(error);
     },
   });
   const select = useMutation({
-    mutationFn: (candidate: DataRightsSubjectCandidate) => request<DataRightsCase>(
-      `${basePath}/subjects/select`,
-      {
+    mutationFn: (submission: {
+      candidate: DataRightsSubjectCandidate;
+      operatorScopeKey: string;
+      scopeKey: string;
+      basePath: string;
+      caseSnapshot: DataRightsCaseSnapshot;
+    }) => {
+      const current = authorityRef.current;
+      const candidateCurrent = candidates.some((candidate) =>
+        candidateKey(candidate) === candidateKey(submission.candidate));
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot) ||
+        !dataRightsMutationAllowed("selection", {
+          permissionsCurrent: current.authorityCurrent,
+          caseCurrent: current.authorityCurrent,
+          supportingSourceCurrent: current.selectedSourceCurrent && candidateCurrent,
+        })) {
+        throw dataRightsSourceChangedError();
+      }
+      return request<DataRightsCase>(
+        `${submission.basePath}/subjects/select`,
+        {
         method: "POST",
         body: JSON.stringify({
-          coordinate: candidate.coordinate,
-          expectedVersion: dataRightsCase.version,
+          coordinate: submission.candidate.coordinate,
+          expectedVersion: submission.caseSnapshot.version,
         }),
-      },
-    ),
-    onSuccess: async (updated) => {
+        },
+      );
+    },
+    onSuccess: async (updated, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !current.authorityCurrent ||
+        !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot)) return;
       clearDiscovery();
       await onCaseUpdated(updated);
       await refreshSelected();
     },
+    onError: async (_error, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      await Promise.all([refreshCase(), refreshSelected()]);
+    },
   });
   const unselect = useMutation({
-    mutationFn: (subject: DataRightsSelectedSubject) => request<DataRightsCase>(
-      `${basePath}/subjects/unselect`,
-      {
+    mutationFn: (submission: {
+      subject: DataRightsSelectedSubject;
+      operatorScopeKey: string;
+      scopeKey: string;
+      basePath: string;
+      caseSnapshot: DataRightsCaseSnapshot;
+    }) => {
+      const current = authorityRef.current;
+      const subjectCurrent = selectedSubjects.some((subject) =>
+        subjectKey(subject) === subjectKey(submission.subject) &&
+        subject.recordVersion === submission.subject.recordVersion);
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot) ||
+        !dataRightsMutationAllowed("selection", {
+          permissionsCurrent: current.authorityCurrent,
+          caseCurrent: current.authorityCurrent,
+          supportingSourceCurrent: current.selectedSourceCurrent && subjectCurrent,
+        })) {
+        throw dataRightsSourceChangedError();
+      }
+      return request<DataRightsCase>(
+        `${submission.basePath}/subjects/unselect`,
+        {
         method: "POST",
         body: JSON.stringify({
           coordinate: {
-            ownerKey: subject.ownerKey,
-            recordType: subject.recordType,
-            recordId: subject.recordId,
+            ownerKey: submission.subject.ownerKey,
+            recordType: submission.subject.recordType,
+            recordId: submission.subject.recordId,
           },
-          expectedVersion: dataRightsCase.version,
+          expectedVersion: submission.caseSnapshot.version,
         }),
-      },
-    ),
-    onSuccess: async (updated) => {
+        },
+      );
+    },
+    onSuccess: async (updated, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !current.authorityCurrent ||
+        !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot)) return;
       await onCaseUpdated(updated);
       await refreshSelected();
+    },
+    onError: async (_error, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      await Promise.all([refreshCase(), refreshSelected()]);
     },
   });
 
@@ -209,6 +361,7 @@ export function PrivacyRequestDiscovery({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!authorityCurrent) return;
     clearDiscovery();
     const controller = new AbortController();
     const attempt = createDataRightsDiscoveryAttempt(
@@ -216,7 +369,14 @@ export function PrivacyRequestDiscovery({
       discoveryGeneration.current,
     );
     discoveryController.current = controller;
-    discover.mutate({ attempt, controller });
+    discover.mutate({
+      attempt,
+      controller,
+      operatorScopeKey,
+      scopeKey,
+      basePath,
+      caseSnapshot: dataRightsCase,
+    });
   }
 
   return (
@@ -239,6 +399,12 @@ export function PrivacyRequestDiscovery({
           </span>
         )}
       </div>
+
+      <CompositeSourceNotice
+        className="mt-4"
+        sources={[selectedSource]}
+        title="Selected record evidence is delayed"
+      />
 
       {dataRightsCase.selectedSubjectCount > 0 && selectedLoading && !selectedSubjects.length && (
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-base-200 px-4 py-4 text-sm text-base-content/55">
@@ -265,8 +431,19 @@ export function PrivacyRequestDiscovery({
               <button
                 type="button"
                 className="btn btn-sm btn-ghost text-error"
-                disabled={unselect.isPending || select.isPending}
-                onClick={() => unselect.mutate(subject)}
+                disabled={
+                  !authorityCurrent ||
+                  !selectedSourceCurrent ||
+                  unselect.isPending ||
+                  select.isPending
+                }
+                onClick={() => unselect.mutate({
+                  subject,
+                  operatorScopeKey,
+                  scopeKey,
+                  basePath,
+                  caseSnapshot: dataRightsCase,
+                })}
               >
                 <Trash2 size={15} />
                 Remove
@@ -280,6 +457,9 @@ export function PrivacyRequestDiscovery({
         <PrivacyRequestRestrictionTarget
           basePath={basePath}
           dataRightsCase={dataRightsCase}
+          operatorScopeKey={operatorScopeKey}
+          scopeKey={scopeKey}
+          authorityCurrent={authorityCurrent}
           onCaseUpdated={onCaseUpdated}
           refreshCase={refreshCase}
           onCurrentChange={onRestrictionTargetCurrentChange}
@@ -382,7 +562,13 @@ export function PrivacyRequestDiscovery({
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={discover.isPending || select.isPending || unselect.isPending || !lookup.trim()}
+            disabled={
+              !authorityCurrent ||
+              discover.isPending ||
+              select.isPending ||
+              unselect.isPending ||
+              !lookup.trim()
+            }
           >
             {discover.isPending
               ? <span className="loading loading-spinner loading-sm" />
@@ -420,11 +606,19 @@ export function PrivacyRequestDiscovery({
                 subject.recordId === candidate.coordinate.recordId)}
               contactHintsVisible={ownerKey !== "ingestion"}
               disabled={
+                !authorityCurrent ||
+                !selectedSourceCurrent ||
                 select.isPending ||
                 unselect.isPending ||
                 (singleSubject && dataRightsCase.selectedSubjectCount >= 1)
               }
-              onSelect={() => select.mutate(candidate)}
+              onSelect={() => select.mutate({
+                candidate,
+                operatorScopeKey,
+                scopeKey,
+                basePath,
+                caseSnapshot: dataRightsCase,
+              })}
             />
           ))}
         </div>

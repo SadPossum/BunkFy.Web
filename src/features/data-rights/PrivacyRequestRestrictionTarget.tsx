@@ -1,66 +1,153 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, RefreshCw, ShieldAlert, Target } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type {
   DataRightsCase,
   DataRightsRestrictionReleaseTargetCandidate,
   DataRightsRestrictionReleaseTargetListResponse,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import {
   dataRightsRestrictionTargetErrorMessage,
   restrictionTargetMatchesCandidate,
   shortRestrictionTargetId,
 } from "./dataRightsRestrictionTarget";
+import {
+  dataRightsCaseMatches,
+  dataRightsMutationAllowed,
+  dataRightsRestrictionTargetsQueryKey,
+  dataRightsSourceChangedError,
+  dataRightsSubmissionMatches,
+  type DataRightsCaseSnapshot,
+} from "./dataRightsSourceAuthority";
 
 export function PrivacyRequestRestrictionTarget({
   basePath,
   dataRightsCase,
+  operatorScopeKey,
+  scopeKey,
+  authorityCurrent,
   onCaseUpdated,
   refreshCase,
   onCurrentChange,
 }: {
   basePath: string;
   dataRightsCase: DataRightsCase;
+  operatorScopeKey: string;
+  scopeKey: string;
+  authorityCurrent: boolean;
   onCaseUpdated: (updated: DataRightsCase) => Promise<void>;
   refreshCase: () => Promise<unknown>;
   onCurrentChange: (current: boolean) => void;
 }) {
   const { request } = useSession();
+  const authorityRef = useRef({
+    authorityCurrent,
+    operatorScopeKey,
+    scopeKey,
+    dataRightsCase,
+  });
+  authorityRef.current = {
+    authorityCurrent,
+    operatorScopeKey,
+    scopeKey,
+    dataRightsCase,
+  };
   const targets = useQuery({
-    queryKey: [
-      "data-rights-restriction-release-targets",
+    queryKey: dataRightsRestrictionTargetsQueryKey(
+      scopeKey,
       dataRightsCase.id,
+      operatorScopeKey,
       dataRightsCase.version,
-    ],
+    ),
     queryFn: () => request<DataRightsRestrictionReleaseTargetListResponse>(
       `${basePath}/restriction/release-targets`,
     ),
     retry: false,
     staleTime: 15_000,
   });
+  const targetSource = createCompositeSource({
+    label: "Active processing limits",
+    hasData: targets.data !== undefined,
+    isLoading: targets.isLoading,
+    error: targets.error,
+    isFetching: targets.isFetching,
+    refetch: () => targets.refetch(),
+  });
+  const targetSourceCurrent = compositeSourceCurrent(targetSource);
+  const targetSourceUsable = compositeSourceUsable(targetSource.state);
   const selectTarget = useMutation({
-    mutationFn: (candidate: DataRightsRestrictionReleaseTargetCandidate) =>
-      request<DataRightsCase>(`${basePath}/restriction/release-target`, {
+    mutationFn: (submission: {
+      candidate: DataRightsRestrictionReleaseTargetCandidate;
+      operatorScopeKey: string;
+      scopeKey: string;
+      basePath: string;
+      caseSnapshot: DataRightsCaseSnapshot;
+    }) => {
+      const current = authorityRef.current;
+      const candidateCurrent = (targets.data?.targets ?? []).some((candidate) =>
+        candidate.ownerOperationId === submission.candidate.ownerOperationId &&
+        candidate.ownerOperationVersion === submission.candidate.ownerOperationVersion);
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot) ||
+        !dataRightsMutationAllowed("restriction-target", {
+          permissionsCurrent: current.authorityCurrent,
+          caseCurrent: current.authorityCurrent,
+          supportingSourceCurrent: targetSourceCurrent && candidateCurrent,
+        })) {
+        throw dataRightsSourceChangedError();
+      }
+      return request<DataRightsCase>(`${submission.basePath}/restriction/release-target`, {
         method: "POST",
         body: JSON.stringify({
-          ownerOperationId: candidate.ownerOperationId,
-          ownerOperationVersion: candidate.ownerOperationVersion,
-          expectedVersion: dataRightsCase.version,
+          ownerOperationId: submission.candidate.ownerOperationId,
+          ownerOperationVersion: submission.candidate.ownerOperationVersion,
+          expectedVersion: submission.caseSnapshot.version,
         }),
-      }),
-    onSuccess: async (updated) => {
+      });
+    },
+    onSuccess: async (updated, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      if (!current.authorityCurrent || !targetSourceCurrent ||
+        !dataRightsCaseMatches(current.dataRightsCase, submission.caseSnapshot)) {
+        await Promise.all([refreshCase(), targets.refetch()]);
+        return;
+      }
       await onCaseUpdated(updated);
     },
-    onError: async () => {
+    onError: async (_error, submission) => {
+      const current = authorityRef.current;
+      if (!dataRightsSubmissionMatches(
+        current.operatorScopeKey,
+        current.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
       await refreshCase();
       await targets.refetch();
     },
   });
 
-  const candidates = targets.data?.targets ?? [];
+  const candidates = targetSourceUsable ? targets.data?.targets ?? [] : [];
   const selected = dataRightsCase.restrictionReleaseTarget;
-  const responseCurrent = targets.data?.caseVersion === dataRightsCase.version;
+  const responseCurrent = targetSourceCurrent &&
+    targets.data?.caseVersion === dataRightsCase.version;
   const selectedCurrent = Boolean(
     selected &&
     responseCurrent &&
@@ -93,6 +180,12 @@ export function PrivacyRequestRestrictionTarget({
         )}
       </div>
 
+      <CompositeSourceNotice
+        className="mt-4"
+        sources={[targetSource]}
+        title="Processing limit evidence is delayed"
+      />
+
       {targets.isLoading && (
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-base-200 px-4 py-4 text-sm text-base-content/55">
           <span className="loading loading-spinner loading-sm text-primary" />
@@ -123,7 +216,7 @@ export function PrivacyRequestRestrictionTarget({
         </div>
       )}
 
-      {!targets.isLoading && !targets.error && selected && !selectedCurrent && responseCurrent && (
+      {!targets.isLoading && selected && !selectedCurrent && responseCurrent && (
         <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/8 px-4 py-3 text-sm text-base-content/70">
           <ShieldAlert size={17} className="mt-0.5 shrink-0 text-warning-content" />
           <p>
@@ -140,7 +233,7 @@ export function PrivacyRequestRestrictionTarget({
         </p>
       )}
 
-      {!targets.isLoading && !targets.error && candidates.length === 0 && (
+      {!targets.isLoading && targetSourceCurrent && candidates.length === 0 && (
         <p className="mt-4 rounded-lg border border-base-300 bg-base-200 px-4 py-4 text-sm text-base-content/60">
           No active processing limit is available for this record. Remove the selected guest
           if the request points to the wrong record, or retry after owner data is corrected.
@@ -152,8 +245,8 @@ export function PrivacyRequestRestrictionTarget({
           {candidates.map((candidate) => {
             const isSelected = restrictionTargetMatchesCandidate(selected, candidate);
             const pending = selectTarget.isPending &&
-              selectTarget.variables?.ownerOperationId === candidate.ownerOperationId &&
-              selectTarget.variables.ownerOperationVersion === candidate.ownerOperationVersion;
+              selectTarget.variables?.candidate.ownerOperationId === candidate.ownerOperationId &&
+              selectTarget.variables.candidate.ownerOperationVersion === candidate.ownerOperationVersion;
             return (
               <button
                 key={`${candidate.ownerOperationId}:${candidate.ownerOperationVersion}`}
@@ -164,8 +257,19 @@ export function PrivacyRequestRestrictionTarget({
                     ? "border-primary bg-primary/8"
                     : "border-base-300 bg-base-100 hover:border-primary/35 hover:bg-primary/5"
                 }`}
-                disabled={selectTarget.isPending || isSelected}
-                onClick={() => selectTarget.mutate(candidate)}
+                disabled={
+                  !authorityCurrent ||
+                  !targetSourceCurrent ||
+                  selectTarget.isPending ||
+                  isSelected
+                }
+                onClick={() => selectTarget.mutate({
+                  candidate,
+                  operatorScopeKey,
+                  scopeKey,
+                  basePath,
+                  caseSnapshot: dataRightsCase,
+                })}
               >
                 <span className="flex items-start justify-between gap-3">
                   <span>

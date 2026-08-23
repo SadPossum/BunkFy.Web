@@ -18,7 +18,17 @@ import type {
   DataRightsRestrictionExecution,
   DataRightsSelectedSubjectsResponse,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import {
   ErrorState,
   LoadingState,
@@ -38,6 +48,16 @@ import {
   type DataRightsConfirmationSnapshot,
 } from "./dataRightsConfirmation";
 import { shortRestrictionTargetId } from "./dataRightsRestrictionTarget";
+import {
+  dataRightsCaseMatches,
+  dataRightsCaseQueryKey,
+  dataRightsExecutionQueryKey,
+  dataRightsMutationAllowed,
+  dataRightsSourceChangedError,
+  dataRightsSubmissionMatches,
+  dataRightsSubjectsQueryKey,
+  type DataRightsCaseSnapshot,
+} from "./dataRightsSourceAuthority";
 import {
   availableDataRightsActions,
   dataRightsActionRequiresReviewEvidence,
@@ -61,17 +81,40 @@ import {
   type DataRightsRequestScope,
 } from "./dataRightsWorkflow";
 
-type CaseActionRequest = { suffix: string; body: Record<string, unknown> };
+type CaseMutationSubmission = {
+  suffix: string;
+  body: Record<string, unknown>;
+  basePath: string;
+  scopeKey: string;
+  operatorScopeKey: string;
+  caseSnapshot: DataRightsCaseSnapshot;
+  requiresSelectedEvidence: boolean;
+};
+
+type ExecutionMutationSubmission = {
+  expectedVersion: number;
+  fingerprint: string;
+  basePath: string;
+  scopeKey: string;
+  operatorScopeKey: string;
+  caseSnapshot: DataRightsCaseSnapshot;
+};
 
 export function PrivacyRequestDetail({
   scope,
   caseId,
   capabilities,
+  operatorScopeKey,
+  permissionSource,
+  erasePermissionSource,
   onClose,
 }: {
   scope: DataRightsRequestScope;
   caseId: string | null;
   capabilities: DataRightsCapabilities;
+  operatorScopeKey: string;
+  permissionSource: CompositeSource;
+  erasePermissionSource: CompositeSource;
   onClose: () => void;
 }) {
   const { request } = useSession();
@@ -92,15 +135,27 @@ export function PrivacyRequestDetail({
   const casesPath = dataRightsCasesPath(scope);
   const basePath = `${casesPath}/${caseId}`;
   const caseQuery = useQuery({
-    queryKey: ["data-rights-case", scopeKey, caseId],
+    queryKey: dataRightsCaseQueryKey(scopeKey, caseId, operatorScopeKey),
     queryFn: () => request<DataRightsCase>(basePath),
-    enabled: Boolean(caseId && capabilities.read),
+    enabled: Boolean(operatorScopeKey && caseId && capabilities.read),
     refetchInterval: (query) => dataRightsCaseNeedsLiveRefresh(query.state.data?.status)
       ? 2_000
       : false,
     refetchIntervalInBackground: false,
   });
-  const dataRightsCase = caseQuery.data;
+  const caseSource = createCompositeSource({
+    label: "Privacy request case",
+    hasData: caseQuery.data !== undefined,
+    isLoading: caseQuery.isLoading,
+    error: caseQuery.error,
+    isFetching: caseQuery.isFetching,
+    refetch: () => caseQuery.refetch(),
+  });
+  const caseCurrent = compositeSourceCurrent(caseSource);
+  const caseUsable = compositeSourceUsable(caseSource.state);
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const erasePermissionCurrent = compositeSourceCurrent(erasePermissionSource);
+  const dataRightsCase = caseUsable ? caseQuery.data : undefined;
   const status = dataRightsCase ? dataRightsCaseStatusKey(dataRightsCase.status) : "unknown";
   const operationKind = dataRightsCase
     ? dataRightsOperationKind(dataRightsCase)
@@ -109,43 +164,61 @@ export function PrivacyRequestDetail({
     ? dataRightsSelectedEvidencePath(scope, caseId, capabilities)
     : null;
   const selected = useQuery({
-    queryKey: [
-      "data-rights-subjects",
+    queryKey: dataRightsSubjectsQueryKey(
       scopeKey,
       caseId,
+      operatorScopeKey,
       dataRightsCase?.version,
       selectedEvidencePath,
-    ],
+    ),
     queryFn: () => request<DataRightsSelectedSubjectsResponse>(selectedEvidencePath!),
     enabled: Boolean(
       caseId &&
       dataRightsCase &&
-      dataRightsCase.selectedSubjectCount > 0 &&
       selectedEvidencePath,
     ),
   });
+  const selectedSource = createCompositeSource({
+    label: "Selected record evidence",
+    hasData: selected.data !== undefined,
+    isLoading: selected.isLoading,
+    error: selected.error,
+    isFetching: selected.isFetching,
+    refetch: () => selected.refetch(),
+  });
+  const executionExpected = Boolean(
+    caseId &&
+    operationKind === "removal" &&
+    ["executing", "blocked", "completed", "partiallyCompleted"].includes(status),
+  );
   const execution = useQuery({
-    queryKey: ["data-rights-execution", scopeKey, caseId],
+    queryKey: dataRightsExecutionQueryKey(scopeKey, caseId, operatorScopeKey),
     queryFn: () => request<DataRightsExecution>(`${basePath}/execution`),
-    enabled: Boolean(
-      caseId &&
-      operationKind === "removal" &&
-      ["executing", "blocked", "completed", "partiallyCompleted"].includes(status),
-    ),
+    enabled: executionExpected,
     refetchInterval: (query) => dataRightsExecutionBatchNeedsLiveRefresh(query.state.data?.workItems)
       ? 2_000
       : false,
     refetchIntervalInBackground: false,
   });
+  const executionSource = createCompositeSource({
+    label: "Removal execution",
+    hasData: execution.data !== undefined,
+    isLoading: execution.isLoading,
+    error: execution.error,
+    isFetching: execution.isFetching,
+    refetch: () => execution.refetch(),
+  });
+  const executionUsable = compositeSourceUsable(executionSource.state);
   const actions = useMemo(
     () => dataRightsCase ? availableDataRightsActions(dataRightsCase, capabilities) : [],
     [capabilities, dataRightsCase],
   );
   const selectedEvidenceCurrent = Boolean(
     dataRightsCase &&
-    !selected.error &&
+    compositeSourceCurrent(selectedSource) &&
     isDataRightsSelectedEvidenceCurrent(dataRightsCase, selected.data),
   );
+  const selectedEvidenceUsable = compositeSourceUsable(selectedSource.state);
   const selectedEvidenceRequired = actions.some(dataRightsActionRequiresReviewEvidence);
   let selectedEvidenceError: Error | null = null;
   if (selectedEvidenceRequired &&
@@ -175,21 +248,42 @@ export function PrivacyRequestDetail({
     validatedRestrictionTarget?.caseId === dataRightsCase.id &&
     validatedRestrictionTarget.caseVersion === dataRightsCase.version,
   );
+  const detailScopeRef = useRef({ operatorScopeKey, scopeKey, caseId });
+  detailScopeRef.current = { operatorScopeKey, scopeKey, caseId };
+  const authorityRef = useRef({
+    permissionsCurrent,
+    caseCurrent,
+    selectedEvidenceCurrent,
+    restrictionTargetCurrent,
+    erasePermissionCurrent,
+    dataRightsCase: caseQuery.data,
+  });
+  authorityRef.current = {
+    permissionsCurrent,
+    caseCurrent,
+    selectedEvidenceCurrent,
+    restrictionTargetCurrent,
+    erasePermissionCurrent,
+    dataRightsCase: caseQuery.data,
+  };
   const visibleActions = useMemo(
     () => actions.filter((action) =>
       action !== "generate-export" &&
       action !== "execute-correction" &&
       !(dataRightsActionRequiresReviewEvidence(action) && !selectedEvidenceCurrent) &&
+      !(action === "execute-removal" && !erasePermissionCurrent) &&
       !(action === "review" && restrictionTargetValidationRequired && !restrictionTargetCurrent)),
     [
       actions,
+      erasePermissionCurrent,
       restrictionTargetCurrent,
       restrictionTargetValidationRequired,
       selectedEvidenceCurrent,
     ],
   );
   const activeConfirmation = useMemo(
-    () => confirmation && dataRightsCase && isDataRightsConfirmationCurrent(
+    () => confirmation && permissionsCurrent && caseCurrent && dataRightsCase &&
+      isDataRightsConfirmationCurrent(
       confirmation,
       dataRightsCase,
       operationKind,
@@ -197,13 +291,35 @@ export function PrivacyRequestDetail({
     )
       ? confirmation
       : null,
-    [confirmation, dataRightsCase, operationKind, visibleActions],
+    [caseCurrent, confirmation, dataRightsCase, operationKind, permissionsCurrent, visibleActions],
   );
+  const actionAuthorityCurrent = permissionsCurrent && caseCurrent;
 
   const updateCase = useCallback(async (updated: DataRightsCase) => {
-    queryClient.setQueryData(["data-rights-case", scopeKey, updated.id], updated);
-    await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
-  }, [queryClient, scopeKey]);
+    const active = detailScopeRef.current;
+    if (!active.operatorScopeKey || active.caseId !== updated.id) return;
+    const queryKey = dataRightsCaseQueryKey(
+      active.scopeKey,
+      updated.id,
+      active.operatorScopeKey,
+    );
+    if (!authorityRef.current.permissionsCurrent || !authorityRef.current.caseCurrent) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey }),
+        queryClient.invalidateQueries({
+          queryKey: ["data-rights-cases", active.scopeKey],
+        }),
+      ]);
+      return;
+    }
+    const current = queryClient.getQueryData<DataRightsCase>(queryKey);
+    if (!current || current.version <= updated.version) {
+      queryClient.setQueryData(queryKey, updated);
+    }
+    await queryClient.invalidateQueries({
+      queryKey: ["data-rights-cases", active.scopeKey],
+    });
+  }, [queryClient]);
 
   const updateRestrictionTargetCurrent = useCallback((current: boolean) => {
     if (!current || !dataRightsCase) {
@@ -217,11 +333,19 @@ export function PrivacyRequestDetail({
   }, [dataRightsCase]);
 
   const refreshCaseState = useCallback(async () => {
+    const active = detailScopeRef.current;
+    if (!active.operatorScopeKey || !active.caseId) return;
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] }),
-      queryClient.invalidateQueries({ queryKey: ["data-rights-case", scopeKey, caseId] }),
+      queryClient.invalidateQueries({ queryKey: ["data-rights-cases", active.scopeKey] }),
+      queryClient.invalidateQueries({
+        queryKey: dataRightsCaseQueryKey(
+          active.scopeKey,
+          active.caseId,
+          active.operatorScopeKey,
+        ),
+      }),
     ]);
-  }, [caseId, queryClient, scopeKey]);
+  }, [queryClient]);
 
   const refreshAffectedProjectionState = useCallback(async () => {
     const privacyQueries = [
@@ -255,34 +379,94 @@ export function PrivacyRequestDetail({
   }, [caseId, queryClient, scope, scopeKey]);
 
   const actionMutation = useMutation({
-    mutationFn: ({ suffix, body }: CaseActionRequest) => request<DataRightsCase>(
-      `${basePath}${suffix}`,
-      { method: "POST", body: JSON.stringify(body) },
-    ),
-    onSuccess: async (updated) => {
+    mutationFn: (submission: CaseMutationSubmission) => {
+      const authority = authorityRef.current;
+      const active = detailScopeRef.current;
+      const mutationKind = submission.requiresSelectedEvidence
+        ? "review-action"
+        : "case-action";
+      if (!dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(
+        authority.dataRightsCase,
+        submission.caseSnapshot,
+      ) || !dataRightsMutationAllowed(mutationKind, {
+        permissionsCurrent: authority.permissionsCurrent,
+        caseCurrent: authority.caseCurrent,
+        selectedEvidenceCurrent: authority.selectedEvidenceCurrent,
+        supportingSourceCurrent: submission.suffix === "/review" &&
+          restrictionTargetValidationRequired
+          ? authority.restrictionTargetCurrent
+          : undefined,
+      })) {
+        throw dataRightsSourceChangedError();
+      }
+      return request<DataRightsCase>(
+        `${submission.basePath}${submission.suffix}`,
+        { method: "POST", body: JSON.stringify(submission.body) },
+      );
+    },
+    onSuccess: async (updated, submission) => {
+      const active = detailScopeRef.current;
+      if (!dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      const authority = authorityRef.current;
+      if (!authority.permissionsCurrent || !authority.caseCurrent ||
+        !dataRightsCaseMatches(
+        authority.dataRightsCase,
+        submission.caseSnapshot,
+      )) {
+        await refreshCaseState();
+        return;
+      }
       setConfirmation(null);
       setDestructiveConfirmation("");
       await updateCase(updated);
     },
-    onError: async () => {
-      await caseQuery.refetch();
+    onError: async (_error, submission) => {
+      const active = detailScopeRef.current;
+      if (dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) await caseQuery.refetch();
     },
   });
   const executeMutation = useMutation({
-    mutationFn: ({
-      expectedVersion,
-      fingerprint,
-    }: {
-      expectedVersion: number;
-      fingerprint: string;
-    }) => {
+    mutationFn: (submission: ExecutionMutationSubmission) => {
+      const authority = authorityRef.current;
+      const active = detailScopeRef.current;
+      if (!dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(
+        authority.dataRightsCase,
+        submission.caseSnapshot,
+      ) || !dataRightsMutationAllowed("execute-removal", {
+        permissionsCurrent: authority.permissionsCurrent,
+        caseCurrent: authority.caseCurrent,
+        erasePermissionCurrent: authority.erasePermissionCurrent,
+      })) {
+        throw dataRightsSourceChangedError();
+      }
+      const { expectedVersion, fingerprint } = submission;
       if (!operationAttempt.current || operationAttempt.current.fingerprint !== fingerprint) {
         operationAttempt.current = {
           fingerprint,
           idempotencyKey: crypto.randomUUID(),
         };
       }
-      return request<DataRightsExecution>(`${basePath}/execution`, {
+      return request<DataRightsExecution>(`${submission.basePath}/execution`, {
         method: "POST",
         body: JSON.stringify({
           idempotencyKey: operationAttempt.current.idempotencyKey,
@@ -290,32 +474,73 @@ export function PrivacyRequestDetail({
         }),
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result, submission) => {
+      const active = detailScopeRef.current;
+      if (!dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      const authority = authorityRef.current;
+      if (!authority.permissionsCurrent || !authority.caseCurrent ||
+        !dataRightsCaseMatches(
+        authority.dataRightsCase,
+        submission.caseSnapshot,
+      )) {
+        await refreshCaseState();
+        return;
+      }
       operationAttempt.current = null;
       setConfirmation(null);
       setDestructiveConfirmation("");
-      queryClient.setQueryData(["data-rights-execution", scopeKey, result.case.id], result);
+      queryClient.setQueryData(
+        dataRightsExecutionQueryKey(
+          submission.scopeKey,
+          result.case.id,
+          submission.operatorScopeKey,
+        ),
+        result,
+      );
       await updateCase(result.case);
     },
-    onError: async () => {
-      await caseQuery.refetch();
+    onError: async (_error, submission) => {
+      const active = detailScopeRef.current;
+      if (dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) await caseQuery.refetch();
     },
   });
   const restrictionMutation = useMutation({
-    mutationFn: ({
-      expectedVersion,
-      fingerprint,
-    }: {
-      expectedVersion: number;
-      fingerprint: string;
-    }) => {
+    mutationFn: (submission: ExecutionMutationSubmission) => {
+      const authority = authorityRef.current;
+      const active = detailScopeRef.current;
+      if (!dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      ) || !dataRightsCaseMatches(
+        authority.dataRightsCase,
+        submission.caseSnapshot,
+      ) || !dataRightsMutationAllowed("execute-restriction", {
+        permissionsCurrent: authority.permissionsCurrent,
+        caseCurrent: authority.caseCurrent,
+        supportingSourceCurrent: true,
+      })) {
+        throw dataRightsSourceChangedError();
+      }
+      const { expectedVersion, fingerprint } = submission;
       if (!operationAttempt.current || operationAttempt.current.fingerprint !== fingerprint) {
         operationAttempt.current = {
           fingerprint,
           idempotencyKey: crypto.randomUUID(),
         };
       }
-      return request<DataRightsRestrictionExecution>(`${basePath}/restriction`, {
+      return request<DataRightsRestrictionExecution>(`${submission.basePath}/restriction`, {
         method: "POST",
         body: JSON.stringify({
           idempotencyKey: operationAttempt.current.idempotencyKey,
@@ -323,15 +548,37 @@ export function PrivacyRequestDetail({
         }),
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result, submission) => {
+      const active = detailScopeRef.current;
+      if (!dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) return;
+      const authority = authorityRef.current;
+      if (!authority.permissionsCurrent || !authority.caseCurrent ||
+        !dataRightsCaseMatches(
+        authority.dataRightsCase,
+        submission.caseSnapshot,
+      )) {
+        await refreshCaseState();
+        return;
+      }
       operationAttempt.current = null;
       setConfirmation(null);
       setRestrictionExecution(result);
       await updateCase(result.case);
       await refreshAffectedProjectionState();
     },
-    onError: async () => {
-      await caseQuery.refetch();
+    onError: async (_error, submission) => {
+      const active = detailScopeRef.current;
+      if (dataRightsSubmissionMatches(
+        active.operatorScopeKey,
+        active.scopeKey,
+        submission.operatorScopeKey,
+        submission.scopeKey,
+      )) await caseQuery.refetch();
     },
   });
 
@@ -369,12 +616,31 @@ export function PrivacyRequestDetail({
     expectedVersion?: number,
   ) {
     if (!dataRightsCase) return;
+    const requiresSelectedEvidence = [
+      "/review",
+      "/decision",
+      "/decision/outcome",
+    ].includes(suffix);
+    const mutationKind = requiresSelectedEvidence ? "review-action" : "case-action";
+    if (!dataRightsMutationAllowed(mutationKind, {
+      permissionsCurrent,
+      caseCurrent,
+      selectedEvidenceCurrent,
+      supportingSourceCurrent: suffix === "/review" && restrictionTargetValidationRequired
+        ? restrictionTargetCurrent
+        : undefined,
+    })) return;
     actionMutation.mutate({
       suffix,
       body: {
         ...body,
         expectedVersion: expectedVersion ?? dataRightsCase.version,
       },
+      basePath,
+      scopeKey,
+      operatorScopeKey,
+      caseSnapshot: dataRightsCase,
+      requiresSelectedEvidence,
     });
   }
 
@@ -387,15 +653,33 @@ export function PrivacyRequestDetail({
     const fingerprint =
       `${selectedOperation}:${dataRightsCase.id}:${reviewedVersion}`;
     if (selectedOperation.startsWith("restriction")) {
+      if (!dataRightsMutationAllowed("execute-restriction", {
+        permissionsCurrent,
+        caseCurrent,
+        supportingSourceCurrent: true,
+      })) return;
       restrictionMutation.mutate({
         expectedVersion: reviewedVersion,
         fingerprint,
+        basePath,
+        scopeKey,
+        operatorScopeKey,
+        caseSnapshot: dataRightsCase,
       });
       return;
     }
+    if (!dataRightsMutationAllowed("execute-removal", {
+      permissionsCurrent,
+      caseCurrent,
+      erasePermissionCurrent,
+    })) return;
     executeMutation.mutate({
       expectedVersion: reviewedVersion,
       fingerprint,
+      basePath,
+      scopeKey,
+      operatorScopeKey,
+      caseSnapshot: dataRightsCase,
     });
   }
 
@@ -404,7 +688,8 @@ export function PrivacyRequestDetail({
   ) {
     setDenialReason("3");
     setDestructiveConfirmation("");
-    if (!action || !dataRightsCase || !visibleActions.includes(action)) {
+    if (!action || !permissionsCurrent || !caseCurrent || !dataRightsCase ||
+      !visibleActions.includes(action)) {
       setConfirmation(null);
       return;
     }
@@ -424,15 +709,40 @@ export function PrivacyRequestDetail({
       onClose={onClose}
       size="lg"
     >
-      {caseQuery.isLoading
+      {caseSource.state === "loading"
         ? <LoadingState label="Loading privacy request" />
-        : caseQuery.error || !dataRightsCase
-          ? <ErrorState error={caseQuery.error} retry={() => void caseQuery.refetch()} />
+        : !caseUsable || !dataRightsCase
+          ? (
+            <div>
+              <CompositeSourceNotice
+                className="mb-3"
+                sources={[permissionSource, caseSource]}
+                title="Privacy request details are delayed"
+              />
+              <CompositeSourceFallback state={caseSource.state} label="privacy request" />
+            </div>
+          )
           : (
             <div className="space-y-5">
+              <CompositeSourceNotice
+                sources={[permissionSource, caseSource]}
+                title="Privacy request details are delayed"
+              />
+              {executionExpected && (
+                <CompositeSourceNotice
+                  sources={[executionSource]}
+                  title="Removal execution status is delayed"
+                />
+              )}
+              {operationKind === "removal" && status === "approved" && (
+                <CompositeSourceNotice
+                  sources={[erasePermissionSource]}
+                  title="Data removal authority is delayed"
+                />
+              )}
               <RequestSummary
                 dataRightsCase={dataRightsCase}
-                execution={execution.data}
+                execution={executionUsable ? execution.data : undefined}
                 restrictionExecution={restrictionExecution}
                 scopeKind={scope.kind}
               />
@@ -445,6 +755,10 @@ export function PrivacyRequestDetail({
                   dataRightsCase={dataRightsCase}
                   selected={selected.data}
                   selectedLoading={selected.isLoading}
+                  selectedSource={selectedSource}
+                  authorityCurrent={actionAuthorityCurrent}
+                  operatorScopeKey={operatorScopeKey}
+                  scopeKey={scopeKey}
                   onCaseUpdated={updateCase}
                   refreshSelected={() => selected.refetch()}
                   refreshCase={() => caseQuery.refetch()}
@@ -457,9 +771,14 @@ export function PrivacyRequestDetail({
                 (status !== "discovery" || !capabilities.discover) && (
                 <section className="border-t border-base-300 pt-5">
                   <h3 className="font-display text-lg font-semibold">Selected records</h3>
+                  <CompositeSourceNotice
+                    className="mt-3"
+                    sources={[selectedSource]}
+                    title="Selected record evidence is delayed"
+                  />
                   {selected.isLoading
                     ? <p className="mt-3 text-sm text-base-content/50">Loading selections...</p>
-                    : selectedEvidenceCurrent && selected.data?.subjects.length
+                    : selectedEvidenceUsable && selected.data?.subjects.length
                       ? (
                         <div className="mt-3 divide-y divide-base-300 rounded-lg bg-base-200 px-4">
                           {selected.data.subjects.map((subject) => (
@@ -503,6 +822,10 @@ export function PrivacyRequestDetail({
                   dataRightsCase={dataRightsCase}
                   canGenerate={actions.includes("generate-export")}
                   canDownload={capabilities.downloadExport}
+                  operatorScopeKey={operatorScopeKey}
+                  permissionCurrent={permissionsCurrent}
+                  caseCurrent={caseCurrent}
+                  selectedEvidenceCurrent={selectedEvidenceCurrent}
                   onTerminalState={refreshCaseState}
                 />
               )}
@@ -521,6 +844,10 @@ export function PrivacyRequestDetail({
                   selectedSubject={selected.data?.subjects[0]}
                   canStart={actions.includes("execute-correction")}
                   canExecute={capabilities.execute}
+                  operatorScopeKey={operatorScopeKey}
+                  permissionCurrent={permissionsCurrent}
+                  caseCurrent={caseCurrent}
+                  selectedEvidenceCurrent={selectedEvidenceCurrent}
                   onCaseUpdated={updateCase}
                 />
               )}
@@ -536,6 +863,7 @@ export function PrivacyRequestDetail({
                   executeMutation.isPending ||
                   restrictionMutation.isPending
                 }
+                authorityCurrent={actionAuthorityCurrent}
                 onConfirmationChange={changeConfirmation}
                 onDenialReasonChange={setDenialReason}
                 onDestructiveConfirmationChange={setDestructiveConfirmation}
