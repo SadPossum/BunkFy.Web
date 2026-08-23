@@ -33,10 +33,17 @@ import type {
   StaffMemberMutationReceipt,
   TotpEnrollment,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSourceState,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
 import { useProductCapabilities } from "../../app/productCapabilities";
 import { focusedResourceClass, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useWorkspace } from "../../app/workspace";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import {
   ErrorState,
   InitialAvatar,
@@ -93,14 +100,27 @@ export function AccountPage() {
   const staffProfile = useQuery({
     queryKey: ["staff", "me", session?.tenantId],
     queryFn: () => request<StaffMember>("/api/staff/me"),
+    enabled: Boolean(selectedWorkspace),
     retry: false,
   });
+  const methodsSource = createCompositeSource({ label: "Sign-in methods", hasData: methods.data !== undefined, isLoading: methods.isLoading, error: methods.error, isFetching: methods.isFetching, refetch: () => methods.refetch() });
+  const providerSource = createCompositeSource({ label: "External providers", hasData: providers.data !== undefined, isLoading: providers.isLoading, error: providers.error, isFetching: providers.isFetching, refetch: () => providers.refetch() });
+  const sessionSource = createCompositeSource({ label: "Active sessions", hasData: sessions.data !== undefined, isLoading: sessions.isLoading, error: sessions.error, isFetching: sessions.isFetching, refetch: () => sessions.refetch() });
+  const staffProfileSource = createCompositeSource({ label: "Workspace profile", hasData: staffProfile.data !== undefined, isLoading: staffProfile.isLoading, error: staffProfile.error, isFetching: staffProfile.isFetching, refetch: () => staffProfile.refetch() });
+  const accountSources = [methodsSource, providerSource, sessionSource, ...(selectedWorkspace ? [staffProfileSource] : [])];
+  const methodsUsable = compositeSourceUsable(methodsSource.state);
+  const providersUsable = compositeSourceUsable(providerSource.state);
+  const sessionsUsable = compositeSourceUsable(sessionSource.state);
+  const staffProfileUsable = compositeSourceUsable(staffProfileSource.state);
+  const methodsCurrent = compositeSourceCurrent(methodsSource);
+  const providersCurrent = compositeSourceCurrent(providerSource);
   const focusedResourceId = useTransientResourceFocus(Boolean(staffProfile.data));
   const [confirmAll, setConfirmAll] = useState(false);
   const [submittingSession, setSubmittingSession] = useState<
     "current" | "all" | null
   >(null);
-  const [sessionError, setSessionError] = useState<unknown>(null);
+  const [signOutError, setSignOutError] = useState<unknown>(null);
+  const [providerLinkError, setProviderLinkError] = useState<unknown>(null);
   const [passwordAction, setPasswordAction] = useState<"set" | "remove" | null>(
     null,
   );
@@ -121,6 +141,9 @@ export function AccountPage() {
 
   const security = useMutation({
     mutationFn: async (action: SecurityAction) => {
+      if (!methodsCurrent) {
+        throw new Error("Refresh account security before making this change.");
+      }
       if (action.kind === "set-password") {
         return request<void>("/api/auth/password", {
           method: "PUT",
@@ -173,36 +196,44 @@ export function AccountPage() {
     },
   });
 
+  useEffect(() => {
+    if (methodsCurrent) return;
+    setPasswordAction(null);
+    setUnlinkIdentity(null);
+  }, [methodsCurrent]);
+
   async function signOut(mode: "current" | "all") {
     setSubmittingSession(mode);
-    setSessionError(null);
+    setSignOutError(null);
     try {
       if (mode === "all") await logoutAll();
       else await logout();
     } catch (caught) {
-      setSessionError(caught);
+      setSignOutError(caught);
       setSubmittingSession(null);
     }
   }
 
   async function linkProvider(provider: string) {
+    if (!methodsCurrent || !providersCurrent) return;
     setLinkingProvider(provider);
+    setProviderLinkError(null);
     security.reset();
     try {
       await beginExternalLink(provider);
     } catch (caught) {
       setLinkingProvider(null);
-      setSessionError(caught);
+      setProviderLinkError(caught);
     }
   }
 
-  const authentication = methods.data;
+  const authentication = methodsUsable ? methods.data : undefined;
   const linkedProviderCodes = new Set(
     authentication?.externalIdentities.map(
       (identity) => identity.providerCode,
     ) ?? [],
   );
-  const availableProviders = (providers.data?.providers ?? []).filter(
+  const availableProviders = (providersUsable ? providers.data?.providers ?? [] : []).filter(
     (provider) => !linkedProviderCodes.has(provider),
   );
 
@@ -213,6 +244,7 @@ export function AccountPage() {
         title="Account"
         description="Manage your profile, sign-in methods, and active sessions."
       />
+      <CompositeSourceNotice sources={accountSources} title="Some account data is delayed" />
       {notice && (
         <div className="alert border border-success/25 bg-success/8 text-sm">
           <BadgeCheck size={18} className="text-success" />
@@ -254,12 +286,16 @@ export function AccountPage() {
               <AccountRow
                 icon={<ShieldCheck />}
                 label="Staff profile"
-                value={staffProfile.data?.displayName || (staffProfile.isLoading ? "Loading..." : "Not ready")}
+                value={!selectedWorkspace
+                  ? "No workspace selected"
+                  : accountSourceValue(staffProfileSource.state, staffProfile.data?.displayName || "Not ready")}
               />
               <AccountRow
                 icon={<Clock3 />}
                 label="Member since"
-                value={staffProfile.data ? new Date(staffProfile.data.createdAtUtc).toLocaleDateString() : "Unavailable"}
+                value={!selectedWorkspace
+                  ? "No workspace selected"
+                  : accountSourceValue(staffProfileSource.state, staffProfile.data ? new Date(staffProfile.data.createdAtUtc).toLocaleDateString() : "Unavailable")}
               />
             </div>
           </div>
@@ -281,11 +317,9 @@ export function AccountPage() {
                 </p>
               </div>
             </div>
-            {Boolean(sessionError) && <ErrorState error={sessionError} />}
-            {sessions.isLoading ? (
-              <div className="mt-5"><LoadingState label="Loading active sessions" /></div>
-            ) : sessions.error ? (
-              <div className="mt-5"><ErrorState error={sessions.error} retry={() => void sessions.refetch()} /></div>
+            {Boolean(signOutError) && <ErrorState error={signOutError} />}
+            {!sessionsUsable ? (
+              <CompositeSourceFallback state={sessionSource.state} label="active sessions" />
             ) : (
               <div
                 className="mt-5 max-h-80 divide-y divide-base-300 overflow-y-auto overscroll-contain rounded-lg border border-base-300"
@@ -374,49 +408,85 @@ export function AccountPage() {
         </section>
       </div>
 
-      {staffProfile.data && (
-        <StaffProfilePanel
-          member={staffProfile.data}
-          focused={focusedResourceId === "workspace-profile"}
-          request={request}
-          onUpdated={(updated) => queryClient.setQueryData(["staff", "me", session?.tenantId], updated)}
-        />
-      )}
-
-      {methods.isLoading ? (
-        <LoadingState label="Loading account security" />
-      ) : methods.error ? (
-        <div className="mt-6">
-          <ErrorState
-            error={methods.error}
-            retry={() => void methods.refetch()}
+      {selectedWorkspace && (
+        staffProfileUsable && staffProfile.data ? (
+          <StaffProfilePanel
+            member={staffProfile.data}
+            focused={focusedResourceId === "workspace-profile"}
+            request={request}
+            onUpdated={(updated) => queryClient.setQueryData(["staff", "me", session?.tenantId], updated)}
           />
-        </div>
-      ) : (
-        authentication && (
-          <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
-            <PasswordPanel
-              methods={authentication}
-              action={passwordAction}
-              mutation={security}
-              onAction={setPasswordAction}
-            />
-            <MultiFactorPanel />
-            <EmailPanel methods={authentication} mutation={security} />
-            <ProviderPanel
-              methods={authentication}
-              availableProviders={availableProviders}
-              linkingProvider={linkingProvider}
-              unlinkIdentity={unlinkIdentity}
-              mutation={security}
-              onLink={linkProvider}
-              onUnlink={setUnlinkIdentity}
-            />
-          </div>
+        ) : (
+          <AccountSourcePanel
+            title="Workspace profile"
+            description="Contact and role details visible to your team."
+            state={staffProfileSource.state}
+            label="workspace profile"
+            className="mt-6"
+          />
         )
       )}
+
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
+        {authentication ? (
+          <PasswordPanel
+            methods={authentication}
+            action={passwordAction}
+            mutation={security}
+            canMutate={methodsCurrent}
+            onAction={setPasswordAction}
+          />
+        ) : (
+          <AccountSourcePanel
+            title="Sign-in methods"
+            description="Password, email, and linked-account settings."
+            state={methodsSource.state}
+            label="sign-in methods"
+          />
+        )}
+        <MultiFactorPanel />
+        {authentication && (
+          <EmailPanel
+            methods={authentication}
+            mutation={security}
+            canMutate={methodsCurrent}
+          />
+        )}
+        {authentication && (
+          <ProviderPanel
+            methods={authentication}
+            availableProviders={availableProviders}
+            linkingProvider={linkingProvider}
+            unlinkIdentity={unlinkIdentity}
+            mutation={security}
+            canLink={methodsCurrent && providersCurrent}
+            canUnlink={methodsCurrent}
+            linkError={providerLinkError}
+            onLink={linkProvider}
+            onUnlink={setUnlinkIdentity}
+          />
+        )}
+      </div>
     </>
   );
+}
+
+function AccountSourcePanel({ title, description, state, label, className = "" }: { title: string; description: string; state: CompositeSourceState; label: string; className?: string }) {
+  return (
+    <section className={`card border border-base-300 bg-base-100 shadow-sm ${className}`}>
+      <div className="border-b border-base-300 px-5 py-5 sm:px-6">
+        <h2 className="font-display text-xl font-semibold">{title}</h2>
+        <p className="mt-1 text-sm text-base-content/50">{description}</p>
+      </div>
+      <CompositeSourceFallback state={state} label={label} />
+    </section>
+  );
+}
+
+function accountSourceValue(state: CompositeSourceState, value: string): string {
+  if (state === "loading") return "Loading...";
+  if (state === "unavailable") return "Unavailable";
+  return value;
 }
 
 function StaffProfilePanel({
@@ -529,17 +599,20 @@ function PasswordPanel({
   methods,
   action,
   mutation,
+  canMutate,
   onAction,
 }: {
   methods: AuthenticationMethods;
   action: "set" | "remove" | null;
   mutation: SecurityMutation;
+  canMutate: boolean;
   onAction: (action: "set" | "remove" | null) => void;
 }) {
   const [validationError, setValidationError] = useState("");
 
   function setPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutate) return;
     const data = new FormData(event.currentTarget);
     const password = String(data.get("newPassword") ?? "");
     if (password !== String(data.get("confirmPassword") ?? "")) {
@@ -558,6 +631,7 @@ function PasswordPanel({
 
   function removePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutate) return;
     mutation.mutate({
       kind: "remove-password",
       currentPassword: String(
@@ -596,6 +670,7 @@ function PasswordPanel({
                 type="button"
                 className="btn btn-ghost btn-sm text-error"
                 onClick={() => onAction("remove")}
+                disabled={!canMutate}
               >
                 <ShieldOff size={15} />
                 Remove password
@@ -605,6 +680,7 @@ function PasswordPanel({
               type="button"
               className="btn btn-primary btn-sm"
               onClick={() => onAction("set")}
+              disabled={!canMutate}
             >
               <KeyRound size={15} />
               {methods.hasPassword ? "Change password" : "Add password"}
@@ -654,7 +730,7 @@ function PasswordPanel({
               <button
                 type="submit"
                 className="btn btn-primary btn-sm"
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || !canMutate}
               >
                 {mutation.isPending && (
                   <span className="loading loading-spinner loading-xs" />
@@ -693,7 +769,7 @@ function PasswordPanel({
               <button
                 type="submit"
                 className="btn btn-error btn-sm"
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || !canMutate}
               >
                 Remove password
               </button>
@@ -971,14 +1047,18 @@ function MultiFactorPanel() {
 function EmailPanel({
   methods,
   mutation,
+  canMutate,
 }: {
   methods: AuthenticationMethods;
   mutation: SecurityMutation;
+  canMutate: boolean;
 }) {
   const { emailVerificationEnabled } = useProductCapabilities();
   const [confirming, setConfirming] = useState(false);
+  useEffect(() => { if (!canMutate) setConfirming(false); }, [canMutate]);
   function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canMutate) return;
     mutation.mutate({
       kind: "confirm-verification",
       code: String(new FormData(event.currentTarget).get("code") ?? "").trim(),
@@ -1020,7 +1100,7 @@ function EmailPanel({
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs text-primary"
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || !canMutate}
                     onClick={() =>
                       mutation.mutate({
                         kind: "request-verification",
@@ -1054,6 +1134,7 @@ function EmailPanel({
                 type="button"
                 className="btn btn-outline btn-sm"
                 onClick={() => setConfirming(true)}
+                disabled={!canMutate}
               >
                 <BadgeCheck size={15} />
                 Enter verification code
@@ -1086,7 +1167,7 @@ function EmailPanel({
                 <button
                   type="submit"
                   className="btn btn-primary btn-sm"
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || !canMutate}
                 >
                   Verify email
                 </button>
@@ -1104,6 +1185,9 @@ function ProviderPanel({
   linkingProvider,
   unlinkIdentity,
   mutation,
+  canLink,
+  canUnlink,
+  linkError,
   onLink,
   onUnlink,
 }: {
@@ -1112,12 +1196,15 @@ function ProviderPanel({
   linkingProvider: string | null;
   unlinkIdentity: ExternalIdentity | null;
   mutation: SecurityMutation;
+  canLink: boolean;
+  canUnlink: boolean;
+  linkError: unknown;
   onLink: (provider: string) => Promise<void>;
   onUnlink: (identity: ExternalIdentity | null) => void;
 }) {
   function unlink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!unlinkIdentity) return;
+    if (!unlinkIdentity || !canUnlink) return;
     mutation.mutate({
       kind: "unlink-provider",
       identityId: unlinkIdentity.id,
@@ -1151,7 +1238,7 @@ function ProviderPanel({
                   key={provider}
                   type="button"
                   className="btn btn-outline btn-sm"
-                  disabled={linkingProvider !== null}
+                  disabled={linkingProvider !== null || !canLink}
                   onClick={() => void onLink(provider)}
                 >
                   {linkingProvider === provider ? (
@@ -1165,6 +1252,7 @@ function ProviderPanel({
             </div>
           )}
         </div>
+        {Boolean(linkError) && <div className="mt-4"><ErrorState error={linkError} /></div>}
         <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
           {methods.externalIdentities.map((identity) => (
             <div
@@ -1183,6 +1271,7 @@ function ProviderPanel({
                 type="button"
                 className="btn btn-ghost btn-sm text-error"
                 onClick={() => onUnlink(identity)}
+                disabled={!canUnlink || mutation.isPending}
               >
                 <Unlink size={15} />
                 Unlink
@@ -1196,7 +1285,7 @@ function ProviderPanel({
             No external accounts are linked.
           </div>
         )}
-        {unlinkIdentity && (
+        {unlinkIdentity && canUnlink && (
           <form
             className="mt-5 border border-warning/30 bg-warning/8 p-4"
             onSubmit={unlink}
@@ -1236,7 +1325,7 @@ function ProviderPanel({
               <button
                 type="submit"
                 className="btn btn-error btn-sm"
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || !canUnlink}
               >
                 Unlink account
               </button>
