@@ -96,8 +96,13 @@ export function usePermissions(checks: AccessPermissionCheck[]) {
   );
 
   return {
+    hasData: query.data !== undefined,
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     error: query.error,
+    refetch: async () => {
+      await query.refetch();
+    },
     allows: (permission: string, scope: string) => allowed.has(`${permission}@${scope}`),
   };
 }

@@ -6,7 +6,16 @@ import type {
   WorkspaceAccessProfile,
   WorkspaceAccessProfileListResponse,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { groupPermissions, updatePermissionSelection } from "./workspaceAccessPermissions";
@@ -36,6 +45,25 @@ export function WorkspaceRolesSettings({
       `/api/workspace-access/profiles?includeArchived=${includeArchived}&page=${page}&pageSize=${PROFILE_PAGE_SIZE}`,
     ),
   });
+  const catalogueSource = createCompositeSource({
+    label: "Permission catalogue",
+    hasData: catalogue.data !== undefined,
+    isLoading: catalogue.isLoading,
+    error: catalogue.error,
+    isFetching: catalogue.isFetching,
+    refetch: () => catalogue.refetch(),
+  });
+  const profileSource = createCompositeSource({
+    label: "Workspace roles",
+    hasData: profiles.data !== undefined,
+    isLoading: profiles.isLoading,
+    error: profiles.error,
+    isFetching: profiles.isFetching,
+    refetch: () => profiles.refetch(),
+  });
+  const catalogueCurrent = compositeSourceCurrent(catalogueSource);
+  const profilesCurrent = compositeSourceCurrent(profileSource);
+  const profilesUsable = compositeSourceUsable(profileSource.state);
   const archiveProfile = useMutation({
     mutationFn: (profile: WorkspaceAccessProfile) => request<void>(
       `/api/workspace-access/profiles/${profile.profileId}/archive`,
@@ -49,11 +77,13 @@ export function WorkspaceRolesSettings({
 
   useEffect(() => setPage(1), [includeArchived, workspaceId]);
   useEffect(() => {
-    if (!canManage) {
+    if (!canManage || !catalogueCurrent || !profilesCurrent) {
       setEditing(null);
+    }
+    if (!canManage || !profilesCurrent) {
       setArchiveTarget(null);
     }
-  }, [canManage]);
+  }, [canManage, catalogueCurrent, profilesCurrent]);
   useEffect(() => {
     if (!profiles.isFetching && page > 1 && profiles.data?.items.length === 0) {
       setPage((current) => Math.max(1, current - 1));
@@ -75,7 +105,12 @@ export function WorkspaceRolesSettings({
           </div>
         </div>
         {canManage && (
-          <button className="btn btn-primary btn-sm shrink-0 text-white" onClick={() => setEditing("new")}>
+          <button
+            className="btn btn-primary btn-sm shrink-0 text-white"
+            disabled={!catalogueCurrent || !profilesCurrent}
+            title={!catalogueCurrent || !profilesCurrent ? "Refresh roles and permissions before creating access." : undefined}
+            onClick={() => setEditing("new")}
+          >
             <Plus size={16} />New role
           </button>
         )}
@@ -91,12 +126,13 @@ export function WorkspaceRolesSettings({
         Show archived
       </label>
 
-      {catalogue.error && <SettingsError error={catalogue.error} />}
-      {profiles.error && <SettingsError error={profiles.error} />}
-      {(catalogue.isLoading || profiles.isLoading) && (
-        <div className="loading loading-spinner loading-md mt-6 text-primary" />
-      )}
-      {!profiles.isLoading && !profiles.error && (
+      <div className="mt-5">
+        <CompositeSourceNotice
+          sources={[catalogueSource, profileSource]}
+          title="Some role data is delayed"
+        />
+      </div>
+      {profilesUsable ? (
         <>
           <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
             {!profiles.data?.items.length && (
@@ -118,14 +154,23 @@ export function WorkspaceRolesSettings({
                 </div>
                 {canManage && profile.status === 1 && (
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(profile)}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={!catalogueCurrent || !profilesCurrent}
+                      title={!catalogueCurrent || !profilesCurrent ? "Refresh roles and permissions before editing access." : undefined}
+                      onClick={() => setEditing(profile)}
+                    >
                       <Pencil size={15} />Edit
                     </button>
                     {!profile.isSeed && (
                       <button
                         className="btn btn-ghost btn-sm text-error"
-                        disabled={profile.assignmentCount > 0}
-                        title={profile.assignmentCount > 0 ? "Move members to another role before archiving." : undefined}
+                        disabled={profile.assignmentCount > 0 || !profilesCurrent}
+                        title={profile.assignmentCount > 0
+                          ? "Move members to another role before archiving."
+                          : !profilesCurrent
+                            ? "Refresh roles before archiving."
+                            : undefined}
                         onClick={() => setArchiveTarget(profile)}
                       >
                         <Archive size={15} />Archive
@@ -142,13 +187,15 @@ export function WorkspaceRolesSettings({
             itemCount={profiles.data?.items.length ?? 0}
             itemLabel="role"
             hasMore={profiles.data?.hasMore}
-            disabled={profiles.isFetching}
+            disabled={!profilesCurrent}
             onPageChange={setPage}
           />
         </>
+      ) : (
+        <CompositeSourceFallback state={profileSource.state} label="workspace roles" />
       )}
 
-      {canManage && editing && catalogue.data && (
+      {canManage && editing && catalogue.data && catalogueCurrent && profilesCurrent && (
         <ProfileEditor
           key={editing === "new" ? "new" : `${editing.profileId}-${editing.version}`}
           profile={editing === "new" ? null : editing}
@@ -162,7 +209,7 @@ export function WorkspaceRolesSettings({
         />
       )}
 
-      {canManage && archiveTarget && (
+      {canManage && archiveTarget && profilesCurrent && (
         <Modal
           open
           title={`Archive ${archiveTarget.displayName}?`}

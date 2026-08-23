@@ -5,16 +5,28 @@ import type {
   WorkspaceStaffOnboarding,
   WorkspaceStaffOnboardingListResponse,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { PaginationBar } from "../../components/ui/PaginationBar";
+import { workspaceAccessActionAllowed } from "./workspaceAccessAuthority";
 
 const PAGE_SIZE = 25;
 
 export function WorkspaceJoinRequestSettings({
   workspaceId,
+  canGrant,
   onMembershipChanged,
 }: {
   workspaceId: string;
+  canGrant: boolean;
   onMembershipChanged: () => Promise<void>;
 }) {
   const { request } = useSession();
@@ -27,11 +39,33 @@ export function WorkspaceJoinRequestSettings({
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   });
+  const requestSource = createCompositeSource({
+    label: "Join requests",
+    hasData: joinRequests.data !== undefined,
+    isLoading: joinRequests.isLoading,
+    error: joinRequests.error,
+    isFetching: joinRequests.isFetching,
+    refetch: () => joinRequests.refetch(),
+  });
+  const requestsUsable = compositeSourceUsable(requestSource.state);
+  const requestsCurrent = compositeSourceCurrent(requestSource);
+  const grantResolutionAllowed = workspaceAccessActionAllowed(
+    "grant",
+    canGrant,
+    requestsCurrent,
+  );
   const resolution = useMutation({
     mutationFn: ({ application, action }: {
       application: WorkspaceStaffOnboarding;
       action: "approve" | "reject" | "retry";
     }) => {
+      if (!workspaceAccessActionAllowed(
+        action === "reject" ? "deny" : "grant",
+        canGrant,
+        requestsCurrent,
+      )) {
+        throw new Error("Refresh join requests and workspace authority before granting access.");
+      }
       if (action === "retry") {
         return request(`/api/workspace-staff-enrollment/applications/${application.applicationId}/retry`, { method: "POST" });
       }
@@ -67,9 +101,13 @@ export function WorkspaceJoinRequestSettings({
           </p>
         </div>
       </div>
-      {joinRequests.isLoading && <div className="loading loading-spinner loading-md mt-6 text-primary" />}
-      {joinRequests.error && <SettingsError error={joinRequests.error} />}
-      {!joinRequests.isLoading && !joinRequests.error && (
+      <div className="mt-5">
+        <CompositeSourceNotice
+          sources={[requestSource]}
+          title="Join requests are delayed"
+        />
+      </div>
+      {requestsUsable ? (
         <>
           <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
             {!joinRequests.data?.items.length && (
@@ -101,7 +139,7 @@ export function WorkspaceJoinRequestSettings({
                     <button
                       className="btn btn-primary btn-sm text-white"
                       onClick={() => resolution.mutate({ application, action: "retry" })}
-                      disabled={resolution.isPending}
+                      disabled={resolution.isPending || !grantResolutionAllowed}
                     >
                       <RotateCw size={15} />Retry setup
                     </button>
@@ -117,7 +155,7 @@ export function WorkspaceJoinRequestSettings({
                       <button
                         className="btn btn-primary btn-sm text-white"
                         onClick={() => resolution.mutate({ application, action: "approve" })}
-                        disabled={resolution.isPending || !application.claimId}
+                        disabled={resolution.isPending || !application.claimId || !grantResolutionAllowed}
                       >
                         <UserCheck size={15} />Approve
                       </button>
@@ -133,11 +171,13 @@ export function WorkspaceJoinRequestSettings({
             itemCount={joinRequests.data?.items.length ?? 0}
             itemLabel="request"
             hasMore={joinRequests.data?.hasMore}
-            disabled={joinRequests.isFetching || resolution.isPending}
+            disabled={!requestsCurrent || resolution.isPending}
             onPageChange={setPage}
           />
           {resolution.error && <SettingsError error={resolution.error} />}
         </>
+      ) : (
+        <CompositeSourceFallback state={requestSource.state} label="join requests" />
       )}
     </section>
   );

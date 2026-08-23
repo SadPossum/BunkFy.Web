@@ -20,13 +20,27 @@ import type {
   WorkspaceStaffJoinSourceListResponse,
   WorkspaceStaffJoinSourceReplacement,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { useProductCapabilities } from "../../app/productCapabilities";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { AccessProfilePicker, PropertyScopeField } from "./WorkspaceAccessControls";
+import {
+  workspaceAccessActionAllowed,
+  workspaceAccessSourcesCurrent,
+} from "./workspaceAccessAuthority";
 import { WorkspaceJoinRequestSettings } from "./WorkspaceJoinRequestSettings";
 import { canReplaceJoinSource, isActiveJoinSource, joinSourceStatusLabel } from "./workspaceJoinSources";
 
@@ -50,10 +64,14 @@ type IssuedJoinLink = {
 export function WorkspaceInvitesSettings({
   workspaceId,
   properties,
+  propertySource,
+  canGrant,
   onMembershipChanged,
 }: {
   workspaceId: string;
   properties: Property[];
+  propertySource: CompositeSource;
+  canGrant: boolean;
   onMembershipChanged: () => Promise<void>;
 }) {
   const { request } = useSession();
@@ -65,48 +83,70 @@ export function WorkspaceInvitesSettings({
       `/api/workspace-access/profiles?includeArchived=false&page=1&pageSize=${ACTIVE_PROFILE_PAGE_SIZE}`,
     ),
   });
+  const profileSource = createCompositeSource({
+    label: "Active roles",
+    hasData: profiles.data !== undefined,
+    isLoading: profiles.isLoading,
+    error: profiles.error,
+    isFetching: profiles.isFetching,
+    refetch: () => profiles.refetch(),
+  });
+  const profilesUsable = compositeSourceUsable(profileSource.state);
+  const propertiesUsable = compositeSourceUsable(propertySource.state);
+  const grantSourcesCurrent = canGrant && workspaceAccessSourcesCurrent([
+    profileSource,
+    propertySource,
+  ]);
 
   return (
     <div className="space-y-10">
-      {profiles.data?.hasMore && (
+      <CompositeSourceNotice
+        sources={[profileSource, propertySource]}
+        title="Some invitation data is delayed"
+      />
+      {profilesUsable && profiles.data?.hasMore && (
         <div className="alert alert-warning py-3 text-sm">
           This workspace has more than {ACTIVE_PROFILE_PAGE_SIZE} active roles. Archive unused roles before issuing new access.
         </div>
       )}
-      {profiles.error && <SettingsError error={profiles.error} />}
-      {profiles.isLoading && <div className="loading loading-spinner loading-md text-primary" />}
-      {profiles.data && !profiles.data.hasMore && (
-        <>
-          <JoinSourceCreation
-            workspaceId={workspaceId}
-            profiles={profiles.data.items.filter((profile) => profile.status === 1)}
-            properties={properties}
-            onIssued={(kind, issuance, lifetimeHours) => {
-              if (!issuance.token) {
-                setTokenNotice("This source was already issued, so its one-time token cannot be shown again. Replace it to create a new link.");
-                return;
-              }
-              setTokenNotice(null);
-              setIssued({ kind, token: issuance.token, lifetimeHours });
-            }}
-          />
-          {tokenNotice && <div className="alert alert-warning py-3 text-sm">{tokenNotice}</div>}
-          <JoinSourceLifecycle
-            workspaceId={workspaceId}
-            profiles={profiles.data.items}
-            properties={properties}
-            onIssued={(kind, issuance, lifetimeHours) => {
-              if (!issuance.token) {
-                setTokenNotice("The replacement exists, but its one-time token was already returned and cannot be replayed. Replace it again if the link was lost.");
-                return;
-              }
-              setTokenNotice(null);
-              setIssued({ kind, token: issuance.token, lifetimeHours });
-            }}
-          />
-        </>
-      )}
-      <WorkspaceJoinRequestSettings workspaceId={workspaceId} onMembershipChanged={onMembershipChanged} />
+      {profilesUsable && profiles.data && !profiles.data.hasMore ? (
+        <JoinSourceCreation
+          workspaceId={workspaceId}
+          profiles={profiles.data.items.filter((profile) => profile.status === 1)}
+          properties={properties}
+          canCreate={grantSourcesCurrent}
+          onIssued={(kind, issuance, lifetimeHours) => {
+            if (!issuance.token) {
+              setTokenNotice("This source was already issued, so its one-time token cannot be shown again. Replace it to create a new link.");
+              return;
+            }
+            setTokenNotice(null);
+            setIssued({ kind, token: issuance.token, lifetimeHours });
+          }}
+        />
+      ) : !profilesUsable ? (
+        <CompositeSourceFallback state={profileSource.state} label="active roles for new access" />
+      ) : null}
+      {tokenNotice && <div className="alert alert-warning py-3 text-sm">{tokenNotice}</div>}
+      <JoinSourceLifecycle
+        workspaceId={workspaceId}
+        profiles={profilesUsable ? profiles.data?.items ?? [] : []}
+        properties={propertiesUsable ? properties : []}
+        canReplace={canGrant}
+        onIssued={(kind, issuance, lifetimeHours) => {
+          if (!issuance.token) {
+            setTokenNotice("The replacement exists, but its one-time token was already returned and cannot be replayed. Replace it again if the link was lost.");
+            return;
+          }
+          setTokenNotice(null);
+          setIssued({ kind, token: issuance.token, lifetimeHours });
+        }}
+      />
+      <WorkspaceJoinRequestSettings
+        workspaceId={workspaceId}
+        canGrant={canGrant}
+        onMembershipChanged={onMembershipChanged}
+      />
       {issued && <IssuedJoinLinkModal issued={issued} onClose={() => setIssued(null)} />}
     </div>
   );
@@ -116,11 +156,13 @@ function JoinSourceCreation({
   workspaceId,
   profiles,
   properties,
+  canCreate,
   onIssued,
 }: {
   workspaceId: string;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
+  canCreate: boolean;
   onIssued: (kind: IssuedJoinLink["kind"], issuance: WorkspaceStaffJoinSourceIssuance, lifetimeHours: number) => void;
 }) {
   const { emailVerificationEnabled } = useProductCapabilities();
@@ -154,6 +196,9 @@ function JoinSourceCreation({
 
   const invite = useMutation({
     mutationFn: () => {
+      if (!canCreate) {
+        throw new Error("Refresh roles, properties, and workspace authority before creating an invitation.");
+      }
       const profile = profiles.find((item) => item.profileId === inviteProfileId);
       if (!profile) throw new Error("Choose a role for this invitation.");
       return request<WorkspaceStaffJoinSourceIssuance>("/api/workspace-staff-enrollment/sources/invitations", {
@@ -175,6 +220,9 @@ function JoinSourceCreation({
   });
   const enrollment = useMutation({
     mutationFn: () => {
+      if (!canCreate) {
+        throw new Error("Refresh roles, properties, and workspace authority before creating a team QR.");
+      }
       const profile = reusableProfiles.find((item) => item.profileId === enrollmentProfileId);
       if (!profile) throw new Error("Choose a reusable low-privilege role.");
       const payload: IssueWorkspaceEnrollmentLinkRequest = {
@@ -208,88 +256,118 @@ function JoinSourceCreation({
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-base-300">
-      <form className="space-y-5 lg:pr-8" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
-        <div>
-          <MailPlus className="text-primary" size={22} />
-          <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
-          <p className="mt-2 text-sm leading-6 text-base-content/50">Create a recipient-aware single-use link with its role already constrained.</p>
+    <div className="space-y-6">
+      {!canCreate && (
+        <div className="alert alert-warning py-3 text-sm">
+          Refresh roles, properties, and workspace authority before issuing new access.
         </div>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold">Recipient email (optional)</span>
-          <input
-            className="input input-bordered w-full"
-            type="email"
-            value={email}
-            onChange={(event) => { setEmail(event.target.value); setInviteSourceId(crypto.randomUUID()); }}
-            placeholder="staff@example.com"
-          />
-        </label>
-        {!emailVerificationEnabled && email.trim() && (
-          <p className="text-xs leading-5 text-warning">
-            Email verification is disabled here. A recipient-bound link requires an account whose email is already verified by the configured identity provider.
-          </p>
-        )}
-        <AccessProfilePicker profiles={profiles} value={inviteProfileId} onValueChange={changeInviteProfile} />
-        <PropertyScopeField
-          properties={properties}
-          propertyIds={invitePropertyIds}
-          onChange={(ids) => { setInvitePropertyIds(ids); setInviteSourceId(crypto.randomUUID()); }}
-        />
-        <LifetimeField value={inviteLifetimeHours} onChange={(value) => { setInviteLifetimeHours(value); setInviteSourceId(crypto.randomUUID()); }} />
-        {invite.error && <SettingsError error={invite.error} />}
-        <button className="btn btn-primary w-full text-white sm:w-auto" disabled={invite.isPending || !inviteProfileId}>
-          {invite.isPending && <span className="loading loading-spinner loading-sm" />}
-          <Link2 size={17} />Create invite
-        </button>
-      </form>
-
-      <form className="space-y-5 border-t border-base-300 pt-8 lg:border-t-0 lg:pl-8 lg:pt-0" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
-        <div>
-          <QrCode className="text-primary" size={22} />
-          <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
-          <p className="mt-2 text-sm leading-6 text-base-content/50">Reusable enrollment is limited to built-in low-privilege roles.</p>
-        </div>
-        <AccessProfilePicker profiles={reusableProfiles} value={enrollmentProfileId} onValueChange={changeEnrollmentProfile} />
-        <PropertyScopeField
-          properties={properties}
-          propertyIds={enrollmentPropertyIds}
-          onChange={(ids) => { setEnrollmentPropertyIds(ids); setEnrollmentSourceId(crypto.randomUUID()); }}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
+      )}
+      <div className="grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-base-300">
+        <form className="space-y-5 lg:pr-8" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
+          <div>
+            <MailPlus className="text-primary" size={22} />
+            <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
+            <p className="mt-2 text-sm leading-6 text-base-content/50">Create a recipient-aware single-use link with its role already constrained.</p>
+          </div>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold">Maximum joins</span>
+            <span className="mb-1.5 block text-sm font-semibold">Recipient email (optional)</span>
             <input
               className="input input-bordered w-full"
-              type="number"
-              min={1}
-              max={1000}
-              value={maximumClaims}
-              onChange={(event) => { setMaximumClaims(Number(event.target.value)); setEnrollmentSourceId(crypto.randomUUID()); }}
+              type="email"
+              value={email}
+              disabled={!canCreate}
+              onChange={(event) => { setEmail(event.target.value); setInviteSourceId(crypto.randomUUID()); }}
+              placeholder="staff@example.com"
             />
           </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold">Approval</span>
-            <SelectPicker
-              value={approvalMode}
-              onValueChange={(value) => {
-                const selected = ENROLLMENT_APPROVAL_OPTIONS.find((option) => option.value === value);
-                if (!selected) return;
-                setApprovalMode(selected.value);
-                setEnrollmentSourceId(crypto.randomUUID());
-              }}
-              ariaLabel="Enrollment approval"
-              options={ENROLLMENT_APPROVAL_OPTIONS}
-            />
-          </label>
-        </div>
-        <LifetimeField value={enrollmentLifetimeHours} onChange={(value) => { setEnrollmentLifetimeHours(value); setEnrollmentSourceId(crypto.randomUUID()); }} />
-        {enrollment.error && <SettingsError error={enrollment.error} />}
-        <button className="btn btn-outline w-full sm:w-auto" disabled={enrollment.isPending || !enrollmentProfileId}>
-          {enrollment.isPending && <span className="loading loading-spinner loading-sm" />}
-          <QrCode size={17} />Create QR
-        </button>
-      </form>
+          {!emailVerificationEnabled && email.trim() && (
+            <p className="text-xs leading-5 text-warning">
+              Email verification is disabled here. A recipient-bound link requires an account whose email is already verified by the configured identity provider.
+            </p>
+          )}
+          <AccessProfilePicker
+            profiles={profiles}
+            value={inviteProfileId}
+            onValueChange={changeInviteProfile}
+            disabled={!canCreate}
+          />
+          <PropertyScopeField
+            properties={properties}
+            propertyIds={invitePropertyIds}
+            onChange={(ids) => { setInvitePropertyIds(ids); setInviteSourceId(crypto.randomUUID()); }}
+            disabled={!canCreate}
+          />
+          <LifetimeField
+            value={inviteLifetimeHours}
+            onChange={(value) => { setInviteLifetimeHours(value); setInviteSourceId(crypto.randomUUID()); }}
+            disabled={!canCreate}
+          />
+          {invite.error && <SettingsError error={invite.error} />}
+          <button className="btn btn-primary w-full text-white sm:w-auto" disabled={invite.isPending || !inviteProfileId || !canCreate}>
+            {invite.isPending && <span className="loading loading-spinner loading-sm" />}
+            <Link2 size={17} />Create invite
+          </button>
+        </form>
+
+        <form className="space-y-5 border-t border-base-300 pt-8 lg:border-t-0 lg:pl-8 lg:pt-0" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
+          <div>
+            <QrCode className="text-primary" size={22} />
+            <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
+            <p className="mt-2 text-sm leading-6 text-base-content/50">Reusable enrollment is limited to built-in low-privilege roles.</p>
+          </div>
+          <AccessProfilePicker
+            profiles={reusableProfiles}
+            value={enrollmentProfileId}
+            onValueChange={changeEnrollmentProfile}
+            disabled={!canCreate}
+          />
+          <PropertyScopeField
+            properties={properties}
+            propertyIds={enrollmentPropertyIds}
+            onChange={(ids) => { setEnrollmentPropertyIds(ids); setEnrollmentSourceId(crypto.randomUUID()); }}
+            disabled={!canCreate}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold">Maximum joins</span>
+              <input
+                className="input input-bordered w-full"
+                type="number"
+                min={1}
+                max={1000}
+                value={maximumClaims}
+                disabled={!canCreate}
+                onChange={(event) => { setMaximumClaims(Number(event.target.value)); setEnrollmentSourceId(crypto.randomUUID()); }}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-semibold">Approval</span>
+              <SelectPicker
+                value={approvalMode}
+                onValueChange={(value) => {
+                  const selected = ENROLLMENT_APPROVAL_OPTIONS.find((option) => option.value === value);
+                  if (!selected) return;
+                  setApprovalMode(selected.value);
+                  setEnrollmentSourceId(crypto.randomUUID());
+                }}
+                ariaLabel="Enrollment approval"
+                disabled={!canCreate}
+                options={ENROLLMENT_APPROVAL_OPTIONS}
+              />
+            </label>
+          </div>
+          <LifetimeField
+            value={enrollmentLifetimeHours}
+            onChange={(value) => { setEnrollmentLifetimeHours(value); setEnrollmentSourceId(crypto.randomUUID()); }}
+            disabled={!canCreate}
+          />
+          {enrollment.error && <SettingsError error={enrollment.error} />}
+          <button className="btn btn-outline w-full sm:w-auto" disabled={enrollment.isPending || !enrollmentProfileId || !canCreate}>
+            {enrollment.isPending && <span className="loading loading-spinner loading-sm" />}
+            <QrCode size={17} />Create QR
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -298,11 +376,13 @@ function JoinSourceLifecycle({
   workspaceId,
   profiles,
   properties,
+  canReplace,
   onIssued,
 }: {
   workspaceId: string;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
+  canReplace: boolean;
   onIssued: (kind: IssuedJoinLink["kind"], issuance: WorkspaceStaffJoinSourceIssuance, lifetimeHours: number) => void;
 }) {
   const { request } = useSession();
@@ -317,10 +397,28 @@ function JoinSourceLifecycle({
       `/api/workspace-staff-enrollment/sources?sourceKind=${sourceKind}&page=${page}&pageSize=${SOURCE_PAGE_SIZE}`,
     ),
   });
+  const sourceState = createCompositeSource({
+    label: kind === "invitation" ? "Issued invitations" : "Issued team QR links",
+    hasData: sources.data !== undefined,
+    isLoading: sources.isLoading,
+    error: sources.error,
+    isFetching: sources.isFetching,
+    refetch: () => sources.refetch(),
+  });
+  const sourcesUsable = compositeSourceUsable(sourceState.state);
+  const sourcesCurrent = compositeSourceCurrent(sourceState);
+  const replacementAllowed = workspaceAccessActionAllowed(
+    "grant",
+    canReplace,
+    sourcesCurrent,
+  );
   const management = useMutation({
     mutationFn: async ({ source, action }: { source: WorkspaceStaffJoinSource; action: "deny" | "replace" }) => {
       const base = source.sourceKind === 1 ? "invitations" : "enrollment-links";
       if (action === "replace") {
+        if (!replacementAllowed) {
+          throw new Error("Refresh the issued source and workspace authority before replacing it.");
+        }
         let replacementSourceId = replacementIds.current.get(source.sourceId);
         if (!replacementSourceId) {
           replacementSourceId = crypto.randomUUID();
@@ -373,9 +471,13 @@ function JoinSourceLifecycle({
           ]}
         />
       </div>
-      {sources.isLoading && <div className="loading loading-spinner loading-md mt-6 text-primary" />}
-      {sources.error && <SettingsError error={sources.error} />}
-      {!sources.isLoading && !sources.error && (
+      <div className="mt-5">
+        <CompositeSourceNotice
+          sources={[sourceState]}
+          title="Issued access links are delayed"
+        />
+      </div>
+      {sourcesUsable ? (
         <>
           <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
             {!sources.data?.items.length && <p className="py-8 text-center text-sm text-base-content/50">No issued sources on this page.</p>}
@@ -386,6 +488,7 @@ function JoinSourceLifecycle({
                 profiles={profiles}
                 properties={properties}
                 pending={management.isPending}
+                replacementAllowed={replacementAllowed}
                 onAction={(action) => management.mutate({ source, action })}
               />
             ))}
@@ -396,11 +499,13 @@ function JoinSourceLifecycle({
             itemCount={sources.data?.items.length ?? 0}
             itemLabel={kind === "invitation" ? "invitation" : "QR link"}
             hasMore={sources.data?.hasMore}
-            disabled={sources.isFetching || management.isPending}
+            disabled={!sourcesCurrent || management.isPending}
             onPageChange={setPage}
           />
           {management.error && <SettingsError error={management.error} />}
         </>
+      ) : (
+        <CompositeSourceFallback state={sourceState.state} label="issued access links" />
       )}
     </section>
   );
@@ -411,12 +516,14 @@ function JoinSourceRow({
   profiles,
   properties,
   pending,
+  replacementAllowed,
   onAction,
 }: {
   source: WorkspaceStaffJoinSource;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
   pending: boolean;
+  replacementAllowed: boolean;
   onAction: (action: "deny" | "replace") => void;
 }) {
   const profile = source.accessPlan
@@ -451,7 +558,12 @@ function JoinSourceRow({
           </button>
         )}
         {source.accessPlan && canReplaceJoinSource(source.sourceKind, source.status) && (
-          <button className="btn btn-outline btn-sm" disabled={pending} onClick={() => onAction("replace")}>
+          <button
+            className="btn btn-outline btn-sm"
+            disabled={pending || !replacementAllowed}
+            title={!replacementAllowed ? "Refresh the source and workspace authority before replacing it." : undefined}
+            onClick={() => onAction("replace")}
+          >
             <RefreshCw size={15} />Replace
           </button>
         )}
@@ -490,11 +602,27 @@ function IssuedJoinLinkModal({ issued, onClose }: { issued: IssuedJoinLink; onCl
   );
 }
 
-function LifetimeField({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+function LifetimeField({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+}) {
   return (
     <label className="block max-w-48">
       <span className="mb-1.5 block text-sm font-semibold">Lifetime (hours)</span>
-      <input className="input input-bordered w-full" type="number" min={1} max={720} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+      <input
+        className="input input-bordered w-full"
+        type="number"
+        min={1}
+        max={720}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
     </label>
   );
 }

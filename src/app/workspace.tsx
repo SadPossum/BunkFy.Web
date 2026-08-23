@@ -27,12 +27,14 @@ type WorkspaceValue = {
   setSelectedWorkspaceId: (id: string) => void;
   refetchWorkspaces: () => Promise<void>;
   properties: Property[];
+  propertiesLoaded: boolean;
   propertiesLoading: boolean;
+  propertiesFetching: boolean;
   propertiesError: unknown;
   selectedProperty: Property | null;
   selectedPropertyId: string;
   setSelectedPropertyId: (id: string) => void;
-  refetchProperties: () => void;
+  refetchProperties: () => Promise<void>;
 };
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
@@ -118,19 +120,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         await workspacesQuery.refetch();
       },
       properties,
+      propertiesLoaded: propertiesQuery.data !== undefined,
       propertiesLoading: propertiesQuery.isLoading,
+      propertiesFetching: propertiesQuery.isFetching,
       propertiesError: propertiesQuery.error,
       selectedProperty:
         properties.find((property) => property.propertyId === selectedPropertyId) ?? null,
       selectedPropertyId,
       setSelectedPropertyId: setSelectedPropertyIdState,
-      refetchProperties: () => {
-        void propertiesQuery.refetch();
+      refetchProperties: async () => {
+        await propertiesQuery.refetch();
       },
     }),
     [
       properties,
+      propertiesQuery.data,
       propertiesQuery.error,
+      propertiesQuery.isFetching,
       propertiesQuery.isLoading,
       propertiesQuery.refetch,
       selectedPropertyId,

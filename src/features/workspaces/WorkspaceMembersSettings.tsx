@@ -10,10 +10,21 @@ import type {
   WorkspaceAccessProfileListResponse,
   WorkspaceMemberAccess,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
 import { Modal, ModalActions } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { AccessProfilePicker, PropertyScopeField } from "./WorkspaceAccessControls";
+import { workspaceAccessSourcesCurrent } from "./workspaceAccessAuthority";
 
 const ACTIVE_PROFILE_PAGE_SIZE = 100;
 
@@ -23,12 +34,11 @@ export function WorkspaceMembersSettings({
   memberships,
   currentUsername,
   properties,
+  propertySource,
+  memberSource,
   page,
   pageSize,
   hasMore,
-  loading,
-  fetching,
-  error,
   onChanged,
   onPageChange,
 }: {
@@ -37,12 +47,11 @@ export function WorkspaceMembersSettings({
   memberships: OrganizationMembership[];
   currentUsername: string;
   properties: Property[];
+  propertySource: CompositeSource;
+  memberSource: CompositeSource;
   page: number;
   pageSize: number;
   hasMore: boolean | undefined;
-  loading: boolean;
-  fetching: boolean;
-  error: unknown;
   onChanged: () => Promise<void>;
   onPageChange: (page: number) => void;
 }) {
@@ -58,9 +67,28 @@ export function WorkspaceMembersSettings({
       `/api/workspace-access/profiles?includeArchived=false&page=1&pageSize=${ACTIVE_PROFILE_PAGE_SIZE}`,
     ),
   });
+  const profileSource = createCompositeSource({
+    label: "Active roles",
+    hasData: profiles.data !== undefined,
+    isLoading: profiles.isLoading,
+    error: profiles.error,
+    isFetching: profiles.isFetching,
+    refetch: () => profiles.refetch(),
+  });
+  const membersUsable = compositeSourceUsable(memberSource.state);
+  const profilesUsable = compositeSourceUsable(profileSource.state);
+  const membersCurrent = compositeSourceCurrent(memberSource);
+  const accessDirectoriesCurrent = workspaceAccessSourcesCurrent([
+    memberSource,
+    profileSource,
+    propertySource,
+  ]) && !profiles.data?.hasMore;
   const transfer = useMutation({
-    mutationFn: (membership: OrganizationMembership) =>
-      request(`/api/organizations/${workspace.organizationId}/ownership/transfer`, {
+    mutationFn: (membership: OrganizationMembership) => {
+      if (!membersCurrent) {
+        throw new Error("Refresh workspace members before transferring ownership.");
+      }
+      return request(`/api/organizations/${workspace.organizationId}/ownership/transfer`, {
         method: "POST",
         body: JSON.stringify({
           targetSubjectId: membership.subjectId,
@@ -68,7 +96,8 @@ export function WorkspaceMembersSettings({
           expectedCurrentOwnerVersion: currentMembership.version,
           expectedTargetVersion: membership.version,
         }),
-      }),
+      });
+    },
     onSuccess: async () => {
       await onChanged();
       setTransferTargetSubjectId(null);
@@ -95,9 +124,6 @@ export function WorkspaceMembersSettings({
     transfer.reset();
   }
 
-  if (loading) return <div className="loading loading-spinner loading-md text-primary" />;
-  if (error) return <SettingsError error={error} />;
-
   return (
     <section>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -117,71 +143,85 @@ export function WorkspaceMembersSettings({
         </Link>
       </div>
 
-      {profiles.data?.hasMore && (
+      <div className="mt-5">
+        <CompositeSourceNotice
+          sources={[memberSource, profileSource, propertySource]}
+          title="Some access data is delayed"
+        />
+      </div>
+      {profilesUsable && profiles.data?.hasMore && (
         <div className="alert alert-warning mt-5 py-3 text-sm">
           This workspace has more than {ACTIVE_PROFILE_PAGE_SIZE} active roles. Archive unused roles before assigning access.
         </div>
       )}
-      {profiles.error && <SettingsError error={profiles.error} />}
-      <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
-        {!memberships.length && <p className="py-8 text-center text-sm text-base-content/50">No members on this page.</p>}
-        {memberships.map((membership) => {
-          const self = membership.membershipId === currentMembership.membershipId;
-          const active = isActive(membership.status);
-          const owner = isOwner(membership.role);
-          const displayName = self ? "You" : `Member ${shortSubject(membership.subjectId)}`;
-          const accountLabel = self ? currentUsername : "Workspace identity";
-          return (
-            <article key={membership.membershipId} className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{displayName}</p>
-                <p className="mt-1 truncate text-xs text-base-content/45">{accountLabel}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {self && <span className="badge border-0 bg-primary font-semibold text-white">Current account</span>}
-                <span className="badge badge-outline">{owner ? "Owner" : active ? "Member" : statusLabel(membership.status)}</span>
-                {!owner && active && (
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setEditing(membership)}
-                    disabled={profiles.isLoading || profiles.data?.hasMore}
-                  >
-                    <Settings2 size={15} />Manage access
-                  </button>
-                )}
-                {!self && active && !owner && (
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      transfer.reset();
-                      setTransferTargetSubjectId(membership.subjectId);
-                    }}
-                    disabled={transfer.isPending}
-                  >
-                    <ShieldCheck size={15} />Make owner
-                  </button>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      <PaginationBar
-        page={page}
-        pageSize={pageSize}
-        itemCount={memberships.length}
-        itemLabel="member"
-        hasMore={hasMore}
-        disabled={fetching}
-        onPageChange={onPageChange}
-      />
-      {editing && profiles.data && (
+      {membersUsable ? (
+        <>
+          <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
+            {!memberships.length && <p className="py-8 text-center text-sm text-base-content/50">No members on this page.</p>}
+            {memberships.map((membership) => {
+              const self = membership.membershipId === currentMembership.membershipId;
+              const active = isActive(membership.status);
+              const owner = isOwner(membership.role);
+              const displayName = self ? "You" : `Member ${shortSubject(membership.subjectId)}`;
+              const accountLabel = self ? currentUsername : "Workspace identity";
+              return (
+                <article key={membership.membershipId} className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{displayName}</p>
+                    <p className="mt-1 truncate text-xs text-base-content/45">{accountLabel}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {self && <span className="badge border-0 bg-primary font-semibold text-white">Current account</span>}
+                    <span className="badge badge-outline">{owner ? "Owner" : active ? "Member" : statusLabel(membership.status)}</span>
+                    {!owner && active && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setEditing(membership)}
+                        disabled={!accessDirectoriesCurrent}
+                        title={!accessDirectoriesCurrent ? "Refresh members, roles, and properties before changing access." : undefined}
+                      >
+                        <Settings2 size={15} />Manage access
+                      </button>
+                    )}
+                    {!self && active && !owner && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => {
+                          transfer.reset();
+                          setTransferTargetSubjectId(membership.subjectId);
+                        }}
+                        disabled={transfer.isPending || !membersCurrent}
+                      >
+                        <ShieldCheck size={15} />Make owner
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            itemCount={memberships.length}
+            itemLabel="member"
+            hasMore={hasMore}
+            disabled={!membersCurrent}
+            onPageChange={onPageChange}
+          />
+        </>
+      ) : (
+        <CompositeSourceFallback state={memberSource.state} label="workspace members" />
+      )}
+      {editing && profilesUsable && profiles.data && (
         <MemberAccessEditor
           key={`${editing.membershipId}-${editing.version}`}
           workspaceId={workspace.organizationId}
           membership={editing}
           profiles={profiles.data.items.filter((profile) => profile.status === 1)}
           properties={properties}
+          authorityCurrent={accessDirectoriesCurrent}
+          authoritySources={[memberSource, profileSource, propertySource]}
           onClose={() => setEditing(null)}
         />
       )}
@@ -210,6 +250,11 @@ export function WorkspaceMembersSettings({
             You will lose owner-only workspace controls immediately. The new owner can manage members,
             invitations, roles, retention settings, and future ownership changes.
           </p>
+          {!membersCurrent && (
+            <div className="alert alert-warning mt-4 py-3 text-sm">
+              Refresh workspace members before confirming this ownership change.
+            </div>
+          )}
           {transfer.error && <SettingsError error={transfer.error} />}
           <ModalActions>
             <button type="button" className="btn btn-ghost" onClick={closeTransferConfirmation} disabled={transfer.isPending}>
@@ -219,7 +264,7 @@ export function WorkspaceMembersSettings({
               type="button"
               className="btn btn-primary min-w-36 text-white"
               onClick={() => transfer.mutate(transferTarget)}
-              disabled={transfer.isPending}
+              disabled={transfer.isPending || !membersCurrent}
             >
               {transfer.isPending && <span className="loading loading-spinner loading-sm" />}
               Transfer ownership
@@ -236,12 +281,16 @@ function MemberAccessEditor({
   membership,
   profiles,
   properties,
+  authorityCurrent,
+  authoritySources,
   onClose,
 }: {
   workspaceId: string;
   membership: OrganizationMembership;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
+  authorityCurrent: boolean;
+  authoritySources: CompositeSource[];
   onClose: () => void;
 }) {
   const { request } = useSession();
@@ -254,6 +303,16 @@ function MemberAccessEditor({
   });
   const [profileId, setProfileId] = useState("");
   const [propertyIds, setPropertyIds] = useState<string[]>([]);
+  const accessSource = createCompositeSource({
+    label: "Member access",
+    hasData: access.data !== undefined,
+    isLoading: access.isLoading,
+    error: access.error,
+    isFetching: access.isFetching,
+    refetch: () => access.refetch(),
+  });
+  const accessUsable = compositeSourceUsable(accessSource.state);
+  const canSave = authorityCurrent && compositeSourceCurrent(accessSource);
   const existingSelection = useMemo(() => access.data ? memberSelection(access.data) : null, [access.data]);
 
   useEffect(() => {
@@ -263,13 +322,18 @@ function MemberAccessEditor({
   }, [access.data, existingSelection, profiles]);
 
   const update = useMutation({
-    mutationFn: () => request<WorkspaceMemberAccess>(
-      `/api/workspace-access/members/${encodeURIComponent(membership.subjectId)}/access`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ profileId, propertyIds }),
-      },
-    ),
+    mutationFn: () => {
+      if (!canSave) {
+        throw new Error("Refresh member access, roles, and properties before saving.");
+      }
+      return request<WorkspaceMemberAccess>(
+        `/api/workspace-access/members/${encodeURIComponent(membership.subjectId)}/access`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ profileId, propertyIds }),
+        },
+      );
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["workspace-access", workspaceId] });
       onClose();
@@ -278,6 +342,7 @@ function MemberAccessEditor({
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (!canSave) return;
     update.mutate();
   }
 
@@ -288,26 +353,44 @@ function MemberAccessEditor({
       description="Saving replaces this member's operational assignment exactly. Workspace ownership is not affected."
       onClose={onClose}
     >
-      {access.isLoading && <div className="loading loading-spinner loading-md text-primary" />}
-      {access.error && <SettingsError error={access.error} />}
-      {access.data && (
+      <CompositeSourceNotice
+        sources={[...authoritySources, accessSource]}
+        title="Some assignment data is delayed"
+      />
+      {accessUsable && access.data ? (
         <form className="space-y-6" onSubmit={submit}>
           {new Set(access.data.assignments.map((assignment) => assignment.profileId)).size > 1 && (
             <div className="alert alert-warning py-3 text-sm">
               This member has multiple legacy role assignments. Saving will replace them with the single role below.
             </div>
           )}
-          <AccessProfilePicker profiles={profiles} value={profileId} onValueChange={setProfileId} />
-          <PropertyScopeField properties={properties} propertyIds={propertyIds} onChange={setPropertyIds} />
+          <AccessProfilePicker
+            profiles={profiles}
+            value={profileId}
+            onValueChange={setProfileId}
+            disabled={!canSave}
+          />
+          <PropertyScopeField
+            properties={properties}
+            propertyIds={propertyIds}
+            onChange={setPropertyIds}
+            disabled={!canSave}
+          />
           {update.error && <SettingsError error={update.error} />}
           <ModalActions>
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary min-w-32 text-white" disabled={update.isPending || !profileId}>
+            <button
+              type="submit"
+              className="btn btn-primary min-w-32 text-white"
+              disabled={update.isPending || !profileId || !canSave}
+            >
               {update.isPending && <span className="loading loading-spinner loading-sm" />}
               Save access
             </button>
           </ModalActions>
         </form>
+      ) : (
+        <CompositeSourceFallback state={accessSource.state} label="member access" />
       )}
     </Modal>
   );

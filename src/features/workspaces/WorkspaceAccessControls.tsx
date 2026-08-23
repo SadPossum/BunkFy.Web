@@ -59,7 +59,7 @@ export function PropertyScopeField({
   }
 
   return (
-    <fieldset disabled={disabled}>
+    <fieldset disabled={disabled} className={disabled ? "opacity-65" : undefined}>
       <legend className="text-sm font-semibold">Property access</legend>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <button

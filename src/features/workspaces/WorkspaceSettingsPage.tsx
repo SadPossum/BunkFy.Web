@@ -6,6 +6,10 @@ import type {
   OrganizationMemberListResponse,
   OrganizationMembership,
 } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  createCompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
 import {
   permissions,
@@ -13,6 +17,7 @@ import {
   usePermissions,
 } from "../../app/permissions";
 import { useWorkspace } from "../../app/workspace";
+import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { PageHeader } from "../../components/ui/primitives";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { WorkspaceInvitesSettings } from "./WorkspaceInvitesSettings";
@@ -37,6 +42,11 @@ export function WorkspaceSettingsPage() {
   const {
     selectedWorkspace,
     properties,
+    propertiesLoaded,
+    propertiesLoading,
+    propertiesFetching,
+    propertiesError,
+    refetchProperties,
     refetchWorkspaces,
   } = useWorkspace();
   const [tab, setTab] = useState<WorkspaceSettingsTab>("general");
@@ -54,6 +64,25 @@ export function WorkspaceSettingsPage() {
     ]
     : []);
   const permissionsLoading = !owner && permissionAccess.isLoading;
+  const permissionSource = owner ? null : createCompositeSource({
+    label: "Workspace permissions",
+    hasData: permissionAccess.hasData,
+    isLoading: permissionAccess.isLoading,
+    error: permissionAccess.error,
+    isFetching: permissionAccess.isFetching,
+    refetch: permissionAccess.refetch,
+  });
+  const permissionAuthorityCurrent = owner || Boolean(
+    permissionSource && compositeSourceCurrent(permissionSource),
+  );
+  const propertySource = createCompositeSource({
+    label: "Property directory",
+    hasData: propertiesLoaded,
+    isLoading: propertiesLoading,
+    error: propertiesError,
+    isFetching: propertiesFetching,
+    refetch: refetchProperties,
+  });
   const capabilities = resolveWorkspaceSettingsCapabilities({
     owner,
     profilesRead: permissionAccess.allows(permissions.accessProfilesRead, tenantScope),
@@ -71,6 +100,14 @@ export function WorkspaceSettingsPage() {
       `/api/organizations/${workspace?.organizationId}/members?page=${memberPage}&pageSize=${MEMBERS_PAGE_SIZE}`,
     ),
     enabled: Boolean(workspace && owner && tab === "members"),
+  });
+  const memberSource = createCompositeSource({
+    label: "Workspace members",
+    hasData: members.data !== undefined,
+    isLoading: members.isLoading,
+    error: members.error,
+    isFetching: members.isFetching,
+    refetch: () => members.refetch(),
   });
 
   useEffect(() => setMemberPage(1), [workspace?.organizationId]);
@@ -109,6 +146,12 @@ export function WorkspaceSettingsPage() {
           </span>
         )}
       />
+      {permissionSource && (
+        <CompositeSourceNotice
+          sources={[permissionSource]}
+          title="Workspace authority is delayed"
+        />
+      )}
 
       <section className="card overflow-visible border border-base-300 bg-base-100 shadow-sm">
         <div className="border-b border-base-300 p-3 sm:px-5">
@@ -147,12 +190,11 @@ export function WorkspaceSettingsPage() {
               memberships={members.data?.items ?? []}
               currentUsername={session?.username ?? ""}
               properties={properties}
+              propertySource={propertySource}
+              memberSource={memberSource}
               page={memberPage}
               pageSize={MEMBERS_PAGE_SIZE}
               hasMore={members.data?.hasMore}
-              loading={members.isLoading}
-              fetching={members.isFetching}
-              error={members.error}
               onChanged={refreshWorkspace}
               onPageChange={setMemberPage}
             />
@@ -160,18 +202,22 @@ export function WorkspaceSettingsPage() {
           {tab === "roles" && capabilities.canReadRoles && (
             <WorkspaceRolesSettings
               workspaceId={workspace.organizationId}
-              canManage={capabilities.canManageRoles}
+              canManage={capabilities.canManageRoles && permissionAuthorityCurrent}
             />
           )}
           {tab === "invites" && capabilities.canManageInvites && (
             <WorkspaceInvitesSettings
               workspaceId={workspace.organizationId}
               properties={properties}
+              propertySource={propertySource}
+              canGrant={permissionAuthorityCurrent}
               onMembershipChanged={refreshWorkspace}
             />
           )}
           {tab === "retention" && capabilities.canReadRetention && (
-            <RetentionHealthSettings canRetry={capabilities.canRetryRetention} />
+            <RetentionHealthSettings
+              canRetry={capabilities.canRetryRetention && permissionAuthorityCurrent}
+            />
           )}
         </div>
       </section>

@@ -108,7 +108,8 @@ describe("frontend repository foundation", () => {
     );
 
     expect(settings).toContain('/api/organizations/${workspace?.organizationId}/members');
-    expect(settings).toContain('error={members.error}');
+    expect(settings).toContain("error: members.error");
+    expect(settings).toContain("memberSource={memberSource}");
     expect(members).toContain("/api/workspace-access/members/");
     expect(`${settings}\n${members}`).not.toContain('/api/staff/members');
     expect(`${settings}\n${members}`).not.toContain('authSubjectId');
