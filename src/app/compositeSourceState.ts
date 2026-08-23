@@ -53,3 +53,9 @@ export function compositeSourceNeedsRetry(
 ): boolean {
   return state === "stale" || state === "unavailable";
 }
+
+export function compositeSourceCurrent(
+  source: Pick<CompositeSource, "state" | "isFetching">,
+): boolean {
+  return source.state === "ready" && !source.isFetching;
+}

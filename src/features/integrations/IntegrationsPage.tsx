@@ -4,10 +4,17 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
 import type { AdapterConnectionCreateRequest, AdapterConnectionListItem, AdapterConnectionListResponse, AdapterConnectionMutationReceipt, AdapterTypeCapability, AdapterTypeCapabilityListResponse } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useTargetProperty } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { EmptyState, ErrorState, FormActions, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
@@ -61,9 +68,13 @@ export function IntegrationsPage() {
   useEffect(() => setPage(1), [status, selectedPropertyId]);
   const connectionParams = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (status !== "all") connectionParams.set("status", status === "enabled" ? "1" : "2");
-  const connections = useQuery({ queryKey: ["ingestion-connections", selectedPropertyId, status, page], queryFn: () => request<AdapterConnectionListResponse>(`/api/ingestion/properties/${selectedPropertyId}/connections?${connectionParams}`), enabled: canRead });
-  const allConnections = useQuery({ queryKey: ["ingestion-connections", selectedPropertyId, "all-options"], queryFn: (context) => loadAllAdapterConnections(request, selectedPropertyId!, context.signal), enabled: canRead, staleTime: 15_000 });
-  const adapterTypes = useQuery({ queryKey: ["ingestion-adapter-types", selectedPropertyId], queryFn: () => request<AdapterTypeCapabilityListResponse>(`/api/ingestion/properties/${selectedPropertyId}/adapter-types`), enabled: canRead, staleTime: 30_000 });
+  const selectedConnectionId = searchParams.get("connection");
+  const connections = useQuery({ queryKey: ["ingestion-connections", selectedPropertyId, status, page], queryFn: () => request<AdapterConnectionListResponse>(`/api/ingestion/properties/${selectedPropertyId}/connections?${connectionParams}`), enabled: canRead && tab === "connections" });
+  const allConnections = useQuery({ queryKey: ["ingestion-connections", selectedPropertyId, "all-options"], queryFn: (context) => loadAllAdapterConnections(request, selectedPropertyId!, context.signal), enabled: canRead && tab === "activity", staleTime: 15_000 });
+  const adapterTypes = useQuery({ queryKey: ["ingestion-adapter-types", selectedPropertyId], queryFn: () => request<AdapterTypeCapabilityListResponse>(`/api/ingestion/properties/${selectedPropertyId}/adapter-types`), enabled: canRead && (tab === "connections" || tab === "activity" || Boolean(selectedConnectionId)), staleTime: 30_000 });
+  const connectionSource = createCompositeSource({ label: "Connection directory", hasData: connections.data !== undefined, isLoading: connections.isLoading, error: connections.error, isFetching: connections.isFetching, refetch: () => connections.refetch() });
+  const allConnectionSource = createCompositeSource({ label: "Connection filter directory", hasData: allConnections.data !== undefined, isLoading: allConnections.isLoading, error: allConnections.error, isFetching: allConnections.isFetching, refetch: () => allConnections.refetch() });
+  const adapterTypeSource = createCompositeSource({ label: "Adapter capabilities", hasData: adapterTypes.data !== undefined, isLoading: adapterTypes.isLoading, error: adapterTypes.error, isFetching: adapterTypes.isFetching, refetch: () => adapterTypes.refetch() });
 
   function selectConnection(id: string | null) { const next = new URLSearchParams(searchParams); if (id) next.set("connection", id); else next.delete("connection"); setSearchParams(next, { replace: true }); }
 
@@ -72,33 +83,170 @@ export function IntegrationsPage() {
   if (access.error) return <ErrorState error={access.error} />;
   if (!canRead) return <EmptyState icon={<ShieldAlert />} title="Integration access is restricted" description="Your account does not have permission to view ingestion activity for this property." />;
 
-  const capabilityItems = adapterTypes.data?.adapterTypes ?? [];
-  const connectionItems = connections.data?.connections ?? [];
-  const allConnectionItems = allConnections.data?.connections ?? connectionItems;
-  return <>
-    <PageHeader eyebrow={selectedProperty.name} title="Integrations" description="Connect reservation sources, review suggested changes, and trace every ingestion event." action={tab === "connections" && canManage ? <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} />New connection</button> : undefined} />
-    <SegmentedTabs
-      className="mb-5"
-      value={tab}
-      ariaLabel="Integration workspace"
-      onValueChange={setTab}
-      options={[
-        { value: "connections", label: "Connections", icon: <Cable size={15} /> },
-        { value: "review", label: "Review", icon: <ClipboardCheck size={15} /> },
-        { value: "activity", label: "Activity", icon: <Activity size={15} /> },
-      ]}
-    />
-    {tab === "connections" && <section className="card border border-base-300 bg-base-100 shadow-sm"><div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><h2 className="font-display text-xl font-semibold">Connections</h2><p className="mt-1 text-sm text-base-content/50">Configured adapter endpoints and execution modes.</p></div><SelectPicker className="w-full sm:w-44" size="sm" value={status} ariaLabel="Connection status" onValueChange={(value) => setStatus(value as ConnectionStatusFilter)} options={[{ value: "all", label: "All statuses" }, { value: "enabled", label: "Enabled" }, { value: "disabled", label: "Disabled" }]} /></div>{connections.isLoading || adapterTypes.isLoading ? <LoadingState label="Loading connections" /> : connections.error || adapterTypes.error ? <div className="p-6"><ErrorState error={connections.error || adapterTypes.error} retry={() => { void connections.refetch(); void adapterTypes.refetch(); }} /></div> : !connectionItems.length ? <div className="p-6"><EmptyState icon={<Cable />} title={status === "all" ? "No connections yet" : `No ${status} connections`} description={status === "all" ? "Create a connection to bring an external reservation source into BunkFy." : "Choose another status filter."} action={canManage && status === "all" ? <button type="button" className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}>Create connection</button> : undefined} /></div> : <><div className="divide-y divide-base-300">{connectionItems.map((connection) => <ConnectionRow key={connection.connectionId} connection={connection} onOpen={() => selectConnection(connection.connectionId)} />)}</div><PaginationBar page={page} pageSize={PAGE_SIZE} itemCount={connectionItems.length} hasMore={connections.data?.hasMore} itemLabel="connection" disabled={connections.isFetching} onPageChange={setPage} /></>}</section>}
-    {tab === "review" && <ProposalQueue propertyId={selectedPropertyId} canReadSensitiveHistory={canReadSensitiveHistory} canDecide={canDecideProposals} canSuggestGuestRecords={canSuggestGuestRecords} />}
-    {tab === "activity" && <IngestionActivity propertyId={selectedPropertyId} connections={allConnectionItems} adapterTypes={capabilityItems} canReadRawPayloads={canReadRawPayloads} />}
-    <CreateConnectionModal open={createOpen} propertyId={selectedPropertyId} adapterTypes={capabilityItems} onClose={() => setCreateOpen(false)} onCreated={async (created) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["ingestion-connections", selectedPropertyId] }), queryClient.invalidateQueries({ queryKey: ["ingestion-connection", selectedPropertyId, created.connectionId] })]); setCreateOpen(false); selectConnection(created.connectionId); }} />
-    <ConnectionDetail propertyId={selectedPropertyId} connectionId={searchParams.get("connection")} adapterTypes={capabilityItems} canManage={canManage} canManageCredentials={canManageCredentials} onClose={() => selectConnection(null)} />
-  </>;
+  const capabilityItems = compositeSourceUsable(adapterTypeSource.state)
+    ? adapterTypes.data?.adapterTypes ?? []
+    : [];
+  const connectionItems = compositeSourceUsable(connectionSource.state)
+    ? connections.data?.connections ?? []
+    : [];
+  const allConnectionItems = compositeSourceUsable(allConnectionSource.state)
+    ? allConnections.data?.connections ?? []
+    : [];
+  const capabilitiesCurrent = compositeSourceCurrent(adapterTypeSource);
+  const createUnavailableReason = adapterTypeSource.state === "loading" || adapterTypeSource.isFetching
+    ? "Adapter capabilities are being refreshed."
+    : "Refresh adapter capabilities before creating a connection.";
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={selectedProperty.name}
+        title="Integrations"
+        description="Connect reservation sources, review suggested changes, and trace every ingestion event."
+        action={tab === "connections" && canManage ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+            disabled={!capabilitiesCurrent}
+            title={capabilitiesCurrent ? undefined : createUnavailableReason}
+          >
+            <Plus size={17} />
+            New connection
+          </button>
+        ) : undefined}
+      />
+      <SegmentedTabs
+        className="mb-5"
+        value={tab}
+        ariaLabel="Integration workspace"
+        onValueChange={setTab}
+        options={[
+          { value: "connections", label: "Connections", icon: <Cable size={15} /> },
+          { value: "review", label: "Review", icon: <ClipboardCheck size={15} /> },
+          { value: "activity", label: "Activity", icon: <Activity size={15} /> },
+        ]}
+      />
+      {tab === "connections" && (
+        <>
+          <CompositeSourceNotice
+            sources={[connectionSource, adapterTypeSource]}
+            title="Some connection data is delayed"
+          />
+          <section className="card border border-base-300 bg-base-100 shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div>
+                <h2 className="font-display text-xl font-semibold">Connections</h2>
+                <p className="mt-1 text-sm text-base-content/50">Configured adapter endpoints and execution modes.</p>
+              </div>
+              <SelectPicker
+                className="w-full sm:w-44"
+                size="sm"
+                value={status}
+                ariaLabel="Connection status"
+                onValueChange={(value) => setStatus(value as ConnectionStatusFilter)}
+                options={[
+                  { value: "all", label: "All statuses" },
+                  { value: "enabled", label: "Enabled" },
+                  { value: "disabled", label: "Disabled" },
+                ]}
+              />
+            </div>
+            {!compositeSourceUsable(connectionSource.state) ? (
+              <CompositeSourceFallback state={connectionSource.state} label="connections" />
+            ) : !connectionItems.length ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<Cable />}
+                  title={status === "all" ? "No connections yet" : `No ${status} connections`}
+                  description={status === "all" ? "Create a connection to bring an external reservation source into BunkFy." : "Choose another status filter."}
+                  action={canManage && status === "all" ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setCreateOpen(true)}
+                      disabled={!capabilitiesCurrent}
+                      title={capabilitiesCurrent ? undefined : createUnavailableReason}
+                    >
+                      Create connection
+                    </button>
+                  ) : undefined}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="divide-y divide-base-300">
+                  {connectionItems.map((connection) => (
+                    <ConnectionRow
+                      key={connection.connectionId}
+                      connection={connection}
+                      onOpen={() => selectConnection(connection.connectionId)}
+                    />
+                  ))}
+                </div>
+                <PaginationBar
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  itemCount={connectionItems.length}
+                  hasMore={connections.data?.hasMore}
+                  itemLabel="connection"
+                  disabled={connections.isFetching}
+                  onPageChange={setPage}
+                />
+              </>
+            )}
+          </section>
+        </>
+      )}
+      {tab === "review" && (
+        <ProposalQueue
+          propertyId={selectedPropertyId}
+          canReadSensitiveHistory={canReadSensitiveHistory}
+          canDecide={canDecideProposals}
+          canSuggestGuestRecords={canSuggestGuestRecords}
+        />
+      )}
+      {tab === "activity" && (
+        <IngestionActivity
+          propertyId={selectedPropertyId}
+          connections={allConnectionItems}
+          connectionSource={allConnectionSource}
+          adapterTypes={capabilityItems}
+          adapterTypeSource={adapterTypeSource}
+          canReadRawPayloads={canReadRawPayloads}
+        />
+      )}
+      <CreateConnectionModal
+        open={createOpen}
+        propertyId={selectedPropertyId}
+        adapterTypes={capabilityItems}
+        adapterTypeSource={adapterTypeSource}
+        onClose={() => setCreateOpen(false)}
+        onCreated={async (created) => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["ingestion-connections", selectedPropertyId] }),
+            queryClient.invalidateQueries({ queryKey: ["ingestion-connection", selectedPropertyId, created.connectionId] }),
+          ]);
+          setCreateOpen(false);
+          selectConnection(created.connectionId);
+        }}
+      />
+      <ConnectionDetail
+        propertyId={selectedPropertyId}
+        connectionId={selectedConnectionId}
+        adapterTypes={capabilityItems}
+        adapterTypeSource={adapterTypeSource}
+        canManage={canManage}
+        canManageCredentials={canManageCredentials}
+        onClose={() => selectConnection(null)}
+      />
+    </>
+  );
 }
 
 function ConnectionRow({ connection, onOpen }: { connection: AdapterConnectionListItem; onOpen: () => void }) { return <button type="button" className="grid w-full gap-3 p-5 text-left transition hover:bg-base-200/70 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6" onClick={onOpen}><div className="flex min-w-0 items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary/15 text-secondary"><Radio size={18} /></div><div className="min-w-0"><p className="truncate font-semibold">{connection.adapterType}</p><p className="mt-1 truncate text-xs text-base-content/45">Connection {connection.connectionId.slice(0, 8).toUpperCase()}</p></div></div><div className="text-xs text-base-content/50 sm:text-right"><p className="font-semibold capitalize text-base-content/70">{adapterExecutionModeLabel(connection.executionMode)}</p><p className="mt-1">{connection.pollingIntervalSeconds ? `Every ${formatDuration(connection.pollingIntervalSeconds)}` : adapterConflictPolicyLabel(connection.conflictPolicy)}</p></div><StatusBadge status={adapterConnectionStatusLabel(connection.status)} /></button>; }
 
-function CreateConnectionModal({ open, propertyId, adapterTypes, onClose, onCreated }: { open: boolean; propertyId: string; adapterTypes: AdapterTypeCapability[]; onClose: () => void; onCreated: (connection: AdapterConnectionMutationReceipt) => Promise<void> }) {
+function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSource, onClose, onCreated }: { open: boolean; propertyId: string; adapterTypes: AdapterTypeCapability[]; adapterTypeSource: CompositeSource; onClose: () => void; onCreated: (connection: AdapterConnectionMutationReceipt) => Promise<void> }) {
   const { request } = useSession();
   const [adapterType, setAdapterType] = useState(
     adapterTypes[0]?.adapterType ?? "",
@@ -178,6 +326,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, onClose, onCrea
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!compositeSourceCurrent(adapterTypeSource)) return;
     const data = new FormData(event.currentTarget);
     const payload: ConnectionCreatePayload = {
       propertyId,
@@ -206,7 +355,26 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, onClose, onCrea
       description="Choose a registered adapter and how it should exchange observations with BunkFy."
       onClose={close}
     >
-      {adapterTypes.length ? (
+      {!compositeSourceCurrent(adapterTypeSource) ? (
+        <div>
+          {adapterTypeSource.state === "loading" || (adapterTypeSource.state === "ready" && adapterTypeSource.isFetching) ? (
+            <LoadingState label="Loading current adapter capabilities" />
+          ) : (
+            <>
+              <CompositeSourceNotice
+                sources={[adapterTypeSource]}
+                title="Current adapter capabilities are required"
+              />
+              <p className="text-sm leading-6 text-base-content/60">
+                Existing connection data remains available, but BunkFy will not create a connection from delayed capability information.
+              </p>
+            </>
+          )}
+          <div className="mt-4 flex justify-end">
+            <button type="button" className="btn btn-ghost" onClick={close}>Close</button>
+          </div>
+        </div>
+      ) : adapterTypes.length ? (
         <form className="space-y-4" onSubmit={submit}>
           <label className="form-control block">
             <span className="label-text mb-1.5 block text-sm font-semibold">

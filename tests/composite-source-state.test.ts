@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  compositeSourceCurrent,
   compositeSourceNeedsRetry,
   compositeSourceState,
   compositeSourceUsable,
@@ -29,6 +30,12 @@ describe("composite source state", () => {
   it("keeps an active read pending and treats a settled empty state as unavailable", () => {
     expect(compositeSourceState(false, true, false)).toBe("loading");
     expect(compositeSourceState(false, false, false)).toBe("unavailable");
+  });
+
+  it("requires a settled successful source before treating evidence as current", () => {
+    expect(compositeSourceCurrent({ state: "ready", isFetching: false })).toBe(true);
+    expect(compositeSourceCurrent({ state: "ready", isFetching: true })).toBe(false);
+    expect(compositeSourceCurrent({ state: "stale", isFetching: false })).toBe(false);
   });
 
   it("keeps independent dashboard sources out of one global error return", () => {

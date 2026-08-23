@@ -4,8 +4,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { adapterExecutionModeLabel, ingestionRunStatusLabel, rawPayloadStatusLabel, receiptStatusLabel, reprocessingStatusLabel } from "../../api/labels";
 import type { AdapterConnectionListItem, AdapterTypeCapability, IngestionRun, IngestionRunListResponse, ObservationParserCapabilityListResponse, ObservationReceipt, ObservationReceiptListResponse, ObservationReprocessingAttemptDetails, ObservationReprocessingAttemptListResponse } from "../../api/types";
+import { compositeSourceUsable, type CompositeSource } from "../../app/compositeSourceState";
 import { ingestionRunNeedsLiveRefresh, LIVE_DETAIL_REFRESH_INTERVAL_MS, LIVE_LIST_REFRESH_INTERVAL_MS, receiptNeedsLiveRefresh, reprocessingNeedsLiveRefresh } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { EmptyState, ErrorState, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
@@ -14,11 +16,36 @@ import { SelectPicker } from "../../components/ui/SelectPicker";
 const PAGE_SIZE = 30;
 type ActivityTab = "runs" | "receipts" | "reprocessing" | "capabilities";
 
-export function IngestionActivity({ propertyId, connections, adapterTypes, canReadRawPayloads }: { propertyId: string; connections: AdapterConnectionListItem[]; adapterTypes: AdapterTypeCapability[]; canReadRawPayloads: boolean }) {
+export function IngestionActivity({ propertyId, connections, connectionSource, adapterTypes, adapterTypeSource, canReadRawPayloads }: { propertyId: string; connections: AdapterConnectionListItem[]; connectionSource: CompositeSource; adapterTypes: AdapterTypeCapability[]; adapterTypeSource: CompositeSource; canReadRawPayloads: boolean }) {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<ActivityTab>(() => activityTab(searchParams.get("activity")));
   useEffect(() => setTab(activityTab(searchParams.get("activity"))), [searchParams]);
-  return <div className="space-y-4"><SegmentedTabs value={tab} ariaLabel="Ingestion activity" onValueChange={setTab} options={[{ value: "runs", label: "Runs", icon: <PlayCircle size={15} /> }, { value: "receipts", label: "Receipts", icon: <Rows3 size={15} /> }, { value: "reprocessing", label: "Reprocessing", icon: <ListRestart size={15} /> }, { value: "capabilities", label: "Capabilities", icon: <Braces size={15} /> }]} />{tab === "runs" && <RunsPanel propertyId={propertyId} connections={connections} />}{tab === "receipts" && <ReceiptsPanel propertyId={propertyId} connections={connections} canReadRawPayloads={canReadRawPayloads} />}{tab === "reprocessing" && <ReprocessingPanel propertyId={propertyId} />}{tab === "capabilities" && <CapabilitiesPanel propertyId={propertyId} adapterTypes={adapterTypes} />}</div>;
+  const contextSources = tab === "runs" || tab === "receipts"
+    ? [connectionSource]
+    : tab === "capabilities"
+      ? [adapterTypeSource]
+      : [];
+
+  return (
+    <div className="space-y-4">
+      <SegmentedTabs
+        value={tab}
+        ariaLabel="Ingestion activity"
+        onValueChange={setTab}
+        options={[
+          { value: "runs", label: "Runs", icon: <PlayCircle size={15} /> },
+          { value: "receipts", label: "Receipts", icon: <Rows3 size={15} /> },
+          { value: "reprocessing", label: "Reprocessing", icon: <ListRestart size={15} /> },
+          { value: "capabilities", label: "Capabilities", icon: <Braces size={15} /> },
+        ]}
+      />
+      <CompositeSourceNotice sources={contextSources} title="Some activity context is delayed" />
+      {tab === "runs" && <RunsPanel propertyId={propertyId} connections={connections} />}
+      {tab === "receipts" && <ReceiptsPanel propertyId={propertyId} connections={connections} canReadRawPayloads={canReadRawPayloads} />}
+      {tab === "reprocessing" && <ReprocessingPanel propertyId={propertyId} />}
+      {tab === "capabilities" && <CapabilitiesPanel propertyId={propertyId} adapterTypes={adapterTypes} adapterTypeSource={adapterTypeSource} />}
+    </div>
+  );
 }
 
 function RunsPanel({ propertyId, connections }: { propertyId: string; connections: AdapterConnectionListItem[] }) {
@@ -41,7 +68,58 @@ function ReprocessingPanel({ propertyId }: { propertyId: string }) { const { req
 
 function ReprocessingDetail({ propertyId, attemptId, onClose }: { propertyId: string; attemptId: string | null; onClose: () => void }) { const { request } = useSession(); const details = useQuery({ queryKey: ["ingestion-reprocessing-attempt", propertyId, attemptId], queryFn: () => request<ObservationReprocessingAttemptDetails>(`/api/ingestion/properties/${propertyId}/reprocessing-attempts/${attemptId}`), enabled: Boolean(attemptId), refetchInterval: (query) => reprocessingNeedsLiveRefresh(query.state.data?.attempt.status) ? LIVE_DETAIL_REFRESH_INTERVAL_MS : false, refetchIntervalInBackground: false }); const item = details.data?.attempt; return <Modal open={Boolean(attemptId)} size="lg" title={item ? `${item.parserType} reprocessing` : "Reprocessing attempt"} description={item ? `Attempt ${item.attemptId.slice(0, 8).toUpperCase()}` : "Loading attempt"} onClose={onClose}>{details.isLoading ? <LoadingState label="Loading reprocessing attempt" /> : details.error ? <ErrorState error={details.error} retry={() => void details.refetch()} /> : item ? <div className="space-y-5"><div className="flex items-center justify-between rounded-2xl bg-base-200 p-4"><div><p className="font-semibold">Requested {formatDateTime(item.requestedAtUtc)}</p><p className="mt-1 text-xs text-base-content/50">Parser version {item.parserVersion} · task attempt {item.lastTaskAttempt}</p></div><StatusBadge status={reprocessingStatusLabel(item.status)} /></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Metric label="Parsed" value={item.parsedCount} /><Metric label="Accepted" value={item.acceptedCount} /><Metric label="Duplicates" value={item.duplicateCount} /><Metric label="Rejected" value={item.rejectedCount} /></div>{item.lastErrorCode && <div className="rounded-xl bg-error/8 p-4 text-sm text-error">{item.lastErrorCode}</div>}<section><h3 className="font-display text-lg font-semibold">Outputs</h3>{details.data?.outputs.length ? <div className="mt-3 space-y-2">{details.data.outputs.map((output) => <div key={output.outputIndex} className="grid gap-2 rounded-xl border border-base-300 p-3 text-sm sm:grid-cols-[60px_1fr_auto] sm:items-center"><span className="font-mono text-xs text-base-content/45">#{output.outputIndex}</span><div><p className="font-semibold">{output.recordType} · {output.externalId}</p><p className="mt-1 text-xs text-base-content/45">{output.errorCode || output.contentHash}</p></div><StatusBadge status={outputStatusLabel(output.status)} /></div>)}</div> : <p className="mt-3 rounded-xl border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">No parser outputs were recorded.</p>}</section><div className="flex justify-end border-t border-base-300 pt-5"><button className="btn btn-ghost" onClick={onClose}>Close</button></div></div> : null}</Modal>; }
 
-function CapabilitiesPanel({ propertyId, adapterTypes }: { propertyId: string; adapterTypes: AdapterTypeCapability[] }) { const { request } = useSession(); const parsers = useQuery({ queryKey: ["ingestion-parser-types", propertyId], queryFn: () => request<ObservationParserCapabilityListResponse>(`/api/ingestion/properties/${propertyId}/parser-types`) }); return <div className="grid gap-5 xl:grid-cols-2"><section className="card border border-base-300 bg-base-100 shadow-sm"><div className="card-body p-5"><h2 className="font-display text-xl font-semibold">Adapter capabilities</h2><p className="text-sm text-base-content/50">Execution modes currently registered with BunkFy.</p><div className="mt-2 space-y-3">{adapterTypes.map((adapter) => <article key={adapter.adapterType} className="rounded-xl border border-base-300 p-4"><h3 className="font-semibold">{adapter.adapterType}</h3><p className="mt-1 text-xs text-base-content/45">Protocol v{adapter.protocolVersion} · configuration schema v{adapter.configurationSchemaVersion}</p><div className="mt-3 flex flex-wrap gap-2">{adapter.executionModes.map((mode) => <span key={String(mode)} className="badge badge-ghost capitalize">{adapterExecutionModeLabel(mode)}</span>)}</div></article>)}{!adapterTypes.length && <p className="rounded-xl border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">No adapter types are registered.</p>}</div></div></section><section className="card border border-base-300 bg-base-100 shadow-sm"><div className="card-body p-5"><h2 className="font-display text-xl font-semibold">Parser capabilities</h2><p className="text-sm text-base-content/50">Parsers available for retained-observation reprocessing.</p>{parsers.isLoading ? <LoadingState label="Loading parsers" /> : parsers.error ? <ErrorState error={parsers.error} retry={() => void parsers.refetch()} /> : <div className="mt-2 space-y-3">{parsers.data?.parsers.map((parser) => <article key={`${parser.parserType}-${parser.parserVersion}`} className="rounded-xl border border-base-300 p-4"><h3 className="font-semibold">{parser.parserType} v{parser.parserVersion}</h3><p className="mt-2 text-xs text-base-content/50">Inputs: {parser.supportedSourceRecordTypes.join(", ") || "None"}</p><p className="mt-1 text-xs text-base-content/50">Outputs: {parser.outputRecordTypes.join(", ") || "None"}</p></article>)}{!parsers.data?.parsers.length && <p className="rounded-xl border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">No parser types are registered.</p>}</div>}</div></section></div>; }
+function CapabilitiesPanel({ propertyId, adapterTypes, adapterTypeSource }: { propertyId: string; adapterTypes: AdapterTypeCapability[]; adapterTypeSource: CompositeSource }) {
+  const { request } = useSession();
+  const parsers = useQuery({ queryKey: ["ingestion-parser-types", propertyId], queryFn: () => request<ObservationParserCapabilityListResponse>(`/api/ingestion/properties/${propertyId}/parser-types`) });
+  return (
+    <div className="grid gap-5 xl:grid-cols-2">
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body p-5">
+          <h2 className="font-display text-xl font-semibold">Adapter capabilities</h2>
+          <p className="text-sm text-base-content/50">Execution modes currently registered with BunkFy.</p>
+          {!compositeSourceUsable(adapterTypeSource.state) ? (
+            <CompositeSourceFallback state={adapterTypeSource.state} label="adapter capabilities" />
+          ) : (
+            <div className="mt-2 space-y-3">
+              {adapterTypes.map((adapter) => (
+                <article key={adapter.adapterType} className="rounded-xl border border-base-300 p-4">
+                  <h3 className="font-semibold">{adapter.adapterType}</h3>
+                  <p className="mt-1 text-xs text-base-content/45">Protocol v{adapter.protocolVersion} · configuration schema v{adapter.configurationSchemaVersion}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {adapter.executionModes.map((mode) => <span key={String(mode)} className="badge badge-ghost capitalize">{adapterExecutionModeLabel(mode)}</span>)}
+                  </div>
+                </article>
+              ))}
+              {!adapterTypes.length && <p className="rounded-xl border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">No adapter types are registered.</p>}
+            </div>
+          )}
+        </div>
+      </section>
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body p-5">
+          <h2 className="font-display text-xl font-semibold">Parser capabilities</h2>
+          <p className="text-sm text-base-content/50">Parsers available for retained-observation reprocessing.</p>
+          {parsers.isLoading ? (
+            <LoadingState label="Loading parsers" />
+          ) : parsers.error ? (
+            <ErrorState error={parsers.error} retry={() => void parsers.refetch()} />
+          ) : (
+            <div className="mt-2 space-y-3">
+              {parsers.data?.parsers.map((parser) => (
+                <article key={`${parser.parserType}-${parser.parserVersion}`} className="rounded-xl border border-base-300 p-4">
+                  <h3 className="font-semibold">{parser.parserType} v{parser.parserVersion}</h3>
+                  <p className="mt-2 text-xs text-base-content/50">Inputs: {parser.supportedSourceRecordTypes.join(", ") || "None"}</p>
+                  <p className="mt-1 text-xs text-base-content/50">Outputs: {parser.outputRecordTypes.join(", ") || "None"}</p>
+                </article>
+              ))}
+              {!parsers.data?.parsers.length && <p className="rounded-xl border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">No parser types are registered.</p>}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
 
 function ActivityCard({ title, description, filter, children }: { title: string; description: string; filter?: ReactNode; children: ReactNode }) { return <section className="card border border-base-300 bg-base-100 shadow-sm"><div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><h2 className="font-display text-xl font-semibold">{title}</h2><p className="mt-1 text-sm text-base-content/50">{description}</p></div>{filter}</div>{children}</section>; }
 function ConnectionFilter({ value, connections, onChange }: { value: string; connections: AdapterConnectionListItem[]; onChange: (value: string) => void }) { return <SelectPicker className="w-full sm:w-56" size="sm" ariaLabel="Filter by connection" value={value || "all"} onValueChange={(next) => onChange(next === "all" ? "" : next)} options={[{ value: "all", label: "All connections" }, ...connections.map((connection) => ({ value: connection.connectionId, label: `${connection.adapterType} · ${connection.connectionId.slice(0, 6)}` }))]} />; }
