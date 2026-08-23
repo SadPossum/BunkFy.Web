@@ -3,8 +3,15 @@ import { AlertTriangle, BedDouble, CalendarDays, CheckCircle2, ChevronRight, Clo
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { reservationDetailsOriginLabel, reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
 import type { GuestListItem, GuestProfile, Reservation, ReservationDetailsHistoryItem, ReservationDetailsHistoryListResponse, ReservationMutationReceipt } from "../../api/types";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { ErrorState, InitialAvatar, InlineFormActions, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { DatePicker } from "../../components/ui/DatePicker";
 import { PaginationBar } from "../../components/ui/PaginationBar";
@@ -15,6 +22,10 @@ import { createAndLinkGuestRecord, guestRecordPayloadFromBooking, hasPrimaryGues
 import { resolveReservationGuestDetailsAttempt, type ReservationGuestDetailsAttempt, type ReservationGuestDetailsAttemptPayload } from "./reservationGuestDetailsAttempt";
 import { resolveReservationGuestLinkAttempt, type ReservationGuestLinkAttempt } from "./reservationGuestLinkAttempt";
 import { resolveReservationLifecycleAttempt, type ReservationLifecycleAttempt, type ReservationLifecycleAction } from "./reservationLifecycleAttempt";
+import {
+  reservationMutationAllowed,
+  reservationRecordMatches,
+} from "./reservationsMutationAuthority";
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
 
 export type ReservationCapabilities = {
@@ -32,11 +43,12 @@ type DetailTab = "overview" | "guest" | "history";
 type ReservationAction = ReservationLifecycleAction;
 const HISTORY_PAGE_SIZE = 20;
 
-export function ReservationDetail({ propertyId, reservationId, initialTab, capabilities, notice, onDismissNotice, onClose }: {
+export function ReservationDetail({ propertyId, reservationId, initialTab, capabilities, permissionSource, notice, onDismissNotice, onClose }: {
   propertyId: string;
   reservationId: string | null;
   initialTab?: DetailTab;
   capabilities: ReservationCapabilities;
+  permissionSource: CompositeSource;
   notice?: string | null;
   onDismissNotice?: () => void;
   onClose: () => void;
@@ -45,6 +57,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<DetailTab>("overview");
   const [pendingAction, setPendingAction] = useState<ReservationAction | null>(null);
+  const [pendingActionVersion, setPendingActionVersion] = useState<number | null>(null);
   const [businessDate, setBusinessDate] = useState("");
   const [editingDetails, setEditingDetails] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
@@ -55,6 +68,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   useEffect(() => {
     setTab(initialTab ?? "overview");
     setPendingAction(null);
+    setPendingActionVersion(null);
     lifecycleAttempt.current = null;
     guestDetailsAttempt.current = null;
     setEditingDetails(false);
@@ -76,17 +90,74 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
     enabled: Boolean(reservationId) && tab === "history",
   });
 
-  useEffect(() => {
-    if (!history.isFetching && history.data && historyPage > 1 && history.data.items.length === 0) {
-      setHistoryPage((current) => Math.max(1, current - 1));
-    }
-  }, [history.data, history.isFetching, historyPage]);
   const inventory = useQuery({
     queryKey: ["inventory-rooms", propertyId],
     queryFn: ({ signal }) => loadAllRoomInventory(request, propertyId, signal),
     enabled: Boolean(reservationId),
     staleTime: 30_000,
   });
+  const reservationSource = createCompositeSource({
+    label: "Reservation details",
+    hasData: reservation.data !== undefined,
+    isLoading: reservation.isLoading,
+    error: reservation.error,
+    isFetching: reservation.isFetching,
+    refetch: () => reservation.refetch(),
+  });
+  const historySource = createCompositeSource({
+    label: "Reservation history",
+    hasData: history.data !== undefined,
+    isLoading: history.isLoading,
+    error: history.error,
+    isFetching: history.isFetching,
+    refetch: () => history.refetch(),
+  });
+  const inventorySource = createCompositeSource({
+    label: "Inventory labels",
+    hasData: inventory.data !== undefined,
+    isLoading: inventory.isLoading,
+    error: inventory.error,
+    isFetching: inventory.isFetching,
+    refetch: () => inventory.refetch(),
+  });
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const reservationCurrent = compositeSourceCurrent(reservationSource);
+  const reservationUsable = compositeSourceUsable(reservationSource.state);
+  const inventoryUsable = compositeSourceUsable(inventorySource.state);
+  const item = reservationUsable ? reservation.data : undefined;
+  const lifecycleAuthorityCurrent = reservationMutationAllowed("lifecycle", {
+    permissionsCurrent,
+    reservationCurrent,
+  });
+  const detailsAuthorityCurrent = capabilities.manage && reservationMutationAllowed(
+    "update-details",
+    { permissionsCurrent, reservationCurrent },
+  );
+  const pendingActionRecordCurrent = !pendingAction ||
+    lifecycleAttempt.current !== null ||
+    item?.version === pendingActionVersion;
+  const lifecycleCommandAuthorityCurrent = lifecycleAuthorityCurrent &&
+    Boolean(item && reservationRecordMatches(reservation.data, item)) &&
+    pendingActionRecordCurrent;
+
+  useEffect(() => {
+    if (compositeSourceCurrent(historySource) && history.data && historyPage > 1 && history.data.items.length === 0) {
+      setHistoryPage((current) => Math.max(1, current - 1));
+    }
+  }, [history.data, historyPage, historySource]);
+
+  useEffect(() => {
+    if (!permissionsCurrent) return;
+    if (!capabilities.manage) {
+      guestDetailsAttempt.current = null;
+      setEditingDetails(false);
+    }
+    if (pendingAction && !lifecyclePermissionAllowed(pendingAction, capabilities)) {
+      lifecycleAttempt.current = null;
+      setPendingAction(null);
+      setPendingActionVersion(null);
+    }
+  }, [capabilities, pendingAction, permissionsCurrent]);
 
   async function refresh(updated?: ReservationMutationReceipt) {
     if (updated && reservationId) {
@@ -124,6 +195,12 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
 
   const actionMutation = useMutation({
     mutationFn: ({ action, date, current }: { action: ReservationAction; date: string; current: Reservation }) => {
+      if (!lifecycleAuthorityCurrent ||
+        !lifecyclePermissionAllowed(action, capabilities) ||
+        (lifecycleAttempt.current === null && pendingActionVersion !== current.version) ||
+        !reservationRecordMatches(reservation.data, current)) {
+        throw new Error("Current reservation and access evidence is required before changing the stay lifecycle.");
+      }
       const attempt = resolveReservationLifecycleAttempt(
         lifecycleAttempt.current,
         {
@@ -153,12 +230,19 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
     onSuccess: async (updated) => {
       lifecycleAttempt.current = null;
       setPendingAction(null);
+      setPendingActionVersion(null);
       await refresh(updated);
     },
   });
 
   const detailsMutation = useMutation({
     mutationFn: (payload: ReservationGuestDetailsAttemptPayload) => {
+      if (!detailsAuthorityCurrent ||
+        reservation.data?.propertyId !== payload.propertyId ||
+        reservation.data.reservationId !== payload.reservationId ||
+        reservation.data.detailsRevision !== payload.expectedDetailsRevision) {
+        throw new Error("Current reservation and access evidence is required before saving booking details.");
+      }
       const attempt = resolveReservationGuestDetailsAttempt(guestDetailsAttempt.current, payload);
       guestDetailsAttempt.current = attempt;
       const { propertyId: requestPropertyId, reservationId: requestReservationId, ...details } = attempt.payload;
@@ -178,25 +262,33 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   });
 
   function beginAction(action: ReservationAction, current: Reservation) {
+    if (!lifecycleAuthorityCurrent ||
+      !lifecyclePermissionAllowed(action, capabilities) ||
+      !reservationRecordMatches(reservation.data, current)) return;
     lifecycleAttempt.current = null;
     setPendingAction(action);
+    setPendingActionVersion(current.version);
     setBusinessDate(defaultBusinessDate(action, current));
     actionMutation.reset();
   }
 
-  const item = reservation.data;
   const inventoryLabels = useMemo(() => {
     const labels = new Map<string, string>();
-    for (const room of inventory.data?.rooms ?? []) {
+    for (const room of inventoryUsable ? inventory.data?.rooms ?? [] : []) {
       for (const unit of room.units) labels.set(unit.inventoryUnitId, `${room.roomName} · ${unit.label}`);
     }
     return labels;
-  }, [inventory.data]);
+  }, [inventory.data, inventoryUsable]);
 
   return (
     <Modal open={Boolean(reservationId)} size="lg" title={item?.primaryGuestName || "Reservation"} description={item ? `Reservation ${item.reservationId.slice(0, 8).toUpperCase()}` : "Loading reservation details"} onClose={onClose}>
-      {reservation.isLoading ? <LoadingState label="Loading reservation" /> : reservation.error ? <ErrorState error={reservation.error} retry={() => void reservation.refetch()} /> : item ? (
+      {reservationSource.state === "loading" ? <LoadingState label="Loading reservation" /> : !reservationUsable ? <div><CompositeSourceNotice className="mb-3" sources={[permissionSource, reservationSource]} title="Reservation details are delayed" /><CompositeSourceFallback state={reservationSource.state} label="reservation details" /></div> : item ? (
         <div className="space-y-5">
+          <CompositeSourceNotice
+            className="mb-0"
+            sources={[permissionSource, reservationSource, inventorySource]}
+            title="Some reservation details are delayed"
+          />
           {notice && <div className="alert border border-warning/25 bg-warning/10 text-base-content"><AlertTriangle size={19} className="text-warning" /><span className="text-sm">{notice}</span>{onDismissNotice && <button type="button" className="btn btn-ghost btn-xs" onClick={onDismissNotice}>Dismiss</button>}</div>}
 
           <div className="rounded-2xl bg-base-200 p-4 sm:flex sm:items-center sm:justify-between sm:gap-5">
@@ -208,7 +300,7 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
             <div className="mt-3 sm:mt-0"><StatusBadge status={reservationStatusLabel(item.status)} /></div>
           </div>
 
-          <ReservationActions reservation={item} capabilities={capabilities} pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error} onBegin={beginAction} onDateChange={setBusinessDate} onConfirm={() => pendingAction && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })} onCancel={() => { lifecycleAttempt.current = null; setPendingAction(null); actionMutation.reset(); }} />
+          <ReservationActions reservation={item} capabilities={capabilities} authorityCurrent={lifecycleCommandAuthorityCurrent} pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error} onBegin={beginAction} onDateChange={setBusinessDate} onConfirm={() => pendingAction && lifecycleCommandAuthorityCurrent && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })} onCancel={() => { lifecycleAttempt.current = null; setPendingAction(null); setPendingActionVersion(null); actionMutation.reset(); }} />
 
           {!hasPrimaryGuestRecord(item) && capabilities.readGuests && capabilities.createGuests && capabilities.manageGuests && (
             <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition hover:border-primary/35 hover:bg-primary/8" onClick={() => setTab("guest")}>
@@ -229,14 +321,14 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
               <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div><h3 className="font-display text-lg font-semibold">Booking details</h3><p className="mt-1 text-xs text-base-content/50">Expected local times, booking contact and staff notes.</p></div>
-                  {capabilities.manage && !editingDetails && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => { guestDetailsAttempt.current = null; setEditingDetails(true); detailsMutation.reset(); }}><Edit3 size={15} />Edit</button>}
+                  {capabilities.manage && !editingDetails && <button type="button" className="btn btn-ghost btn-sm text-primary" disabled={!detailsAuthorityCurrent} onClick={() => { if (!detailsAuthorityCurrent) return; guestDetailsAttempt.current = null; setEditingDetails(true); detailsMutation.reset(); }}><Edit3 size={15} />Edit</button>}
                 </div>
-                {editingDetails ? <GuestDetailsForm reservation={item} submitting={detailsMutation.isPending} error={detailsMutation.error} onSubmit={(payload) => detailsMutation.mutate({ propertyId, reservationId: item.reservationId, ...payload })} onCancel={() => { guestDetailsAttempt.current = null; setEditingDetails(false); detailsMutation.reset(); }} /> : <GuestDetailsReadOnly reservation={item} />}
+                {editingDetails ? <GuestDetailsForm reservation={item} authorityCurrent={detailsAuthorityCurrent && reservationRecordMatches(reservation.data, item)} submitting={detailsMutation.isPending} error={detailsMutation.error} onSubmit={(payload) => detailsAuthorityCurrent && reservationRecordMatches(reservation.data, item) && detailsMutation.mutate({ propertyId, reservationId: item.reservationId, ...payload })} onCancel={() => { guestDetailsAttempt.current = null; setEditingDetails(false); detailsMutation.reset(); }} /> : <GuestDetailsReadOnly reservation={item} />}
               </section>
-              <LinkedGuestRecord propertyId={propertyId} reservation={item} canRead={capabilities.readGuests} canCreate={capabilities.createGuests} canManage={capabilities.manageGuests} onUpdated={refresh} />
+              <LinkedGuestRecord propertyId={propertyId} reservation={item} currentReservation={reservation.data} permissionsCurrent={permissionsCurrent} reservationCurrent={reservationCurrent} canRead={capabilities.readGuests} canCreate={capabilities.createGuests} canManage={capabilities.manageGuests} onUpdated={refresh} />
             </div>
           )}
-          {tab === "history" && <ReservationHistory query={history} page={historyPage} onPageChange={setHistoryPage} />}
+          {tab === "history" && <ReservationHistory query={history} source={historySource} page={historyPage} onPageChange={setHistoryPage} />}
 
           <div className="flex justify-end border-t border-base-300 pt-5"><button type="button" className="btn btn-ghost" onClick={onClose}>Close</button></div>
         </div>
@@ -245,9 +337,10 @@ export function ReservationDetail({ propertyId, reservationId, initialTab, capab
   );
 }
 
-function ReservationActions({ reservation, capabilities, pendingAction, businessDate, submitting, error, onBegin, onDateChange, onConfirm, onCancel }: {
+function ReservationActions({ reservation, capabilities, authorityCurrent, pendingAction, businessDate, submitting, error, onBegin, onDateChange, onConfirm, onCancel }: {
   reservation: Reservation;
   capabilities: ReservationCapabilities;
+  authorityCurrent: boolean;
   pendingAction: ReservationAction | null;
   businessDate: string;
   submitting: boolean;
@@ -269,9 +362,10 @@ function ReservationActions({ reservation, capabilities, pendingAction, business
     return (
       <section className="rounded-2xl border border-warning/30 bg-warning/8 p-4">
         <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-warning" size={19} /><div><h3 className="font-semibold">{copy.title}</h3><p className="mt-1 text-sm leading-6 text-base-content/60">{copy.description}</p></div></div>
-        {pendingAction !== "cancel" && <div className="form-control mt-4 block max-w-xs"><span className="label-text mb-1.5 block text-sm font-semibold">Business date</span><DatePicker className="w-full" value={businessDate} min={pendingAction === "check-out" ? reservation.checkedInBusinessDate || reservation.arrival : reservation.arrival} max={pendingAction === "check-in" ? dateBefore(reservation.departure) : undefined} onChange={onDateChange} ariaLabel="Business date" required /></div>}
+        {pendingAction !== "cancel" && <div className="form-control mt-4 block max-w-xs"><span className="label-text mb-1.5 block text-sm font-semibold">Business date</span><DatePicker className="w-full" value={businessDate} min={pendingAction === "check-out" ? reservation.checkedInBusinessDate || reservation.arrival : reservation.arrival} max={pendingAction === "check-in" ? dateBefore(reservation.departure) : undefined} onChange={onDateChange} ariaLabel="Business date" required disabled={!authorityCurrent || submitting} /></div>}
         {Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}
-        <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Keep reservation</button><button type="button" className={`btn btn-sm ${pendingAction === "cancel" || pendingAction === "no-show" ? "btn-error" : "btn-primary"}`} onClick={onConfirm} disabled={submitting || (pendingAction !== "cancel" && !businessDate)}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.confirmLabel}</button></div>
+        {!authorityCurrent && <p className="mt-4 text-sm font-medium text-warning">Refresh current reservation access and details before confirming.</p>}
+        <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Keep reservation</button><button type="button" className={`btn btn-sm ${pendingAction === "cancel" || pendingAction === "no-show" ? "btn-error" : "btn-primary"}`} onClick={onConfirm} disabled={submitting || !authorityCurrent || (pendingAction !== "cancel" && !businessDate)}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.confirmLabel}</button></div>
       </section>
     );
   }
@@ -281,7 +375,7 @@ function ReservationActions({ reservation, capabilities, pendingAction, business
     return null;
   }
 
-  return <div className="flex flex-wrap gap-2" aria-label="Reservation actions">{actions.map(({ action, label, icon, tone }) => <button key={action} type="button" className={`btn btn-sm ${tone}`} onClick={() => onBegin(action, reservation)}>{icon}{label}</button>)}</div>;
+  return <div className="flex flex-wrap gap-2" aria-label="Reservation actions">{actions.map(({ action, label, icon, tone }) => <button key={action} type="button" className={`btn btn-sm ${tone}`} disabled={!authorityCurrent} onClick={() => onBegin(action, reservation)}>{icon}{label}</button>)}</div>;
 }
 
 function ReservationOverview({ reservation, inventoryLabels }: { reservation: Reservation; inventoryLabels: Map<string, string> }) {
@@ -321,33 +415,61 @@ function GuestDetailsReadOnly({ reservation }: { reservation: Reservation }) {
 
 type GuestDetailsFormPayload = Omit<ReservationGuestDetailsAttemptPayload, "propertyId" | "reservationId">;
 
-function GuestDetailsForm({ reservation, submitting, error, onSubmit, onCancel }: { reservation: Reservation; submitting: boolean; error: unknown; onSubmit: (payload: GuestDetailsFormPayload) => void; onCancel: () => void }) {
+function GuestDetailsForm({ reservation, authorityCurrent, submitting, error, onSubmit, onCancel }: { reservation: Reservation; authorityCurrent: boolean; submitting: boolean; error: unknown; onSubmit: (payload: GuestDetailsFormPayload) => void; onCancel: () => void }) {
   const [expectedArrivalTime, setExpectedArrivalTime] = useState(reservation.expectedArrivalTime?.slice(0, 5) ?? "");
   const [expectedDepartureTime, setExpectedDepartureTime] = useState(reservation.expectedDepartureTime?.slice(0, 5) ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!authorityCurrent) return;
     const data = new FormData(event.currentTarget);
     onSubmit({ primaryGuestName: String(data.get("primaryGuestName") ?? "").trim(), email: emptyToNull(data.get("email")), phone: emptyToNull(data.get("phone")), guestCount: Number(data.get("guestCount")), notes: emptyToNull(data.get("notes")), expectedArrivalTime: emptyStringToNull(expectedArrivalTime), expectedDepartureTime: emptyStringToNull(expectedDepartureTime), expectedDetailsRevision: reservation.detailsRevision });
   }
-  return <form key={reservation.detailsRevision} className="space-y-4" onSubmit={submit}><div className="grid gap-4 sm:grid-cols-2"><TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} /><TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} /></div><div className="grid gap-4 sm:grid-cols-[1fr_140px]"><TextField label="Primary guest" name="primaryGuestName" defaultValue={reservation.primaryGuestName} /><TextField label="Guests" name="guestCount" type="number" min="1" defaultValue={String(reservation.guestCount)} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Email" name="email" type="email" required={false} defaultValue={reservation.email || ""} /><TextField label="Phone" name="phone" type="tel" required={false} defaultValue={reservation.phone || ""} /></div><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-20 w-full" name="notes" defaultValue={reservation.notes || ""} /></label>{Boolean(error) && <ErrorState error={error} />}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>{submitting ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}Save details</button></InlineFormActions></form>;
+  return <form key={reservation.detailsRevision} className="space-y-4" onSubmit={submit}><div className="grid gap-4 sm:grid-cols-2"><TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} disabled={!authorityCurrent || submitting} /><TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} disabled={!authorityCurrent || submitting} /></div><div className="grid gap-4 sm:grid-cols-[1fr_140px]"><TextField label="Primary guest" name="primaryGuestName" defaultValue={reservation.primaryGuestName} disabled={!authorityCurrent || submitting} /><TextField label="Guests" name="guestCount" type="number" min="1" defaultValue={String(reservation.guestCount)} disabled={!authorityCurrent || submitting} /></div><div className="grid gap-4 sm:grid-cols-2"><TextField label="Email" name="email" type="email" required={false} defaultValue={reservation.email || ""} disabled={!authorityCurrent || submitting} /><TextField label="Phone" name="phone" type="tel" required={false} defaultValue={reservation.phone || ""} disabled={!authorityCurrent || submitting} /></div><label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-20 w-full" name="notes" defaultValue={reservation.notes || ""} disabled={!authorityCurrent || submitting} /></label>{!authorityCurrent && <p className="text-sm font-medium text-warning">Refresh current reservation access and details before saving.</p>}{Boolean(error) && <ErrorState error={error} />}<InlineFormActions><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={submitting || !authorityCurrent}>{submitting ? <span className="loading loading-spinner loading-xs" /> : <Save size={15} />}Save details</button></InlineFormActions></form>;
 }
 
-function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canManage, onUpdated }: { propertyId: string; reservation: Reservation; canRead: boolean; canCreate: boolean; canManage: boolean; onUpdated: (updated?: ReservationMutationReceipt) => Promise<void> }) {
+function LinkedGuestRecord({ propertyId, reservation, currentReservation, permissionsCurrent, reservationCurrent, canRead, canCreate, canManage, onUpdated }: { propertyId: string; reservation: Reservation; currentReservation?: Reservation; permissionsCurrent: boolean; reservationCurrent: boolean; canRead: boolean; canCreate: boolean; canManage: boolean; onUpdated: (updated?: ReservationMutationReceipt) => Promise<void> }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const currentLink = reservation.guests.find((guest) => guest.role === 1 || String(guest.role).toLowerCase() === "primary");
   const [choosing, setChoosing] = useState(!currentLink);
   const [candidate, setCandidate] = useState<GuestListItem | null>(null);
+  const [candidateCurrent, setCandidateCurrent] = useState(false);
   const linkAttempt = useRef<ReservationGuestLinkAttempt | null>(null);
   const createAttempt = useRef<ReservationGuestRecordAttempt | null>(null);
-  useEffect(() => { linkAttempt.current = null; createAttempt.current = null; setChoosing(!currentLink); setCandidate(null); }, [propertyId, reservation.reservationId, currentLink?.guestId]);
+  useEffect(() => { linkAttempt.current = null; createAttempt.current = null; setChoosing(!currentLink); setCandidate(null); setCandidateCurrent(false); }, [propertyId, reservation.reservationId, currentLink?.guestId]);
   const currentGuest = useQuery({
     queryKey: ["guest", propertyId, currentLink?.guestId],
     queryFn: () => request<GuestProfile>(`/api/guests/properties/${propertyId}/${currentLink?.guestId}`),
     enabled: canRead && Boolean(currentLink?.guestId),
   });
+  const currentGuestSource = createCompositeSource({
+    label: "Linked Guest Record",
+    hasData: currentGuest.data !== undefined,
+    isLoading: currentGuest.isLoading,
+    error: currentGuest.error,
+    isFetching: currentGuest.isFetching,
+    refetch: () => currentGuest.refetch(),
+  });
+  const currentGuestUsable = compositeSourceUsable(currentGuestSource.state);
+  const reservationRecordCurrent = reservationCurrent &&
+    reservationRecordMatches(currentReservation, reservation);
+  const createAuthorityCurrent = canCreate && canManage &&
+    reservationMutationAllowed("create-and-link-guest", {
+      permissionsCurrent,
+      reservationCurrent: reservationRecordCurrent,
+    });
+  const linkAuthorityCurrent = canRead && canManage && Boolean(candidate) &&
+    reservationMutationAllowed("link-existing-guest", {
+      permissionsCurrent,
+      reservationCurrent: reservationRecordCurrent,
+      guestDirectoryCurrent: candidateCurrent,
+    });
   const linkMutation = useMutation({
     mutationFn: (guest: GuestListItem) => {
+      if (!linkAuthorityCurrent || candidate?.guestId !== guest.guestId ||
+        !reservationRecordMatches(currentReservation, reservation)) {
+        throw new Error("Current reservation, Guest Record, and access evidence is required before linking this guest.");
+      }
       const attempt = resolveReservationGuestLinkAttempt(linkAttempt.current, { propertyId, reservationId: reservation.reservationId, guestId: guest.guestId, role: 1, replaceExistingRole: Boolean(currentLink), expectedVersion: reservation.version });
       linkAttempt.current = attempt;
       const { propertyId: requestPropertyId, reservationId: requestReservationId, ...payload } = attempt.payload;
@@ -357,6 +479,10 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
   });
   const createMutation = useMutation({
     mutationFn: () => {
+      if (!createAuthorityCurrent ||
+        !reservationRecordMatches(currentReservation, reservation)) {
+        throw new Error("Current reservation and access evidence is required before creating a Guest Record.");
+      }
       const profile = guestRecordPayloadFromBooking(reservation);
       createAttempt.current = resolveReservationGuestRecordAttempt(
         createAttempt.current,
@@ -388,18 +514,20 @@ function LinkedGuestRecord({ propertyId, reservation, canRead, canCreate, canMan
   });
   return (
     <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
-      <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="font-display text-lg font-semibold">Canonical Guest Record</h3><p className="mt-1 text-xs leading-5 text-base-content/50">Linking keeps this stay in the guest’s history without replacing the booking contact details.</p></div>{currentLink && canManage && !choosing && <button type="button" className="btn btn-ghost btn-sm text-primary" onClick={() => { linkAttempt.current = null; setChoosing(true); linkMutation.reset(); }}><Link2 size={15} />Replace</button>}</div>
-      {currentLink && !choosing ? currentGuest.isLoading ? <div className="flex items-center gap-2 rounded-xl bg-base-200 p-4 text-sm text-base-content/55"><span className="loading loading-spinner loading-sm" />Loading linked guest</div> : currentGuest.data ? <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><InitialAvatar name={currentGuest.data.displayName} /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{currentGuest.data.displayName}</p><p className="truncate text-xs text-base-content/50">{currentGuest.data.email || currentGuest.data.phone || "Guest Record linked"}</p></div><span className="badge border-0 bg-primary text-primary-content">Linked</span></div> : <div className="rounded-xl bg-base-200 p-4 text-sm text-base-content/55">A Guest Record is linked, but its profile is not available with your current access.</div> : canManage ? <div className="space-y-3"><GuestRecordPicker propertyId={propertyId} selectedGuest={candidate} onSelect={(guest) => { linkAttempt.current = null; setCandidate(guest); linkMutation.reset(); }} disabled={!canRead} label={currentLink ? "Replacement Guest Record" : "Guest Record"} />{!currentLink && canRead && canCreate && <div className="flex flex-col gap-3 border-y border-primary/15 bg-primary/5 p-4 sm:flex-row sm:items-center"><UserPlus size={19} className="shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">No existing profile?</p><p className="mt-1 text-xs leading-5 text-base-content/55">Create and link a Guest Record using {reservation.primaryGuestName}&apos;s booking contact details.</p></div><button type="button" className="btn btn-primary btn-sm shrink-0" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>{createMutation.isPending ? <span className="loading loading-spinner loading-xs" /> : <UserPlus size={15} />}Create and link</button></div>}{linkMutation.error && <ErrorState error={linkMutation.error} />}{createMutation.error && <ErrorState error={createMutation.error} />}{choosing && currentLink && <div className="flex justify-end"><button type="button" className="btn btn-ghost btn-sm" onClick={() => { linkAttempt.current = null; setChoosing(false); setCandidate(null); linkMutation.reset(); createMutation.reset(); }}>Keep current guest</button></div>}{candidate && <div className="flex justify-end"><button type="button" className="btn btn-primary btn-sm" onClick={() => linkMutation.mutate(candidate)} disabled={linkMutation.isPending || createMutation.isPending}>{linkMutation.isPending && <span className="loading loading-spinner loading-xs" />}{currentLink ? "Replace primary guest" : "Link Guest Record"}</button></div>}</div> : <div className="rounded-xl border border-dashed border-base-300 p-4 text-sm text-base-content/55">No canonical Guest Record is linked to this reservation.</div>}
+      <div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="font-display text-lg font-semibold">Canonical Guest Record</h3><p className="mt-1 text-xs leading-5 text-base-content/50">Linking keeps this stay in the guest’s history without replacing the booking contact details.</p></div>{currentLink && canManage && !choosing && <button type="button" className="btn btn-ghost btn-sm text-primary" disabled={!reservationRecordCurrent || !permissionsCurrent} onClick={() => { if (!reservationRecordCurrent || !permissionsCurrent) return; linkAttempt.current = null; setChoosing(true); linkMutation.reset(); }}><Link2 size={15} />Replace</button>}</div>
+      {currentLink && canRead && <CompositeSourceNotice className="mb-3" sources={[currentGuestSource]} title="Linked Guest Record is delayed" />}
+      {currentLink && !choosing ? currentGuestSource.state === "loading" ? <div className="flex items-center gap-2 rounded-xl bg-base-200 p-4 text-sm text-base-content/55"><span className="loading loading-spinner loading-sm" />Loading linked guest</div> : currentGuestUsable && currentGuest.data ? <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><InitialAvatar name={currentGuest.data.displayName} /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{currentGuest.data.displayName}</p><p className="truncate text-xs text-base-content/50">{currentGuest.data.email || currentGuest.data.phone || "Guest Record linked"}</p></div><span className="badge border-0 bg-primary text-primary-content">Linked</span></div> : <div className="rounded-xl bg-base-200 p-4 text-sm text-base-content/55">A Guest Record is linked, but its profile is not available with your current access.</div> : canManage ? <div className="space-y-3"><GuestRecordPicker propertyId={propertyId} selectedGuest={candidate} onSelect={(guest) => { linkAttempt.current = null; setCandidate(guest); linkMutation.reset(); }} onSelectionAuthorityChange={setCandidateCurrent} disabled={!canRead} selectionEnabled={permissionsCurrent && reservationRecordCurrent} label={currentLink ? "Replacement Guest Record" : "Guest Record"} />{!currentLink && canCreate && <div className="flex flex-col gap-3 border-y border-primary/15 bg-primary/5 p-4 sm:flex-row sm:items-center"><UserPlus size={19} className="shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">No existing profile?</p><p className="mt-1 text-xs leading-5 text-base-content/55">Create and link a Guest Record using {reservation.primaryGuestName}&apos;s booking contact details.</p></div><button type="button" className="btn btn-primary btn-sm shrink-0" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !createAuthorityCurrent}>{createMutation.isPending ? <span className="loading loading-spinner loading-xs" /> : <UserPlus size={15} />}Create and link</button></div>}{linkMutation.error && <ErrorState error={linkMutation.error} />}{createMutation.error && <ErrorState error={createMutation.error} />}{choosing && currentLink && <div className="flex justify-end"><button type="button" className="btn btn-ghost btn-sm" onClick={() => { linkAttempt.current = null; setChoosing(false); setCandidate(null); setCandidateCurrent(false); linkMutation.reset(); createMutation.reset(); }}>Keep current guest</button></div>}{candidate && <div className="flex justify-end"><button type="button" className="btn btn-primary btn-sm" onClick={() => linkMutation.mutate(candidate)} disabled={linkMutation.isPending || createMutation.isPending || !linkAuthorityCurrent}>{linkMutation.isPending && <span className="loading loading-spinner loading-xs" />}{currentLink ? "Replace primary guest" : "Link Guest Record"}</button></div>}</div> : <div className="rounded-xl border border-dashed border-base-300 p-4 text-sm text-base-content/55">No canonical Guest Record is linked to this reservation.</div>}
     </section>
   );
 }
 
 
-function ReservationHistory({ query, page, onPageChange }: { query: { isLoading: boolean; isFetching: boolean; error: unknown; data?: ReservationDetailsHistoryListResponse; refetch: () => Promise<unknown> }; page: number; onPageChange: (page: number) => void }) {
-  if (query.isLoading) return <LoadingState label="Loading change history" />;
-  if (query.error) return <ErrorState error={query.error} retry={() => void query.refetch()} />;
-  if (!query.data?.items.length) return <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><History className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No detail changes yet</h3><p className="mt-1 text-sm text-base-content/50">Edits to expected times, booking contact and notes will appear here.</p></div>;
-  return <div><div className="space-y-3">{query.data.items.map((item) => <article key={item.changeId} className="rounded-2xl border border-base-300 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{formatChangedFields(item.changedFields)}</p><p className="mt-1 text-xs text-base-content/50">Revision {item.fromRevision} → {item.toRevision} · {reservationDetailsOriginLabel(item.origin)}</p></div><time className="text-xs text-base-content/45" dateTime={item.occurredAtUtc}>{formatDateTime(item.occurredAtUtc)}</time></div><p className="mt-3 text-sm text-base-content/60">Changed by {formatActor(item.actorId, item.origin)}.</p><HistoryValues item={item} /></article>)}</div><PaginationBar page={page} pageSize={HISTORY_PAGE_SIZE} itemCount={query.data.items.length} itemLabel="change" hasMore={query.data.hasMore} disabled={query.isFetching} onPageChange={onPageChange} /></div>;
+function ReservationHistory({ query, source, page, onPageChange }: { query: { isFetching: boolean; data?: ReservationDetailsHistoryListResponse }; source: CompositeSource; page: number; onPageChange: (page: number) => void }) {
+  const usable = compositeSourceUsable(source.state);
+  if (source.state === "loading") return <LoadingState label="Loading change history" />;
+  if (!usable) return <div><CompositeSourceNotice className="mb-3" sources={[source]} title="Reservation history is delayed" /><CompositeSourceFallback state={source.state} label="reservation history" /></div>;
+  if (!query.data?.items.length) return <div><CompositeSourceNotice className="mb-3" sources={[source]} title="Reservation history is delayed" /><div className="rounded-2xl border border-dashed border-base-300 p-8 text-center"><History className="mx-auto text-base-content/30" /><h3 className="mt-3 font-display text-lg font-semibold">No detail changes yet</h3><p className="mt-1 text-sm text-base-content/50">Edits to expected times, booking contact and notes will appear here.</p></div></div>;
+  return <div><CompositeSourceNotice className="mb-3" sources={[source]} title="Reservation history is delayed" /><div className="space-y-3">{query.data.items.map((item) => <article key={item.changeId} className="rounded-2xl border border-base-300 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{formatChangedFields(item.changedFields)}</p><p className="mt-1 text-xs text-base-content/50">Revision {item.fromRevision} → {item.toRevision} · {reservationDetailsOriginLabel(item.origin)}</p></div><time className="text-xs text-base-content/45" dateTime={item.occurredAtUtc}>{formatDateTime(item.occurredAtUtc)}</time></div><p className="mt-3 text-sm text-base-content/60">Changed by {formatActor(item.actorId, item.origin)}.</p><HistoryValues item={item} /></article>)}</div><PaginationBar page={page} pageSize={HISTORY_PAGE_SIZE} itemCount={query.data.items.length} itemLabel="change" hasMore={query.data.hasMore} disabled={query.isFetching} onPageChange={onPageChange} /></div>;
 }
 
 function HistoryValues({ item }: { item: ReservationDetailsHistoryItem }) {
@@ -418,14 +546,20 @@ function HistoryValues({ item }: { item: ReservationDetailsHistoryItem }) {
 
 function DetailRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href?: string }) { return <div className="flex items-start gap-3 rounded-xl border border-base-300 p-4"><div className="mt-0.5 text-primary">{icon}</div><div className="min-w-0"><p className="text-xs text-base-content/40">{label}</p>{href ? <a className="mt-1 block truncate text-sm font-semibold text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 truncate text-sm font-semibold">{value}</p>}</div></div>; }
 function TimelineItem({ label, value }: { label: string; value: string }) { return <div className="flex items-center gap-3"><CheckCircle2 size={16} className="shrink-0 text-primary" /><div><p className="text-xs text-base-content/45">{label}</p><p className="text-sm font-semibold">{value}</p></div></div>; }
-function TextField({ label, name, type = "text", defaultValue, required = true, min }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; min?: string }) { return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue} required={required} min={min} /></label>; }
-function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><TimePicker className="w-full" value={value} onChange={onChange} ariaLabel={label} /></div>; }
+function TextField({ label, name, type = "text", defaultValue, required = true, min, disabled = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; min?: string; disabled?: boolean }) { return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue} required={required} min={min} disabled={disabled} /></label>; }
+function TimeField({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) { return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><TimePicker className="w-full" value={value} onChange={onChange} ariaLabel={label} disabled={disabled} /></div>; }
 
 function actionCopy(action: ReservationAction, reservation: Reservation) {
   if (action === "check-in") return { title: `Check in ${reservation.primaryGuestName}?`, description: "Confirm the property business date. This marks the guest as in house.", confirmLabel: "Confirm check-in" };
   if (action === "no-show") return { title: `Mark ${reservation.primaryGuestName} as a no-show?`, description: "This releases the allocated inventory and cannot be undone from this screen.", confirmLabel: "Confirm no-show" };
   if (action === "check-out") return { title: `Check out ${reservation.primaryGuestName}?`, description: "Confirm the property business date. BunkFy will release the occupied inventory.", confirmLabel: "Confirm checkout" };
   return { title: `Cancel ${reservation.primaryGuestName}’s reservation?`, description: "BunkFy will release the allocated inventory. This action cannot be undone from this screen.", confirmLabel: "Cancel reservation" };
+}
+function lifecyclePermissionAllowed(action: ReservationAction, capabilities: ReservationCapabilities) {
+  if (action === "check-in") return capabilities.checkIn;
+  if (action === "no-show") return capabilities.noShow;
+  if (action === "check-out") return capabilities.checkOut;
+  return capabilities.cancel;
 }
 function defaultBusinessDate(action: ReservationAction, reservation: Reservation) {
   const today = localDateKey(new Date());

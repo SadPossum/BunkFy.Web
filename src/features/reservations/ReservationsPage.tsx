@@ -4,12 +4,19 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Reservation, ReservationListItem, ReservationListResponse, ReservationStatus } from "../../api/types";
 import { reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh } from "../../app/liveUpdates";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
-import { EmptyState, ErrorState, InitialAvatar, LoadingState, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
+import { EmptyState, InitialAvatar, LoadingState, PageHeader, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { CreateReservationModal } from "./CreateReservationModal";
@@ -33,7 +40,8 @@ const statusesByFilter: Record<Exclude<StatusFilter, "all">, ReservationStatus[]
 
 export function ReservationsPage() {
   const { request, session } = useSession();
-  const { selectedProperty, selectedPropertyId } = useWorkspace();
+  const workspace = useWorkspace();
+  const { selectedProperty, selectedPropertyId } = workspace;
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   useTargetProperty(searchParams.get("property"));
@@ -49,7 +57,7 @@ export function ReservationsPage() {
   );
   const reservationInitialTab = searchParams.get("section") === "guest" ? "guest" : undefined;
   const createOpen = searchParams.get("new") === "1";
-  const enabled = Boolean(selectedPropertyId);
+  const enabled = Boolean(selectedPropertyId && selectedProperty);
   const accessScope = session && selectedPropertyId ? propertyAccessScope(session.tenantId, selectedPropertyId) : "";
   const access = usePermissions(accessScope ? [
     { permission: permissions.reservationsCreate, scope: accessScope },
@@ -62,7 +70,25 @@ export function ReservationsPage() {
     { permission: permissions.guestsRead, scope: accessScope },
     { permission: permissions.guestsCreate, scope: accessScope },
   ] : []);
-  const canCreate = access.allows(permissions.reservationsCreate, accessScope);
+  const mayCreate = access.allows(permissions.reservationsCreate, accessScope);
+  const permissionSource = createCompositeSource({
+    label: "Reservation permissions",
+    hasData: access.hasData,
+    isLoading: access.isLoading,
+    error: access.error,
+    isFetching: access.isFetching,
+    refetch: access.refetch,
+  });
+  const propertySource = createCompositeSource({
+    label: "Property directory",
+    hasData: workspace.propertiesLoaded,
+    isLoading: workspace.propertiesLoading,
+    error: workspace.propertiesError,
+    isFetching: workspace.propertiesFetching,
+    refetch: workspace.refetchProperties,
+  });
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const canCreate = mayCreate && permissionsCurrent;
   const capabilities: ReservationCapabilities = {
     manage: access.allows(permissions.reservationsManage, accessScope),
     manageGuests: access.allows(permissions.reservationsManageGuests, accessScope),
@@ -98,31 +124,53 @@ export function ReservationsPage() {
       enabled,
     })),
   });
+  const reservationSource = createCompositeSource({
+    label: "Reservation directory",
+    hasData: reservations.data !== undefined,
+    isLoading: reservations.isLoading,
+    error: reservations.error,
+    isFetching: reservations.isFetching,
+    refetch: () => reservations.refetch(),
+  });
+  const affectedSources = affectedReservations.map((query, index) => createCompositeSource({
+    label: `Reservation ${affectedReservationIds[index]?.slice(0, 8).toUpperCase() ?? index + 1}`,
+    hasData: query.data !== undefined,
+    isLoading: query.isLoading,
+    error: query.error,
+    isFetching: query.isFetching,
+    refetch: () => query.refetch(),
+  }));
 
   useEffect(() => setPage(1), [selectedPropertyId]);
   useEffect(() => {
-    if (!reservations.isFetching && reservations.data && page > 1 && reservations.data.reservations.length === 0) {
+    if (compositeSourceCurrent(reservationSource) && reservations.data && page > 1 && reservations.data.reservations.length === 0) {
       setPage((current) => Math.max(1, current - 1));
     }
-  }, [page, reservations.data, reservations.isFetching]);
+  }, [page, reservationSource, reservations.data]);
 
   const visible = useMemo(() => {
     if (affectedReservationIds.length > 0) {
       return affectedReservations
-        .map((query) => query.data)
+        .map((query, index) => compositeSourceUsable(affectedSources[index].state) ? query.data : undefined)
         .filter((reservation): reservation is Reservation => Boolean(reservation))
         .map(toReservationListItem);
     }
-    return reservations.data?.reservations ?? [];
-  }, [affectedReservationIds.length, affectedReservations, reservations.data]);
+    return compositeSourceUsable(reservationSource.state)
+      ? reservations.data?.reservations ?? []
+      : [];
+  }, [affectedReservationIds.length, affectedReservations, affectedSources, reservationSource.state, reservations.data]);
 
-  const listLoading = affectedReservationIds.length > 0
-    ? affectedReservations.some((query) => query.isLoading)
-    : reservations.isLoading;
-  const listError = affectedReservationIds.length > 0
-    ? affectedReservations.find((query) => query.error)?.error
-    : reservations.error;
-  const focusedReservationId = useTransientResourceFocus(!listLoading);
+  const affectedSource = createAffectedReservationSource(
+    affectedSources,
+    visible.length,
+  );
+  const listSource = affectedReservationIds.length > 0
+    ? affectedSource
+    : reservationSource;
+  const listLoading = listSource.state === "loading";
+  const listUsable = compositeSourceUsable(listSource.state);
+  const loadingAffectedCount = affectedSources.filter((source) => source.state === "loading").length;
+  const focusedReservationId = useTransientResourceFocus(listUsable && !listLoading);
 
   function clearAffectedFilter() {
     const next = new URLSearchParams(searchParams);
@@ -143,15 +191,24 @@ export function ReservationsPage() {
   return (
     <>
       <PageHeader eyebrow={selectedProperty.name} title="Reservations" description="Run the full stay lifecycle, from booking and Guest Record linking through checkout." action={canCreate ? <button className="btn btn-primary" onClick={() => setParam("new", "1")}><Plus size={17} />New reservation</button> : undefined} />
+      <CompositeSourceNotice
+        sources={[permissionSource, propertySource]}
+        title="Some reservation context is delayed"
+      />
 
       <section className="card border border-base-300 bg-base-100 shadow-sm">
-        {affectedReservationIds.length > 0 && <div className="flex items-center justify-between gap-4 border-b border-primary/15 bg-primary/5 px-5 py-3 sm:px-6"><div><p className="text-sm font-semibold">Reservations affected by the inventory change</p><p className="mt-1 text-xs text-base-content/50">Showing {affectedReservationIds.length} linked {affectedReservationIds.length === 1 ? "reservation" : "reservations"}.</p></div><button type="button" className="btn btn-circle btn-ghost btn-sm" onClick={clearAffectedFilter} aria-label="Clear affected reservations filter"><X size={16} /></button></div>}
+        {affectedReservationIds.length > 0 && <div className="flex items-center justify-between gap-4 border-b border-primary/15 bg-primary/5 px-5 py-3 sm:px-6"><div><p className="text-sm font-semibold">Reservations affected by the inventory change</p><p className="mt-1 text-xs text-base-content/50">Showing {visible.length} of {affectedReservationIds.length} linked {affectedReservationIds.length === 1 ? "reservation" : "reservations"}{loadingAffectedCount > 0 ? ` · loading ${loadingAffectedCount}` : ""}.</p></div><button type="button" className="btn btn-circle btn-ghost btn-sm" onClick={clearAffectedFilter} aria-label="Clear affected reservations filter"><X size={16} /></button></div>}
         <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
           <SegmentedTabs value={status} options={statusFilters} ariaLabel="Reservation status" onValueChange={(value) => { setStatus(value); setPage(1); }} />
           <label className="input input-bordered input-sm flex w-full items-center gap-2 xl:w-72"><Search size={15} className="text-base-content/35" /><input className="grow" aria-label="Search reservations" placeholder="Guest, contact or reference" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label>
         </div>
 
-        {listLoading ? <LoadingState label="Loading reservations" /> : listError ? <div className="p-6"><ErrorState error={listError} retry={() => affectedReservationIds.length > 0 ? void Promise.all(affectedReservations.map((query) => query.refetch())) : void reservations.refetch()} /></div> : !visible.length ? <div className="p-6"><EmptyState icon={<CalendarDays />} title={affectedReservationIds.length > 0 ? "Affected reservations are unavailable" : search || status !== "all" ? "No reservations match" : "No reservations yet"} description={affectedReservationIds.length > 0 ? "The linked reservations may have moved or no longer be accessible." : search || status !== "all" ? "Try changing the status or search filter." : "Create the first stay and BunkFy will allocate the selected inventory."} action={canCreate && !search && status === "all" && affectedReservationIds.length === 0 ? <button className="btn btn-sm btn-primary" onClick={() => setParam("new", "1")}>Add reservation</button> : undefined} /></div> : (<>
+        <CompositeSourceNotice
+          className="mx-4 mt-4 sm:mx-6"
+          sources={[listSource]}
+          title={affectedReservationIds.length > 0 ? "Some affected reservations are delayed" : "Reservation results are delayed"}
+        />
+        {listLoading ? <LoadingState label="Loading reservations" /> : !listUsable ? <CompositeSourceFallback state={listSource.state} label="reservations" /> : !visible.length ? <div className="p-6"><EmptyState icon={<CalendarDays />} title={search || status !== "all" ? "No reservations match" : "No reservations yet"} description={search || status !== "all" ? "Try changing the status or search filter." : "Create the first stay and BunkFy will allocate the selected inventory."} action={canCreate && !search && status === "all" && affectedReservationIds.length === 0 ? <button className="btn btn-sm btn-primary" onClick={() => setParam("new", "1")}>Add reservation</button> : undefined} /></div> : (<>
           <div className="hidden overflow-x-auto lg:block">
             <table className="table">
               <thead><tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40"><th className="pl-6">Guest</th><th>Stay</th><th>Units</th><th>Status</th><th>Source</th><th className="pr-6" /></tr></thead>
@@ -167,7 +224,10 @@ export function ReservationsPage() {
 
       {createOpen && (
         <CreateReservationModal
+          key={selectedPropertyId}
           propertyId={selectedPropertyId}
+          permissionSource={permissionSource}
+          canCreateReservation={mayCreate}
           canReadGuests={capabilities.readGuests}
           canCreateGuests={capabilities.createGuests}
           canManageGuests={capabilities.manageGuests}
@@ -183,7 +243,7 @@ export function ReservationsPage() {
           }}
         />
       )}
-      <ReservationDetail propertyId={selectedPropertyId} reservationId={selectedReservationId} initialTab={reservationInitialTab} capabilities={capabilities} notice={notice} onDismissNotice={() => setNotice(null)} onClose={() => { setNotice(null); const next = new URLSearchParams(searchParams); next.delete("reservation"); next.delete("section"); setSearchParams(next, { replace: true }); }} />
+      <ReservationDetail propertyId={selectedPropertyId} reservationId={selectedReservationId} initialTab={reservationInitialTab} capabilities={capabilities} permissionSource={permissionSource} notice={notice} onDismissNotice={() => setNotice(null)} onClose={() => { setNotice(null); const next = new URLSearchParams(searchParams); next.delete("reservation"); next.delete("section"); setSearchParams(next, { replace: true }); }} />
     </>
   );
 }
@@ -193,3 +253,29 @@ function toReservationListItem(reservation: Reservation): ReservationListItem { 
 function formatStayEndpoint(date: string, time?: string | null) { return time ? `${formatDate(date)}, ${formatTime(time)}` : formatDate(date); }
 function formatTime(value: string) { const [hours, minutes] = value.split(":").map(Number); return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(2000, 0, 1, hours, minutes)); }
 function nightsBetween(arrival: string, departure: string) { return Math.max(0, Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000)); }
+
+function createAffectedReservationSource(
+  sources: CompositeSource[],
+  visibleCount: number,
+): CompositeSource {
+  const hasDelayedSource = sources.some((source) =>
+    source.state === "stale" || source.state === "unavailable");
+  const hasLoadingSource = sources.some((source) => source.state === "loading");
+
+  return {
+    label: "Affected reservation details",
+    state: visibleCount > 0
+      ? hasDelayedSource ? "stale" : "ready"
+      : hasLoadingSource
+        ? "loading"
+        : hasDelayedSource
+          ? "unavailable"
+          : "ready",
+    isFetching: sources.some((source) => source.isFetching),
+    refetch: async () => {
+      await Promise.all(sources
+        .filter((source) => source.state !== "ready")
+        .map((source) => source.refetch()));
+    },
+  };
+}

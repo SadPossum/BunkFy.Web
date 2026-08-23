@@ -1,9 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, UserPlus } from "lucide-react";
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { GuestListItem, InventoryAvailabilityResponse, ReservationMutationReceipt } from "../../api/types";
 import { reservationSourceValue } from "../../api/labels";
+import {
+  compositeSourceCurrent,
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSource,
+} from "../../app/compositeSourceState";
 import { useSession } from "../../app/session";
+import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { DatePicker } from "../../components/ui/DatePicker";
 import { ErrorState, Modal, ModalActions } from "../../components/ui/primitives";
 import { TimePicker } from "../../components/ui/TimePicker";
@@ -19,6 +26,10 @@ import {
 import { groupAvailabilityByRoom } from "./inventoryGrouping";
 import { ReservationInventoryPicker } from "./ReservationInventoryPicker";
 import {
+  inventorySelectionIsCurrent,
+  reservationMutationAllowed,
+} from "./reservationsMutationAuthority";
+import {
   resolveReservationCreateAttempt,
   type ReservationCreateAttempt,
   type ReservationCreatePayload,
@@ -29,6 +40,8 @@ type ReservationStep = "reservation" | "guest";
 
 export function CreateReservationModal({
   propertyId,
+  permissionSource,
+  canCreateReservation,
   canReadGuests,
   canCreateGuests,
   canManageGuests,
@@ -36,6 +49,8 @@ export function CreateReservationModal({
   onCreated,
 }: {
   propertyId: string;
+  permissionSource: CompositeSource;
+  canCreateReservation: boolean;
   canReadGuests: boolean;
   canCreateGuests: boolean;
   canManageGuests: boolean;
@@ -64,6 +79,7 @@ export function CreateReservationModal({
   const [nationalityCountryCode, setNationalityCountryCode] = useState("");
   const [preferredLanguageTag, setPreferredLanguageTag] = useState("");
   const [guestNotes, setGuestNotes] = useState("");
+  const [selectedGuestCurrent, setSelectedGuestCurrent] = useState(false);
   const createAttempt = useRef<ReservationCreateAttempt | null>(null);
   const guestRecordAttempt = useRef<ReservationGuestRecordAttempt | null>(null);
 
@@ -76,22 +92,80 @@ export function CreateReservationModal({
     queryKey: ["inventory-rooms", propertyId],
     queryFn: ({ signal }) => loadAllRoomInventory(request, propertyId, signal),
   });
-  const units = availability.data?.units ?? [];
+  const availabilitySource = createCompositeSource({
+    label: "Availability",
+    hasData: availability.data !== undefined,
+    isLoading: availability.isLoading,
+    error: availability.error,
+    isFetching: availability.isFetching,
+    refetch: () => availability.refetch(),
+  });
+  const roomInventorySource = createCompositeSource({
+    label: "Room labels",
+    hasData: roomInventory.data !== undefined,
+    isLoading: roomInventory.isLoading,
+    error: roomInventory.error,
+    isFetching: roomInventory.isFetching,
+    refetch: () => roomInventory.refetch(),
+  });
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const availabilityCurrent = compositeSourceCurrent(availabilitySource);
+  const availabilityUsable = compositeSourceUsable(availabilitySource.state);
+  const roomInventoryUsable = compositeSourceUsable(roomInventorySource.state);
+  const units = availabilityUsable ? availability.data?.units ?? [] : [];
   const groups = useMemo(
-    () => groupAvailabilityByRoom(units, roomInventory.data?.rooms ?? []),
-    [roomInventory.data?.rooms, units],
+    () => groupAvailabilityByRoom(
+      units,
+      roomInventoryUsable ? roomInventory.data?.rooms ?? [] : [],
+    ),
+    [roomInventory.data?.rooms, roomInventoryUsable, units],
   );
   const invalidDates = !range.arrival || !range.departure || range.arrival >= range.departure;
   const invalidExternalSource = sourceKind === "external" && (!sourceSystem.trim() || !sourceReference.trim());
   const invalidGuestCount = !Number.isInteger(Number(guestCount)) || Number(guestCount) < 1;
   const reservationStepInvalid = !selectedUnits.length || !guestName.trim() || invalidGuestCount || invalidDates || invalidExternalSource;
-  const canOfferGuestSave = !selectedGuest && canReadGuests && canCreateGuests && canManageGuests;
+  const createAuthorityCurrent = canCreateReservation && reservationMutationAllowed(
+    "create-reservation",
+    { permissionsCurrent, availabilityCurrent },
+  );
+  const selectedInventoryCurrent = inventorySelectionIsCurrent(
+    propertyId,
+    units,
+    selectedUnits,
+  );
+  const guestIntentCurrent = selectedGuest
+    ? canReadGuests && canManageGuests && selectedGuestCurrent
+    : saveGuestRecord
+      ? canCreateGuests && canManageGuests
+      : true;
+  const canSubmit = !reservationStepInvalid && createAuthorityCurrent &&
+    selectedInventoryCurrent && guestIntentCurrent;
+  const canOfferGuestSave = !selectedGuest && canCreateGuests && canManageGuests;
+
+  useEffect(() => {
+    if (!availabilityCurrent) return;
+    const availableIds = new Set(
+      units.filter((unit) => unit.isAvailable).map((unit) => unit.unit.inventoryUnitId),
+    );
+    setSelectedUnits((current) => {
+      const next = current.filter((id) => availableIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [availabilityCurrent, units]);
+
+  useEffect(() => {
+    if (!permissionsCurrent) return;
+    if (!canCreateGuests || !canManageGuests) setSaveGuestRecord(false);
+  }, [canCreateGuests, canManageGuests, permissionsCurrent]);
 
   const mutation = useMutation({
     mutationFn: async ({ profileDetails, selectedGuestId }: {
       profileDetails: GuestRecordProfileDetails | null;
       selectedGuestId: string | null;
     }) => {
+      if (!canSubmit) {
+        throw new Error("Current reservation, availability, and access evidence is required before creating this reservation.");
+      }
       const payload: ReservationCreatePayload = {
         arrival: range.arrival,
         departure: range.departure,
@@ -186,9 +260,11 @@ export function CreateReservationModal({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (step === "reservation" && saveGuestRecord) {
-      if (!reservationStepInvalid) setStep("guest");
+      if (canSubmit) setStep("guest");
       return;
     }
+
+    if (!canSubmit) return;
 
     mutation.mutate({
       profileDetails: saveGuestRecord ? {
@@ -221,6 +297,11 @@ export function CreateReservationModal({
     >
       <form onSubmit={submit} className="space-y-4">
         {saveGuestRecord && <ReservationStepIndicator step={step} />}
+        <CompositeSourceNotice
+          className="mb-0"
+          sources={[permissionSource, availabilitySource, roomInventorySource]}
+          title="Some reservation context is delayed"
+        />
 
         {step === "reservation" ? (
           <>
@@ -238,13 +319,24 @@ export function CreateReservationModal({
 
             <ReservationInventoryPicker
               groups={groups}
-              loading={availability.isLoading}
-              error={availability.error}
+              loading={availabilitySource.state === "loading"}
+              error={availabilitySource.state === "unavailable" ? availability.error : null}
+              selectionEnabled={createAuthorityCurrent}
               selectedUnits={selectedUnits}
-              onToggle={(inventoryUnitId) => setSelectedUnits((current) => current.includes(inventoryUnitId) ? current.filter((id) => id !== inventoryUnitId) : [...current, inventoryUnitId])}
+              onToggle={(inventoryUnitId) => {
+                if (!createAuthorityCurrent) return;
+                setSelectedUnits((current) => current.includes(inventoryUnitId) ? current.filter((id) => id !== inventoryUnitId) : [...current, inventoryUnitId]);
+              }}
             />
 
-            <GuestRecordPicker propertyId={propertyId} selectedGuest={selectedGuest} onSelect={chooseGuest} disabled={!canReadGuests || !canManageGuests} />
+            <GuestRecordPicker
+              propertyId={propertyId}
+              selectedGuest={selectedGuest}
+              onSelect={chooseGuest}
+              onSelectionAuthorityChange={setSelectedGuestCurrent}
+              disabled={!canReadGuests}
+              selectionEnabled={permissionsCurrent && canManageGuests}
+            />
             <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
               <ControlledTextField label="Primary guest" value={guestName} onChange={setGuestName} placeholder="Guest name" autoComplete="name" />
               <ControlledTextField label="Guests" type="number" min="1" value={guestCount} onChange={setGuestCount} />
@@ -302,11 +394,11 @@ export function CreateReservationModal({
           step={step}
           saveGuestRecord={saveGuestRecord}
           submitting={mutation.isPending}
-          disabled={reservationStepInvalid}
+          disabled={!canSubmit}
           onBack={() => setStep("reservation")}
           onCancel={onClose}
         />
-        {step === "reservation" && !selectedUnits.length && <p className="-mt-3 text-right text-xs text-warning">Select at least one available unit.</p>}
+        {step === "reservation" && availabilityUsable && !selectedUnits.length && <p className="-mt-3 text-right text-xs text-warning">Select at least one available unit.</p>}
       </form>
     </Modal>
   );
@@ -398,7 +490,7 @@ function ReservationFormActions({
       {step === "guest" && <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onBack}><ArrowLeft size={16} />Back</button>}
       <span className="flex-1" />
       <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onCancel}>Cancel</button>
-      <button type="submit" className="btn btn-primary btn-sm min-w-24 sm:btn-md sm:min-w-40" disabled={submitting || (step === "reservation" && disabled)}>
+      <button type="submit" className="btn btn-primary btn-sm min-w-24 sm:btn-md sm:min-w-40" disabled={submitting || disabled}>
         {submitting && <span className="loading loading-spinner loading-sm" />}
         <span className="sm:hidden">{submitLabel === "Create reservation" ? "Create" : submitLabel}</span>
         <span className="hidden sm:inline">{submitLabel}</span>

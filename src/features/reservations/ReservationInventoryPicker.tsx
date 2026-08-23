@@ -9,12 +9,14 @@ export function ReservationInventoryPicker({
   groups,
   loading,
   error,
+  selectionEnabled,
   selectedUnits,
   onToggle,
 }: {
   groups: InventoryRoomGroup[];
   loading: boolean;
   error: unknown;
+  selectionEnabled: boolean;
   selectedUnits: string[];
   onToggle: (inventoryUnitId: string) => void;
 }) {
@@ -93,6 +95,7 @@ export function ReservationInventoryPicker({
               group={group}
               collapsed={collapsedRooms.has(group.roomId)}
               selectedUnits={selectedUnits}
+              selectionEnabled={selectionEnabled}
               onCollapse={() => toggleRoom(group.roomId)}
               onToggle={onToggle}
             />
@@ -107,12 +110,14 @@ function InventoryRoomSection({
   group,
   collapsed,
   selectedUnits,
+  selectionEnabled,
   onCollapse,
   onToggle,
 }: {
   group: InventoryRoomGroup;
   collapsed: boolean;
   selectedUnits: string[];
+  selectionEnabled: boolean;
   onCollapse: () => void;
   onToggle: (inventoryUnitId: string) => void;
 }) {
@@ -144,6 +149,7 @@ function InventoryRoomSection({
               key={unit.unit.inventoryUnitId}
               item={unit}
               selected={selectedUnits.includes(unit.unit.inventoryUnitId)}
+              selectionEnabled={selectionEnabled}
               onToggle={onToggle}
             />
           ))}
@@ -156,16 +162,18 @@ function InventoryRoomSection({
 function InventoryUnitOption({
   item,
   selected,
+  selectionEnabled,
   onToggle,
 }: {
   item: InventoryUnitAvailability;
   selected: boolean;
+  selectionEnabled: boolean;
   onToggle: (inventoryUnitId: string) => void;
 }) {
   const { unit, isAvailable } = item;
   return (
-    <label className={`flex min-h-14 items-center gap-3 rounded-md border px-3 py-2 transition ${selected ? "border-primary bg-primary/8" : isAvailable ? "cursor-pointer border-transparent bg-base-200 hover:border-primary/30" : "cursor-not-allowed border-base-300 bg-base-200/80"}`}>
-      <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={selected} disabled={!isAvailable} onChange={() => onToggle(unit.inventoryUnitId)} />
+    <label className={`flex min-h-14 items-center gap-3 rounded-md border px-3 py-2 transition ${selected ? "border-primary bg-primary/8" : isAvailable && selectionEnabled ? "cursor-pointer border-transparent bg-base-200 hover:border-primary/30" : "cursor-not-allowed border-base-300 bg-base-200/80"}`}>
+      <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={selected} disabled={!isAvailable || !selectionEnabled} onChange={() => onToggle(unit.inventoryUnitId)} />
       <span>
         <span className={`block text-sm font-semibold ${isAvailable ? "" : "text-base-content/70"}`}>{unit.label}</span>
         <span className={`block text-xs capitalize ${isAvailable ? "font-semibold text-primary" : "font-medium text-base-content/60"}`}>
