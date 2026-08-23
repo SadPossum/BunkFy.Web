@@ -21,6 +21,11 @@ import type {
   RoomInventoryMutationReceipt,
 } from "../../api/types";
 import { inventorySalesModeValue, manualBlockStatusLabel } from "../../api/labels";
+import {
+  compositeSourceUsable,
+  createCompositeSource,
+  type CompositeSourceState,
+} from "../../app/compositeSourceState";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
@@ -32,6 +37,7 @@ import {
   PageHeader,
 } from "../../components/ui/primitives";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { BlockInventoryModal, type CreateBlockGroupPayload } from "./BlockInventoryModal";
@@ -101,9 +107,14 @@ export function InventoryPage() {
     ),
     enabled: Boolean(selectedPropertyId && pendingSalesModeChange),
   });
-  const focusedResourceId = useTransientResourceFocus(Boolean(inventory.data && blocks.data));
+  const inventorySource = createCompositeSource({ label: "Sales setup", hasData: inventory.data !== undefined, isLoading: inventory.isLoading, error: inventory.error, isFetching: inventory.isFetching, refetch: () => inventory.refetch() });
+  const blockSource = createCompositeSource({ label: "Inventory blocks", hasData: blocks.data !== undefined, isLoading: blocks.isLoading, error: blocks.error, isFetching: blocks.isFetching, refetch: () => blocks.refetch() });
+  const primarySources = [inventorySource, blockSource];
+  const inventoryUsable = compositeSourceUsable(inventorySource.state);
+  const blocksUsable = compositeSourceUsable(blockSource.state);
+  const focusedResourceId = useTransientResourceFocus(inventoryUsable && blocksUsable);
 
-  const rooms = inventory.data?.rooms ?? [];
+  const rooms = inventoryUsable ? inventory.data?.rooms ?? [] : [];
   const targetUnitId = searchParams.get("unit");
   const targetRoomId = searchParams.get("room")
     ?? rooms.find((room) => room.units.some((unit) => unit.inventoryUnitId === targetUnitId))?.roomId
@@ -120,8 +131,8 @@ export function InventoryPage() {
     [rooms, selectedProperty?.name],
   );
   const activeBlockGroups = useMemo(
-    () => groupActiveBlocks(blocks.data?.blocks ?? [], targetOptions),
-    [blocks.data?.blocks, targetOptions],
+    () => groupActiveBlocks(blocksUsable ? blocks.data?.blocks ?? [] : [], targetOptions),
+    [blocks.data, blocksUsable, targetOptions],
   );
 
   function setBlockView(value: "active" | "all") {
@@ -228,9 +239,6 @@ export function InventoryPage() {
   if (!selectedProperty) {
     return <EmptyState icon={<DoorOpen />} title="Choose a property first" description="Inventory is managed within a property. Create or select one to continue." />;
   }
-  if (inventory.isLoading || blocks.isLoading) return <LoadingState label="Loading inventory" />;
-  if (inventory.error || blocks.error) return <ErrorState error={inventory.error ?? blocks.error} />;
-
   const availableCount = availability.data?.units.filter((item) => item.isAvailable).length ?? 0;
   const unavailableCount = availability.data?.units.filter((item) => !item.isAvailable).length ?? 0;
 
@@ -244,13 +252,15 @@ export function InventoryPage() {
           <button
             className="btn btn-primary"
             onClick={() => setBlockOpen(true)}
-            disabled={targetOptions.length === 0}
+            disabled={!inventoryUsable || targetOptions.length === 0}
           >
             <Plus size={17} />
             Block inventory
           </button>
         ) : undefined}
       />
+
+      <CompositeSourceNotice sources={primarySources} title="Some inventory data is delayed" />
 
       <AvailabilitySection
         range={range}
@@ -265,6 +275,7 @@ export function InventoryPage() {
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <SalesSetupSection
           rooms={rooms}
+          state={inventorySource.state}
           focusedRoomId={focusedRoomId}
           canConfigure={canConfigure}
           pending={salesModeMutation.isPending}
@@ -291,7 +302,9 @@ export function InventoryPage() {
               ]}
             />
           </div>
-          {activeBlockGroups.length === 0 ? (
+          {!blocksUsable ? (
+            <CompositeSourceFallback state={blockSource.state} label="inventory blocks" />
+          ) : activeBlockGroups.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 icon={<Blocks />}
@@ -338,7 +351,7 @@ export function InventoryPage() {
       </div>
 
       <BlockInventoryModal
-        open={blockOpen && canManageBlocks}
+        open={blockOpen && canManageBlocks && inventoryUsable}
         propertyName={selectedProperty.name}
         rooms={rooms}
         mutation={createBlockGroup}
@@ -422,12 +435,14 @@ function AvailabilitySection({
 
 function SalesSetupSection({
   rooms,
+  state,
   focusedRoomId,
   canConfigure,
   pending,
   onModeChange,
 }: {
   rooms: RoomInventory[];
+  state: CompositeSourceState;
   focusedRoomId: string | null;
   canConfigure: boolean;
   pending: boolean;
@@ -438,7 +453,9 @@ function SalesSetupSection({
       <div className="border-b border-base-300 px-5 py-5 sm:px-6">
         <h2 className="font-display text-xl font-semibold">Sales setup</h2>
       </div>
-      {rooms.length === 0 ? (
+      {!compositeSourceUsable(state) ? (
+        <CompositeSourceFallback state={state} label="sales setup" />
+      ) : rooms.length === 0 ? (
         <div className="p-6">
           <EmptyState icon={<DoorOpen />} title="No rooms available" description="Set up rooms and beds in Properties before configuring inventory." />
         </div>
