@@ -58,7 +58,7 @@ describe("Spaces foundation route", () => {
     expect(page).not.toContain('ownerHref("/properties"');
     expect(page).toContain('parsePropertyRetirementReturn(searchParams, targetPropertyId)');
     expect(page).not.toContain('ownerHref("/inventory"');
-    expect(page).toContain('Change selling setup');
+    expect(page).toContain('Edit selling setup');
     expect(page).toContain('hidden={focusedSurfaceOpen}');
     expect(page).toContain('if (!context.has("property")) context.set("property", targetPropertyId)');
     expect(page).toContain('const { params: searchParams, setParams: setSearchParams } = navigation');

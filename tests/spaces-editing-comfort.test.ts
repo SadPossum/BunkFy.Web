@@ -89,6 +89,48 @@ beforeEach(() => {
   state.heldSearch = ""; state.pausedExpanded = true;
 });
 describe("Spaces editing comfort — rendered composition, not browser acceptance", () => {
+  it.each(['room', 'bed', 'whole-room'])('R2: %s has one routine Holds section before Selling and Retirement', target => {
+    const url = target === 'room' ? route().replace('&bed=' + bedId, '').replace('&unit=' + unitId, '')
+      : target === 'whole-room' ? route().replace('&bed=' + bedId, '').replace('unit=' + unitId, 'unit=' + id(5)) : route();
+    const html = render(url);
+    const inspector = html.slice(html.indexOf('id="spaces-selection-inspector"'));
+    expect(html.match(/id="spaces-blocks-heading"/g)).toHaveLength(1);
+    const holds = inspector.indexOf('id="spaces-blocks-heading"');
+    expect(holds).toBeGreaterThan(0);
+    expect(holds).toBeLessThan(inspector.indexOf('aria-label="Selling"'));
+    expect(holds).toBeLessThan(inspector.indexOf('aria-label="Retirement actions"'));
+  });
+  it('UR038: routine selling facts and direct edit are visible; retirement is separate and secondary',()=>{
+    const html=render();const inspector=html.slice(html.indexOf('id="spaces-selection-inspector"'));
+    expect(inspector).toContain('aria-label="Selling"');
+    expect(inspector).toContain('Whole room not offered separately');
+    expect(inspector).toContain('Whole-room inventory is separate from the physical bed count.');
+    expect(inspector).not.toContain('<details');expect(inspector).not.toContain('<summary');
+    expect(button(inspector,'Edit selling setup')).toBeDefined();
+    expect(button(inspector,'Inspect whole-room option')).toBeDefined();
+    expect(inspector).toContain('aria-label="Retirement actions"');
+    expect(inspector.indexOf('aria-label="Retirement actions"')).toBeGreaterThan(inspector.indexOf('aria-label="Selling"'));
+    expect(button(inspector,'Retire room')).toContain('btn-ghost');
+    expect(button(inspector,'Retire bed')).toContain('aria-label="Retire bed 104-D long exact label"');
+  });
+  it('UR038: denied selling and retirement authority never exposes their actions',()=>{
+    state.grants.delete(permissions.inventoryConfigure);state.grants.delete(permissions.inventoryRetire);
+    const html=render();expect(button(html,'Edit selling setup')).toBeUndefined();
+    expect(button(html,'Retire room')).toBeUndefined();expect(button(html,'Retire bed')).toBeUndefined();
+    expect(html).not.toContain('aria-label="Retirement actions"');
+  });
+  it('UR038: each opener retains its own source-currentness contract',()=>{
+    state.inventoryMode='stale';const html=render();
+    expect(html).toContain('Selling setup unconfirmed');
+    expect(button(html,'Edit selling setup')).toContain('disabled');
+    // Retirement opens its own fresh impact read. The existing opener requires
+    // current physical topology, not an unrelated sellability read; it sends
+    // no command until the separate retirement context/confirmation allows it.
+    expect(button(html,'Retire room')).not.toContain('disabled');
+    state.roomMode='stale';const topologyStale=render();
+    expect(button(topologyStale,'Retire room')).toContain('disabled');
+    expect(button(topologyStale,'Retire bed')).toContain('disabled');
+  });
   it("uses one compact title/action header and one search/night-range toolbar", () => {
     const html = render();
     const header = html.slice(html.indexOf('<header class="spaces-room-heading'), html.indexOf("</header>"));
@@ -157,7 +199,7 @@ describe("Spaces editing comfort — rendered composition, not browser acceptanc
     expect(html).toContain('aria-label="Room facts"');
     expect(html).toContain("Dorm 104 — quiet courtyard");
     expect(html).toContain("104-D long exact label");
-    expect(html.indexOf('aria-label="Room facts"')).toBeLessThan(html.indexOf("<summary"));
+    expect(html.indexOf('aria-label="Room facts"')).toBeLessThan(html.indexOf('aria-label="Selling"'));
     expect(button(html, "Edit room")).toBeDefined(); expect(button(html, "Edit bed")).toBeDefined();
     expect(html).not.toContain("Room setup &amp; selling");
     expect(html).not.toContain('role="grid"');
@@ -229,6 +271,7 @@ describe("Spaces editing comfort — rendered composition, not browser acceptanc
     expect(html).not.toContain("Inventory access is not assigned");
     expect(html).not.toContain("Confirming requested unit");
     expect(button(html, "Edit bed")).toBeUndefined();
+    expect(html.match(/id="spaces-blocks-heading"/g)).toHaveLength(1);
   });
   it("shows settings as a named focused surface with one visible processing panel and exact Back", () => {
     const html = render(route().replace("section=layout", "section=property"));

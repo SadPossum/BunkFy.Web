@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // Mounted real workspace, DatePickers and local CSS in Chromium. Only the
 // parent data/selection callbacks are synthetic; this is not live API or UX
@@ -11,12 +14,15 @@ const fixture = `
 import React, {useState} from "react";
 import {createRoot} from "react-dom/client";
 import {SpacesRoomWorkspace} from "/src/features/spaces/SpacesRoomWorkspace.tsx";
+import {spacesOverviewUnits} from "/src/features/spaces/spacesWorkspace.ts";
 import {useSpacesRetryFocus} from "/src/features/spaces/useSpacesRetryFocus.ts";
 import {CompositeSourceNotice} from "/src/components/ui/CompositeSourceNotice.tsx";
 import "/src/styles.css";
-const rooms = ["101", "102"].map(id => ({roomId:id, propertyId:"synthetic", name:"Dorm " + id, location:"Demo House", inventoryUnits:[], physicalStatus:"active", inventoryState:"present", salesMode:"bedLevel"}));
+const rooms = ["101", "102"].map(id => ({roomId:id, propertyId:"synthetic", name:"Dorm " + id, location:"Demo House", inventoryUnits:location.search.includes("roomControls") ? ["A","B"].map(suffix=>({roomId:id,bedId:id+suffix,inventoryUnitId:"unit"+id+suffix,kind:"bed",label:id+"-"+suffix,isSellable:true,isTopologyActive:true})) : [], physicalStatus:"active", inventoryState:"present", salesMode:"bedLevel"}));
 function Fixture() {
   const [selection, setSelection] = useState(new URLSearchParams(location.search).get("selected") ?? "101");
+  const [bedSelection,setBedSelection] = useState(null);
+  const [workspaceKey,setWorkspaceKey] = useState(0);
   const [filter, setFilter] = useState("");
   const [range, setRange] = useState(location.search.includes("invalidDates") ? {arrival:"2026-99-01", departure:""} : {arrival:"2026-09-06", departure:"2026-09-08"});
   const [editing, setEditing] = useState(false);
@@ -30,7 +36,7 @@ function Fixture() {
   const noticeState = {active:true, pending:mode.startsWith("pending"), retryable:mode === "stale"};
   const retryFocus = useSpacesRetryFocus({owner:JSON.stringify([context, selection]), enabled:!editing && mounted, ready:mode === "ready", denied,
     notices:{layout:{...noticeState,active:notice === "layout"},availability:{...noticeState,active:notice === "availability"}}});
-  window.spacesHarness = {settle:setMode, changeContext:setContext, deny:() => setDenied(true), unmount:() => setMounted(false), changeNotice:setNotice};
+  window.spacesHarness = {settle:setMode, changeContext:setContext, deny:() => setDenied(true), unmount:() => setMounted(false), changeNotice:setNotice, resetWorkspace:()=>setWorkspaceKey(n=>n+1)};
   const source = {label:"Synthetic inventory", state:mode === "ready" ? "ready" : mode === "pending" && location.search.includes("replaceRetry") ? "loading" : "stale", isFetching:mode.startsWith("pending"),
     refetch:async () => {setRequests(n => n + 1); setMode("pending");}};
   const selected = rooms.find(room => room.roomId === selection) ?? null;
@@ -38,13 +44,13 @@ function Fixture() {
     <button>Unrelated destination</button>
     <div ref={notice === "layout" ? retryFocus.layoutNotice : retryFocus.availabilityNotice} className="contents" onClickCapture={retryFocus.remember}><CompositeSourceNotice sources={[source]} keepRetryFocusable/></div>
     {mounted && <section ref={retryFocus.surface} className="spaces-room-frame">
-    <SpacesRoomWorkspace rooms={rooms} selectedRoom={selected} selectedUnit={null} selectedUnits={[]} physicalBedCount={0}
+    <SpacesRoomWorkspace key={workspaceKey} rooms={rooms} selectedRoom={selected} selectedUnit={bedSelection} selectedUnits={selected ? spacesOverviewUnits(selected) : []} physicalBedCount={selected?.inventoryUnits.length ?? 0}
       availability={{rows:[], total:0, reportedAvailable:0, reportedUnavailable:0, unresolvedTargets:0, contextMismatch:false}}
       inventoryCurrent={true} mayReadInventory={!location.search.includes("noInventory")} range={range} timeZoneId="Europe/London" locked={editing}
-      onRangeChange={setRange} onSelectRoom={setSelection} onSelectUnit={() => {}} filter={filter} onFilterChange={setFilter}
-      requestedTarget={Boolean(selection)} selectionKey={selection}
+      onRangeChange={setRange} onSelectRoom={id=>{setSelection(id);setBedSelection(null);}} onSelectUnit={setBedSelection} filter={filter} onFilterChange={setFilter}
+      requestedTarget={!location.search.includes("implicitTarget") && Boolean(selection)} selectionKey={selection+(bedSelection?.key ?? "")}
       sourceNotice={<p role="status" data-source-notice>Inventory source notice outside controls</p>}
-      inspector={<><h3 data-inspector-heading tabIndex={-1}>{selected?.name ?? "Requested room is unavailable"}</h3>
+      inspector={<><h3 data-inspector-heading tabIndex={-1}>{bedSelection?.label ?? selected?.name ?? "Requested room is unavailable"}</h3>
         <p>Physical status: active</p><button disabled={editing} onClick={() => setEditing(true)}>Edit room</button>
         {editing && <div data-topology-editor><label>Room name<input aria-label="Room name" value={draft} onChange={event => setDraft(event.target.value)}/></label><button onClick={() => setEditing(false)}>Cancel</button></div>}
         <section aria-label="Selected holds">No holds for this space</section></>}/>
@@ -58,7 +64,10 @@ let origin: string;
 const runtimeErrors: string[] = [];
 beforeAll(async () => {
   const fixturePath = process.cwd() + "/__spaces_disclosure_fixture.tsx";
-  server = await createServer({ configFile: false, root: process.cwd(), logLevel: "error",
+  // This virtual entry must not share the app's optimizer generation or scan
+  // its unrelated index.html while mounted tests are navigating.
+  server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-spaces-disclosure-vite-")), logLevel: "error",
+    optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "lucide-react", "@radix-ui/react-popover", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), {
       name: "spaces-disclosure-test-fixture",
       resolveId: id => id === "/__spaces_disclosure_fixture.tsx" || id === fixturePath ? fixturePath : undefined,
@@ -80,9 +89,14 @@ afterAll(async () => { await browser?.close(); await server?.close(); expect(run
 async function open(width = 320, query = "", touch = false) {
   const page = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: touch });
   page.setDefaultTimeout(5000);
+  const startupErrors: string[] = [];
   page.on("pageerror", error => runtimeErrors.push(error.message));
+  page.on("console", message => { if (message.type() === "error") { runtimeErrors.push(message.text()); startupErrors.push(message.text()); } });
+  page.on("response", response => { if (response.status() >= 400) startupErrors.push(`${response.status()} ${response.url()}`); });
+  page.on("requestfailed", request => startupErrors.push(`${request.failure()?.errorText} ${request.url()}`));
   await page.goto(origin + "__spaces-disclosure" + query);
-  await page.getByRole("region", { name: "Rooms and beds comparison" }).waitFor();
+  try { await page.getByRole("region", { name: "Rooms and beds comparison" }).waitFor(); }
+  catch (error) { await page.close(); throw new Error(`Spaces fixture startup failed: ${JSON.stringify(startupErrors)}`, { cause: error }); }
   return page;
 }
 const toggle = (page: Page) => page.getByRole("button", { name: /Find another room or check dates/ });
@@ -94,6 +108,105 @@ async function settledResize(page: Page, width: number) {
 }
 
 describe("Spaces single mounted selected-context disclosure", () => {
+  it.each(["explicit", "implicit"])("R2: %s room edit after browsing stays visible through narrow resize and cancel", async target => {
+    const page = await open(1440, '?roomControls' + (target === 'implicit' ? '&implicitTarget' : ''));
+    try {
+      await page.getByRole('button', { name: /spaces in Dorm 101/ }).click();
+      await search(page).fill('101-A');
+      await search(page).fill('');
+      await page.getByRole('button', { name: 'Edit room', exact: true }).click();
+      const draft = page.getByRole('textbox', { name: 'Room name', exact: true });
+      await draft.fill('Keep this unsaved room draft');
+      await draft.evaluate(e => { (window as unknown as { roomDraft: Element }).roomDraft = e; });
+      for (const width of [320, 1024]) {
+        await settledResize(page, width);
+        expect(await draft.isVisible()).toBe(true);
+        expect(await draft.inputValue()).toBe('Keep this unsaved room draft');
+        expect(await draft.evaluate(e => e === (window as unknown as { roomDraft: Element }).roomDraft)).toBe(true);
+        expect(await page.getByRole('button', { name: 'Cancel', exact: true }).isVisible()).toBe(true);
+      }
+      await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await settledResize(page, 320);
+      expect(await page.getByRole('button', { name: 'Edit room', exact: true }).isVisible()).toBe(true);
+      expect(await page.locator('[data-spaces-view]').getAttribute('data-spaces-view')).toBe('selection');
+      await page.getByRole('button', { name: 'Back to rooms & beds', exact: true }).click();
+      expect(await page.locator('[data-spaces-view]').getAttribute('data-spaces-view')).toBe('navigator');
+      expect(await search(page).isVisible()).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each(["click", "Enter", "Space"])("UR038: selected room collapses and reopens once with %s without changing inspector", async input => {
+    const page = await open(1440, "?roomControls");
+    try {
+      const disclosure=page.getByRole("button",{name:/spaces in Dorm 101/});
+      const inspector=page.locator('#spaces-selection-inspector');
+      await inspector.evaluate(e=>{(window as unknown as {savedInspector:Element}).savedInspector=e;});
+      expect(await disclosure.isEnabled()).toBe(true);
+      const act=()=>input==="click"?disclosure.click():disclosure.press(input);
+      await act();
+      expect(await disclosure.getAttribute('aria-expanded')).toBe('false');
+      expect(await page.getByRole('button',{name:'101-A',exact:true}).isVisible()).toBe(false);
+      expect(await page.getByRole('heading',{name:'Dorm 101',exact:true}).isVisible()).toBe(true);
+      expect(await disclosure.evaluate(e=>document.activeElement===e)).toBe(true);
+      await act();
+      expect(await disclosure.getAttribute('aria-expanded')).toBe('true');
+      expect(await page.getByRole('button',{name:'101-A',exact:true}).isVisible()).toBe(true);
+      expect(await inspector.evaluate(e=>e===(window as unknown as {savedInspector:Element}).savedInspector)).toBe(true);
+    } finally { await page.close(); }
+  },30000);
+
+  it("UR038: hidden selected bed and dirty inspector survive resize; active editor still locks disclosure",async()=>{
+    const page=await open(1440,'?roomControls');
+    try{
+      await page.getByRole('button',{name:'101-A',exact:true}).click();
+      await page.getByRole('heading',{name:'101-A',exact:true}).waitFor();
+      const disclosure=page.getByRole('button',{name:/spaces in Dorm 101/});
+      expect(await disclosure.isEnabled()).toBe(true);await disclosure.click();
+      expect(await page.getByRole('heading',{name:'101-A',exact:true}).isVisible()).toBe(true);
+      await page.getByRole('button',{name:'Edit room',exact:true}).click();
+      const draft=page.getByRole('textbox',{name:'Room name'});await draft.fill('Preserved edit');
+      await draft.evaluate(e=>{(window as unknown as {savedDraft:Element}).savedDraft=e;});
+      expect(await disclosure.isDisabled()).toBe(true);
+      await settledResize(page,320);await settledResize(page,1440);
+      expect(await draft.inputValue()).toBe('Preserved edit');
+      expect(await draft.evaluate(e=>e===(window as unknown as {savedDraft:Element}).savedDraft)).toBe(true);
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      expect(await disclosure.getAttribute('aria-expanded')).toBe('false');await disclosure.press('Enter');
+      expect(await page.getByRole('button',{name:'101-A',exact:true}).getAttribute('aria-pressed')).toBe('true');
+      expect(await page.locator('[data-space-selection="bed:101A"]').count()).toBe(1);
+    }finally{await page.close();}
+  },30000);
+
+  it("UR038: search reveals a collapsed selected branch without erasing its choice",async()=>{
+    const page=await open(1440,'?roomControls');
+    try{
+      const disclosure=page.getByRole('button',{name:/spaces in Dorm 101/});
+      expect(await disclosure.isEnabled()).toBe(true);await disclosure.click();
+      await search(page).fill('101-A');
+      expect(await disclosure.getAttribute('aria-expanded')).toBe('true');
+      expect(await disclosure.isDisabled()).toBe(true);
+      expect(await disclosure.getAttribute('title')).toBe('Search results stay expanded');
+      expect(await page.getByRole('button',{name:'101-A',exact:true}).isVisible()).toBe(true);
+      await page.getByRole('button',{name:'Clear search',exact:true}).click();
+      expect(await disclosure.getAttribute('aria-expanded')).toBe('false');
+      expect(await page.getByRole('heading',{name:'Dorm 101',exact:true}).isVisible()).toBe(true);
+    }finally{await page.close();}
+  },30000);
+
+  it("UR038: selections do not erase a room's explicit choice; an authority workspace remount resets it",async()=>{
+    const page=await open(1440,'?roomControls');
+    try{
+      const first=page.getByRole('button',{name:/spaces in Dorm 101/});expect(await first.isEnabled()).toBe(true);await first.click();
+      await page.getByRole('button',{name:/^Dorm 102/}).click();
+      expect(await page.getByRole('button',{name:/spaces in Dorm 102/}).getAttribute('aria-expanded')).toBe('true');
+      await page.getByRole('button',{name:/^Dorm 101/}).click();
+      expect(await first.getAttribute('aria-expanded')).toBe('false');
+      await page.evaluate(()=>(window as unknown as {spacesHarness:{resetWorkspace():void}}).spacesHarness.resetWorkspace());
+      await page.getByRole('button',{name:'Hide spaces in Dorm 101'}).waitFor();
+      expect(await page.getByRole('button',{name:'101-A',exact:true}).isVisible()).toBe(true);
+    }finally{await page.close();}
+  },30000);
+
   it("starts selected room compact, with applied dates and critical notices outside the hidden controls", async () => {
     const page = await open();
     try {

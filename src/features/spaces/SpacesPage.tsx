@@ -793,11 +793,12 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
               <p className={`mt-1 font-semibold ${spacesUnitAvailability(selectedUnit, availabilityModel.rows, inventoryCurrent).tone}`}>{spacesUnitAvailability(selectedUnit, availabilityModel.rows, inventoryCurrent).label}</p>
               {spacesHasCurrentAllocation(selectedUnit, availabilityModel.rows, inventoryCurrent) ? <p className="mt-1 text-xs text-base-content/55">An active allocation holds this space. Guest and check-in details are not part of this availability source.</p> : null}
             </div>}
+            {!holdsOpen && holds}
           </>}
           otherEditorOpen={propertyEditorEngaged || Boolean(blockEditor.editor)}
           onClearUnavailableTarget={() => { const next = new URLSearchParams(searchParams); next.delete("bed"); next.delete("unit"); next.delete("focus"); next.delete("blockGroup"); setSearchParams(next); }}
         /> : requestedBlockGroupId || blockView === "all" || !layout.rooms.length ? null : <TargetPromptPanel />}
-    {!holdsOpen && holds}
+    {!holdsOpen && !selectedRoom && holds}
     {retirementEditor.target && <TopologyRetirementPanel editor={retirementEditor} inline mayReadReservations={mayReadReservations} blocksHref={retirementBlocksHref} mayUseTemporaryBlock={Boolean(retirementUnit?.isTopologyActive && retirementUnit.isSellable)} />}
   </>;
   const layoutFeedback = !hasUsableLayoutSource ? <CompositeSourceFallback error={roomsMismatch ? new Error("The rooms did not match this property.") : roomsQuery.error} state={roomSource.state} label="room layout" retry={() => void roomSource.refetch()} title="Room layout could not be loaded" />
@@ -925,8 +926,8 @@ function RoomDetail({
         </dl>}
     </section>
     {operationalContent}
-    <details className="border-t border-base-300" open={Boolean(salesEditor.target || selectedUnit?.kind === "room") || undefined}>
-      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary">Selling &amp; whole-room option</summary>
+    <section aria-label="Selling" className="border-t border-base-300">
+      <h4 className="px-4 py-3 text-base font-semibold">Selling</h4>
       <div className="px-4 pb-4">
         <p className="text-sm">{inventoryEvidence !== "current" ? "Selling setup unconfirmed" : room.salesMode === null ? "Unknown" : salesModeLabel(room.salesMode)}</p>
         {wholeRoomUnits.map((unit) => <div key={unit.key} className="mt-2 border-l-2 border-base-300 pl-3 text-xs">
@@ -935,12 +936,12 @@ function RoomDetail({
           <button type="button" className="btn btn-ghost btn-xs mt-1 min-h-9" disabled={locked} onClick={() => onSelectUnit(unit)}>Inspect whole-room option</button>
         </div>)}
         {mayConfigureInventory && salesRoom && <button type="button" className="btn btn-outline btn-sm mt-3" disabled={!salesEditor.canOpen(salesRoom) || locked}
-          onClick={(event) => salesEditor.open(salesRoom, event.currentTarget, salesOrigin)}><SlidersHorizontal size={15} />Change selling setup</button>}
+          onClick={(event) => salesEditor.open(salesRoom, event.currentTarget, salesOrigin)}><SlidersHorizontal size={15} />Edit selling setup</button>}
       </div>
-    </details>
+    </section>
     {salesEditor.target?.room.roomId === room.roomId && <SalesModeChangeModal editor={salesEditor} inline mayReadReservations={mayReadReservations} />}
-        {mayRetireInventory && <details className="border-t border-base-300 px-4 py-3" open={Boolean(retirementEditor.target) || undefined}>
-          <summary className="cursor-pointer text-sm focus-visible:outline-2 focus-visible:outline-primary">Retirement</summary>
+        {mayRetireInventory && <section aria-label="Retirement actions" className="border-t border-base-300 px-4 py-3">
+          <h4 className="text-sm font-medium text-base-content/65">Retirement actions</h4>
           <div className="mt-2 flex flex-wrap gap-2">
             {bed && <button type="button" className="btn btn-ghost btn-sm text-error" aria-label={"Retire bed " + bed.label}
               disabled={!retirementEditor.canOpen({ propertyId: bed.propertyId, roomId: room.roomId, bedId: bed.bedId, kind: "bed" }) || locked}
@@ -948,7 +949,7 @@ function RoomDetail({
             <button type="button" className="btn btn-ghost btn-sm text-error" disabled={!retirementEditor.canOpen({ propertyId: retirementEditor.propertyId, roomId: room.roomId, kind: "room" }) || locked}
               onClick={(event) => retirementEditor.open({ propertyId: retirementEditor.propertyId, roomId: room.roomId, kind: "room", label: room.name }, event.currentTarget)}>Retire room</button>
           </div>
-        </details>}
+        </section>}
   </div>;
 }
 

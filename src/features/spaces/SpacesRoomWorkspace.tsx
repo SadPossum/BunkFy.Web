@@ -19,8 +19,13 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
   focusedResourceId?: string | null; requestedTarget?: boolean; selectionKey?: string; visible?: boolean;
 }) {
   const [draft, setDraft] = useState(range);
-  const [navigatorOpen, setNavigatorOpen] = useState(false);
-  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(() => new Set());
+  // Neutral follows the route. A real browse/inspector interaction takes
+  // precedence, including when the selected room was only a desktop default.
+  const [navigatorOpen, setNavigatorOpen] = useState<boolean | null>(null);
+  const showNavigator = navigatorOpen ?? !requestedTarget;
+  // Selection opens an untouched branch, but must not override an operator's
+  // explicit disclosure choice. Search reveals matches without changing it.
+  const [roomDisclosure, setRoomDisclosure] = useState<Record<string, boolean>>({});
   const [comparisonWide, setComparisonWide] = useState(false);
   const [toolsExpanded, setToolsExpanded] = useState(false);
   const [toolsFocused, setToolsFocused] = useState(false);
@@ -34,7 +39,7 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
   const revealedSelection = useRef<string | null>(null);
   const pointerIntent = useRef<{ owner: string; button: HTMLButtonElement; pointerId: number; open: boolean; cancel: () => void } | null>(null);
   useEffect(() => setDraft(range), [range.arrival, range.departure]);
-  useEffect(() => setNavigatorOpen(false), [selectionKey]);
+  useEffect(() => setNavigatorOpen(null), [selectionKey]);
   const valid = validStayDateRange(draft);
   const visibleRooms = rooms.filter((room) => [room.name, room.location, ...room.inventoryUnits.map((unit) => unit.label),
     ...(room.roomId === selectedRoom?.roomId ? selectedUnits.map((unit) => unit.label) : [])]
@@ -46,9 +51,9 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
   function wideComparison() {
     return workspaceElement.current && getComputedStyle(workspaceElement.current).getPropertyValue("--spaces-comparison-mode").trim() === "wide";
   }
-  const toolsCollapsible = !comparisonWide && requestedTarget && !navigatorOpen;
+  const toolsCollapsible = !comparisonWide && !showNavigator;
   const toolsOpen = !toolsCollapsible || toolsExpanded || toolsFocused;
-  const pointerOwner = JSON.stringify([selectionKey, requestedTarget, navigatorOpen, visible, locked, comparisonWide]);
+  const pointerOwner = JSON.stringify([selectionKey, requestedTarget, showNavigator, visible, locked, comparisonWide]);
   useLayoutEffect(() => {
     if (pointerIntent.current?.owner !== pointerOwner) pointerIntent.current?.cancel();
   }, [pointerOwner]);
@@ -231,7 +236,7 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
     </div>
     </div>
     {sourceNotice}
-    <div ref={workspaceElement} role="region" aria-label="Rooms and beds comparison" className="spaces-room-workspace min-w-0" data-spaces-view={navigatorOpen || !requestedTarget ? "navigator" : "selection"}>
+    <div ref={workspaceElement} role="region" aria-label="Rooms and beds comparison" className="spaces-room-workspace min-w-0" data-spaces-view={showNavigator ? "navigator" : "selection"}>
       <nav ref={navigatorElement} aria-label="Rooms and beds navigator" className="spaces-room-navigator min-w-0" onFocusCapture={(event) => {
         const target = event.target;
         requestAnimationFrame(() => {
@@ -258,7 +263,7 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
         {visibleRooms.map((room) => {
           const selected = room.roomId === selectedRoom?.roomId;
           const units = spacesOverviewUnits(room, selected ? selectedUnits : undefined);
-          const expanded = selected || Boolean(filter.trim()) || expandedRooms.has(room.roomId);
+          const expanded = Boolean(filter.trim()) || (roomDisclosure[room.roomId] ?? selected);
           const childrenId = `spaces-room-children-${room.roomId}`;
           return <section key={room.roomId} className="spaces-room-group min-w-0 border-b border-base-300" aria-label={room.name}>
             <div className={"flex items-start gap-1 " + (selected ? "bg-primary/8" : "bg-base-200/45")}>
@@ -269,9 +274,9 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
               </span>{room.physicalStatus?.toLowerCase() === "retired" && <span className="text-[0.8125rem]">Retired</span>}
             </button></h3>
             <button type="button" className="btn btn-ghost btn-sm mr-1 mt-1 w-11 shrink-0 px-0" aria-label={`${expanded ? "Hide" : "Show"} spaces in ${room.name}`}
-              aria-expanded={expanded} aria-controls={childrenId} disabled={locked || selected || Boolean(filter.trim())}
-              title={selected ? "The selected room stays expanded" : filter.trim() ? "Search results stay expanded" : undefined}
-              onClick={() => setExpandedRooms((current) => { const next = new Set(current); if (next.has(room.roomId)) next.delete(room.roomId); else next.add(room.roomId); return next; })}>
+              aria-expanded={expanded} aria-controls={childrenId} disabled={locked || Boolean(filter.trim())}
+              title={filter.trim() ? "Search results stay expanded" : undefined}
+              onClick={() => setRoomDisclosure((current) => ({ ...current, [room.roomId]: !expanded }))}>
               <ChevronDown size={16} className={expanded ? "rotate-180" : ""} aria-hidden="true" />
             </button>
             </div>
@@ -296,6 +301,7 @@ export function SpacesRoomWorkspace({ rooms, selectedRoom, selectedUnit, selecte
         })}
       </nav>
       <aside ref={inspectorElement} id="spaces-selection-inspector" tabIndex={-1} aria-label="Selected room and space"
+        onFocusCapture={() => setNavigatorOpen(false)}
         className={"spaces-room-inspector min-w-0 bg-base-100 outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-primary " + (focusedResourceId && selectedUnit?.inventoryUnitId === focusedResourceId ? "resource-focus" : "")}>
         <button type="button" className="spaces-room-back btn btn-ghost btn-sm mx-3 mt-2 min-h-11" disabled={locked} onClick={returnToSelection}><ArrowLeft size={15} />Back to rooms &amp; beds</button>
         {inspector}
