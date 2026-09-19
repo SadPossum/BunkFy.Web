@@ -23,6 +23,7 @@ import {
   operationalPreviewTriggerKey,
   parseOperationalPreviewRoute,
   withOperationalPreviewRoute,
+  writeTodayQueue,
   withoutOperationalPreviewRoute,
   type OperationalPreviewRoute,
   type OperationalUnitState,
@@ -147,8 +148,10 @@ export function OperationalPreviewProvider({ children }: { children: ReactNode }
       writeCalendarViewport(originParams, route.origin.viewport);
     } else if (route.origin.view === "visual") {
       originParams.set("view", "visual");
+      originParams.delete("todayQueue");
     } else {
       originParams.delete("view");
+      writeTodayQueue(originParams, route.origin.queue);
     }
     const next = withOperationalPreviewRoute(
       originParams,

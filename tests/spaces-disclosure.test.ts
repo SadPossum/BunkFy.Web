@@ -405,8 +405,11 @@ describe("Spaces single mounted selected-context disclosure", () => {
       await retry.press("Enter"); await retry.press("Space");
       expect(await page.getByRole("status", { name: "Retry requests" }).textContent()).toBe("1");
       await page.evaluate(() => (window as unknown as {spacesHarness:{settle:(mode:string)=>void}}).spacesHarness.settle("stale"));
+      // The synthetic setter schedules a React render; native press does not
+      // wait for aria-disabled to clear as a pointer click would.
+      await expect.poll(() => retry.getAttribute("aria-disabled")).toBe("false");
       await retry.press(key);
-      expect(await page.getByRole("status", { name: "Retry requests" }).textContent()).toBe("2");
+      await expect.poll(() => page.getByRole("status", { name: "Retry requests" }).textContent()).toBe("2");
       await page.context().setOffline(true);
       const offline = page.getByRole("button", { name: "Reconnect to retry", exact: true });
       expect(await offline.evaluate(el => el === document.activeElement)).toBe(true);

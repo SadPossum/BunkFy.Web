@@ -49,7 +49,7 @@ describe("Today Rooms presentation and local event state (not browser geometry p
       else {
         const count = { reservationCount: 0, guestCount: 0, inventoryUnitCount: 0 };
         const snapshot = { propertyId, localDate: date, timeZoneId: "UTC", cohorts: { confirmedArrivalsOnLocalDate: count, scheduledDeparturesOnLocalDate: count, currentlyInHouse: count }, attention: { total: count }, upcoming: [item] } as unknown as ReservationOperationsSnapshot;
-        tree = nodes(TodayOperationsView({ propertyId, canOpenSpaces: true, snapshot, snapshotState: "ready", inventory: [room], inventoryState: "ready", blocks: [], blockState: "ready", reservations: [item], reservationState: "ready" }));
+        tree = nodes(TodayOperationsView({ propertyId, queue: "attention", onQueueChange: () => {}, canOpenSpaces: true, snapshot, snapshotState: "ready", inventory: [room], inventoryState: "ready", blocks: [], blockState: "ready", reservations: [item], reservationState: "ready" }));
       }
       state.open.mockClear();
       if (view === "visual") {
@@ -169,7 +169,7 @@ describe("Today Rooms presentation and local event state (not browser geometry p
   it("qualifies Operations denominator drift and empty unavailable sections", () => {
     const count = { reservationCount: 0, guestCount: 0, inventoryUnitCount: 0 };
     const snapshot = { propertyId, localDate: date, timeZoneId: "UTC", cohorts: { confirmedArrivalsOnLocalDate: count, scheduledDeparturesOnLocalDate: count, currentlyInHouse: count }, attention: { total: { ...count, reservationCount: 17 } }, upcoming: [] } as unknown as ReservationOperationsSnapshot;
-    const props: ComponentProps<typeof TodayOperationsView> = { propertyId, canOpenSpaces: false, snapshot, snapshotState: "ready", inventory: [room], inventoryState: "ready", blocks: [], blockState: "ready", reservations: [], reservationState: "ready" };
+    const props: ComponentProps<typeof TodayOperationsView> = { propertyId, queue: "attention", onQueueChange: () => {}, canOpenSpaces: false, snapshot, snapshotState: "ready", inventory: [room], inventoryState: "ready", blocks: [], blockState: "ready", reservations: [], reservationState: "ready" };
     const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(TodayOperationsView, props)));
     expect(html).toContain("were read separately and currently differ");
     const unknown = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(TodayOperationsView, { ...props, reservationCurrent: false, snapshotCurrent: false })));
@@ -178,5 +178,30 @@ describe("Today Rooms presentation and local event state (not browser geometry p
     const withoutStatus = (value: string) => value.replace(/(<p id="today-source-status"[^>]*>)[\s\S]*?(<\/p>)/, "$1$2");
     expect(withoutStatus(refreshed)).toBe(withoutStatus(html));
     expect(refreshed).toContain("were read separately and currently differ");
+  });
+  it.each(["attention", "arrivals", "departures", "staying"] as const)("mounts only the selected %s queue with counts from detailed records", queue => {
+    const count = { reservationCount: 99, guestCount: 99, inventoryUnitCount: 99 };
+    const snapshot = { propertyId, localDate: date, timeZoneId: "UTC", cohorts: { confirmedArrivalsOnLocalDate: count, scheduledDeparturesOnLocalDate: count, currentlyInHouse: count }, attention: { total: count }, upcoming: [] } as unknown as ReservationOperationsSnapshot;
+    const records = [stay("attention", { primaryGuestName: "Attention guest", status: "confirmed", arrival: "2026-09-01" }), stay("arrivals", { primaryGuestName: "Arrival guest", status: "confirmed", arrival: date, departure: "2026-09-10" }), stay("departures", { primaryGuestName: "Departure guest" }), stay("staying", { primaryGuestName: "Staying guest", departure: "2026-09-10" })];
+    const onQueueChange = vi.fn();
+    const props: ComponentProps<typeof TodayOperationsView> = { propertyId, queue, onQueueChange, canOpenSpaces: true, snapshot, snapshotState: "ready", inventory: [room], inventoryState: "ready", blocks: [], blockState: "ready", reservations: records, reservationState: "ready" };
+    const tree = TodayOperationsView(props), html = renderToStaticMarkup(createElement(MemoryRouter, null, tree));
+    expect(html.match(/data-today-queue=/g)).toHaveLength(1);
+    for (const [index, key] of ["attention", "arrivals", "departures", "staying"].entries()) {
+      if (key === queue) expect(html).toContain(records[index].primaryGuestName); else expect(html).not.toContain(records[index].primaryGuestName);
+    }
+    for (const label of ["Needs attention", "Arrivals", "Departures", "Staying tonight"]) expect(html).toContain(`${label} · 1`);
+    const selector = nodes(tree).find(node => node.props.ariaLabel === "Shift queue")!;
+    (selector.props.onValueChange as (queue: string) => void)("departures"); expect(onQueueChange).toHaveBeenCalledWith("departures");
+    const row = nodes(tree).find(node => node.props.items && node.props.onOpen)!;
+    (row.props.onOpen as (record: ReservationListItem, event: unknown) => void)(records[["attention", "arrivals", "departures", "staying"].indexOf(queue)], { currentTarget: {} });
+    expect(state.open.mock.calls.at(-1)![0].route.origin).toEqual({ surface: "today", propertyId, view: "operations", ...(queue !== "attention" ? { queue } : {}) });
+    if (queue !== "attention") expect(html).toContain(`surfaceReturnTodayQueue=${queue}`);
+    const unconfirmed = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(TodayOperationsView, { ...props, reservationCurrent: false, reservationState: "stale" })));
+    for (const label of ["Needs attention", "Arrivals", "Departures", "Staying tonight"]) { expect(unconfirmed).toContain(`${label} · —`); expect(unconfirmed).not.toContain(`${label} · 1`); }
+    for (const reservationState of ["loading", "unavailable"] as const) {
+      const missing = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(TodayOperationsView, { ...props, reservationState, reservations: [] })));
+      expect(missing).not.toContain('aria-label="Shift queue"'); expect(missing).not.toContain('data-today-queue');
+    }
   });
 });

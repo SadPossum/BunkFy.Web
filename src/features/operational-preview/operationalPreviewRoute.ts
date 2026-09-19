@@ -10,6 +10,29 @@ export type OperationalUnitState =
 export type TodayRoomsFilter = "all" | "attention" | "movements" | "available" | "blocked";
 export type TodayRoomsContext = { roomId?: string; filter?: TodayRoomsFilter };
 
+export type TodayQueue = "attention" | "arrivals" | "departures" | "staying";
+
+export function readTodayQueue(params: URLSearchParams, key = "todayQueue"): { valid: boolean; queue: TodayQueue } {
+  const values = params.getAll(key);
+  const valid = values.length === 0 || (values.length === 1 && ["attention", "arrivals", "departures", "staying"].includes(values[0]));
+  return { valid, queue: valid && values.length ? values[0] as TodayQueue : "attention" };
+}
+
+export function writeTodayQueue(params: URLSearchParams, queue: TodayQueue = "attention", key = "todayQueue") {
+  params.delete(key);
+  if (queue !== "attention") params.set(key, queue);
+}
+
+export function readTodayOriginContext(params: URLSearchParams, view: string | null, prefix: string): { valid: boolean; rooms?: TodayRoomsContext; queue?: TodayQueue } {
+  if (view === "visual") {
+    const rooms = readTodayRoomsContext(params, prefix);
+    return { valid: rooms.valid, ...(Object.keys(rooms.context).length ? { rooms: rooms.context } : {}) };
+  }
+  const key = `${prefix}Queue`, queue = readTodayQueue(params, key);
+  const valid = view === "operations" && queue.valid && ![...params.keys()].some(key => key.startsWith(prefix) && key !== `${prefix}Queue`);
+  return { valid, ...(valid && queue.queue !== "attention" ? { queue: queue.queue } : {}) };
+}
+
 export function readTodayRoomsContext(params: URLSearchParams, prefix = "today"): { valid: boolean; context: TodayRoomsContext } {
   const roomKey = `${prefix}Room`, filterKey = `${prefix}Filter`;
   const room = params.get(roomKey), filter = params.get(filterKey);
@@ -67,8 +90,16 @@ export type OperationalOrigin =
   | {
       surface: "today";
       propertyId: string;
-      view: "operations" | "visual";
+      view: "visual";
       rooms?: TodayRoomsContext;
+      queue?: never;
+    }
+  | {
+      surface: "today";
+      propertyId: string;
+      view: "operations";
+      rooms?: never;
+      queue?: TodayQueue;
     };
 
 export type OperationalPreviewRoute = {
@@ -95,6 +126,7 @@ const activeKeys = [
   "opFromView",
   "opFromTodayRoom",
   "opFromTodayFilter",
+  "opFromTodayQueue",
 ] as const;
 
 const returnKeys = activeKeys.map((key) => `opReturn${key.slice(2)}`);
@@ -180,6 +212,7 @@ export function operationalOriginHref(route: OperationalPreviewRoute): string {
     pathname = "/";
     if (route.origin.view === "visual") originParams.set("view", "visual");
     writeTodayRoomsContext(originParams, route.origin.rooms);
+    if (route.origin.view === "operations") writeTodayQueue(originParams, route.origin.queue);
   }
 
   const params = withOperationalPreviewRoute(originParams, route);
@@ -203,7 +236,7 @@ export function operationalPreviewTriggerKey(route: OperationalPreviewRoute): st
       : selection.inventoryUnitId;
   const origin = route.origin.surface === "calendar"
     ? `${route.origin.surface}:${selection.date ?? route.origin.day}`
-    : `${route.origin.surface}:${route.origin.view}`;
+    : `${route.origin.surface}:${route.origin.view}${route.origin.view === "operations" && route.origin.queue && route.origin.queue !== "attention" ? `:${route.origin.queue}` : ""}`;
   return `${origin}:${selection.kind}:${entity}`;
 }
 
@@ -228,6 +261,10 @@ export function operationalOriginMatchesLocation(
   }
   if (pathname !== "/") return false;
   const view = params.get("view") === "visual" ? "visual" : "operations";
+  if (view === "operations") {
+    const queue = readTodayQueue(params);
+    return view === origin.view && queue.valid && queue.queue === (origin.queue ?? "attention");
+  }
   const rooms = readTodayRoomsContext(params);
   return view === origin.view && rooms.valid && (!origin.rooms
     || (rooms.context.roomId === origin.rooms.roomId && rooms.context.filter === origin.rooms.filter));
@@ -321,11 +358,11 @@ function parseOrigin(
   if (surface === "today") {
     if ([...params.keys()].some((key) => key.startsWith(`${prefix}FromViewport`))) return null;
     const view = params.get(`${prefix}FromView`);
-    const rooms = readTodayRoomsContext(params, `${prefix}FromToday`);
-    const hasRooms = Object.keys(rooms.context).length > 0;
-    return rooms.valid && (view === "visual" || (view === "operations" && !hasRooms))
-      ? { surface, propertyId, view, ...(hasRooms ? { rooms: rooms.context } : {}) }
-      : null;
+    const { valid, ...context } = readTodayOriginContext(params, view, `${prefix}FromToday`);
+    if (!valid) return null;
+    if (view === "visual") return { surface, propertyId, view, ...(context.rooms ? { rooms: context.rooms } : {}) };
+    if (view === "operations") return { surface, propertyId, view, ...(context.queue ? { queue: context.queue } : {}) };
+    return null;
   }
   return null;
 }
@@ -359,7 +396,8 @@ function writeNamespacedRoute(
     writeCalendarViewport(params, route.origin.viewport, `${prefix}FromViewport`);
   } else {
     params.set(`${prefix}FromView`, route.origin.view);
-    writeTodayRoomsContext(params, route.origin.rooms, `${prefix}FromToday`);
+    if (route.origin.view === "visual") writeTodayRoomsContext(params, route.origin.rooms, `${prefix}FromToday`);
+    else writeTodayQueue(params, route.origin.queue, `${prefix}FromTodayQueue`);
   }
 }
 

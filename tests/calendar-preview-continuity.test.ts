@@ -117,22 +117,24 @@ describe("Today owned retry focus recovery (browser focus remains an aftergate)"
     vi.stubGlobal("getComputedStyle", () => ({ visibility: "visible" }));
     state.params = new URLSearchParams({ property: propertyId, view: "visual" });
     state.todayFailureKey = "availability";
-    let capture: (event: unknown) => void, effect: () => unknown, unmount: () => void;
+    let capture: (event: unknown) => void;
+    let cleanups: Array<() => void> = [];
     const render = () => {
       state.cursor = 0; state.layouts = [];
       const tree = nodes(DashboardPage());
       const controls = tree.find(node => node.type === "div" && node.props.ref);
       if (controls) (controls.props.ref as { current: unknown }).current = { querySelector: () => tab };
       capture = tree.find(node => node.props.onClickCapture)?.props.onClickCapture as typeof capture;
-      effect = state.layouts[0]; unmount = state.layouts[1]() as () => void;
-      effect();
+      // Run every registered layout effect, without assuming retry ownership
+      // is the page's first effect. Only actual cleanup returns run on unmount.
+      cleanups = state.layouts.map(effect => effect()).filter((value): value is () => void => typeof value === "function");
     };
     render();
     return { doc, retry, tab, render,
       activate: () => capture({ target: retry }),
       recovered: () => { state.todayFailureKey = ""; state.todayFetching = false; retry.isConnected = false; doc.activeElement = doc.body; render(); },
       cancel: (type: string, key?: string, target?: unknown) => { const event = new Event(type); if (key) Object.defineProperty(event, "key", { value: key }); if (target) Object.defineProperty(event, "target", { value: target }); doc.dispatchEvent(event); },
-      unmount: () => unmount(),
+      unmount: () => { const current = cleanups; cleanups = []; current.forEach(cleanup => cleanup()); },
     };
   }
   it("hands focused retry to the active view once after success, without scrolling", () => {

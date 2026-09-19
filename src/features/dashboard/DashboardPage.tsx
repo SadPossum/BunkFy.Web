@@ -28,6 +28,7 @@ import { ApiError } from "../../api/client";
 import { loadTodayReservationFeed, TodayReservationFeedError, type TodayReservationFeed } from "./todayReservationFeed";
 import { TodayOperationsView } from "./TodayOperationsView";
 import { TodayVisualView } from "./TodayVisualView";
+import { readTodayQueue, writeTodayQueue, type TodayQueue } from "../operational-preview/operationalPreviewRoute";
 
 const todayViews = [
   { value: "operations", label: "Operations", icon: <LayoutDashboard size={16} /> },
@@ -76,6 +77,20 @@ export function DashboardPage() {
     && access.allows(permissions.propertiesRead, accessScope);
   const enabled = Boolean(propertyBound && selectedPropertyId && permissionCurrent && hasTodayAccess);
   const authority = `${session?.tenantId}:${session?.subjectId}:${session?.sessionId}:${session?.generation}:${selectedPropertyId}`;
+  const queueOwner = useRef<string | null>(null);
+  const parsedQueue = readTodayQueue(searchParams);
+  const queueOwnerChanged = queueOwner.current !== null && queueOwner.current !== authority;
+  const queue: TodayQueue = view === "operations" && !queueOwnerChanged ? parsedQueue.queue : "attention";
+  useLayoutEffect(() => {
+    // Admit an authorized initial deep link only after its requested property binds.
+    // Later authority/property changes must not inherit another owner's queue.
+    if (!enabled || propertiesLoading || propertiesError) return;
+    const changed = queueOwner.current !== null && queueOwner.current !== authority;
+    queueOwner.current = authority;
+    if (searchParams.has("todayQueue") && (changed || view !== "operations" || !parsedQueue.valid || parsedQueue.queue === "attention")) {
+      setSearchParams(current => { const next = new URLSearchParams(current); next.delete("todayQueue"); return next; }, { replace: true });
+    }
+  }, [authority, enabled, propertiesLoading, propertiesError, view, parsedQueue.valid, parsedQueue.queue, searchParams, setSearchParams]);
   const operations = useQuery({
     queryKey: ["reservation-operations", selectedPropertyId],
     queryFn: ({ signal }) => request<ReservationOperationsSnapshot>(
@@ -179,8 +194,15 @@ export function DashboardPage() {
 
   function setView(nextView: TodayView) {
     const next = new URLSearchParams(searchParams);
+    next.delete("todayQueue");
     if (nextView === "operations") next.delete("view");
     else next.set("view", nextView);
+    setSearchParams(next, { replace: true });
+  }
+
+  function setQueue(nextQueue: TodayQueue) {
+    const next = new URLSearchParams(searchParams);
+    writeTodayQueue(next, nextQueue);
     setSearchParams(next, { replace: true });
   }
 
@@ -260,6 +282,8 @@ export function DashboardPage() {
       {view === "operations" ? (
         <TodayOperationsView
           propertyId={selectedPropertyId}
+          queue={queue}
+          onQueueChange={setQueue}
           canOpenSpaces={canOpenSpaces}
           snapshot={snapshot}
           snapshotState={operationSource.state}

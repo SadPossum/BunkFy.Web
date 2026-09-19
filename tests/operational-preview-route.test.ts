@@ -6,6 +6,8 @@ import {
   operationalOriginMatchesLocation,
   operationalPreviewTriggerKey,
   readTodayRoomsContext,
+  readTodayQueue,
+  writeTodayQueue,
   parseOperationalPreviewRoute,
   parseOperationalReturnRoute,
   withOperationalPreviewRoute,
@@ -37,6 +39,43 @@ const route: OperationalPreviewRoute = {
 };
 
 describe("operational preview route", () => {
+  it.each(["attention", "arrivals", "departures", "staying"] as const)("round-trips the %s Operations queue and its exact preview identity", queue => {
+    const value: OperationalPreviewRoute = { selection: { kind: "reservation", propertyId, reservationId, inventoryUnitId: unitId }, origin: { surface: "today", propertyId, view: "operations", ...(queue !== "attention" ? { queue } : {}) } };
+    for (const [prefix, write, parse] of [["op", withOperationalPreviewRoute, parseOperationalPreviewRoute], ["opReturn", withOperationalReturnRoute, parseOperationalReturnRoute]] as const) {
+      const params = write(new URLSearchParams(), value);
+      expect(params.get(`${prefix}FromTodayQueue`)).toBe(queue === "attention" ? null : queue);
+      expect(parse(params)).toEqual(value);
+      params.append(`${prefix}FromTodayQueue`, queue); params.append(`${prefix}FromTodayQueue`, queue);
+      expect(parse(params)).toBeNull();
+    }
+    const returned = new URL(operationalOriginHref(value), "https://example.test");
+    expect(readTodayQueue(returned.searchParams)).toEqual({ valid: true, queue });
+    expect(operationalOriginMatchesLocation(value.origin, "/", returned.searchParams)).toBe(true);
+    returned.searchParams.set("todayQueue", queue === "arrivals" ? "departures" : "arrivals");
+    expect(operationalOriginMatchesLocation(value.origin, "/", returned.searchParams)).toBe(false);
+    expect(operationalPreviewTriggerKey(value)).toBe(`today:operations${queue === "attention" ? "" : `:${queue}`}:reservation:${reservationId}:${unitId}`);
+  });
+  it.each(["", "ARRIVALS", "invalid", "arrivals&todayQueue=departures"])("rejects malformed Today queue %s without adopting it", input => {
+    const params = new URLSearchParams(`todayQueue=${input}`);
+    expect(readTodayQueue(params)).toEqual({ valid: false, queue: "attention" });
+    writeTodayQueue(params, "attention"); expect(params.has("todayQueue")).toBe(false);
+    for (const [prefix, write, parse] of [["op", withOperationalPreviewRoute, parseOperationalPreviewRoute], ["opReturn", withOperationalReturnRoute, parseOperationalReturnRoute]] as const) {
+      const value: OperationalPreviewRoute = { ...route, origin: { surface: "today", propertyId, view: "operations" } };
+      const active = write(new URLSearchParams(), value); active.set(`${prefix}FromTodayQueue`, input);
+      expect(parse(active)).toBeNull();
+    }
+  });
+  it("rejects queue context belonging to a different surface and cleans both namespaces", () => {
+    for (const origin of [route.origin, { surface: "today", propertyId, view: "visual" } as const]) {
+      for (const [prefix, write, parse] of [["op", withOperationalPreviewRoute, parseOperationalPreviewRoute], ["opReturn", withOperationalReturnRoute, parseOperationalReturnRoute]] as const) {
+        const params = write(new URLSearchParams(), { ...route, origin }); params.set(`${prefix}FromTodayQueue`, "arrivals");
+        expect(parse(params)).toBeNull();
+      }
+    }
+    const params = withOperationalPreviewRoute(new URLSearchParams("todayQueue=arrivals&property=" + propertyId), { ...route, origin: { surface: "today", propertyId, view: "operations", queue: "arrivals" } });
+    const closed = withoutOperationalPreviewRoute(params);
+    expect(closed.get("todayQueue")).toBe("arrivals"); expect(closed.get("property")).toBe(propertyId); expect(closed.has("opFromTodayQueue")).toBe(false);
+  });
   it("round-trips Today structural room/filter context without search or changing literal trigger keys", () => {
     const value: OperationalPreviewRoute = { selection: { kind: "reservation", propertyId, reservationId, inventoryUnitId: unitId, roomId }, origin: { surface: "today", propertyId, view: "visual", rooms: { roomId, filter: "attention" } } };
     const active = withOperationalPreviewRoute(new URLSearchParams(), value);
@@ -80,7 +119,8 @@ describe("operational preview route", () => {
     const value: OperationalPreviewRoute = { ...route, origin: { surface: "today", propertyId, view: "visual", rooms: { roomId, filter: "attention" } } };
     const active = withOperationalPreviewRoute(new URLSearchParams(), value); active.append(key, active.get(key)!);
     expect(parseOperationalPreviewRoute(active)).toBeNull(); active.set(key, "private guest name"); expect(parseOperationalPreviewRoute(active)).toBeNull();
-    expect(parseOperationalPreviewRoute(withOperationalPreviewRoute(new URLSearchParams(), { ...route, origin: { surface: "today", propertyId, view: "operations", rooms: { roomId } } }))).toBeNull();
+    const mixed = withOperationalPreviewRoute(new URLSearchParams(), { ...route, origin: { surface: "today", propertyId, view: "operations" } });
+    mixed.set("opFromTodayRoom", roomId); expect(parseOperationalPreviewRoute(mixed)).toBeNull();
   });
   const clickedDay = "2026-09-05";
   const selections: [string, OperationalPreviewRoute["selection"], string][] = [

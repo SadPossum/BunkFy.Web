@@ -25,13 +25,16 @@ import type {
 import { reservationStatusLabel } from "../../api/labels";
 import type { CompositeSourceState } from "../../app/compositeSourceState";
 import { InitialAvatar, StatusBadge } from "../../components/ui/primitives";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { buildTodayBoard, todayAttentionReason } from "./todayOperationsModel";
 import { useOperationalPreview } from "../operational-preview/OperationalPreviewProvider";
-import type { OperationalPreviewRoute } from "../operational-preview/operationalPreviewRoute";
+import type { OperationalPreviewRoute, TodayQueue } from "../operational-preview/operationalPreviewRoute";
 import { operationalSpacesHref } from "../operational-preview/operationalSurfaceReturn";
 
 export function TodayOperationsView({
   propertyId,
+  queue,
+  onQueueChange,
   canOpenSpaces,
   snapshot,
   snapshotState,
@@ -48,6 +51,8 @@ export function TodayOperationsView({
   sourceStatus,
 }: {
   propertyId: string;
+  queue: TodayQueue;
+  onQueueChange: (queue: TodayQueue) => void;
   canOpenSpaces: boolean;
   snapshot?: ReservationOperationsSnapshot;
   snapshotState: CompositeSourceState;
@@ -73,6 +78,14 @@ export function TodayOperationsView({
   const completePresentation = (reservationCurrent && snapshotCurrent) || (routineRefresh && reservationState === "ready" && snapshotState === "ready" && !conflictCount);
   const reservationPresentation = reservationCurrent || (routineRefresh && reservationState === "ready" && !conflictCount);
   const comingUp = snapshot?.upcoming.filter((reservation) => reservation.arrival > snapshot.localDate).slice(0, 3) ?? [];
+  const queues = [
+    { value: "attention", label: "Needs attention", items: board.attention, icon: <TriangleAlert size={16} />, tone: "warning", kind: "attention", emptyLabel: "No decisions waiting" },
+    { value: "arrivals", label: "Arrivals", items: board.arrivals, icon: <LogIn size={16} />, tone: "success", kind: "arrival", emptyLabel: "No confirmed arrivals today" },
+    { value: "departures", label: "Departures", items: board.departures, icon: <LogOut size={16} />, tone: "primary", kind: "departure", emptyLabel: "No departures waiting" },
+    { value: "staying", label: "Staying tonight", items: board.inHouse, icon: <UsersRound size={16} />, tone: "secondary", kind: "inHouse", emptyLabel: "No continuing in-house stays" },
+  ] as const;
+  const selectedQueue = queues.find(item => item.value === queue)!;
+  const origin = { surface: "today", propertyId, view: "operations", ...(queue !== "attention" ? { queue } : {}) } as const;
 
   function openReservation(
     reservation: ReservationListItem,
@@ -88,7 +101,7 @@ export function TodayOperationsView({
         roomId: inventoryContext?.roomId,
         bedId: inventoryContext?.bedId,
       },
-      origin: { surface: "today", propertyId, view: "operations" },
+      origin,
     };
     openPreview({
       route,
@@ -98,7 +111,7 @@ export function TodayOperationsView({
   }
 
   return (
-    <div role="tabpanel" aria-label="Today operations" className="space-y-5">
+    <div role="tabpanel" aria-label="Today operations" className="space-y-5 max-lg:[&_:is(button,a,[tabindex])]:scroll-mt-20 max-lg:[&_:is(button,a,[tabindex])]:scroll-mb-[calc(5rem+env(safe-area-inset-bottom))]">
       <p id="today-source-status" role="status" aria-live="polite" className="min-h-[20px] text-[13px] leading-[20px] text-base-content/70">{sourceStatus}</p>
       <section className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-base-300 bg-base-300 shadow-sm xl:grid-cols-4" aria-label="Today summary">
         <OperationMetric
@@ -135,15 +148,15 @@ export function TodayOperationsView({
         />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.72fr)]">
-        <div className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
-          <div className="flex items-start justify-between gap-4 border-b border-base-300 px-5 py-4 sm:px-6">
-            <div>
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.72fr)]">
+        <div className="min-w-0 overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-base-300 px-5 py-4 sm:px-6">
+            <div className="min-w-0 flex-1 basis-48">
               <div className="flex items-center gap-2 text-primary"><CalendarClock size={17} /><p className="text-xs font-semibold uppercase">Current shift</p></div>
               <h2 className="mt-2 font-display text-lg font-semibold">Shift board</h2>
               <p className="mt-1 text-sm text-base-content/55">Decisions and guest movements in the order staff need them.</p>
             </div>
-            <Link to="/calendar" className="btn btn-ghost btn-sm shrink-0 text-primary">Calendar <ArrowRight size={16} /></Link>
+            <Link to="/calendar" className="btn btn-ghost btn-sm h-auto min-h-[44px] shrink-0 text-primary">Calendar <ArrowRight size={16} /></Link>
           </div>
           {!completePresentation && <p role="status" className="border-b border-base-300 px-5 py-3 text-sm">Shift coverage is unconfirmed. Shown details are last known; missing records do not mean no work. Use Retry above for unavailable sources.{conflictCount > 0 ? ` ${conflictCount} conflicting records are withheld.` : ""}</p>}
           {completePresentation && attention && attention.reservationCount !== board.attention.length && <p role="status" className="border-b border-base-300 px-5 py-3 text-sm">Summary and detailed records were read separately and currently differ. The complete detail feed shows {board.attention.length} attention records; refresh both sources before relying on the summary count.</p>}
@@ -152,56 +165,21 @@ export function TodayOperationsView({
           ) : reservationState === "unavailable" || !snapshot ? (
             <div className="p-5 text-sm text-base-content/50">The detailed shift schedule is temporarily unavailable.</div>
           ) : (
-            <div className="divide-y divide-base-300">
+            <div>
+              <div className="border-b border-base-300 p-2">
+                <SegmentedTabs
+                  value={queue}
+                  onValueChange={onQueueChange}
+                  ariaLabel="Shift queue"
+                  options={queues.map(item => ({ value: item.value, label: `${item.label} · ${reservationPresentation ? item.items.length : "—"}` }))}
+                  stretch
+                  narrowGrid
+                  className="!grid !w-full grid-cols-2 !overflow-visible sm:grid-cols-4 [&>button]:h-auto [&>button]:min-h-[44px] [&>button]:whitespace-normal [&>button]:text-[14px] [&>button]:leading-[20px]"
+                />
+              </div>
               <ShiftSection
-                icon={<TriangleAlert size={16} />}
-                label="Needs attention"
-                items={board.attention}
-                emptyLabel="No decisions waiting"
-                tone="warning"
-                kind="attention"
-                current={reservationPresentation}
-                unitLabels={unitLabels}
-                localDate={snapshot.localDate}
-                activeRoute={activeRoute}
-                inventory={inventory}
-                onOpen={openReservation}
-              />
-              <ShiftSection
-                icon={<LogIn size={16} />}
-                label="Arrivals"
-                items={board.arrivals}
-                emptyLabel="No confirmed arrivals today"
-                tone="success"
-                kind="arrival"
-                current={reservationPresentation}
-                unitLabels={unitLabels}
-                localDate={snapshot.localDate}
-                activeRoute={activeRoute}
-                inventory={inventory}
-                onOpen={openReservation}
-              />
-              <ShiftSection
-                icon={<LogOut size={16} />}
-                label="Departures"
-                items={board.departures}
-                emptyLabel="No departures waiting"
-                tone="primary"
-                kind="departure"
-                current={reservationPresentation}
-                unitLabels={unitLabels}
-                localDate={snapshot.localDate}
-                activeRoute={activeRoute}
-                inventory={inventory}
-                onOpen={openReservation}
-              />
-              <ShiftSection
-                icon={<UsersRound size={16} />}
-                label="Staying tonight"
-                items={board.inHouse}
-                emptyLabel="No continuing in-house stays"
-                tone="secondary"
-                kind="inHouse"
+                {...selectedQueue}
+                queue={queue}
                 current={reservationPresentation}
                 unitLabels={unitLabels}
                 localDate={snapshot.localDate}
@@ -213,7 +191,7 @@ export function TodayOperationsView({
           )}
         </div>
 
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <div className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
             <div className="border-b border-base-300 px-5 py-4 sm:px-6">
               <div className="flex items-center gap-2 text-primary"><DoorOpen size={17} /><p className="text-xs font-semibold uppercase">Property pulse</p></div>
@@ -226,8 +204,8 @@ export function TodayOperationsView({
               <PulseRow icon={<Settings2 />} label="Rooms needing setup" value={sourceValue(inventoryState, unconfiguredRooms.length)} attention={unconfiguredRooms.length > 0} />
             </div>
             {canOpenSpaces && <div className="grid grid-cols-2 gap-2 border-t border-base-300 p-4 sm:px-5">
-              <Link to={operationalSpacesHref({ surface: "today", propertyId, view: "operations" }, "availability")} className="btn btn-outline btn-sm border-base-300 text-primary"><Blocks size={15} />Availability</Link>
-              <Link to={operationalSpacesHref({ surface: "today", propertyId, view: "operations" }, "layout")} className="btn btn-outline btn-sm border-base-300 text-primary"><Building2 size={15} />Rooms & beds</Link>
+              <Link to={operationalSpacesHref(origin, "availability")} className="btn btn-outline btn-sm border-base-300 text-primary"><Blocks size={15} />Availability</Link>
+              <Link to={operationalSpacesHref(origin, "layout")} className="btn btn-outline btn-sm border-base-300 text-primary"><Building2 size={15} />Rooms & beds</Link>
             </div>}
           </div>
 
@@ -244,6 +222,7 @@ export function TodayOperationsView({
                   <UpcomingStay
                     key={reservation.reservationId}
                     reservation={reservation}
+                    queue={queue}
                     inventory={inventory}
                     activeRoute={activeRoute}
                     onOpen={openReservation}
@@ -291,6 +270,7 @@ function OperationMetric({ icon, label, value, detail, tone, to }: {
 type ShiftKind = "attention" | "arrival" | "departure" | "inHouse";
 
 function ShiftSection({
+  queue,
   icon,
   label,
   items,
@@ -304,6 +284,7 @@ function ShiftSection({
   inventory,
   onOpen,
 }: {
+  queue: TodayQueue;
   icon: ReactNode;
   label: string;
   items: ReservationListItem[];
@@ -324,7 +305,7 @@ function ShiftSection({
     secondary: "bg-secondary/12 text-secondary",
   };
   return (
-    <section>
+    <section role="tabpanel" aria-label={label} tabIndex={0} data-today-queue={queue}>
       <div className="flex items-center gap-3 bg-base-200/45 px-5 py-2.5 sm:px-6">
         <span className={`grid size-7 shrink-0 place-items-center rounded-md ${tones[tone]}`}>{icon}</span>
         <h3 className="min-w-0 flex-1 text-sm font-semibold">{label}</h3>
@@ -336,6 +317,7 @@ function ShiftSection({
             <ShiftReservationRow
               key={reservation.reservationId}
               reservation={reservation}
+              queue={queue}
               kind={kind}
               unitLabels={unitLabels}
               localDate={localDate}
@@ -355,6 +337,7 @@ function ShiftSection({
 }
 
 function ShiftReservationRow({
+  queue,
   reservation,
   kind,
   unitLabels,
@@ -363,6 +346,7 @@ function ShiftReservationRow({
   inventory,
   onOpen,
 }: {
+  queue: TodayQueue;
   reservation: ReservationListItem;
   kind: ShiftKind;
   unitLabels: Map<string, string>;
@@ -373,14 +357,14 @@ function ShiftReservationRow({
 }) {
   const time = shiftTime(reservation, kind, localDate);
   const inventoryContext = reservationInventoryContext(reservation, inventory);
-  const selected = operationalReservationSelected(activeRoute, reservation, inventoryContext?.inventoryUnitId);
+  const selected = operationalReservationSelected(activeRoute, reservation, inventoryContext?.inventoryUnitId, queue);
   return (
     <button
       type="button"
       className={`grid w-full gap-2 px-5 py-3 text-left transition hover:bg-base-200/55 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-center sm:px-6 ${selected ? "bg-primary/8 ring-2 ring-inset ring-primary/35" : ""}`}
       aria-expanded={selected}
       aria-controls="operational-preview"
-      data-operational-preview-trigger={todayReservationTriggerKey(reservation.reservationId, inventoryContext?.inventoryUnitId)}
+      data-operational-preview-trigger={todayReservationTriggerKey(reservation.reservationId, inventoryContext?.inventoryUnitId, queue)}
       onClick={(event) => onOpen(reservation, event)}
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -399,21 +383,22 @@ function ShiftReservationRow({
   );
 }
 
-function UpcomingStay({ reservation, inventory, activeRoute, onOpen }: {
+function UpcomingStay({ reservation, inventory, activeRoute, onOpen, queue }: {
+  queue: TodayQueue;
   reservation: ReservationListItem;
   inventory: RoomInventory[];
   activeRoute: OperationalPreviewRoute | null;
   onOpen: (reservation: ReservationListItem, event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const inventoryContext = reservationInventoryContext(reservation, inventory);
-  const selected = operationalReservationSelected(activeRoute, reservation, inventoryContext?.inventoryUnitId);
+  const selected = operationalReservationSelected(activeRoute, reservation, inventoryContext?.inventoryUnitId, queue);
   return (
     <button
       type="button"
       className={`flex w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-base-200/55 ${selected ? "bg-primary/8 ring-2 ring-inset ring-primary/35" : ""}`}
       aria-expanded={selected}
       aria-controls="operational-preview"
-      data-operational-preview-trigger={todayReservationTriggerKey(reservation.reservationId, inventoryContext?.inventoryUnitId)}
+      data-operational-preview-trigger={todayReservationTriggerKey(reservation.reservationId, inventoryContext?.inventoryUnitId, queue)}
       onClick={(event) => onOpen(reservation, event)}
     >
       <InitialAvatar name={reservation.primaryGuestName} size="sm" />
@@ -462,9 +447,11 @@ function operationalReservationSelected(
   route: OperationalPreviewRoute | null,
   reservation: ReservationListItem,
   inventoryUnitId: string | undefined,
+  queue: TodayQueue,
 ) {
   return route?.origin.surface === "today"
     && route.origin.view === "operations"
+    && (route.origin.queue ?? "attention") === queue
     && route.selection.kind === "reservation"
     && route.selection.reservationId === reservation.reservationId
     && route.selection.inventoryUnitId === inventoryUnitId;
@@ -473,8 +460,9 @@ function operationalReservationSelected(
 function todayReservationTriggerKey(
   reservationId: string,
   inventoryUnitId: string | undefined,
+  queue: TodayQueue,
 ) {
-  return `today:operations:reservation:${reservationId}:${inventoryUnitId ?? "none"}`;
+  return `today:operations${queue === "attention" ? "" : `:${queue}`}:reservation:${reservationId}:${inventoryUnitId ?? "none"}`;
 }
 
 function reservationUnitLabel(reservation: ReservationListItem, labels: Map<string, string>) {

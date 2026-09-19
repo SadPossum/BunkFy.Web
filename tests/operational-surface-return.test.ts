@@ -15,6 +15,26 @@ const otherProperty = "22222222-2222-4222-8222-222222222222";
 const params = () => new URL(todayVisualSpacesHref(propertyId), "https://example.test").searchParams;
 
 describe("surface-only Today return", () => {
+  it.each(["attention", "arrivals", "departures", "staying"] as const)("preserves %s Operations queue through Spaces and nested return", queue => {
+    const origin = { surface: "today" as const, propertyId, view: "operations" as const, ...(queue !== "attention" ? { queue } : {}) };
+    const initial = new URL(operationalSpacesHref(origin, "layout"), "https://example.test").searchParams;
+    expect(parseOperationalSurfaceReturn(initial)).toEqual(origin);
+    const owner = withSpacesReturnRoute(initial, { section: "layout", propertyId, roomId: otherProperty });
+    const returned = new URL(spacesReturnHref({ section: "layout", propertyId, roomId: otherProperty }, owner), "https://example.test").searchParams;
+    expect(parseOperationalSurfaceReturn(returned)).toEqual(origin);
+    const href = new URL(operationalSurfaceOriginHref(origin), "https://example.test");
+    expect(href.searchParams.get("todayQueue")).toBe(queue === "attention" ? null : queue);
+    expect(href.searchParams.has("view")).toBe(false); expect(href.searchParams.get("property")).toBe(propertyId);
+    for (const invalid of ["", "ARRIVALS", "secret"]) { const bad = new URLSearchParams(initial); bad.set("surfaceReturnTodayQueue", invalid); expect(parseOperationalSurfaceReturn(bad)).toBeNull(); }
+    initial.append("surfaceReturnTodayQueue", "arrivals"); initial.append("surfaceReturnTodayQueue", "arrivals"); expect(parseOperationalSurfaceReturn(initial)).toBeNull();
+    expect(parseOperationalSurfaceReturn(propertySwitchSearchParams("/spaces", returned, otherProperty))).toBeNull();
+  });
+  it("rejects a queue on Rooms or Calendar and keeps unknown/mixed namespaces closed", () => {
+    for (const origin of [{ surface: "today" as const, propertyId, view: "visual" as const }, { surface: "calendar" as const, propertyId, date: "2026-09-09", day: "2026-09-09" }]) {
+      const value = new URL(operationalSpacesHref(origin, "layout"), "https://example.test").searchParams;
+      value.set("surfaceReturnTodayQueue", "attention"); expect(parseOperationalSurfaceReturn(value)).toBeNull();
+    }
+  });
   it("preserves only scoped structural Rooms filters through Spaces and nested editor return", () => {
     const origin = { surface: "today" as const, propertyId, view: "visual" as const, rooms: { roomId: otherProperty, filter: "movements" as const } };
     const initial = new URL(todayVisualSpacesHref(propertyId, otherProperty, origin.rooms), "https://example.test").searchParams;
@@ -93,7 +113,7 @@ describe("Calendar and Today entityless Spaces handoffs", () => {
     }
     expect(parseOperationalSurfaceReturn(propertySwitchSearchParams("/spaces", initial, otherProperty))).toBeNull();
   });
-  it("preserves exact room/property, Calendar anchor/selected day and explicit Today Operations view", () => {
+  it("preserves exact room/property, Calendar anchor/selected day and canonical Today Operations view", () => {
     const next = calendarParams();
     expect(next.get("room")).toBe(otherProperty);
     expect(parseOperationalSurfaceReturn(next)).toEqual(calendar);
@@ -103,7 +123,7 @@ describe("Calendar and Today entityless Spaces handoffs", () => {
     expect(availability.searchParams.get("section")).toBe("availability");
     expect(availability.searchParams.has("room")).toBe(false);
     expect(parseOperationalSurfaceReturn(availability.searchParams)).toEqual(today);
-    expect(operationalSurfaceOriginHref(today)).toBe(`/?view=operations&property=${propertyId}`);
+    expect(operationalSurfaceOriginHref(today)).toBe(`/?property=${propertyId}`);
     for (const item of [next, availability.searchParams]) {
       expect(parseOperationalPreviewRoute(item)).toBeNull(); expect(parseOperationalReturnRoute(item)).toBeNull();
     }

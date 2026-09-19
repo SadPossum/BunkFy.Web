@@ -1,9 +1,9 @@
-import { readTodayRoomsContext, writeTodayRoomsContext, type OperationalOrigin, type TodayRoomsContext } from "./operationalPreviewRoute";
+import { readTodayOriginContext, writeTodayQueue, writeTodayRoomsContext, type OperationalOrigin, type TodayRoomsContext } from "./operationalPreviewRoute";
 import { readCalendarViewport, writeCalendarViewport } from "../calendar/calendarWindow";
 
 // A surface handoff has no selected entity. Keep it separate from preview routes.
 export type OperationalSurfaceReturn = OperationalOrigin;
-const keys = ["surfaceReturn", "surfaceReturnView", "surfaceReturnProperty", "surfaceReturnDate", "surfaceReturnDay", "surfaceReturnViewportDate", "surfaceReturnViewportOffset", "surfaceReturnTodayRoom", "surfaceReturnTodayFilter"] as const;
+const keys = ["surfaceReturn", "surfaceReturnView", "surfaceReturnProperty", "surfaceReturnDate", "surfaceReturnDay", "surfaceReturnViewportDate", "surfaceReturnViewportOffset", "surfaceReturnTodayRoom", "surfaceReturnTodayFilter", "surfaceReturnTodayQueue"] as const;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function parseOperationalSurfaceReturn(
@@ -20,9 +20,11 @@ export function parseOperationalSurfaceReturn(
   if (!property || !uuidPattern.test(property) || property !== propertyId || property !== params.get("property")) return null;
   if (params.get("surfaceReturn") === "today") {
     const view = params.get("surfaceReturnView");
-    const rooms = readTodayRoomsContext(params, "surfaceReturnToday"), hasRooms = Object.keys(rooms.context).length > 0;
-    return rooms.valid && !params.has("surfaceReturnDate") && !params.has("surfaceReturnDay") && !params.has("surfaceReturnViewportDate") && !params.has("surfaceReturnViewportOffset") && (view === "visual" || (view === "operations" && !hasRooms))
-      ? { surface: "today", propertyId: property, view, ...(hasRooms ? { rooms: rooms.context } : {}) } : null;
+    const { valid, ...context } = readTodayOriginContext(params, view, "surfaceReturnToday");
+    if (!valid || params.has("surfaceReturnDate") || params.has("surfaceReturnDay") || params.has("surfaceReturnViewportDate") || params.has("surfaceReturnViewportOffset")) return null;
+    if (view === "visual") return { surface: "today", propertyId: property, view, ...(context.rooms ? { rooms: context.rooms } : {}) };
+    if (view === "operations") return { surface: "today", propertyId: property, view, ...(context.queue ? { queue: context.queue } : {}) };
+    return null;
   }
   if (params.get("surfaceReturn") === "calendar" && !params.has("surfaceReturnView")) {
     if ([...params.keys()].some(key => key.startsWith("surfaceReturnToday"))) return null;
@@ -53,7 +55,8 @@ export function withOperationalSurfaceReturn(
   next.set("surfaceReturn", origin.surface);
   if (origin.surface === "today") {
     next.set("surfaceReturnView", origin.view);
-    writeTodayRoomsContext(next, origin.rooms, "surfaceReturnToday");
+    if (origin.view === "visual") writeTodayRoomsContext(next, origin.rooms, "surfaceReturnToday");
+    else writeTodayQueue(next, origin.queue, "surfaceReturnTodayQueue");
   }
   else {
     next.set("surfaceReturnDate", origin.date);
@@ -68,6 +71,10 @@ export function operationalSurfaceOriginHref(origin: OperationalSurfaceReturn): 
   if (origin.surface === "today") {
     const params = new URLSearchParams({ view: origin.view, property: origin.propertyId });
     writeTodayRoomsContext(params, origin.rooms);
+    if (origin.view === "operations") {
+      params.delete("view");
+      writeTodayQueue(params, origin.queue);
+    }
     return `/?${params}`;
   }
   const params = new URLSearchParams({ date: origin.date, day: origin.day, property: origin.propertyId });

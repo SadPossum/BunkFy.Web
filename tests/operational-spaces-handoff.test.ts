@@ -101,7 +101,7 @@ describe("rendered operational Spaces handoffs", () => {
     for (const rooms of [[], [room]]) expect(links(render(week(rooms, false)).html).some((href) => href.startsWith("/spaces"))).toBe(false);
   });
   it("shows truthful Today Operations destinations without fabricating an entity selection", () => {
-    const props = { propertyId, canOpenSpaces: true, snapshotState: "ready" as const, inventory: [room],
+    const props = { propertyId, queue: "attention" as const, onQueueChange: () => {}, canOpenSpaces: true, snapshotState: "ready" as const, inventory: [room],
       inventoryState: "ready" as const, blocks: [], blockState: "ready" as const,
       reservations: [], reservationState: "ready" as const };
     const html = render(createElement(TodayOperationsView, props)).html;
