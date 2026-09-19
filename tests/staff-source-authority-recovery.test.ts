@@ -9,6 +9,7 @@ import {
   staffRecordMatches,
   staffSensitiveRecordMatches,
 } from "../src/features/staff/staffMutationAuthority";
+import { staffDirectoryScope } from "../src/features/staff/staffPresentation";
 
 const repositoryRoot = process.cwd();
 
@@ -97,17 +98,27 @@ describe("staff source authority recovery", () => {
     expect(staffLifecycleActionMatches(directoryMember("departed"), "depart")).toBe(false);
   });
 
+  it("keeps workspace and current-property directory scope explicit", () => {
+    expect(staffDirectoryScope(null, true)).toBe("workspace");
+    expect(staffDirectoryScope("workspace", true)).toBe("workspace");
+    expect(staffDirectoryScope("property", true)).toBe("property");
+    expect(staffDirectoryScope("property", false)).toBe("workspace");
+    expect(staffDirectoryScope("unknown", true)).toBe("workspace");
+  });
+
   it("keeps tenant, directory, sensitive profile, property, and permission evidence independent", () => {
     const page = source("features/staff/StaffPage.tsx");
     const detail = source("features/staff/StaffDetail.tsx");
     const assignments = source("features/staff/StaffAssignmentsPanel.tsx");
 
     expect(page).toContain("const tenantAccess = usePermissions(");
-    expect(page).toContain("const assignmentAccess = usePermissions(");
+    expect(page).toContain("const propertyStaffAccess = usePermissions(");
     expect(page).toContain("const permissionSource = createCompositeSource({");
-    expect(page).toContain("const assignmentPermissionSource = selectedProperty");
+    expect(page).toContain("const propertyStaffPermissionSource = selectedProperty");
     expect(page).toContain("const propertySource = createCompositeSource({");
-    expect(page).toContain("queryKey: [\"staff-members\", tenantId, deferredSearch, status, page]");
+    expect(page).toContain("directoryScope === \"property\" ? selectedProperty?.propertyId ?? \"none\" : \"workspace\"");
+    expect(page).toContain("`/api/staff/properties/${selectedProperty.propertyId}/members?${params}`");
+    expect(page).toContain("next.set(\"section\", section)");
     expect(page).toContain("tenantIdRef.current !== targetTenantId");
     expect(page).toContain("if (tenantId) previousTenantIdRef.current = tenantId;");
     expect(page).toContain("disabled={!createAuthorityCurrent}");

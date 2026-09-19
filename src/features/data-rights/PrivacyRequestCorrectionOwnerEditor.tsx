@@ -58,6 +58,8 @@ export function PrivacyRequestCorrectionOwnerEditor({
   propertyId,
   execution,
   disabled,
+  guestDraftReady = false,
+  guestSubmitReady = false,
   operatorScopeKey,
   scopeKey,
   caseSnapshot,
@@ -66,6 +68,8 @@ export function PrivacyRequestCorrectionOwnerEditor({
   propertyId?: string;
   execution: DataRightsCorrectionExecutionDetails;
   disabled: boolean;
+  guestDraftReady?: boolean;
+  guestSubmitReady?: boolean;
   operatorScopeKey: string;
   scopeKey: string;
   caseSnapshot: DataRightsCaseSnapshot;
@@ -216,10 +220,11 @@ export function PrivacyRequestCorrectionOwnerEditor({
     return (
       <OwnerSourceFrame source={guestSource}>
         <GuestCorrectionForm
-          key={`${guest.data.guestId}:${guest.data.version}`}
+          key={`${operatorScopeKey}:${scopeKey}:${caseSnapshot.id}:${caseSnapshot.version}:${execution.executionId}:${execution.version}:${execution.executionRevision}:${guest.data.guestId}:${guest.data.version}`}
           profile={guest.data}
           execution={execution}
-          disabled={disabled || !ownerRecordCurrent}
+          editingDisabled={!guestDraftReady || guestSource.state !== "ready" || guest.data.guestId !== recordId}
+          disabled={disabled || !guestSubmitReady || !ownerRecordCurrent}
           pending={guestCorrection.isPending}
           error={guestCorrection.error}
           onSubmit={(body) => {

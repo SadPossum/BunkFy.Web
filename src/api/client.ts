@@ -1,4 +1,16 @@
-export type ApiSession = { accessToken: string; tenantId: string; username: string };
+import {
+  assertRequestCanStart,
+  networkRequestFailure,
+} from "./requestConnectivity";
+
+export type ApiSession = {
+  accessToken: string;
+  tenantId: string;
+  username: string;
+  subjectId?: string;
+  sessionId?: string;
+  generation?: string;
+};
 export type ApiDownload = { blob: Blob; fileName: string | null; contentType: string | null };
 
 export class ApiError extends Error {
@@ -7,6 +19,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code?: string,
     public readonly retryAfterMs?: number,
+    public readonly referenceId?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -32,7 +45,7 @@ export async function apiRequest<T>(
   if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
   if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
 
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+  const response = await fetchWithConnectivity(`${resolveApiBaseUrl()}${path}`, {
     ...options,
     credentials: "include",
     headers,
@@ -59,7 +72,7 @@ export async function apiDownload(
   if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
   if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
 
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+  const response = await fetchWithConnectivity(`${resolveApiBaseUrl()}${path}`, {
     ...options,
     credentials: "include",
     headers,
@@ -80,7 +93,7 @@ export async function apiStream(
   const headers = new Headers({ Accept: "text/event-stream" });
   if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
   if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
-  const response = await fetch(`${resolveApiBaseUrl()}${path}`, { credentials: "include", headers, signal });
+  const response = await fetchWithConnectivity(`${resolveApiBaseUrl()}${path}`, { credentials: "include", headers, signal });
   if (!response.ok) throw await toApiError(response);
   return response;
 }
@@ -98,12 +111,35 @@ async function toApiError(response: Response): Promise<ApiError> {
   const code = getString(payload, "code") ||
     getNestedString(payload, "error", "code") ||
     (isErrorCode(title) ? title : undefined);
+  const referenceId = safeReferenceId(
+    getString(payload, "requestId") ||
+      getString(payload, "traceId") ||
+      getString(payload, "correlationId") ||
+      getNestedString(payload, "extensions", "requestId") ||
+      getNestedString(payload, "extensions", "traceId") ||
+      response.headers.get("x-request-id") ||
+      response.headers.get("x-correlation-id") ||
+      undefined,
+  );
   return new ApiError(
     detail || `Request failed with HTTP ${response.status}`,
     response.status,
     code,
     parseRetryAfterMilliseconds(response.headers.get("retry-after")),
+    referenceId,
   );
+}
+
+async function fetchWithConnectivity(
+  input: RequestInfo | URL,
+  init: RequestInit,
+): Promise<Response> {
+  assertRequestCanStart(init);
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    throw networkRequestFailure(error);
+  }
 }
 
 function parseRetryAfterMilliseconds(value: string | null): number | undefined {
@@ -132,6 +168,13 @@ function getString(value: unknown, key: string): string | undefined {
 function getNestedString(value: unknown, parent: string, key: string): string | undefined {
   if (!value || typeof value !== "object") return undefined;
   return getString((value as Record<string, unknown>)[parent], key);
+}
+
+function safeReferenceId(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && /^[A-Za-z0-9._:-]{4,128}$/.test(normalized)
+    ? normalized
+    : undefined;
 }
 
 function trimTrailingSlash(value: string): string {

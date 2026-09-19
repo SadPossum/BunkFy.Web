@@ -3,6 +3,8 @@ import {
   ChevronRight,
   Clock3,
   FileLock2,
+  FileOutput,
+  PencilLine,
   Plus,
   ShieldCheck,
   TriangleAlert,
@@ -75,6 +77,17 @@ import {
   type DataRightsCaseCreateAttempt,
 } from "./dataRightsCaseCreateAttempt";
 import {
+  clearDataRightsOperatorContextSearchParams,
+  clearDataRightsScopeContextSearchParams,
+  dataRightsCaseSearchParams,
+  dataRightsPageSearchParams,
+  dataRightsScopeSearchParams,
+  dataRightsStatusSearchParams,
+  dataRightsViewState,
+  type DataRightsScopeFilter,
+  type DataRightsStatusFilter,
+} from "./dataRightsViewState";
+import {
   dataRightsCaseQueryKey,
   dataRightsCasesQueryKey,
   dataRightsMutationAllowed,
@@ -121,17 +134,16 @@ export function PrivacyRequestsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const targetPropertyId = searchParams.get("property");
-  const targetScopeKind = searchParams.get("scope");
   useTargetProperty(targetPropertyId);
-  const [scopeKind, setScopeKind] = useState<"guest" | "staff">(
-    targetScopeKind === "guest" || targetScopeKind === "staff"
-      ? targetScopeKind
-      : selectedPropertyId ? "guest" : "staff",
+  const view = dataRightsViewState(
+    searchParams,
+    selectedPropertyId ? "guest" : "staff",
   );
-  const [status, setStatus] = useState("all");
-  const [page, setPage] = useState(1);
+  const scopeKind = view.scope;
+  const status = view.status;
+  const page = view.page;
   const [createOpen, setCreateOpen] = useState(false);
-  const selectedCaseId = searchParams.get("case");
+  const selectedCaseId = view.selectedCaseId;
   const tenantScope = session ? tenantAccessScope(session.tenantId) : "";
   const propertyScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
@@ -238,20 +250,6 @@ export function PrivacyRequestsPage() {
   const focusedCaseId = useTransientResourceFocus(casesUsable);
 
   useEffect(() => {
-    if ((targetScopeKind === "guest" || targetScopeKind === "staff") &&
-      targetScopeKind !== scopeKind) {
-      setScopeKind(targetScopeKind);
-    }
-  }, [scopeKind, targetScopeKind]);
-
-  useEffect(() => {
-    if (!selectedPropertyId && scopeKind === "guest" && targetScopeKind !== "guest") {
-      setScopeKind("staff");
-    }
-  }, [scopeKind, selectedPropertyId, targetScopeKind]);
-
-  useEffect(() => {
-    setPage(1);
     setCreateOpen(false);
   }, [scopeKey]);
 
@@ -261,10 +259,10 @@ export function PrivacyRequestsPage() {
     previousWorkflowScopeKeyRef.current = scopeKey;
     if (previous === "guest:none") return;
 
-    const next = new URLSearchParams(searchParams);
-    next.delete("case");
-    next.delete("focus");
-    setSearchParams(next, { replace: true });
+    setSearchParams(
+      clearDataRightsScopeContextSearchParams(searchParams),
+      { replace: true },
+    );
   }, [scopeKey, searchParams, setSearchParams]);
 
   useEffect(() => {
@@ -273,38 +271,29 @@ export function PrivacyRequestsPage() {
     previousOperatorScopeKeyRef.current = operatorScopeKey;
     if (!previous) return;
 
-    setStatus("all");
-    setPage(1);
     setCreateOpen(false);
-    const next = new URLSearchParams(searchParams);
-    next.delete("case");
-    next.delete("focus");
-    setSearchParams(next, { replace: true });
+    setSearchParams(
+      clearDataRightsOperatorContextSearchParams(searchParams),
+      { replace: true },
+    );
   }, [operatorScopeKey, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (items.length === 0 && page > 1 && casesCurrent) {
-      setPage((current) => Math.max(1, current - 1));
+      setSearchParams(
+        dataRightsPageSearchParams(searchParams, Math.max(1, page - 1)),
+        { replace: true },
+      );
     }
-  }, [casesCurrent, items.length, page]);
+  }, [casesCurrent, items.length, page, searchParams, setSearchParams]);
 
-  function selectScope(value: "guest" | "staff") {
-    setScopeKind(value);
-    setPage(1);
+  function selectScope(value: DataRightsScopeFilter) {
     setCreateOpen(false);
-    const next = new URLSearchParams(searchParams);
-    next.set("scope", value);
-    next.delete("case");
-    next.delete("focus");
-    setSearchParams(next, { replace: true });
+    setSearchParams(dataRightsScopeSearchParams(searchParams, value), { replace: true });
   }
 
   function selectCase(caseId: string | null) {
-    const next = new URLSearchParams(searchParams);
-    if (caseId) next.set("case", caseId);
-    else next.delete("case");
-    next.delete("focus");
-    setSearchParams(next, { replace: true });
+    setSearchParams(dataRightsCaseSearchParams(searchParams, caseId), { replace: true });
   }
 
   return (
@@ -339,25 +328,27 @@ export function PrivacyRequestsPage() {
         title="Privacy access is delayed"
       />
 
-      <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
-        <div className="border-b border-base-300 px-4 py-3 sm:px-6">
-          <SegmentedTabs
-            value={scopeKind}
-            ariaLabel="Privacy request scope"
-            onValueChange={selectScope}
-            options={[
-              { value: "guest", label: "Guest requests", icon: <ShieldCheck size={15} /> },
-              { value: "staff", label: "Staff requests", icon: <UsersRound size={15} /> },
-            ]}
-          />
-        </div>
+      <SegmentedTabs
+        className="mb-5"
+        value={scopeKind}
+        ariaLabel="Privacy request scope"
+        onValueChange={selectScope}
+        options={[
+          { value: "guest", label: "Guest requests", icon: <ShieldCheck size={15} /> },
+          { value: "staff", label: "Staff requests", icon: <UsersRound size={15} /> },
+        ]}
+      />
+
+      <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm" aria-labelledby="privacy-queue-heading">
         <div className="flex flex-col items-stretch gap-4 border-b border-base-300 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <h2 className="font-display text-lg font-semibold">
+            <h2 id="privacy-queue-heading" className="font-display text-xl font-semibold">
               {scopeKind === "staff" ? "Workspace request queue" : "Property request queue"}
             </h2>
-            <p className="mt-1 text-xs text-base-content/50">
-              Sensitive record matching happens only inside an open request.
+            <p className="mt-1 text-sm text-base-content/55">
+              {scopeKind === "staff"
+                ? "Staff records remain workspace scoped; matching starts only inside a request."
+                : "Guest records remain property scoped; matching starts only inside a request."}
             </p>
           </div>
           <SelectPicker
@@ -365,8 +356,13 @@ export function PrivacyRequestsPage() {
             size="sm"
             value={status}
             onValueChange={(value) => {
-              setStatus(value);
-              setPage(1);
+              setSearchParams(
+                dataRightsStatusSearchParams(
+                  searchParams,
+                  value as DataRightsStatusFilter,
+                ),
+                { replace: true },
+              );
             }}
             ariaLabel="Privacy request status"
             options={[...statusOptions]}
@@ -460,7 +456,10 @@ export function PrivacyRequestsPage() {
                         itemLabel="request"
                         hasMore={cases.data?.hasMore}
                         disabled={!casesCurrent}
-                        onPageChange={setPage}
+                        onPageChange={(nextPage) => setSearchParams(
+                          dataRightsPageSearchParams(searchParams, nextPage),
+                          { replace: true },
+                        )}
                       />
                     </>
                   )}
@@ -521,6 +520,7 @@ function PrivacyRequestRow({
 }) {
   const status = dataRightsCaseStatusKey(item.status);
   const operationKind = dataRightsOperationKind(item);
+  const { Icon, className: iconClassName } = privacyRequestVisual(operationKind);
   return (
     <button
       type="button"
@@ -528,8 +528,8 @@ function PrivacyRequestRow({
       onClick={onOpen}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-          <FileLock2 size={18} />
+        <span className={`grid size-10 shrink-0 place-items-center rounded-lg ${iconClassName}`}>
+          <Icon size={18} />
         </span>
         <span className="min-w-0">
           <span className="block font-semibold">{dataRightsRequestLabel(item)}</span>
@@ -856,6 +856,22 @@ function workspaceInitiatedDescription(operationKind: DataRightsOperationKind): 
     return "Use when the workspace has confirmed a processing limit can be released.";
   }
   return "Use for an internally initiated removal review.";
+}
+
+function privacyRequestVisual(operationKind: DataRightsOperationKind) {
+  if (operationKind === "export") {
+    return { Icon: FileOutput, className: "bg-info/10 text-info" };
+  }
+  if (operationKind === "correction") {
+    return { Icon: PencilLine, className: "bg-success/10 text-success" };
+  }
+  if (operationKind.startsWith("restriction")) {
+    return { Icon: ShieldCheck, className: "bg-primary/10 text-primary" };
+  }
+  if (operationKind === "removal") {
+    return { Icon: FileLock2, className: "bg-error/10 text-error" };
+  }
+  return { Icon: FileLock2, className: "bg-base-200 text-base-content/55" };
 }
 
 function requestPurposeTitle(operationKind: DataRightsOperationKind): string {

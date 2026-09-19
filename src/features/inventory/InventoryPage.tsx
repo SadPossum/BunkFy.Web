@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   BedDouble,
   Blocks,
@@ -8,26 +8,30 @@ import {
   DoorOpen,
   History,
   Plus,
+  ShieldCheck,
   Unlock,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import type {
-  InventoryAvailabilityResponse,
   ManualBlockGroup,
-  ManualBlockGroupMutationReceipt,
   RoomInventory,
-  RoomInventoryChangeImpact,
-  RoomInventoryMutationReceipt,
 } from "../../api/types";
-import { inventorySalesModeValue, manualBlockStatusLabel } from "../../api/labels";
+import { manualBlockStatusLabel } from "../../api/labels";
 import {
+  compositeSourceCurrent,
   compositeSourceUsable,
   createCompositeSource,
+  type CompositeSource,
   type CompositeSourceState,
 } from "../../app/compositeSourceState";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
-import { focusedResourceClass, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
+import {
+  defaultPropertyStayRange,
+  validStayDateRange,
+  type StayDateRange,
+} from "../../app/propertyDate";
+import { focusedResourceClass, useScrollToTransientResourceFocus, useTargetProperty, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import {
@@ -39,44 +43,78 @@ import {
 import { DatePicker } from "../../components/ui/DatePicker";
 import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
-import { SelectPicker } from "../../components/ui/SelectPicker";
-import { BlockInventoryModal, type CreateBlockGroupPayload } from "./BlockInventoryModal";
+import { BlockInventoryModal } from "./BlockInventoryModal";
+import { BlockReleaseForm } from "./BlockReleaseForm";
+import { BlockMutationNotice } from "./BlockEditorFrame";
+import { useManualBlockEditor } from "./useManualBlockEditor";
 import { buildBlockTargetOptions, groupActiveBlocks } from "./inventoryBlocking";
-import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "./inventoryApi";
-import { sellableInventorySummary } from "./inventorySummary";
 import {
-  resolveManualBlockCreateAttempt,
-  resolveManualBlockGroupReleaseAttempt,
-  type ManualBlockMutationAttempt,
-} from "./manualBlockMutationAttempt";
-import { resolveSalesModeMutationAttempt, type SalesModeMutationAttempt } from "./salesModeMutationAttempt";
-import { SalesModeChangeModal, type PendingSalesModeChange } from "./SalesModeChangeModal";
+  inventoryAvailabilityMatchesContext,
+  loadAllManualInventoryBlocks,
+  loadAllRoomInventory,
+  loadInventoryAvailability,
+  manualBlockListMatchesProperty,
+  roomInventoryMatchesProperty,
+} from "./inventoryApi";
+import { sellableInventorySummary } from "./inventorySummary";
+import { SalesModeChangeModal, SalesModeNotice } from "./SalesModeChangeModal";
+import { useSalesModeEditor } from "./useSalesModeEditor";
+import { OwnerOriginLink } from "../spaces/OwnerOriginLink";
 
 export function InventoryPage() {
   const { request, session } = useSession();
-  const { selectedProperty, selectedPropertyId } = useWorkspace();
-  const queryClient = useQueryClient();
+  const workspace = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
-  useTargetProperty(searchParams.get("property"));
+  const hasRequestedProperty = searchParams.has("property");
+  const requestedPropertyId = searchParams.get("property");
+  const selectedPropertyId = hasRequestedProperty
+    ? requestedPropertyId ?? ""
+    : workspace.selectedPropertyId;
+  const selectedProperty = workspace.properties.find(
+    (property) => property.propertyId === selectedPropertyId,
+  );
+  useTargetProperty(hasRequestedProperty ? requestedPropertyId : null);
   const targetArrival = searchParams.get("arrival");
   const targetDeparture = searchParams.get("departure");
   const blockView = searchParams.get("history") === "all" ? "all" : "active";
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [range, setRange] = useState(defaultRange);
-  const [pendingSalesModeChange, setPendingSalesModeChange] = useState<PendingSalesModeChange | null>(null);
-  const salesModeAttempt = useRef<SalesModeMutationAttempt | null>(null);
-  const createBlockAttempt = useRef<ManualBlockMutationAttempt | null>(null);
-  const releaseBlockAttempt = useRef<ManualBlockMutationAttempt | null>(null);
-  const enabled = Boolean(selectedPropertyId);
+  const [range, setRange] = useState<StayDateRange>({ arrival: "", departure: "" });
   const accessScope = session && selectedPropertyId
     ? propertyAccessScope(session.tenantId, selectedPropertyId)
     : "";
   const access = usePermissions(accessScope ? [
+    { permission: permissions.inventoryRead, scope: accessScope },
     { permission: permissions.inventoryConfigure, scope: accessScope },
+    { permission: permissions.reservationsRead, scope: accessScope },
     { permission: permissions.inventoryBlocksManage, scope: accessScope },
   ] : []);
+  const mayRead = access.allows(permissions.inventoryRead, accessScope);
   const canConfigure = access.allows(permissions.inventoryConfigure, accessScope);
   const canManageBlocks = access.allows(permissions.inventoryBlocksManage, accessScope);
+  const permissionSource = createCompositeSource({
+    label: "Inventory permissions",
+    hasData: access.hasData,
+    isLoading: access.isLoading,
+    error: access.error,
+    isFetching: access.isFetching,
+    refetch: access.refetch,
+  });
+  const propertySource = createCompositeSource({
+    label: "Property directory",
+    hasData: workspace.propertiesLoaded,
+    isLoading: workspace.propertiesLoading,
+    error: workspace.propertiesError,
+    isFetching: workspace.propertiesFetching,
+    refetch: workspace.refetchProperties,
+  });
+  const permissionsCurrent = compositeSourceCurrent(permissionSource);
+  const propertyCurrent = compositeSourceCurrent(propertySource);
+  const mayReadCurrent = mayRead && permissionsCurrent && propertyCurrent;
+  const enabled = Boolean(selectedPropertyId && selectedProperty && mayReadCurrent);
+  const propertyTimeZoneId = selectedProperty?.canonicalTimeZoneId || selectedProperty?.timeZoneId || "";
+  const propertyDefaultRange = useMemo(
+    () => propertyTimeZoneId ? defaultPropertyStayRange(propertyTimeZoneId) : null,
+    [propertyTimeZoneId],
+  );
 
   const inventory = useQuery({
     queryKey: ["inventory-rooms", selectedPropertyId],
@@ -85,10 +123,14 @@ export function InventoryPage() {
   });
   const availability = useQuery({
     queryKey: ["availability", selectedPropertyId, range.arrival, range.departure],
-    queryFn: () => request<InventoryAvailabilityResponse>(
-      `/api/inventory/properties/${selectedPropertyId}/availability?arrival=${range.arrival}&departure=${range.departure}`,
+    queryFn: ({ signal }) => loadInventoryAvailability(
+      request,
+      selectedPropertyId,
+      range.arrival,
+      range.departure,
+      signal,
     ),
-    enabled: enabled && Boolean(range.arrival && range.departure),
+    enabled: enabled && validStayDateRange(range),
   });
   const blocks = useQuery({
     queryKey: ["blocks", selectedPropertyId, blockView],
@@ -100,32 +142,68 @@ export function InventoryPage() {
     ),
     enabled,
   });
-  const salesModeImpact = useQuery({
-    queryKey: ["room-sales-mode-impact", selectedPropertyId, pendingSalesModeChange?.room.roomId],
-    queryFn: () => request<RoomInventoryChangeImpact>(
-      `/api/inventory/properties/${selectedPropertyId}/rooms/${pendingSalesModeChange?.room.roomId}/change-impact`,
-    ),
-    enabled: Boolean(selectedPropertyId && pendingSalesModeChange),
+  const inventoryContextMismatch = Boolean(
+    inventory.data && !roomInventoryMatchesProperty(inventory.data.rooms, selectedPropertyId),
+  );
+  const availabilityContextMismatch = !inventoryAvailabilityMatchesContext(
+    availability.data,
+    selectedPropertyId,
+    range.arrival,
+    range.departure,
+  );
+  const blockContextMismatch = Boolean(
+    blocks.data && !manualBlockListMatchesProperty(blocks.data.blocks, selectedPropertyId),
+  );
+  const inventorySource = createCompositeSource({
+    label: "Sales setup",
+    hasData: inventory.data !== undefined && !inventoryContextMismatch,
+    isLoading: inventory.isLoading,
+    error: inventoryContextMismatch
+      ? new Error("The sales setup response did not match the selected property.")
+      : inventory.error,
+    isFetching: inventory.isFetching,
+    refetch: () => inventory.refetch(),
   });
-  const inventorySource = createCompositeSource({ label: "Sales setup", hasData: inventory.data !== undefined, isLoading: inventory.isLoading, error: inventory.error, isFetching: inventory.isFetching, refetch: () => inventory.refetch() });
-  const blockSource = createCompositeSource({ label: "Inventory blocks", hasData: blocks.data !== undefined, isLoading: blocks.isLoading, error: blocks.error, isFetching: blocks.isFetching, refetch: () => blocks.refetch() });
-  const primarySources = [inventorySource, blockSource];
+  const availabilitySource = createCompositeSource({
+    label: "Availability",
+    hasData: availability.data !== undefined && !availabilityContextMismatch,
+    isLoading: availability.isLoading,
+    error: availabilityContextMismatch
+      ? new Error("The availability response did not match the selected property and dates.")
+      : availability.error,
+    isFetching: availability.isFetching,
+    refetch: () => availability.refetch(),
+  });
+  const blockSource = createCompositeSource({
+    label: "Inventory blocks",
+    hasData: blocks.data !== undefined && !blockContextMismatch,
+    isLoading: blocks.isLoading,
+    error: blockContextMismatch
+      ? new Error("The block response did not match the selected property.")
+      : blocks.error,
+    isFetching: blocks.isFetching,
+    refetch: () => blocks.refetch(),
+  });
+  const primarySources = [permissionSource, propertySource, inventorySource, availabilitySource, blockSource];
   const inventoryUsable = compositeSourceUsable(inventorySource.state);
+  const availabilityUsable = compositeSourceUsable(availabilitySource.state);
   const blocksUsable = compositeSourceUsable(blockSource.state);
-  const focusedResourceId = useTransientResourceFocus(inventoryUsable && blocksUsable);
-
+  const inventoryCurrent = compositeSourceCurrent(inventorySource);
+  const blocksCurrent = compositeSourceCurrent(blockSource);
   const rooms = inventoryUsable ? inventory.data?.rooms ?? [] : [];
   const targetUnitId = searchParams.get("unit");
   const targetRoomId = searchParams.get("room")
     ?? rooms.find((room) => room.units.some((unit) => unit.inventoryUnitId === targetUnitId))?.roomId
     ?? null;
   const targetBlockGroupId = searchParams.get("blockGroup");
+  const focusedTargetReady = targetBlockGroupId ? blocksUsable : inventoryUsable;
+  const focusedResourceId = useTransientResourceFocus(focusedTargetReady);
   const focusedRoomId = focusedResourceId && (
     focusedResourceId === targetRoomId ||
-    focusedResourceId === targetUnitId ||
-    focusedResourceId === targetBlockGroupId
+    focusedResourceId === targetUnitId
   ) ? targetRoomId : null;
   const focusedBlockGroupId = focusedResourceId === targetBlockGroupId ? targetBlockGroupId : null;
+  useScrollToTransientResourceFocus(focusedResourceId, focusedTargetReady);
   const targetOptions = useMemo(
     () => buildBlockTargetOptions(selectedProperty?.name ?? "Property", rooms),
     [rooms, selectedProperty?.name],
@@ -134,7 +212,6 @@ export function InventoryPage() {
     () => groupActiveBlocks(blocksUsable ? blocks.data?.blocks ?? [] : [], targetOptions),
     [blocks.data, blocksUsable, targetOptions],
   );
-
   function setBlockView(value: "active" | "all") {
     const next = new URLSearchParams(searchParams);
     if (value === "all") next.set("history", "all");
@@ -145,105 +222,94 @@ export function InventoryPage() {
   }
 
   useEffect(() => {
-    if (!targetArrival || !targetDeparture || targetArrival >= targetDeparture) return;
-    setRange((current) => current.arrival === targetArrival && current.departure === targetDeparture
+    const targetedRange = targetArrival && targetDeparture
+      ? { arrival: targetArrival, departure: targetDeparture }
+      : null;
+    const nextRange = validStayDateRange(targetedRange)
+      ? targetedRange
+      : propertyDefaultRange;
+    if (!nextRange) {
+      setRange({ arrival: "", departure: "" });
+      return;
+    }
+    setRange((current) => current.arrival === nextRange.arrival && current.departure === nextRange.departure
       ? current
-      : { arrival: targetArrival, departure: targetDeparture });
-  }, [targetArrival, targetDeparture]);
+      : nextRange);
+  }, [propertyDefaultRange, selectedPropertyId, targetArrival, targetDeparture]);
 
-  useEffect(() => {
-    salesModeAttempt.current = null;
-    createBlockAttempt.current = null;
-    releaseBlockAttempt.current = null;
-    setPendingSalesModeChange(null);
-  }, [selectedPropertyId]);
-
-  const salesModeMutation = useMutation({
-    mutationFn: ({ room, salesMode }: { room: RoomInventory; salesMode: "roomLevel" | "bedLevel" }) => {
-      salesModeAttempt.current = resolveSalesModeMutationAttempt(
-        salesModeAttempt.current,
-        {
-          propertyId: selectedPropertyId!,
-          roomId: room.roomId,
-          salesMode,
-          expectedVersion: room.version,
-        },
-      );
-      return request<RoomInventoryMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/rooms/${room.roomId}/sales-mode`, {
-        method: "PUT",
-        body: JSON.stringify({
-          operationId: salesModeAttempt.current.operationId,
-          salesMode: inventorySalesModeValue(salesMode),
-          expectedVersion: salesModeAttempt.current.expectedVersion,
-        }),
-      });
-    },
-    onSuccess: async () => {
-      salesModeAttempt.current = null;
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["inventory-rooms", selectedPropertyId] }),
-        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
-      ]);
-      setPendingSalesModeChange(null);
-    },
-  });
-  const createBlockGroup = useMutation({
-    mutationFn: (payload: CreateBlockGroupPayload) => {
-      createBlockAttempt.current = resolveManualBlockCreateAttempt(
-        createBlockAttempt.current,
-        { propertyId: selectedPropertyId!, ...payload },
-      );
-      return request<ManualBlockGroupMutationReceipt>(`/api/inventory/properties/${selectedPropertyId}/block-groups`, {
-        method: "POST",
-        body: JSON.stringify({ operationId: createBlockAttempt.current.operationId, ...payload }),
-      });
-    },
-    onSuccess: async () => {
-      createBlockAttempt.current = null;
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
-        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
-      ]);
-      setBlockOpen(false);
-    },
-  });
-  const releaseBlockGroup = useMutation({
-    mutationFn: (blockGroupId: string) => {
-      releaseBlockAttempt.current = resolveManualBlockGroupReleaseAttempt(
-        releaseBlockAttempt.current,
-        selectedPropertyId!,
-        blockGroupId,
-      );
-      return request<ManualBlockGroupMutationReceipt>(
-        `/api/inventory/properties/${selectedPropertyId}/block-groups/${blockGroupId}/release`,
-        {
-          method: "POST",
-          body: JSON.stringify({ operationId: releaseBlockAttempt.current.operationId }),
-        },
-      );
-    },
-    onSuccess: async () => {
-      releaseBlockAttempt.current = null;
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["blocks", selectedPropertyId] }),
-        queryClient.invalidateQueries({ queryKey: ["availability", selectedPropertyId] }),
-      ]);
-    },
-  });
-
-  function closeBlockModal() {
-    createBlockAttempt.current = null;
-    setBlockOpen(false);
+  function setAvailabilityRange(nextRange: StayDateRange) {
+    if (!validStayDateRange(nextRange)) return;
+    setRange(nextRange);
+    const next = new URLSearchParams(searchParams);
+    next.set("arrival", nextRange.arrival);
+    next.set("departure", nextRange.departure);
+    setSearchParams(next, { replace: true });
   }
+
+  const salesEditor = useSalesModeEditor({
+    evidence: { propertyId: selectedPropertyId, rooms, mayRead, mayConfigure: canConfigure, permissionsCurrent, propertyCurrent, inventoryCurrent },
+    selectionKey: [targetRoomId ?? "", targetUnitId ?? ""].join(":"),
+    refreshAuthority: () => Promise.all([access.refetch(), workspace.refetchProperties()]),
+  });
+  const blockEditor = useManualBlockEditor({
+    propertyId: selectedPropertyId,
+    propertyName: selectedProperty?.name ?? "Property",
+    rooms,
+    blocks: blocks.data?.blocks ?? [],
+    mayManage: mayRead && canManageBlocks,
+    evidence: { permissionsCurrent, propertyCurrent, inventoryCurrent, blocksCurrent },
+    onSuccess: ({ action, receipt }) => setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("property", receipt.propertyId);
+      next.set("blockGroup", receipt.blockGroupId);
+      next.set("focus", receipt.blockGroupId);
+      if (action === "released") next.set("history", "all");
+      return next;
+    }),
+  });
 
   if (!selectedProperty) {
-    return <EmptyState icon={<DoorOpen />} title="Choose a property first" description="Inventory is managed within a property. Create or select one to continue." />;
+    return (
+      <InventoryPageFrame>
+        <EmptyState icon={<DoorOpen />} title="Choose a property first" description="Inventory is managed within a property. Create or select one to continue." />
+      </InventoryPageFrame>
+    );
   }
-  const availableCount = availability.data?.units.filter((item) => item.isAvailable).length ?? 0;
-  const unavailableCount = availability.data?.units.filter((item) => !item.isAvailable).length ?? 0;
+  if (!access.hasData) {
+    return (
+      <InventoryPageFrame>
+        <PageHeader eyebrow={selectedProperty.name} title="Inventory" description="Control how rooms are sold, check availability, and take physical areas out of service." />
+        <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+          {access.error
+            ? <div className="p-4 sm:p-6"><ErrorState error={access.error} retry={() => void access.refetch()} title="Inventory access could not be checked" /></div>
+            : <LoadingState label="Checking inventory access" />}
+        </section>
+      </InventoryPageFrame>
+    );
+  }
+  if (!mayRead) {
+    return (
+      <InventoryPageFrame>
+        <PageHeader eyebrow={selectedProperty.name} title="Inventory" description="Control how rooms are sold, check availability, and take physical areas out of service." />
+        <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+          <EmptyState
+            icon={<ShieldCheck />}
+            title="Inventory access is not assigned"
+            description="Ask a workspace administrator for inventory read access to this property."
+          />
+        </section>
+      </InventoryPageFrame>
+    );
+  }
+  const availableCount = availabilityUsable
+    ? availability.data?.units.filter((item) => item.isAvailable).length ?? 0
+    : 0;
+  const unavailableCount = availabilityUsable
+    ? availability.data?.units.filter((item) => !item.isAvailable).length ?? 0
+    : 0;
 
   return (
-    <>
+    <InventoryPageFrame>
       <PageHeader
         eyebrow={selectedProperty.name}
         title="Inventory"
@@ -251,8 +317,8 @@ export function InventoryPage() {
         action={canManageBlocks ? (
           <button
             className="btn btn-primary"
-            onClick={() => setBlockOpen(true)}
-            disabled={!inventoryUsable || targetOptions.length === 0}
+            onClick={(event) => blockEditor.openCreate(event.currentTarget)}
+            disabled={!blockEditor.ready || !targetOptions.length || Boolean(blockEditor.editor) || blockEditor.busy}
           >
             <Plus size={17} />
             Block inventory
@@ -261,43 +327,44 @@ export function InventoryPage() {
       />
 
       <CompositeSourceNotice sources={primarySources} title="Some inventory data is delayed" />
+      <BlockMutationNotice notice={blockEditor.notice} />
+      <SalesModeNotice notice={salesEditor.notice} />
 
       <AvailabilitySection
         range={range}
-        onRangeChange={setRange}
-        loading={availability.isLoading}
-        error={availability.error}
+        timeZoneId={propertyTimeZoneId}
+        source={availabilitySource}
+        authorityCurrent={mayReadCurrent}
+        onRangeChange={setAvailabilityRange}
         availableCount={availableCount}
         unavailableCount={unavailableCount}
-        totalCount={availability.data?.units.length ?? 0}
+        totalCount={availabilityUsable ? availability.data?.units.length ?? 0 : 0}
       />
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_1fr]">
         <SalesSetupSection
           rooms={rooms}
           state={inventorySource.state}
           focusedRoomId={focusedRoomId}
           canConfigure={canConfigure}
-          pending={salesModeMutation.isPending}
-          onModeChange={(room, salesMode) => {
-            salesModeAttempt.current = null;
-            salesModeMutation.reset();
-            setPendingSalesModeChange({ room, salesMode });
-          }}
+          configurationCurrent={permissionsCurrent && propertyCurrent && inventoryCurrent}
+          canEditRoom={salesEditor.canOpen}
+          pending={salesEditor.busy || Boolean(salesEditor.target)}
+          onEdit={(room, trigger) => salesEditor.open(room, trigger, searchParams)}
         />
 
-        <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <section data-blocks-region className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="flex flex-col gap-3 border-b border-base-300 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <h2 className="font-display text-xl font-semibold">Inventory blocks</h2>
-              <p className="mt-1 text-sm text-base-content/50">Current holds and released-block history.</p>
+              <p className="mt-1 text-sm text-base-content/50">Manual holds and release history.</p>
             </div>
             <SegmentedTabs
               value={blockView}
               ariaLabel="Inventory block view"
               onValueChange={setBlockView}
               options={[
-                { value: "active", label: "Active", icon: <Blocks size={14} /> },
+                { value: "active", label: "Unreleased", icon: <Blocks size={14} /> },
                 { value: "all", label: "All", icon: <History size={14} /> },
               ]}
             />
@@ -305,17 +372,17 @@ export function InventoryPage() {
           {!blocksUsable ? (
             <CompositeSourceFallback state={blockSource.state} label="inventory blocks" />
           ) : activeBlockGroups.length === 0 ? (
-            <div className="p-6">
+            <div className="p-3 sm:p-4">
               <EmptyState
                 icon={<Blocks />}
-                title={blockView === "active" ? "No active blocks" : "No block history"}
-                description={blockView === "active" ? "All configured inventory is free from manual blocks." : "No inventory blocks have been recorded yet."}
+                title={blockView === "active" ? "No unreleased blocks" : "No block history"}
+                description={blockView === "active" ? "Choose All to see released blocks." : "No manual holds have been recorded."}
               />
             </div>
           ) : (
             <div className="divide-y divide-base-300">
               {activeBlockGroups.map((group) => (
-                <div key={group.blockGroupId} className={`px-5 py-4 sm:px-6 ${group.blockGroupId === focusedBlockGroupId ? focusedResourceClass : ""}`}>
+                <div key={group.blockGroupId} tabIndex={group.blockGroupId === focusedBlockGroupId ? -1 : undefined} className={`px-5 py-4 outline-none outline-offset-[-3px] focus:outline-2 focus:outline-primary sm:px-6 ${group.blockGroupId === focusedBlockGroupId ? focusedResourceClass : ""}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{group.label}</p>
@@ -326,14 +393,14 @@ export function InventoryPage() {
                     <div className="flex shrink-0 items-center gap-2">
                       {blockView === "all" && (
                         <span className={`badge badge-sm ${blockStatus(group) === "released" ? "badge-ghost" : "badge-neutral"}`}>
-                          {capitalize(blockStatus(group))}
+                          {blockStatus(group) === "active" ? "Unreleased" : capitalize(blockStatus(group))}
                         </span>
                       )}
                     {canManageBlocks && blockStatus(group) === "active" && (
                       <button
                         className="btn btn-ghost btn-sm shrink-0 text-primary"
-                        onClick={() => releaseBlockGroup.mutate(group.blockGroupId)}
-                        disabled={releaseBlockGroup.isPending}
+                        onClick={(event) => blockEditor.openRelease(group.blockGroupId, group.label, group.detail, event.currentTarget)}
+                        disabled={!blockEditor.ready || blockEditor.busy || Boolean(blockEditor.editor)}
                       >
                         <Unlock size={15} />
                         Release
@@ -342,50 +409,49 @@ export function InventoryPage() {
                     </div>
                   </div>
                   <p className="mt-3 rounded-lg bg-base-200 px-3 py-2 text-xs text-base-content/60">{group.reason}</p>
+                  {blockEditor.editor?.kind === "release" && blockEditor.editor.target.blockGroupId === group.blockGroupId && <BlockReleaseForm editor={blockEditor} />}
                 </div>
               ))}
             </div>
           )}
-          {releaseBlockGroup.error && <div className="p-5"><ErrorState error={releaseBlockGroup.error} /></div>}
+          {blockEditor.releaseGroupId && !activeBlockGroups.some((group) => group.blockGroupId === blockEditor.releaseGroupId) && <BlockReleaseForm editor={blockEditor} />}
         </section>
       </div>
 
       <BlockInventoryModal
-        open={blockOpen && canManageBlocks && inventoryUsable}
-        propertyName={selectedProperty.name}
-        rooms={rooms}
-        mutation={createBlockGroup}
-        onClose={closeBlockModal}
+        editor={blockEditor}
+        initialRange={range}
+        sources={[permissionSource, propertySource, inventorySource, blockSource]}
       />
-      <SalesModeChangeModal
-        change={pendingSalesModeChange}
-        impact={salesModeImpact.data}
-        loading={salesModeImpact.isLoading}
-        pending={salesModeMutation.isPending}
-        error={salesModeImpact.error ?? salesModeMutation.error}
-        onConfirm={() => pendingSalesModeChange && salesModeMutation.mutate(pendingSalesModeChange)}
-        onClose={() => {
-          salesModeAttempt.current = null;
-          setPendingSalesModeChange(null);
-        }}
-      />
+      <SalesModeChangeModal editor={salesEditor} mayReadReservations={permissionsCurrent && access.allows(permissions.reservationsRead, accessScope)} />
+    </InventoryPageFrame>
+  );
+}
+
+function InventoryPageFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <OwnerOriginLink />
+      {children}
     </>
   );
 }
 
 function AvailabilitySection({
   range,
+  timeZoneId,
+  source,
+  authorityCurrent,
   onRangeChange,
-  loading,
-  error,
   availableCount,
   unavailableCount,
   totalCount,
 }: {
-  range: { arrival: string; departure: string };
-  onRangeChange: (range: { arrival: string; departure: string }) => void;
-  loading: boolean;
-  error: Error | null;
+  range: StayDateRange;
+  timeZoneId: string;
+  source: CompositeSource;
+  authorityCurrent: boolean;
+  onRangeChange: (range: StayDateRange) => void;
   availableCount: number;
   unavailableCount: number;
   totalCount: number;
@@ -397,6 +463,8 @@ function AvailabilitySection({
     setArrival(range.arrival);
     setDeparture(range.departure);
   }, [range.arrival, range.departure]);
+  const draftRange = { arrival, departure };
+  const canCheck = authorityCurrent && validStayDateRange(draftRange);
 
   return (
     <section className="card border border-base-300 bg-base-100 shadow-sm">
@@ -404,26 +472,27 @@ function AvailabilitySection({
         <div>
           <h2 className="font-display text-xl font-semibold">Availability check</h2>
           <p className="mt-1 text-sm text-base-content/50">See what can be assigned for a stay range.</p>
+          {timeZoneId && <p className="mt-1 text-xs text-base-content/40">Property time · {timeZoneId}</p>}
         </div>
         <form
-          className="flex flex-col gap-2 sm:flex-row"
+          className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"
           onSubmit={(event) => {
             event.preventDefault();
-            onRangeChange({ arrival, departure });
+            if (canCheck) onRangeChange(draftRange);
           }}
         >
-          <DatePicker value={arrival} onChange={setArrival} ariaLabel="Arrival date" size="sm" className="w-full sm:w-40" required />
+          <DatePicker value={arrival} onChange={setArrival} ariaLabel="Arrival date" size="sm" className="w-full sm:w-44" required />
           <span className="hidden self-center text-base-content/30 sm:block">to</span>
-          <DatePicker value={departure} onChange={setDeparture} ariaLabel="Departure date" min={arrival} size="sm" className="w-full sm:w-40" required />
-          <button className="btn btn-secondary btn-sm text-white"><CalendarSearch size={16} />Check</button>
+          <DatePicker value={departure} onChange={setDeparture} ariaLabel="Departure date" min={arrival} size="sm" className="w-full sm:w-44" required />
+          <button className="btn btn-secondary btn-sm shrink-0 text-white" disabled={!canCheck}><CalendarSearch size={16} />Check</button>
         </form>
       </div>
-      {loading ? (
+      {source.state === "loading" ? (
         <LoadingState label="Checking availability" />
-      ) : error ? (
-        <div className="p-6"><ErrorState error={error} /></div>
+      ) : !compositeSourceUsable(source.state) ? (
+        <CompositeSourceFallback state={source.state} label="availability" />
       ) : (
-        <div className="grid gap-4 p-5 sm:grid-cols-3 sm:p-6">
+        <div className="grid gap-px overflow-hidden border-t border-base-300 bg-base-300 sm:grid-cols-3">
           <AvailabilityStat icon={<CheckCircle2 />} label="Available" value={availableCount} tone="success" />
           <AvailabilityStat icon={<CircleSlash2 />} label="Unavailable" value={unavailableCount} tone="error" />
           <AvailabilityStat icon={<BedDouble />} label="Total sellable" value={totalCount} tone="primary" />
@@ -438,25 +507,29 @@ function SalesSetupSection({
   state,
   focusedRoomId,
   canConfigure,
+  configurationCurrent,
+  canEditRoom,
   pending,
-  onModeChange,
+  onEdit,
 }: {
   rooms: RoomInventory[];
   state: CompositeSourceState;
   focusedRoomId: string | null;
   canConfigure: boolean;
+  configurationCurrent: boolean;
+  canEditRoom: (room: RoomInventory) => boolean;
   pending: boolean;
-  onModeChange: (room: RoomInventory, salesMode: "roomLevel" | "bedLevel") => void;
+  onEdit: (room: RoomInventory, trigger: HTMLElement) => void;
 }) {
   return (
-    <section className="card border border-base-300 bg-base-100 shadow-sm">
+    <section data-sales-region className="card border border-base-300 bg-base-100 shadow-sm">
       <div className="border-b border-base-300 px-5 py-5 sm:px-6">
         <h2 className="font-display text-xl font-semibold">Sales setup</h2>
       </div>
       {!compositeSourceUsable(state) ? (
         <CompositeSourceFallback state={state} label="sales setup" />
       ) : rooms.length === 0 ? (
-        <div className="p-6">
+        <div className="p-3 sm:p-4">
           <EmptyState icon={<DoorOpen />} title="No rooms available" description="Set up rooms and beds in Properties before configuring inventory." />
         </div>
       ) : (
@@ -465,12 +538,12 @@ function SalesSetupSection({
             const mode = normalizeSalesMode(room.salesMode);
             const location = [room.buildingLabel, room.floorLabel].filter(Boolean).join(" / ");
             return (
-              <div key={room.roomId} className={`flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${room.roomId === focusedRoomId ? focusedResourceClass : ""}`}>
+              <div key={room.roomId} tabIndex={room.roomId === focusedRoomId ? -1 : undefined} className={`flex flex-col gap-4 px-5 py-4 outline-none sm:flex-row sm:items-center sm:justify-between sm:px-6 ${room.roomId === focusedRoomId ? focusedResourceClass : ""}`}>
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary/15 text-secondary"><DoorOpen size={18} /></div>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{room.roomName}</p>
-                    <p className="mt-1 truncate text-xs text-base-content/45">
+                  <div className="min-w-0 flex-1">
+                    <p className="whitespace-normal break-words font-semibold leading-5">{room.roomName}</p>
+                    <p className="mt-1 whitespace-normal break-words text-xs leading-4 text-base-content/45">
                       {[location, sellableInventorySummary(room.units)].filter(Boolean).join(" - ")}
                     </p>
                   </div>
@@ -478,19 +551,7 @@ function SalesSetupSection({
                 <div className="flex min-w-0 flex-col items-start gap-2 sm:shrink-0 sm:flex-row sm:items-center sm:gap-3">
                   <SalesModeBadge mode={mode} />
                   {canConfigure && (
-                    <SelectPicker
-                      className="w-full min-w-0 sm:w-64"
-                      size="sm"
-                      ariaLabel={`Sales mode for ${room.roomName}`}
-                      value={mode}
-                      disabled={pending}
-                      onValueChange={(value) => onModeChange(room, value as "roomLevel" | "bedLevel")}
-                      options={[
-                        { value: "unconfigured", label: "Not configured", disabled: true },
-                        { value: "roomLevel", label: "Private room" },
-                        { value: "bedLevel", label: "Shared room" },
-                      ]}
-                    />
+                    <button type="button" className="btn btn-outline btn-sm" disabled={pending || !configurationCurrent || !canEditRoom(room)} onClick={(event) => onEdit(room, event.currentTarget)}>Change selling setup</button>
                   )}
                 </div>
               </div>
@@ -519,7 +580,7 @@ function AvailabilityStat({
     primary: "bg-primary/12 text-primary",
   };
   return (
-    <div className="flex items-center gap-4 rounded-lg bg-base-200 p-4">
+    <div className="flex min-h-20 items-center gap-4 bg-base-100 px-5 py-4 sm:px-6">
       <div className={`grid size-11 place-items-center rounded-lg ${tones[tone]}`}>{icon}</div>
       <div>
         <p className="text-2xl font-semibold">{value}</p>
@@ -531,10 +592,10 @@ function AvailabilityStat({
 
 function SalesModeBadge({ mode }: { mode: "unconfigured" | "roomLevel" | "bedLevel" }) {
   if (mode === "roomLevel") {
-    return <span className="badge badge-sm whitespace-nowrap border-0 bg-secondary font-semibold text-white">Private room</span>;
+    return <span className="badge badge-sm whitespace-nowrap border-0 bg-secondary font-semibold text-white">Whole room</span>;
   }
   if (mode === "bedLevel") {
-    return <span className="badge badge-sm whitespace-nowrap border-0 bg-primary font-semibold text-white">Shared room</span>;
+    return <span className="badge badge-sm whitespace-nowrap border-0 bg-primary font-semibold text-white">Individual beds</span>;
   }
   return <span className="badge badge-sm whitespace-nowrap border-0 bg-warning-content font-semibold text-white">Not configured</span>;
 }
@@ -543,17 +604,6 @@ function normalizeSalesMode(value: RoomInventory["salesMode"]): "unconfigured" |
   if (value === 2 || String(value).toLowerCase() === "roomlevel") return "roomLevel";
   if (value === 3 || String(value).toLowerCase() === "bedlevel") return "bedLevel";
   return "unconfigured";
-}
-
-function defaultRange() {
-  const arrival = new Date();
-  arrival.setDate(arrival.getDate() + 1);
-  const departure = new Date(arrival);
-  departure.setDate(departure.getDate() + 2);
-  return {
-    arrival: arrival.toISOString().slice(0, 10),
-    departure: departure.toISOString().slice(0, 10),
-  };
 }
 
 function formatDate(value: string) {

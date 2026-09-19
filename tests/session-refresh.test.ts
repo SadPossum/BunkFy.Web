@@ -1,11 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSingleFlightRefresh,
+  hasSessionActorGenerationChanged,
   hasSessionBoundaryChanged,
   hasSessionIdentityChanged,
   runWithBrowserSessionLock,
   startBrowserSessionSignOut,
+  type SessionIdentity,
 } from "../src/app/singleFlightRefresh";
+import {
+  readAccessTokenIdentity,
+  resolveRefreshedSessionIdentity,
+  SessionIdentityMismatchError,
+} from "../src/app/sessionTokenIdentity";
 
 const identity = { tenantId: "tenant-a", username: "member@example.com" };
 
@@ -21,6 +28,10 @@ describe("browser session refresh", () => {
     expect(hasSessionBoundaryChanged(identity, { ...identity, username: "MEMBER@EXAMPLE.COM" })).toBe(false);
     expect(hasSessionIdentityChanged(identity, { ...identity, tenantId: "tenant-b" })).toBe(false);
     expect(hasSessionIdentityChanged(identity, { ...identity, username: "other@example.com" })).toBe(true);
+    expect(hasSessionActorGenerationChanged(
+      { ...identity, generation: "first" },
+      { ...identity, generation: "second" },
+    )).toBe(true);
   });
 
   it("coalesces concurrent refresh attempts and resets after completion", async () => {
@@ -53,6 +64,51 @@ describe("browser session refresh", () => {
     await expect(refresh(identity)).rejects.toThrow("expired");
     await expect(refresh(identity)).resolves.toBe("access-token");
     expect(refreshOperation).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not coalesce refreshes across different actor generations", async () => {
+    const refreshOperation = vi.fn(async (value: SessionIdentity) => value.username);
+    const refresh = createSingleFlightRefresh<string>(refreshOperation);
+
+    const first = refresh({ ...identity, generation: "first" });
+    const second = refresh({ ...identity, username: "other@example.com", generation: "second" });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "member@example.com",
+      "other@example.com",
+    ]);
+    expect(refreshOperation).toHaveBeenCalledTimes(2);
+  });
+
+  it("binds refresh results to the token subject and current browser generation", () => {
+    const subjectId = "11111111-1111-4111-8111-111111111111";
+    const sessionId = "22222222-2222-4222-8222-222222222222";
+    const token = jwt({ sub: subjectId, sid: sessionId });
+
+    expect(readAccessTokenIdentity(token)).toEqual({ subjectId, sessionId });
+    expect(resolveRefreshedSessionIdentity(
+      { ...identity, subjectId, sessionId, generation: "current" },
+      null,
+      { subjectId, sessionId },
+    )).toMatchObject({ generation: "current", subjectId, sessionId });
+  });
+
+  it("uses a newly published browser identity instead of merging another actor's token", () => {
+    const oldSubjectId = "11111111-1111-4111-8111-111111111111";
+    const newSubjectId = "33333333-3333-4333-8333-333333333333";
+    const newSessionId = "44444444-4444-4444-8444-444444444444";
+
+    expect(resolveRefreshedSessionIdentity(
+      { ...identity, subjectId: oldSubjectId, sessionId: "22222222-2222-4222-8222-222222222222" },
+      { tenantId: "global", username: "new@example.com", subjectId: newSubjectId, sessionId: newSessionId, generation: "new" },
+      { subjectId: newSubjectId, sessionId: newSessionId },
+    )).toMatchObject({ username: "new@example.com", generation: "new" });
+
+    expect(() => resolveRefreshedSessionIdentity(
+      { ...identity, subjectId: oldSubjectId },
+      null,
+      { subjectId: newSubjectId, sessionId: newSessionId },
+    )).toThrow(SessionIdentityMismatchError);
   });
 
   it("serializes shared browser-cookie mutations across tabs when Web Locks are available", async () => {
@@ -103,3 +159,10 @@ describe("browser session refresh", () => {
     expect(clearLocalSession).toHaveBeenCalledOnce();
   });
 });
+
+function jwt(payload: Record<string, unknown>): string {
+  const encode = (value: Record<string, unknown>) => Buffer
+    .from(JSON.stringify(value))
+    .toString("base64url");
+  return `${encode({ alg: "none" })}.${encode(payload)}.`;
+}

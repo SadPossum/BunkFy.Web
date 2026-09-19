@@ -1,3 +1,5 @@
+import { guestLanguageSelectionKey } from "./guestLanguageSelection";
+
 export type GuestCreatePayload = {
   displayName: string;
   legalName: string | null;
@@ -6,6 +8,7 @@ export type GuestCreatePayload = {
   dateOfBirth: string | null;
   nationalityCountryCode: string | null;
   preferredLanguageTag: string | null;
+  languageTags?: string[] | null;
   notes: string | null;
 };
 
@@ -30,6 +33,14 @@ export function guestCreateFingerprint(
   propertyId: string,
   payload: GuestCreatePayload,
 ): string {
+  return guestWriteFingerprint(propertyId, payload, "create");
+}
+
+export function guestUpdateFingerprint(propertyId: string, payload: GuestCreatePayload): string {
+  return guestWriteFingerprint(propertyId, payload, "update");
+}
+
+function guestWriteFingerprint(propertyId: string, payload: GuestCreatePayload, operation: "create" | "update"): string {
   return JSON.stringify({
     propertyId,
     displayName: payload.displayName.trim(),
@@ -39,6 +50,7 @@ export function guestCreateFingerprint(
     dateOfBirth: normalizeOptional(payload.dateOfBirth),
     nationalityCountryCode: normalizeOptional(payload.nationalityCountryCode)?.toUpperCase() ?? null,
     preferredLanguageTag: normalizeOptional(payload.preferredLanguageTag),
+    languageTags: guestLanguageSelectionKey(operation, payload),
     notes: normalizeOptional(payload.notes),
   });
 }

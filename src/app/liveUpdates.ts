@@ -86,9 +86,12 @@ export function operationalNotificationQueryKeys(
 
   if (item.name.startsWith("reservation-") || item.name === "provider-reservation-operation-needs-attention") {
     addPropertyKey(keys, ["reservations"], propertyId);
+    addPropertyKey(keys, ["reservation-calendar"], propertyId);
+    addPropertyKey(keys, ["reservation-operations"], propertyId);
     addPropertyKey(keys, ["availability"], propertyId);
     addPropertyKey(keys, ["guest-stays"], propertyId);
     addPropertyKey(keys, ["inventory-rooms"], propertyId);
+    addPropertyKey(keys, ["room-sales-mode-impact"], propertyId);
     addPropertyKey(keys, ["rooms"], propertyId);
     addPropertyKey(keys, ["beds"], propertyId);
     if (propertyId && reservationId) {
@@ -108,6 +111,7 @@ export function operationalNotificationQueryKeys(
     addPropertyKey(keys, ["blocks"], propertyId);
     addPropertyKey(keys, ["availability"], propertyId);
     addPropertyKey(keys, ["inventory-rooms"], propertyId);
+    addPropertyKey(keys, ["room-sales-mode-impact"], propertyId);
     addPropertyKey(keys, ["rooms"], propertyId);
     addPropertyKey(keys, ["beds"], propertyId);
   }

@@ -18,6 +18,17 @@ Run the app directly:
 pnpm dev
 ```
 
+To develop against an already running preview API, opt into Vite's same-origin
+proxy:
+
+```powershell
+$env:VITE_BUNKFY_API_BASE_URL = "/"
+$env:BUNKFY_DEV_PROXY_TARGET = "http://127.0.0.1:18080"
+pnpm dev
+```
+
+`BUNKFY_DEV_PROXY_TARGET` is read only by Vite and is not included in the browser bundle.
+
 The generated API contract lives at `src/api/contracts.generated.ts` and the source OpenAPI snapshot at `openapi/bunkfy-api.json`. Refresh both with `pnpm contracts:generate` after an intentional backend API change; never hand-edit the generated file.
 
 Use the browser auth endpoints for staff sessions. Refresh credentials stay in path-scoped HttpOnly cookies, access tokens stay in memory, refresh is single-flight, and Web Locks serialize shared-cookie mutation across tabs where supported. Permission evaluation improves the UI by hiding unavailable actions, but every backend command remains independently authorized.
@@ -28,4 +39,3 @@ The backend Development environment loads the digest-pinned
 existing properties still begin unconfigured; explicitly enable the pack from
 the selected property's Data processing panel before exercising guest,
 reservation, or ingestion writes.
-

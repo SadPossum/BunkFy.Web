@@ -6,18 +6,25 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
-import { ApiError } from "../../api/client";
 import type { NotificationBroadcastItem, NotificationBroadcastListResponse, NotificationHistoryItem, NotificationHistoryListResponse } from "../../api/types";
 import { operationalNotificationQueryKeys } from "../../app/liveUpdates";
 import { useSession } from "../../app/session";
+import { sessionIdentityKey } from "../../app/singleFlightRefresh";
 import {
   notificationInboxQueryKey,
   notificationScopeKey,
-  notificationStreamRetryDelay,
   notificationSummaryQueryKey,
 } from "./notificationSourceAuthority";
+import {
+  notificationStreamSupervisor,
+  restartNotificationStreamsOnPersistedPageShow,
+  stopNotificationStreamOnPageHide,
+} from "./notificationStreamLifecycle";
+
+export { shouldRetryNotificationStream } from "./notificationStreamLifecycle";
 
 type NotificationsContextValue = { unreadCount: number; isLoading: boolean; refresh: () => Promise<void> };
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -27,16 +34,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const historySequence = useRef(0);
   const broadcastSequence = useRef(0);
+  const [pageLifecycleRevision, setPageLifecycleRevision] = useState(0);
   const scopeKey = notificationScopeKey(session);
+  const streamBoundaryKey = sessionIdentityKey(session);
   const history = useQuery({
     queryKey: notificationSummaryQueryKey(scopeKey, "history"),
-    queryFn: () => request<NotificationHistoryListResponse>("/api/notifications?page=1&pageSize=1"),
+    queryFn: ({ signal }) => request<NotificationHistoryListResponse>(
+      "/api/notifications?page=1&pageSize=1",
+      { signal },
+    ),
     enabled: Boolean(scopeKey),
     refetchInterval: 60_000,
   });
   const broadcasts = useQuery({
     queryKey: notificationSummaryQueryKey(scopeKey, "broadcasts"),
-    queryFn: () => request<NotificationBroadcastListResponse>("/api/notifications/broadcasts?page=1&pageSize=1"),
+    queryFn: ({ signal }) => request<NotificationBroadcastListResponse>(
+      "/api/notifications/broadcasts?page=1&pageSize=1",
+      { signal },
+    ),
     enabled: Boolean(scopeKey),
     refetchInterval: 60_000,
   });
@@ -46,7 +61,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     historySequence.current = 0;
     broadcastSequence.current = 0;
-  }, [scopeKey]);
+  }, [streamBoundaryKey]);
+
+  useEffect(() => restartNotificationStreamsOnPersistedPageShow(
+    window,
+    () => setPageLifecycleRevision((revision) => revision + 1),
+  ), []);
 
   useEffect(() => {
     const sequence = history.data?.items[0]?.streamSequence;
@@ -76,17 +96,37 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!scopeKey || !historySeeded) return;
-    const controller = new AbortController();
-    void keepStreaming("/api/notifications/history/stream", historySequence, stream, controller.signal, invalidateHistory);
-    return () => controller.abort();
-  }, [historySeeded, invalidateHistory, scopeKey, stream]);
+    const lease = notificationStreamSupervisor.start({
+      channel: "history",
+      boundaryKey: streamBoundaryKey,
+      path: "/api/notifications/history/stream",
+      sequence: historySequence,
+      open: stream,
+      onItem: invalidateHistory,
+    });
+    const detachPageHide = stopNotificationStreamOnPageHide(window, lease.stop);
+    return () => {
+      detachPageHide();
+      lease.stop();
+    };
+  }, [historySeeded, invalidateHistory, pageLifecycleRevision, scopeKey, stream, streamBoundaryKey]);
 
   useEffect(() => {
     if (!scopeKey || !broadcastsSeeded) return;
-    const controller = new AbortController();
-    void keepStreaming("/api/notifications/broadcasts/stream", broadcastSequence, stream, controller.signal, invalidateBroadcasts);
-    return () => controller.abort();
-  }, [broadcastsSeeded, invalidateBroadcasts, scopeKey, stream]);
+    const lease = notificationStreamSupervisor.start({
+      channel: "broadcasts",
+      boundaryKey: streamBoundaryKey,
+      path: "/api/notifications/broadcasts/stream",
+      sequence: broadcastSequence,
+      open: stream,
+      onItem: invalidateBroadcasts,
+    });
+    const detachPageHide = stopNotificationStreamOnPageHide(window, lease.stop);
+    return () => {
+      detachPageHide();
+      lease.stop();
+    };
+  }, [broadcastsSeeded, invalidateBroadcasts, pageLifecycleRevision, scopeKey, stream, streamBoundaryKey]);
 
   const value = useMemo<NotificationsContextValue>(() => ({
     unreadCount: (history.data?.unreadCount ?? 0) + (broadcasts.data?.unreadCount ?? 0),
@@ -100,72 +140,4 @@ export function useNotifications() {
   const value = useContext(NotificationsContext);
   if (!value) throw new Error("useNotifications must be used inside NotificationsProvider.");
   return value;
-}
-
-async function keepStreaming<T extends { streamSequence?: number }>(path: string, sequence: React.RefObject<number>, open: (path: string, signal: AbortSignal) => Promise<Response>, signal: AbortSignal, onItem: (item: T) => void) {
-  let retryAttempt = 0;
-  while (!signal.aborted) {
-    let connectedAt: number | null = null;
-    try {
-      const response = await open(`${path}?afterSequence=${sequence.current}`, signal);
-      connectedAt = Date.now();
-      await consumeSse(response, sequence, signal, onItem);
-    } catch (error) {
-      if (signal.aborted || !shouldRetryNotificationStream(error)) return;
-    }
-    if (connectedAt !== null && Date.now() - connectedAt >= 30_000) retryAttempt = 0;
-    await waitForRetry(signal, notificationStreamRetryDelay(retryAttempt));
-    retryAttempt = Math.min(5, retryAttempt + 1);
-  }
-}
-
-export function shouldRetryNotificationStream(error: unknown) {
-  return !(error instanceof ApiError
-    && error.status >= 400
-    && error.status < 500
-    && error.status !== 408
-    && error.status !== 429);
-}
-
-async function consumeSse<T extends { streamSequence?: number }>(response: Response, sequence: React.RefObject<number>, signal: AbortSignal, onItem: (item: T) => void) {
-  const reader = response.body?.getReader();
-  if (!reader) return;
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (!signal.aborted) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const data = block.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
-      if (data) {
-        try {
-          const item = JSON.parse(data) as T;
-          if (typeof item.streamSequence === "number") sequence.current = Math.max(sequence.current, item.streamSequence);
-          onItem(item);
-        } catch {
-          // Ignore malformed events and continue the durable stream.
-        }
-      }
-      boundary = buffer.indexOf("\n\n");
-    }
-  }
-}
-
-function waitForRetry(signal: AbortSignal, delay: number) {
-  return new Promise<void>((resolve) => {
-    if (signal.aborted) return resolve();
-    const onAbort = () => {
-      window.clearTimeout(timer);
-      resolve();
-    };
-    const timer = window.setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, delay);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }

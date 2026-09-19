@@ -43,6 +43,7 @@ describe("workspace catalogue recovery", () => {
     expect(provider).toContain("workspacesLoaded: workspacesQuery.data !== undefined");
     expect(provider).toContain("workspacesFetching: workspacesQuery.isFetching");
     expect(gate).toContain("resolveWorkspaceGateMode(");
+    expect(gate).toContain('<Navigate to="/workspace/new" replace />');
     expect(gate).not.toContain("workspacesError instanceof Error");
     expect(shell).toContain("<CompositeSourceNotice");
     expect(shell).toContain("Workspace updates delayed");

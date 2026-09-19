@@ -1,10 +1,12 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   DataRightsCorrectionExecutionDetails,
   GuestDataRightsCorrectionRequest,
   GuestProfile,
 } from "../../api/types";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { NationalityPicker } from "../guests/NationalityPicker";
+import { LanguagePicker } from "../guests/LanguagePicker";
 import {
   CorrectionError,
   CorrectionFormHeader,
@@ -23,6 +25,7 @@ export function GuestCorrectionForm({
   profile,
   execution,
   disabled,
+  editingDisabled = true,
   pending,
   error,
   onSubmit,
@@ -30,31 +33,36 @@ export function GuestCorrectionForm({
   profile: GuestProfile;
   execution: DataRightsCorrectionExecutionDetails;
   disabled: boolean;
+  editingDisabled?: boolean;
   pending: boolean;
   error: unknown;
   onSubmit: (body: GuestDataRightsCorrectionRequest) => void;
 }) {
   const initial = useMemo(() => guestCorrectionValues(profile), [profile]);
   const [values, setValues] = useState(initial);
+  const recoveryHeading = useRef<HTMLDivElement>(null);
   const request = buildGuestCorrectionRequest(profile, execution, values);
   const changed = guestCorrectionChanged(profile, values);
+  const fieldsDisabled = editingDisabled || pending;
+  const submitDisabled = disabled || fieldsDisabled || !changed || !request.displayName;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitDisabled) return;
     onSubmit(request);
   }
 
   return (
     <form className="space-y-4 rounded-lg border border-base-300 p-4 sm:p-5" onSubmit={submit}>
-      <CorrectionFormHeader
+      <div ref={recoveryHeading} tabIndex={-1} className="rounded outline-none focus:ring-2 focus:ring-primary"><CorrectionFormHeader
         title="Guest Record"
         revision={execution.subject.recordVersion}
-      />
+      /></div>
       <CorrectionTextInput
         label="Display name"
         value={values.displayName}
         onChange={(displayName) => setValues((current) => ({ ...current, displayName }))}
-        disabled={disabled}
+        disabled={fieldsDisabled}
         required
         maxLength={256}
       />
@@ -62,7 +70,7 @@ export function GuestCorrectionForm({
         label="Legal name"
         value={values.legalName}
         onChange={(legalName) => setValues((current) => ({ ...current, legalName }))}
-        disabled={disabled}
+        disabled={fieldsDisabled}
         maxLength={256}
       />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -71,7 +79,7 @@ export function GuestCorrectionForm({
           type="email"
           value={values.email}
           onChange={(email) => setValues((current) => ({ ...current, email }))}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           maxLength={320}
         />
         <CorrectionTextInput
@@ -79,46 +87,39 @@ export function GuestCorrectionForm({
           type="tel"
           value={values.phone}
           onChange={(phone) => setValues((current) => ({ ...current, phone }))}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           maxLength={64}
         />
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <CorrectionPickerField label="Date of birth">
           <DatePicker
             className="w-full"
             value={values.dateOfBirth}
             onChange={(dateOfBirth) => setValues((current) => ({ ...current, dateOfBirth }))}
             ariaLabel="Date of birth"
-            disabled={disabled}
+            disabled={fieldsDisabled}
           />
         </CorrectionPickerField>
-        <CorrectionTextInput
-          label="Nationality"
-          value={values.nationalityCountryCode}
-          onChange={(nationalityCountryCode) =>
-            setValues((current) => ({ ...current, nationalityCountryCode }))}
-          disabled={disabled}
-          maxLength={2}
-        />
-        <CorrectionTextInput
-          label="Language"
-          value={values.preferredLanguageTag}
-          onChange={(preferredLanguageTag) =>
-            setValues((current) => ({ ...current, preferredLanguageTag }))}
-          disabled={disabled}
-          maxLength={35}
-        />
+        <CorrectionPickerField label="Nationality (optional)">
+          <NationalityPicker
+            value={values.nationalityCountryCode}
+            onChange={(nationalityCountryCode) => setValues((current) => ({ ...current, nationalityCountryCode }))}
+            disabled={fieldsDisabled}
+          />
+        </CorrectionPickerField>
       </div>
+      <LanguagePicker value={values.languageTags} onChange={languageTags => setValues(current => ({ ...current, languageTags }))}
+        disabled={fieldsDisabled} onDisabledClose={() => recoveryHeading.current?.focus()} />
       <CorrectionTextArea
         label="Staff notes"
         value={values.notes}
         onChange={(notes) => setValues((current) => ({ ...current, notes }))}
-        disabled={disabled}
+        disabled={fieldsDisabled}
       />
       {Boolean(error) && <CorrectionError error={error} />}
       <CorrectionSubmit
-        disabled={disabled || !changed || !request.displayName}
+        disabled={submitDisabled}
         pending={pending}
       />
     </form>

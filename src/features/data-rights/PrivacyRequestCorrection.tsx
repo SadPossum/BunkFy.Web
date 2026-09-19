@@ -29,6 +29,8 @@ import {
   correctionClaimAction,
   correctionClaimExpired,
   correctionExecutionStatus,
+  guestCorrectionDraftReady,
+  type GuestCorrectionDraftContext,
 } from "./dataRightsCorrectionWorkflow";
 import {
   dataRightsCaseMatches,
@@ -51,6 +53,7 @@ export function PrivacyRequestCorrection({
   permissionCurrent,
   caseCurrent,
   selectedEvidenceCurrent,
+  guestDraftContext,
   onCaseUpdated,
 }: {
   basePath: string;
@@ -64,6 +67,7 @@ export function PrivacyRequestCorrection({
   permissionCurrent: boolean;
   caseCurrent: boolean;
   selectedEvidenceCurrent: boolean;
+  guestDraftContext?: GuestCorrectionDraftContext;
   onCaseUpdated: (updated: DataRightsCase) => Promise<void>;
 }) {
   const { request } = useSession();
@@ -338,6 +342,12 @@ export function PrivacyRequestCorrection({
                       <PrivacyRequestCorrectionOwnerEditor
                         propertyId={propertyId}
                         execution={execution}
+                        guestDraftReady={guestCorrectionDraftReady({
+                          context: guestDraftContext, propertyId, operatorScopeKey, scopeKey, dataRightsCase, execution,
+                          permissionCurrent: permissionCurrent && canExecute,
+                          correctionReady: correctionSource.state === "ready", now,
+                        }) && !start.isPending}
+                        guestSubmitReady={permissionCurrent && caseCurrent && selectedEvidenceCurrent && correctionCurrent}
                         disabled={!dataRightsMutationAllowed("apply-correction", {
                           permissionsCurrent: permissionCurrent,
                           caseCurrent,

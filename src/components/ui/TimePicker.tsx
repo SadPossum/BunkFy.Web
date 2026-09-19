@@ -59,7 +59,7 @@ export function TimePicker({
               aria-expanded={open}
               aria-haspopup="dialog"
               disabled={disabled}
-              className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg px-3 text-left text-sm outline-none disabled:cursor-not-allowed"
+              className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg px-3 text-left text-base outline-none disabled:cursor-not-allowed"
             >
               <Clock3 size={16} className="shrink-0 text-primary" />
               <span className={`min-w-0 flex-1 truncate ${value ? "font-medium" : "text-base-content/45"}`}>

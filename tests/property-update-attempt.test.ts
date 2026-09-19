@@ -9,7 +9,6 @@ const payload: PropertyUpdatePayload = {
   expectedVersion: 7,
   name: "Harbour House",
   code: "harbour-house",
-  timeZoneId: "Europe/London",
 };
 
 describe("property update attempts", () => {
@@ -23,7 +22,6 @@ describe("property update attempts", () => {
         ...payload,
         name: "  Harbour House  ",
         code: " HARBOUR-HOUSE ",
-        timeZoneId: " Europe/London ",
       },
       allocate,
     );

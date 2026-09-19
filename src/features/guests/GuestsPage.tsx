@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowUpRight,
   Archive,
   CalendarDays,
   ChevronRight,
@@ -9,13 +10,17 @@ import {
   History,
   Languages,
   Mail,
+  MessageSquareText,
   Phone,
   Plus,
   Search,
   UserRound,
   UsersRound,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router";
+import { ApiError } from "../../api/client";
 import type { GuestListItem, GuestListResponse, GuestMutationReceipt, GuestProfile, GuestStayHistoryItem, GuestStayHistoryListResponse } from "../../api/types";
 import { guestStatusLabel, guestStatusValue, guestStayRoleLabel, guestStayStatusLabel } from "../../api/labels";
 import {
@@ -25,6 +30,7 @@ import {
   type CompositeSource,
 } from "../../app/compositeSourceState";
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
+import { useTargetProperty } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { DatePicker } from "../../components/ui/DatePicker";
@@ -50,12 +56,23 @@ import {
 import {
   resolveGuestArchiveAttempt,
   resolveGuestUpdateAttempt,
+  guestUpdateRecoveryAllowed,
+  guestSaveResultUncertain,
   type GuestManagementAttempt,
+  type GuestUpdateAttempt,
 } from "./guestManagementAttempt";
 import {
   guestMutationAllowed,
   guestRecordMatches,
 } from "./guestsMutationAuthority";
+import {
+  guestCountryLabel,
+  guestIdentitySummary,
+  guestLanguageLabels,
+} from "./guestProfilePresentation";
+import { NationalityPicker } from "./NationalityPicker";
+import { LanguagePicker } from "./LanguagePicker";
+import { guestLanguagePayload, guestLanguageSelection } from "./guestLanguageSelection";
 
 const PAGE_SIZE = 30;
 const STAY_PAGE_SIZE = 8;
@@ -69,7 +86,11 @@ type GuestFormSubmission = {
   propertyId: string;
   guest: GuestProfile | null;
   values: GuestWriteValues;
+  intent: { ownerKey: string };
+  attempt?: GuestUpdateAttempt;
+  recovery?: boolean;
 };
+type GuestUpdateRecovery = { attempt: GuestUpdateAttempt; uncertain: boolean };
 
 type GuestArchiveSubmission = {
   propertyId: string;
@@ -79,6 +100,9 @@ type GuestArchiveSubmission = {
 export function GuestsPage() {
   const { request, session } = useSession();
   const { selectedProperty, selectedPropertyId } = useWorkspace();
+  const [searchParams, setSearchParams] = useSearchParams();
+  useTargetProperty(searchParams.get("property"));
+  const requestedGuestId = searchParams.get("guest");
   const selectedPropertyIdRef = useRef(selectedPropertyId);
   selectedPropertyIdRef.current = selectedPropertyId;
   const queryClient = useQueryClient();
@@ -86,12 +110,18 @@ export function GuestsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
   const [page, setPage] = useState(1);
-  const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
+  const [selectedGuestId, setSelectedGuestId] = useState<string | null>(requestedGuestId);
   const [stayPage, setStayPage] = useState(1);
   const [formState, setFormState] = useState<GuestFormState>(undefined);
   const [archiveTarget, setArchiveTarget] = useState<GuestProfile | null>(null);
+  const [updateRecovery, setUpdateRecovery] = useState<GuestUpdateRecovery | null>(null);
+  const [guestOutcome, setGuestOutcome] = useState<string | null>(null);
+  const ownerKey = JSON.stringify([session?.tenantId, session?.subjectId ?? session?.username, session?.sessionId, session?.generation, selectedPropertyId]);
+  const ownerKeyRef = useRef(ownerKey);
+  ownerKeyRef.current = ownerKey;
+  const formIntent = useRef<{ ownerKey: string } | null>(null);
   const createAttempt = useRef<GuestCreateAttempt | null>(null);
-  const updateAttempt = useRef<GuestManagementAttempt | null>(null);
+  const updateAttempt = useRef<GuestUpdateAttempt | null>(null);
   const archiveAttempt = useRef<GuestManagementAttempt | null>(null);
 
   const accessScope = session && selectedPropertyId
@@ -102,11 +132,13 @@ export function GuestsPage() {
     { permission: permissions.guestsCreate, scope: accessScope },
     { permission: permissions.guestsManage, scope: accessScope },
     { permission: permissions.guestsArchive, scope: accessScope },
+    { permission: permissions.reservationsRead, scope: accessScope },
   ] : []);
   const mayRead = access.allows(permissions.guestsRead, accessScope);
   const mayCreate = access.allows(permissions.guestsCreate, accessScope);
   const mayManage = access.allows(permissions.guestsManage, accessScope);
   const mayArchive = access.allows(permissions.guestsArchive, accessScope);
+  const mayReadReservations = access.allows(permissions.reservationsRead, accessScope);
   const mayReadRef = useRef(mayRead);
   mayReadRef.current = mayRead;
   const permissionSource = createCompositeSource({
@@ -199,35 +231,35 @@ export function GuestsPage() {
     ? "Current create permission could not be confirmed. Retry the access source before submitting."
     : "Current Guest Record and access evidence is refreshing or no longer matches this form. If it remains disabled, close and reopen the latest profile."
   const archiveAuthorityMessage = "Current Guest Record and access evidence is refreshing or no longer matches this confirmation. If it remains disabled, close it and review the latest profile.";
+  const recoveryAllowed = Boolean(updateRecovery?.uncertain && formIntent.current?.ownerKey === ownerKey &&
+    guestUpdateRecoveryAllowed(updateRecovery.attempt, {
+      propertyId: selectedPropertyId, guestId: selectedGuestId, permissionsCurrent, mayRead, mayManage,
+      guestCurrent: detailCurrent, guest: detail.data,
+    }));
 
   const guestMutation = useMutation<GuestMutationReceipt, Error, GuestFormSubmission>({
-    mutationFn: ({ propertyId, guest, values }) => {
-      const authorityCurrent = propertyId === selectedPropertyId && (
+    mutationFn: ({ propertyId, guest, values, intent, attempt, recovery }) => {
+      const exactOwner = formIntent.current === intent && intent.ownerKey === ownerKeyRef.current;
+      const authorityCurrent = exactOwner && propertyId === selectedPropertyId && (
         guest
-          ? mayRead && mayManage && guestMutationAllowed("update", {
+          ? recovery
+            ? attempt === updateRecovery?.attempt && recoveryAllowed
+            : !updateRecovery && guest.status === 1 && mayRead && mayManage && guestMutationAllowed("update", {
               permissionsCurrent,
               guestCurrent: detailCurrent && guestRecordMatches(detail.data, guest),
             })
           : mayRead && mayCreate && guestMutationAllowed("create", { permissionsCurrent })
       );
       if (!authorityCurrent) {
-        throw new Error("Current Guest Record access and profile evidence could not be confirmed. Refresh and try again.");
+        throw new ApiError("Current Guest Record access and profile evidence could not be confirmed. Review the latest profile before making another change.", 409);
       }
 
       const body = guest
         ? (() => {
-            updateAttempt.current = resolveGuestUpdateAttempt(
-              updateAttempt.current,
-              propertyId,
-              guest.guestId,
-              guest.version,
-              values,
-            );
-            return {
-              ...values,
-              operationId: updateAttempt.current.operationId,
-              expectedVersion: guest.version,
-            };
+            if (!attempt || attempt !== updateAttempt.current || attempt.propertyId !== propertyId || attempt.guestId !== guest.guestId) {
+              throw new ApiError("This save attempt is no longer owned by this form. Review the latest profile.", 409);
+            }
+            return attempt.requestBody;
           })()
         : (() => {
             createAttempt.current = resolveGuestCreateAttempt(
@@ -235,27 +267,35 @@ export function GuestsPage() {
               propertyId,
               values,
             );
-            return { ...values, operationId: createAttempt.current.operationId };
+            return JSON.stringify({ ...values, operationId: createAttempt.current.operationId });
           })();
       return request<GuestMutationReceipt>(
         guest
           ? `/api/guests/properties/${propertyId}/${guest.guestId}`
           : `/api/guests/properties/${propertyId}`,
-        { method: guest ? "PUT" : "POST", body: JSON.stringify(body) },
+        { method: guest ? "PUT" : "POST", body },
       );
     },
     onSuccess: async (saved, submission) => {
+      if (formIntent.current !== submission.intent || submission.intent.ownerKey !== ownerKeyRef.current) return;
       createAttempt.current = null;
       updateAttempt.current = null;
+      setUpdateRecovery(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["guest-list", submission.propertyId] }),
         queryClient.invalidateQueries({ queryKey: ["guest-detail", submission.propertyId, saved.guestId] }),
       ]);
-      if (selectedPropertyIdRef.current !== submission.propertyId || !mayReadRef.current) return;
+      if (selectedPropertyIdRef.current !== submission.propertyId || !mayReadRef.current || formIntent.current !== submission.intent || submission.intent.ownerKey !== ownerKeyRef.current) return;
+      formIntent.current = null;
+      setGuestOutcome("Guest record saved.");
       setFormState(undefined);
       selectGuest(saved.guestId);
     },
-    onError: async (_error, submission) => {
+    onError: async (error, submission) => {
+      if (formIntent.current !== submission.intent || submission.intent.ownerKey !== ownerKeyRef.current) return;
+      if (submission.guest && submission.attempt) {
+        setUpdateRecovery({ attempt: submission.attempt, uncertain: guestSaveResultUncertain(error) });
+      }
       if (!submission.guest) return;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["guest-list", submission.propertyId] }),
@@ -312,6 +352,9 @@ export function GuestsPage() {
   });
 
   useEffect(() => {
+    formIntent.current = null;
+    setUpdateRecovery(null);
+    setGuestOutcome(null);
     createAttempt.current = null;
     updateAttempt.current = null;
     archiveAttempt.current = null;
@@ -320,12 +363,20 @@ export function GuestsPage() {
     setSelectedGuestId(null);
     setFormState(undefined);
     setArchiveTarget(null);
-  }, [selectedPropertyId]);
+  }, [selectedPropertyId, ownerKey]);
+
+  useEffect(() => {
+    if (!requestedGuestId || !selectedPropertyId) return;
+    setStayPage(1);
+    setSelectedGuestId(requestedGuestId);
+  }, [requestedGuestId, selectedPropertyId]);
 
   useEffect(() => {
     if (!permissionsCurrent) return;
 
     if (!mayRead) {
+      formIntent.current = null;
+      setUpdateRecovery(null);
       createAttempt.current = null;
       updateAttempt.current = null;
       archiveAttempt.current = null;
@@ -336,6 +387,8 @@ export function GuestsPage() {
     }
 
     if ((formState === null && !mayCreate) || (formState && !mayManage)) {
+      formIntent.current = null;
+      setUpdateRecovery(null);
       createAttempt.current = null;
       updateAttempt.current = null;
       setFormState(undefined);
@@ -345,6 +398,19 @@ export function GuestsPage() {
       setArchiveTarget(null);
     }
   }, [archiveTarget, formState, mayArchive, mayCreate, mayManage, mayRead, permissionsCurrent]);
+
+  useEffect(() => {
+    if (!formState) return;
+    const identityChanged = selectedGuestId !== formState.guestId || requestedGuestId !== formState.guestId;
+    const denied = detail.error instanceof ApiError && [401, 403, 404, 410].includes(detail.error.status);
+    const inactive = detailCurrent && detail.data?.guestId === formState.guestId && detail.data.status !== 1;
+    if (!identityChanged && !denied && !inactive) return;
+    formIntent.current = null;
+    updateAttempt.current = null;
+    setUpdateRecovery(null);
+    setFormState(undefined);
+    if (denied || inactive) setGuestOutcome("This Guest record can no longer be edited. Review the latest profile and access status.");
+  }, [formState, selectedGuestId, requestedGuestId, detail.error, detailCurrent, detail.data]);
 
   useEffect(() => {
     if (directoryCurrent && guests.data && page > 1 && guests.data.guests.length === 0) {
@@ -366,6 +432,15 @@ export function GuestsPage() {
   function selectGuest(guestId: string | null) {
     setStayPage(1);
     setSelectedGuestId(guestId);
+    const next = new URLSearchParams(searchParams);
+    if (guestId) {
+      next.set("guest", guestId);
+    } else {
+      next.delete("guest");
+      next.delete("focus");
+      next.delete("property");
+    }
+    setSearchParams(next, { replace: true });
   }
 
   function openCreate() {
@@ -373,6 +448,9 @@ export function GuestsPage() {
     guestMutation.reset();
     createAttempt.current = null;
     updateAttempt.current = null;
+    setUpdateRecovery(null);
+    setGuestOutcome(null);
+    formIntent.current = { ownerKey };
     selectGuest(null);
     setFormState(null);
   }
@@ -382,6 +460,9 @@ export function GuestsPage() {
     guestMutation.reset();
     createAttempt.current = null;
     updateAttempt.current = null;
+    setUpdateRecovery(null);
+    setGuestOutcome(null);
+    formIntent.current = { ownerKey };
     setSelectedGuestId(guest.guestId);
     setFormState(guest);
   }
@@ -402,10 +483,11 @@ export function GuestsPage() {
     <>
       <PageHeader
         eyebrow={selectedProperty.name}
-        title="Guests"
-        description="Keep guest details and stay history together, without turning guest records into login accounts."
-        action={mayRead && mayCreate ? <button type="button" className="btn btn-primary" disabled={!createAuthorityCurrent} onClick={openCreate}><Plus size={17} />New guest</button> : undefined}
+        title="Guest records"
+        description="Find durable contact details and review reservation-linked stay history."
+        action={mayRead && mayCreate ? <button type="button" className="btn btn-primary" disabled={!createAuthorityCurrent} onClick={openCreate}><Plus size={17} />New guest record</button> : undefined}
       />
+      {guestOutcome && <p role="status" className="mb-4 text-sm">{guestOutcome}</p>}
 
       {!permissionUsable || !mayRead ? permissionsCurrent && !mayRead ? (
         <EmptyState icon={<UsersRound />} title="Guest access is not enabled" description="Ask an administrator for guest record access at this property." />
@@ -424,15 +506,18 @@ export function GuestsPage() {
           />
           <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
           <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <SegmentedTabs
-              value={status}
-              ariaLabel="Guest status"
-              onValueChange={(nextStatus) => { setStatus(nextStatus); setPage(1); }}
-              options={statusFilters.map((option) => ({
-                value: option,
-                label: option === "all" ? "All guests" : option === "active" ? "Active" : "Archived",
-              }))}
-            />
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <SegmentedTabs
+                value={status}
+                ariaLabel="Guest status"
+                onValueChange={(nextStatus) => { setStatus(nextStatus); setPage(1); }}
+                options={statusFilters.map((option) => ({
+                  value: option,
+                  label: option === "all" ? "All guests" : option === "active" ? "Active" : "Archived",
+                }))}
+              />
+              {directoryUsable && <p className="text-xs font-medium text-base-content/50" aria-live="polite">Page {page} · {guestItems.length} {guestItems.length === 1 ? "record" : "records"}</p>}
+            </div>
             <label className="input input-bordered input-sm flex w-full items-center gap-2 sm:w-72">
               <Search size={15} className="text-base-content/35" />
               <input
@@ -444,6 +529,7 @@ export function GuestsPage() {
                 onChange={(event) => { setSearch(event.target.value); setPage(1); }}
               />
               {guests.isFetching && <span className="loading loading-spinner loading-xs text-primary" aria-label="Updating guest results" />}
+              {search && !guests.isFetching && <button type="button" className="btn btn-circle btn-ghost btn-xs -mr-1" aria-label="Clear guest search" onClick={() => { setSearch(""); setPage(1); }}><X size={14} /></button>}
             </label>
           </div>
 
@@ -478,13 +564,14 @@ export function GuestsPage() {
       <Modal
         open={detailOpen}
         title={detail.data?.displayName ?? selectedSummary?.displayName ?? "Guest profile"}
-        description="Profile details and recorded stay history"
+        description="Durable identity, contact details and reservation-linked history"
         onClose={() => selectGuest(null)}
+        size="lg"
       >
         {detailSource.state === "loading" ? <LoadingState label="Loading guest profile" /> : !detailUsable ? (
           <div>
-            <CompositeSourceNotice sources={[permissionSource, detailSource]} title="Guest profile is delayed" />
-            <CompositeSourceFallback state={detailSource.state} label="guest profile" />
+            <CompositeSourceNotice sources={[permissionSource]} title="Guest access is delayed" />
+            <CompositeSourceFallback error={detail.error} retry={() => void detail.refetch()} state={detailSource.state} label="guest profile" title="Guest profile could not be opened" />
           </div>
         ) : detail.data ? (
           <div>
@@ -499,6 +586,7 @@ export function GuestsPage() {
               onStayPageChange={setStayPage}
               canManage={mayManage}
               canArchive={mayArchive}
+              canOpenReservations={mayReadReservations && permissionsCurrent}
               manageEnabled={detailManageAuthorityCurrent}
               archiveEnabled={detailArchiveAuthorityCurrent}
               onEdit={() => openEdit(detail.data)}
@@ -509,17 +597,26 @@ export function GuestsPage() {
       </Modal>
 
       <GuestForm
-        state={guestDataVisible ? formState : undefined}
+        state={guestDataVisible && formIntent.current?.ownerKey === ownerKey ? formState : undefined}
         submitting={guestMutation.isPending}
         error={guestMutation.error}
         sources={formState ? [permissionSource, detailSource] : [permissionSource]}
         authorityCurrent={formAuthorityCurrent}
         authorityMessage={formAuthorityMessage}
-        onSubmit={(values) => {
-          if (!formAuthorityCurrent) return;
-          guestMutation.mutate({ propertyId: selectedPropertyId, guest: formState ?? null, values });
+        recovery={updateRecovery}
+        recoveryAllowed={recoveryAllowed}
+        onRetry={() => {
+          if (!formState || !formIntent.current || !recoveryAllowed || !updateRecovery || guestMutation.isPending) return;
+          guestMutation.mutate({ propertyId: selectedPropertyId, guest: formState, values: JSON.parse(updateRecovery.attempt.requestBody),
+            intent: formIntent.current, attempt: updateRecovery.attempt, recovery: true });
         }}
-        onClose={() => { guestMutation.reset(); createAttempt.current = null; updateAttempt.current = null; setFormState(undefined); }}
+        onSubmit={(values) => {
+          if (!formAuthorityCurrent || !formIntent.current || updateRecovery || guestMutation.isPending) return;
+          const attempt = formState ? resolveGuestUpdateAttempt(updateAttempt.current, selectedPropertyId, formState.guestId, formState.version, values) : undefined;
+          if (attempt) updateAttempt.current = attempt;
+          guestMutation.mutate({ propertyId: selectedPropertyId, guest: formState ?? null, values, intent: formIntent.current, attempt });
+        }}
+        onClose={() => { formIntent.current = null; guestMutation.reset(); createAttempt.current = null; updateAttempt.current = null; setUpdateRecovery(null); setFormState(undefined); }}
       />
 
       <ArchiveGuestModal
@@ -544,7 +641,7 @@ function GuestList({ guests, onSelect }: { guests: GuestListItem[]; onSelect: (g
     <>
       <div className="hidden overflow-x-auto lg:block">
         <table className="table">
-          <thead><tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40"><th className="pl-6">Guest</th><th>Contact</th><th>Profile</th><th>Status</th><th>Last updated</th><th className="pr-6" /></tr></thead>
+          <thead><tr className="border-base-300 text-[0.68rem] uppercase text-base-content/40"><th className="pl-6">Guest</th><th>Contact</th><th>Identity details</th><th>Status</th><th>Last updated</th><th className="pr-6" /></tr></thead>
           <tbody>
             {guests.map((guest) => (
               <tr key={guest.guestId} className="border-base-300 transition hover:bg-base-200/70">
@@ -555,7 +652,7 @@ function GuestList({ guests, onSelect }: { guests: GuestListItem[]; onSelect: (g
                   </button>
                 </td>
                 <td><ContactSummary guest={guest} /></td>
-                <td className="text-sm text-base-content/55">{[guest.nationalityCountryCode?.toUpperCase(), guest.preferredLanguageTag].filter(Boolean).join(" · ") || "Basic profile"}</td>
+                <td><IdentitySummary guest={guest} /></td>
                 <td><StatusBadge status={guestStatusLabel(guest.status)} /></td>
                 <td><p className="text-sm font-medium">{formatDateTime(guest.lastChangedAtUtc)}</p><p className="mt-1 text-xs text-base-content/40">by {formatActor(guest.lastChangedBy)}</p></td>
                 <td className="pr-6 text-right"><button type="button" className="btn btn-circle btn-ghost btn-xs" aria-label={`View ${guest.displayName}`} onClick={() => onSelect(guest.guestId)}><ChevronRight size={17} /></button></td>
@@ -584,6 +681,12 @@ function ContactSummary({ guest }: { guest: GuestListItem }) {
   return <div className="space-y-1 text-sm">{guest.email && <p className="flex items-center gap-2"><Mail size={14} className="text-base-content/35" /><span className="max-w-56 truncate">{guest.email}</span></p>}{guest.phone && <p className="flex items-center gap-2"><Phone size={14} className="text-base-content/35" />{guest.phone}</p>}</div>;
 }
 
+function IdentitySummary({ guest }: { guest: GuestListItem }) {
+  const details = guestIdentitySummary(guest);
+  if (!details.length) return <span className="text-sm text-base-content/35">Display name only</span>;
+  return <div className="max-w-52 space-y-1 text-sm text-base-content/55">{details.map((detail) => <p key={detail} className="truncate" title={detail}>{detail}</p>)}</div>;
+}
+
 function GuestDetail({
   guest,
   stays,
@@ -594,6 +697,7 @@ function GuestDetail({
   onStayPageChange,
   canManage,
   canArchive,
+  canOpenReservations,
   manageEnabled,
   archiveEnabled,
   onEdit,
@@ -608,52 +712,71 @@ function GuestDetail({
   onStayPageChange: (page: number) => void;
   canManage: boolean;
   canArchive: boolean;
+  canOpenReservations: boolean;
   manageEnabled: boolean;
   archiveEnabled: boolean;
   onEdit: () => void;
   onArchive: () => void;
 }) {
   const active = guestStatusLabel(guest.status) === "active";
+  const country = guestCountryLabel(guest.nationalityCountryCode);
+  const language = guestLanguageLabels(guest).join(" · ");
+  const hasRecordedProfileFacts = Boolean(
+    guest.legalName || guest.email || guest.phone || guest.dateOfBirth || country || language,
+  );
+  const missingProfileFacts = [
+    !guest.legalName && "legal name",
+    !guest.email && "email",
+    !guest.phone && "phone",
+    !guest.dateOfBirth && "date of birth",
+    !country && "nationality",
+    !language && "languages",
+  ].filter((value): value is string => Boolean(value));
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 rounded-lg bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3"><InitialAvatar name={guest.displayName} variant="solid" /><div><div className="flex flex-wrap items-center gap-2"><p className="font-display text-lg font-semibold">{guest.displayName}</p><StatusBadge status={guestStatusLabel(guest.status)} /></div><p className="mt-1 text-xs text-base-content/45">Guest since {formatDateTime(guest.createdAtUtc)}</p></div></div>
         {active && (canManage || canArchive) && <div className="flex gap-2">{canManage && <button type="button" className="btn btn-sm btn-outline" disabled={!manageEnabled} onClick={onEdit}><Edit3 size={15} />Edit</button>}{canArchive && <button type="button" className="btn btn-sm btn-ghost text-error" disabled={!archiveEnabled} onClick={onArchive}><Archive size={15} />Archive</button>}</div>}
       </div>
 
-      <section aria-labelledby="guest-profile-details">
-        <h3 id="guest-profile-details" className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Profile</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <DetailField icon={<UserRound size={16} />} label="Legal name" value={guest.legalName || "Not provided"} />
-          <DetailField icon={<CalendarDays size={16} />} label="Date of birth" value={guest.dateOfBirth ? formatDate(guest.dateOfBirth) : "Not provided"} />
-          <DetailField icon={<Mail size={16} />} label="Email" value={guest.email || "Not provided"} href={guest.email ? `mailto:${guest.email}` : undefined} />
-          <DetailField icon={<Phone size={16} />} label="Phone" value={guest.phone || "Not provided"} href={guest.phone ? `tel:${guest.phone}` : undefined} />
-          <DetailField icon={<Globe2 size={16} />} label="Nationality" value={guest.nationalityCountryCode?.toUpperCase() || "Not provided"} />
-          <DetailField icon={<Languages size={16} />} label="Preferred language" value={guest.preferredLanguageTag || "Not provided"} />
-        </div>
-        {guest.notes && <div className="mt-3 rounded-xl border border-base-300 p-4"><p className="text-xs font-semibold text-base-content/45">Staff notes</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{guest.notes}</p></div>}
-      </section>
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <section className="min-w-0" aria-labelledby="guest-profile-details">
+          <h3 id="guest-profile-details" className="mb-3 text-xs font-bold uppercase text-base-content/40">Identity and contact</h3>
+          <div className="divide-y divide-base-300 overflow-hidden rounded-lg border border-base-300 bg-base-100">
+            {guest.legalName && <ProfileFact icon={<UserRound size={16} />} label="Legal name" value={guest.legalName} />}
+            {guest.email && <ProfileFact icon={<Mail size={16} />} label="Email" value={guest.email} href={`mailto:${guest.email}`} />}
+            {guest.phone && <ProfileFact icon={<Phone size={16} />} label="Phone" value={guest.phone} href={`tel:${guest.phone}`} />}
+            {guest.dateOfBirth && <ProfileFact icon={<CalendarDays size={16} />} label="Date of birth" value={formatDate(guest.dateOfBirth)} />}
+            {country && <ProfileFact icon={<Globe2 size={16} />} label="Nationality" value={country} />}
+            {language && <ProfileFact icon={<Languages size={16} />} label="Languages" value={language} />}
+            {!hasRecordedProfileFacts && <div className="p-4 text-sm text-base-content/50">Only the display name is recorded.</div>}
+          </div>
+          {missingProfileFacts.length > 0 && <p className="mt-3 text-xs leading-5 text-base-content/45">Not recorded: {missingProfileFacts.join(", ")}.</p>}
+          {guest.notes && <div className="mt-5 border-l-2 border-primary/35 pl-4"><div className="flex items-center gap-2 text-xs font-semibold text-base-content/50"><MessageSquareText size={15} className="text-primary" />Staff notes</div><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{guest.notes}</p></div>}
+        </section>
 
-      <section aria-labelledby="guest-stay-history">
-        <div className="mb-3 flex items-center justify-between"><h3 id="guest-stay-history" className="text-xs font-bold uppercase tracking-[0.15em] text-base-content/40">Stay history</h3>{stays.length > 0 && <span className="text-xs font-medium text-base-content/40">Page {stayPage}</span>}</div>
-        <CompositeSourceNotice className="mb-3" sources={[staysSource]} title="Stay history is delayed" />
-        {staysSource.state === "loading" ? <LoadingState label="Loading stay history" /> : !compositeSourceUsable(staysSource.state) ? (
-          <CompositeSourceFallback state={staysSource.state} label="stay history" />
-        ) : !stays.length ? (
-          <div className="rounded-2xl border border-dashed border-base-300 p-6 text-center"><History className="mx-auto text-base-content/25" size={26} /><p className="mt-3 text-sm font-semibold">No stays recorded yet</p><p className="mt-1 text-xs text-base-content/45">Reservation participation will appear here automatically.</p></div>
-        ) : <><div className="space-y-3">{stays.map((stay) => <StayHistoryCard key={`${stay.reservationId}-${stay.reservationVersion}`} stay={stay} />)}</div><PaginationBar page={stayPage} pageSize={stayPageSize} itemCount={stays.length} itemLabel="stay" hasMore={staysHasMore} disabled={!compositeSourceCurrent(staysSource)} onPageChange={onStayPageChange} /></>}
-      </section>
+        <section className="min-w-0" aria-labelledby="guest-stay-history">
+          <div className="mb-3 flex items-center justify-between gap-3"><h3 id="guest-stay-history" className="text-xs font-bold uppercase text-base-content/40">Stay history</h3>{stays.length > 0 && <span className="text-xs font-medium text-base-content/40">Page {stayPage}</span>}</div>
+          <CompositeSourceNotice className="mb-3" sources={[staysSource]} title="Stay history is delayed" />
+          {staysSource.state === "loading" ? <LoadingState label="Loading stay history" /> : !compositeSourceUsable(staysSource.state) ? (
+            <CompositeSourceFallback state={staysSource.state} label="stay history" />
+          ) : !stays.length ? (
+            <div className="rounded-lg border border-dashed border-base-300 p-6 text-center"><History className="mx-auto text-base-content/25" size={26} /><p className="mt-3 text-sm font-semibold">No stays recorded yet</p><p className="mt-1 text-xs text-base-content/45">A linked reservation will appear here automatically.</p></div>
+          ) : <><div className="space-y-3">{stays.map((stay) => <StayHistoryCard key={`${stay.reservationId}-${stay.reservationVersion}`} stay={stay} canOpenReservation={canOpenReservations} />)}</div><PaginationBar page={stayPage} pageSize={stayPageSize} itemCount={stays.length} itemLabel="stay" hasMore={staysHasMore} disabled={!compositeSourceCurrent(staysSource)} onPageChange={onStayPageChange} /></>}
+        </section>
+      </div>
 
       <p className="border-t border-base-300 pt-4 text-xs leading-5 text-base-content/40">Last updated {formatDateTime(guest.lastChangedAtUtc)} by {formatActor(guest.lastChangedBy)} · Profile version {guest.version}</p>
     </div>
   );
 }
 
-function DetailField({ icon, label, value, href }: { icon: React.ReactNode; label: string; value: string; href?: string }) {
-  return <div className="flex gap-3 rounded-xl border border-base-300 p-4"><span className="mt-0.5 text-primary">{icon}</span><div className="min-w-0"><p className="text-xs font-semibold text-base-content/45">{label}</p>{href ? <a className="mt-1 block truncate text-sm font-medium text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 truncate text-sm font-medium">{value}</p>}</div></div>;
+function ProfileFact({ icon, label, value, href }: { icon: React.ReactNode; label: string; value: string; href?: string }) {
+  return <div className="flex min-w-0 gap-3 p-4"><span className="mt-0.5 shrink-0 text-primary">{icon}</span><div className="min-w-0"><p className="text-xs font-semibold text-base-content/45">{label}</p>{href ? <a className="mt-1 block break-words text-sm font-medium text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 break-words text-sm font-medium">{value}</p>}</div></div>;
 }
 
-function StayHistoryCard({ stay }: { stay: GuestStayHistoryItem }) {
+function StayHistoryCard({ stay, canOpenReservation }: { stay: GuestStayHistoryItem; canOpenReservation: boolean }) {
   const lifecycleDate = stay.checkedOutBusinessDate
     ? `Checked out ${formatDate(stay.checkedOutBusinessDate)}`
     : stay.noShowBusinessDate
@@ -662,31 +785,83 @@ function StayHistoryCard({ stay }: { stay: GuestStayHistoryItem }) {
         ? `Checked in ${formatDate(stay.checkedInBusinessDate)}`
         : null;
   return (
-    <article className="rounded-xl border border-base-300 p-4">
+    <article className="rounded-lg border border-base-300 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><CalendarDays size={17} /></span><div><p className="font-semibold">{formatDate(stay.arrival)} → {formatDate(stay.departure)}</p><p className="mt-1 text-xs text-base-content/45">{nightsBetween(stay.arrival, stay.departure)} nights · {guestStayRoleLabel(stay.role)}</p></div></div>
         <StatusBadge status={guestStayStatusLabel(stay.status)} />
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-3 text-xs text-base-content/45"><span>{lifecycleDate ?? "Stay not started"}</span><span>{stay.isCurrentParticipant ? "Current reservation link" : "Previous reservation link"}</span></div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-3">
+        <div className="text-xs text-base-content/45"><p>{lifecycleDate ?? "Stay not started"}</p><p className="mt-1">{stay.isCurrentParticipant ? "Current participant" : "Historical participant"} · Reservation {stay.reservationId.slice(0, 8).toUpperCase()}</p></div>
+        {canOpenReservation && <Link className="btn btn-ghost btn-sm shrink-0 text-primary" to={`/reservations?${new URLSearchParams({ property: stay.propertyId, reservation: stay.reservationId, focus: stay.reservationId })}`}><span>Open reservation</span><ArrowUpRight size={15} /></Link>}
+      </div>
     </article>
   );
 }
 
-function GuestForm({ state, submitting, error, sources, authorityCurrent, authorityMessage, onSubmit, onClose }: {
+type GuestFormProps = {
   state: GuestFormState;
   submitting: boolean;
   error: unknown;
   sources: CompositeSource[];
   authorityCurrent: boolean;
   authorityMessage: string;
+  recovery: GuestUpdateRecovery | null;
+  recoveryAllowed: boolean;
+  onRetry: () => void;
   onSubmit: (values: GuestWriteValues) => void;
   onClose: () => void;
-}) {
+};
+
+function GuestForm(props: GuestFormProps) {
+  const guest = props.state ?? null;
+  return <Modal open={props.state !== undefined} title={guest ? "Edit guest record" : "New guest record"} description="Durable identity and contact details for future reservations and stay history." onClose={props.onClose} size="lg">
+    <GuestEditor key={guest?.guestId ?? "new"} {...props} />
+  </Modal>;
+}
+
+function GuestEditor({ state, submitting, error, sources, authorityCurrent, authorityMessage, recovery, recoveryAllowed, onRetry, onSubmit, onClose }: GuestFormProps) {
   const guest = state ?? null;
+  const [languageTags, setLanguageTags] = useState(() => guestLanguageSelection(guest ?? {}));
+  const [languageError, setLanguageError] = useState<string | null>(null);
+  const authorityFeedback = useRef<HTMLDivElement>(null);
+  const detailsHeading = useRef<HTMLHeadingElement>(null);
+  const failureFocusOwner = useRef<Element | null>(null);
+  const fieldsDisabled = !authorityCurrent || submitting || Boolean(recovery);
+  useEffect(() => {
+    if (!submitting || !failureFocusOwner.current) return;
+    const cancel = () => { failureFocusOwner.current = null; };
+    const focus = (event: FocusEvent) => {
+      if (event.target !== failureFocusOwner.current && event.target !== detailsHeading.current && event.target !== authorityFeedback.current &&
+        event.target !== document.body && event.target !== authorityFeedback.current?.closest("[data-bunkfy-modal-box]")) cancel();
+    };
+    const pointer = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || !failureFocusOwner.current?.contains(event.target)) cancel();
+    };
+    const key = (event: KeyboardEvent) => { if (event.key === "Tab") cancel(); };
+    document.addEventListener("focusin", focus);
+    document.addEventListener("pointerdown", pointer);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("focusin", focus);
+      document.removeEventListener("pointerdown", pointer);
+      document.removeEventListener("keydown", key);
+    };
+  }, [submitting]);
+  useEffect(() => {
+    if (!error || submitting || !failureFocusOwner.current) return;
+    const active = document.activeElement;
+    if (active === failureFocusOwner.current || active === document.body || active === detailsHeading.current || active === authorityFeedback.current || active === authorityFeedback.current?.closest("[data-bunkfy-modal-box]")) {
+      authorityFeedback.current?.focus();
+    }
+    failureFocusOwner.current = null;
+  }, [error, submitting]);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!authorityCurrent) return;
+    if (fieldsDisabled) return;
+    const languages = guestLanguagePayload(languageTags, guest?.preferredLanguageTag);
+    if (!languages.ok) { setLanguageError(languages.error); detailsHeading.current?.focus(); return; }
     const data = new FormData(event.currentTarget);
+    failureFocusOwner.current = document.activeElement;
     onSubmit({
       displayName: String(data.get("displayName") ?? "").trim(),
       legalName: optionalFormValue(data, "legalName"),
@@ -694,34 +869,62 @@ function GuestForm({ state, submitting, error, sources, authorityCurrent, author
       phone: optionalFormValue(data, "phone"),
       dateOfBirth: optionalFormValue(data, "dateOfBirth"),
       nationalityCountryCode: optionalFormValue(data, "nationalityCountryCode")?.toUpperCase() ?? null,
-      preferredLanguageTag: optionalFormValue(data, "preferredLanguageTag"),
+      preferredLanguageTag: languages.preferredLanguageTag,
+      languageTags: languages.languageTags,
       notes: optionalFormValue(data, "notes"),
     });
   }
   return (
-    <Modal open={state !== undefined} title={guest ? "Edit guest" : "New guest"} description="Start with the details staff need most. Optional fields can be completed later." onClose={onClose}>
-      <form key={guest?.guestId ?? "new"} onSubmit={submit} className="space-y-4">
-        <CompositeSourceNotice className="mb-0" sources={sources} title="Guest command context is delayed" />
-        {!authorityCurrent && <MutationAuthorityNotice message={authorityMessage} />}
-        <fieldset disabled={!authorityCurrent || submitting} className="space-y-4">
-          <FormField label="Display name" name="displayName" defaultValue={guest?.displayName} placeholder="Maya Chen" maxLength={256} autoComplete="name" />
-          <FormField label="Legal name (optional)" name="legalName" defaultValue={guest?.legalName} placeholder="As shown on identification" maxLength={256} required={false} autoComplete="name" />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Email (optional)" name="email" type="email" defaultValue={guest?.email} placeholder="maya@example.com" maxLength={320} required={false} autoComplete="email" />
-            <FormField label="Phone (optional)" name="phone" type="tel" defaultValue={guest?.phone} placeholder="+44 20 1234 5678" maxLength={64} required={false} autoComplete="tel" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <FormDatePicker label="Date of birth" name="dateOfBirth" defaultValue={guest?.dateOfBirth} />
-            <FormField label="Nationality" name="nationalityCountryCode" defaultValue={guest?.nationalityCountryCode} placeholder="GB" maxLength={2} required={false} autoComplete="country" />
-            <FormField label="Language" name="preferredLanguageTag" defaultValue={guest?.preferredLanguageTag} placeholder="en-GB" maxLength={35} required={false} autoComplete="language" />
-          </div>
-          <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Staff notes (optional)</span><textarea className="textarea textarea-bordered min-h-20 w-full" name="notes" defaultValue={guest?.notes ?? ""} maxLength={4000} placeholder="Preferences or operational notes visible to staff" /></label>
+      <form onSubmit={submit} className="space-y-4">
+        <div ref={authorityFeedback} tabIndex={-1} className="rounded outline-none focus:ring-2 focus:ring-primary">
+          <CompositeSourceNotice className="mb-0" sources={sources} title="Guest command context is delayed" />
+          {recovery ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm" role="alert">
+            <p className="font-semibold">{recovery.uncertain ? "Save result not confirmed" : "This save could not be completed"}</p>
+            <p className="mt-1">{recovery.uncertain ? "Retry the same save to confirm its result. Your submitted details are locked until it is resolved." : "No replacement save has been sent. Review the latest profile before making another change."}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {recovery.uncertain && <button type="button" className="btn btn-primary min-h-11" disabled={!recoveryAllowed || submitting}
+                onClick={event => { failureFocusOwner.current = event.currentTarget; onRetry(); }}>{submitting ? "Checking save…" : "Retry save"}</button>}
+              <button type="button" className="btn btn-ghost min-h-11" disabled={submitting} onClick={onClose}>Review latest profile</button>
+            </div>
+          </div> : <>
+            {!authorityCurrent && <MutationAuthorityNotice message={authorityMessage} />}
+            {Boolean(error) && <ErrorState error={error} />}
+            {!guest && Boolean(error) && guestSaveResultUncertain(error) && <button type="submit" className="btn btn-primary mt-3 min-h-11" disabled={!authorityCurrent || submitting}>Retry create</button>}
+          </>}
+        </div>
+        <fieldset disabled={fieldsDisabled} className="divide-y divide-base-300">
+          <FormSection icon={<UserRound size={17} />} title="Identity">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Display name" name="displayName" defaultValue={guest?.displayName} placeholder="Maya Chen" maxLength={256} autoComplete="name" />
+              <FormField label="Legal name (optional)" name="legalName" defaultValue={guest?.legalName} placeholder="As shown on identification" maxLength={256} required={false} autoComplete="name" />
+            </div>
+          </FormSection>
+          <FormSection icon={<Mail size={17} />} title="Contact">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Email (optional)" name="email" type="email" defaultValue={guest?.email} placeholder="maya@example.com" maxLength={320} required={false} autoComplete="email" />
+              <FormField label="Phone (optional)" name="phone" type="tel" defaultValue={guest?.phone} placeholder="+44 20 1234 5678" maxLength={64} required={false} autoComplete="tel" />
+            </div>
+          </FormSection>
+          <FormSection icon={<Globe2 size={17} />} title="Additional details" headingRef={detailsHeading}>
+            <div className="mb-4 grid gap-4 sm:grid-cols-2">
+              <FormDatePicker label="Date of birth (optional)" name="dateOfBirth" defaultValue={guest?.dateOfBirth} />
+              <FormNationalityPicker defaultValue={guest?.nationalityCountryCode} disabled={fieldsDisabled} />
+            </div>
+            <LanguagePicker value={languageTags} onChange={value => { setLanguageTags(value); setLanguageError(null); }} disabled={fieldsDisabled}
+              onDisabledClose={() => (!authorityCurrent ? authorityFeedback.current : detailsHeading.current)?.focus()} />
+            {languageError && <p role="alert" className="mt-2 text-sm text-error">{languageError}</p>}
+          </FormSection>
+          <FormSection icon={<MessageSquareText size={17} />} title="Staff context">
+            <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Staff notes (optional)</span><textarea className="textarea textarea-bordered min-h-24 w-full" name="notes" defaultValue={guest?.notes ?? ""} maxLength={4000} placeholder="Operational preferences or context" /><span className="mt-1.5 block text-xs leading-5 text-base-content/45">Visible to staff who can read Guest Records at this property.</span></label>
+          </FormSection>
         </fieldset>
-        {Boolean(error) && <ErrorState error={error} />}
-        <FormActions submitting={submitting} disabled={!authorityCurrent} submitLabel={guest ? "Save changes" : "Create guest"} onCancel={onClose} />
+        <FormActions submitting={submitting} disabled={!authorityCurrent || Boolean(recovery)} submitLabel={guest ? "Save changes" : "Create guest record"} onCancel={onClose} />
       </form>
-    </Modal>
   );
+}
+
+function FormSection({ icon, title, children, headingRef }: { icon: React.ReactNode; title: string; children: React.ReactNode; headingRef?: React.Ref<HTMLHeadingElement> }) {
+  return <section className="py-5 first:pt-0 last:pb-0"><div className="mb-4 flex items-center gap-2"><span className="text-primary">{icon}</span><h3 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="rounded font-display text-base font-semibold outline-none focus:ring-2 focus:ring-primary">{title}</h3></div>{children}</section>;
 }
 
 function MutationAuthorityNotice({ message }: { message: string }) {
@@ -733,22 +936,33 @@ function MutationAuthorityNotice({ message }: { message: string }) {
   );
 }
 
-function FormField({ label, name, defaultValue, placeholder, type = "text", maxLength, required = true, autoComplete }: {
+function FormField({ label, name, defaultValue, placeholder, type = "text", minLength, maxLength, pattern, required = true, autoComplete, autoCapitalize, spellCheck, hint }: {
   label: string;
   name: string;
   defaultValue?: string | null;
   placeholder?: string;
   type?: string;
+  minLength?: number;
   maxLength?: number;
+  pattern?: string;
   required?: boolean;
   autoComplete?: string;
+  autoCapitalize?: string;
+  spellCheck?: boolean;
+  hint?: string;
 }) {
-  return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} maxLength={maxLength} autoComplete={autoComplete} /></label>;
+  const hintId = useId();
+  return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} pattern={pattern} autoComplete={autoComplete} autoCapitalize={autoCapitalize} spellCheck={spellCheck} aria-describedby={hint ? hintId : undefined} />{hint && <span id={hintId} className="mt-1.5 block text-xs leading-5 text-base-content/45">{hint}</span>}</label>;
 }
 
 function FormDatePicker({ label, name, defaultValue }: { label: string; name: string; defaultValue?: string | null }) {
   const [value, setValue] = useState(defaultValue ?? "");
   return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" name={name} value={value} onChange={setValue} ariaLabel={label} /></div>;
+}
+
+function FormNationalityPicker({ defaultValue, disabled }: { defaultValue?: string | null; disabled: boolean }) {
+  const [value, setValue] = useState(defaultValue ?? "");
+  return <div className="form-control min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">Nationality (optional)</span><NationalityPicker name="nationalityCountryCode" value={value} onChange={setValue} disabled={disabled} /></div>;
 }
 
 function ArchiveGuestModal({ guest, submitting, error, sources, authorityCurrent, authorityMessage, onConfirm, onClose }: {
@@ -762,7 +976,7 @@ function ArchiveGuestModal({ guest, submitting, error, sources, authorityCurrent
   onClose: () => void;
 }) {
   return (
-    <Modal open={Boolean(guest)} title="Archive guest profile?" description="Archived profiles remain available for historical records." onClose={onClose}>
+    <Modal open={Boolean(guest)} title="Archive guest record?" description="Remove this profile from future booking selection while preserving its history." onClose={onClose}>
       {guest && (
         <div className="space-y-4">
           <CompositeSourceNotice
@@ -775,7 +989,7 @@ function ArchiveGuestModal({ guest, submitting, error, sources, authorityCurrent
             <InitialAvatar name={guest.displayName} />
             <div>
               <p className="font-semibold">{guest.displayName}</p>
-              <p className="mt-1 text-xs text-base-content/45">Stay history and reservation links are preserved.</p>
+              <p className="mt-1 text-xs leading-5 text-base-content/50">Existing reservation links and stay history remain visible. This is not deletion or a privacy-rights outcome.</p>
             </div>
           </div>
           {Boolean(error) && <ErrorState error={error} />}
@@ -783,7 +997,7 @@ function ArchiveGuestModal({ guest, submitting, error, sources, authorityCurrent
             <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Keep active</button>
             <button type="button" className="btn btn-error btn-sm sm:btn-md" disabled={submitting || !authorityCurrent} onClick={onConfirm}>
               {submitting && <span className="loading loading-spinner loading-sm" />}
-              Archive guest
+              Archive record
             </button>
           </ModalActions>
         </div>

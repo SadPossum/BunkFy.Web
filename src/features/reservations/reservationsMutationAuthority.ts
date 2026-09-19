@@ -3,7 +3,37 @@ import type {
   GuestListItem,
   InventoryUnitAvailability,
   Reservation,
+  ReservationMutationReceipt,
 } from "../../api/types";
+import type { ApiSession } from "../../api/client";
+import { reservationStatusKey } from "../../app/liveUpdates";
+
+export function reservationEditorIdentity(session: ApiSession | null, propertyId: string): string {
+  return JSON.stringify([session?.tenantId, session?.subjectId, session?.sessionId, session?.generation, propertyId]);
+}
+
+export function reservationCreateReceiptMatches(receipt: ReservationMutationReceipt, propertyId: string): boolean {
+  return receipt.propertyId === propertyId && Boolean(receipt.reservationId)
+    && Number.isInteger(receipt.version) && receipt.version > 0
+    && Number.isInteger(receipt.detailsRevision) && receipt.detailsRevision > 0
+    && ["pendingAllocation", "confirmed", "allocationRejected", "cancellationPending", "cancelled", "checkedIn", "noShowPending", "noShow", "checkoutPending", "checkedOut"].includes(reservationStatusKey(receipt.status));
+}
+
+export function reservationCreationSubmitAllowed(evidence: {
+  formValid: boolean;
+  guestIntentCurrent: boolean;
+  permissionsCurrent: boolean;
+  canCreate: boolean;
+  exactReplay: boolean;
+  freshInventoryCurrent: boolean;
+}): boolean {
+  return evidence.formValid && evidence.guestIntentCurrent && evidence.permissionsCurrent && evidence.canCreate
+    && (evidence.exactReplay || evidence.freshInventoryCurrent);
+}
+
+export function reservationEditorCompletionCurrent(capturedIdentity: string, currentIdentity: string, mounted: boolean): boolean {
+  return mounted && capturedIdentity === currentIdentity;
+}
 
 export type ReservationMutationAction =
   | "create-reservation"

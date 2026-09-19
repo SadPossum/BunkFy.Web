@@ -1,5 +1,7 @@
 import type {
+  DataRightsCase,
   DataRightsCorrectionExecutionDetails,
+  DataRightsSelectedSubjectsResponse,
   GuestDataRightsCorrectionRequest,
   GuestProfile,
   Reservation,
@@ -8,6 +10,47 @@ import type {
   WorkspaceStaffOnboardingDataRightsCorrectionTarget,
 } from "../../api/types";
 import { ApiError } from "../../api/client";
+import { guestLanguagePayload, guestLanguageSelection, guestLanguageSelectionKey } from "../guests/guestLanguageSelection";
+
+export type GuestCorrectionDraftContext = {
+  operatorScopeKey: string;
+  scopeKey: string;
+  caseId: string;
+  caseVersion: number;
+  caseReady: boolean;
+  selectedReady: boolean;
+  selectedEvidence: DataRightsSelectedSubjectsResponse | undefined;
+};
+
+// Draft editing may survive an error-free background read. This is NOT command authority.
+export function guestCorrectionDraftReady({ context, propertyId, operatorScopeKey, scopeKey,
+  dataRightsCase, execution, permissionCurrent, correctionReady, now }: {
+  context: GuestCorrectionDraftContext | undefined;
+  propertyId: string | undefined;
+  operatorScopeKey: string;
+  scopeKey: string;
+  dataRightsCase: Pick<DataRightsCase, "id" | "propertyId" | "version" | "status" | "selectedSubjectCount">;
+  execution: DataRightsCorrectionExecutionDetails | undefined;
+  permissionCurrent: boolean;
+  correctionReady: boolean;
+  now: number;
+}): boolean {
+  if (!context || !propertyId || !operatorScopeKey || !permissionCurrent || !correctionReady ||
+      !context.caseReady || !context.selectedReady || context.operatorScopeKey !== operatorScopeKey ||
+      context.scopeKey !== scopeKey || scopeKey !== `guest:${propertyId}` ||
+      context.caseId !== dataRightsCase.id || context.caseVersion !== dataRightsCase.version ||
+      dataRightsCase.propertyId !== propertyId || correctionCaseStatus(dataRightsCase.status) !== "executing" ||
+      dataRightsCase.selectedSubjectCount !== 1 || !execution || execution.propertyId !== propertyId ||
+      execution.caseId !== dataRightsCase.id || execution.executionRevision !== dataRightsCase.version ||
+      !Number.isFinite(Date.parse(execution.expiresAtUtc)) || !canEditCorrectionClaim(execution, now)) return false;
+  const selected = context.selectedEvidence;
+  const subject = selected?.subjects[0];
+  return selected?.caseVersion === dataRightsCase.version && selected.subjects.length === 1 &&
+    subject?.ownerKey === "guests" && subject.recordType === "guest-profile" &&
+    Boolean(subject.recordId) && subject.ownerKey === execution.subject.ownerKey &&
+    subject.recordType === execution.subject.recordType && subject.recordId === execution.subject.recordId &&
+    subject.recordVersion === execution.subject.recordVersion;
+}
 
 export type GuestCorrectionValues = {
   displayName: string;
@@ -17,6 +60,7 @@ export type GuestCorrectionValues = {
   dateOfBirth: string;
   nationalityCountryCode: string;
   preferredLanguageTag: string;
+  languageTags: string[];
   notes: string;
 };
 
@@ -49,6 +93,7 @@ export function guestCorrectionValues(profile: GuestProfile): GuestCorrectionVal
     dateOfBirth: profile.dateOfBirth ?? "",
     nationalityCountryCode: profile.nationalityCountryCode ?? "",
     preferredLanguageTag: profile.preferredLanguageTag ?? "",
+    languageTags: guestLanguageSelection(profile),
     notes: profile.notes ?? "",
   };
 }
@@ -145,8 +190,11 @@ export function guestCorrectionChanged(
   profile: GuestProfile,
   values: GuestCorrectionValues,
 ): boolean {
-  return JSON.stringify(normalizeGuestCorrectionValues(values)) !==
-    JSON.stringify(normalizeGuestCorrectionValues(guestCorrectionValues(profile)));
+  function comparison(draft: GuestCorrectionValues) {
+    const normalized = normalizeGuestCorrectionValues(draft);
+    return JSON.stringify({ ...normalized, languageTags: guestLanguageSelectionKey("update", normalized) });
+  }
+  return comparison(values) !== comparison(guestCorrectionValues(profile));
 }
 
 export function reservationCorrectionChanged(
@@ -267,6 +315,8 @@ export function correctionErrorMessage(error: unknown): string {
 }
 
 function normalizeGuestCorrectionValues(values: GuestCorrectionValues) {
+  const languages = guestLanguagePayload(values.languageTags, values.preferredLanguageTag || null);
+  if (!languages.ok) throw new RangeError(languages.error);
   return {
     displayName: values.displayName.trim(),
     legalName: optional(values.legalName),
@@ -274,7 +324,8 @@ function normalizeGuestCorrectionValues(values: GuestCorrectionValues) {
     phone: optional(values.phone),
     dateOfBirth: optional(values.dateOfBirth),
     nationalityCountryCode: optional(values.nationalityCountryCode)?.toUpperCase() ?? null,
-    preferredLanguageTag: optional(values.preferredLanguageTag),
+    preferredLanguageTag: languages.preferredLanguageTag,
+    languageTags: languages.languageTags,
     notes: optional(values.notes),
   };
 }

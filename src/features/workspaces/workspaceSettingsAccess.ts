@@ -5,6 +5,8 @@ export type WorkspaceSettingsTab =
   | "invites"
   | "retention";
 
+export type WorkspaceJoiningView = "invite" | "qr" | "requests";
+
 export type WorkspaceSettingsCapabilities = {
   canReadMembers: boolean;
   canReadRoles: boolean;
@@ -55,4 +57,22 @@ export function canOpenWorkspaceSettingsTab(
     case "retention":
       return capabilities.canReadRetention;
   }
+}
+
+export function shouldRedirectWorkspaceSettingsTab(
+  tab: WorkspaceSettingsTab,
+  capabilities: WorkspaceSettingsCapabilities,
+  authorityCurrent: boolean,
+): boolean {
+  return authorityCurrent && !canOpenWorkspaceSettingsTab(tab, capabilities);
+}
+
+export function workspaceSettingsTab(value: string | null): WorkspaceSettingsTab {
+  return value === "members" || value === "roles" || value === "invites" || value === "retention"
+    ? value
+    : "general";
+}
+
+export function workspaceJoiningView(value: string | null): WorkspaceJoiningView {
+  return value === "qr" || value === "requests" ? value : "invite";
 }

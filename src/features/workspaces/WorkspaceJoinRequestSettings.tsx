@@ -16,6 +16,7 @@ import {
   CompositeSourceNotice,
 } from "../../components/ui/CompositeSourceNotice";
 import { PaginationBar } from "../../components/ui/PaginationBar";
+import { ErrorState } from "../../components/ui/primitives";
 import { workspaceAccessActionAllowed } from "./workspaceAccessAuthority";
 
 const PAGE_SIZE = 25;
@@ -89,7 +90,7 @@ export function WorkspaceJoinRequestSettings({
   }, [joinRequests.data?.items.length, joinRequests.isFetching, page]);
 
   return (
-    <section className="border-t border-base-300 pt-8">
+    <section className="mt-6">
       <div className="flex items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
           <UserCheck size={20} />
@@ -184,5 +185,5 @@ export function WorkspaceJoinRequestSettings({
 }
 
 function SettingsError({ error }: { error: unknown }) {
-  return <div className="alert alert-error mt-5 text-sm">{error instanceof Error ? error.message : "Request failed."}</div>;
+  return <div className="mt-5"><ErrorState error={error} /></div>;
 }

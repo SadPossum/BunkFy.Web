@@ -92,6 +92,22 @@ export function adapterExecutionModeLabel(mode: AdapterExecutionMode): string {
   if (typeof mode === "string") return splitCamelCase(mode);
   return ({ 1: "polling", 2: "continuous", 3: "push", 4: "remote polling" } as Record<number, string>)[mode] ?? "unknown";
 }
+export type AdapterExecutionModeKey = "polling" | "continuous" | "push" | "remotePolling";
+
+export function adapterExecutionModeKey(mode: AdapterExecutionMode): AdapterExecutionModeKey | "unknown" {
+  if (typeof mode === "string") {
+    const normalized = mode.replace(/[ -](.)/g, (_, letter: string) => letter.toUpperCase());
+    return (["polling", "continuous", "push", "remotePolling"] as const)
+      .find((value) => value.toLowerCase() === normalized.toLowerCase()) ?? "unknown";
+  }
+
+  return ({ 1: "polling", 2: "continuous", 3: "push", 4: "remotePolling" } as const)[mode as 1 | 2 | 3 | 4] ?? "unknown";
+}
+
+export function adapterExecutionModeSupportsIngressCredentials(mode: AdapterExecutionMode): boolean {
+  return ["push", "remotePolling"].includes(adapterExecutionModeKey(mode));
+}
+
 export function adapterExecutionModeValue(mode: "polling" | "continuous" | "push" | "remotePolling"): 1 | 2 | 3 | 4 { return ({ polling: 1, continuous: 2, push: 3, remotePolling: 4 } as const)[mode]; }
 
 export function adapterConflictPolicyLabel(policy: AdapterConflictPolicy): string {

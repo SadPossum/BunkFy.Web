@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   canOpenWorkspaceSettingsTab,
   resolveWorkspaceSettingsCapabilities,
+  shouldRedirectWorkspaceSettingsTab,
+  workspaceJoiningView,
+  workspaceSettingsTab,
 } from "../src/features/workspaces/workspaceSettingsAccess";
 
 describe("workspace settings access", () => {
@@ -91,5 +94,27 @@ describe("workspace settings access", () => {
     expect(reader.canReadRetention).toBe(true);
     expect(reader.canRetryRetention).toBe(false);
     expect(operator.canRetryRetention).toBe(true);
+  });
+
+  it("restores only known workspace and joining sections from the URL", () => {
+    expect(workspaceSettingsTab("members")).toBe("members");
+    expect(workspaceSettingsTab("unknown")).toBe("general");
+    expect(workspaceJoiningView("qr")).toBe("qr");
+    expect(workspaceJoiningView("requests")).toBe("requests");
+    expect(workspaceJoiningView("unknown")).toBe("invite");
+  });
+
+  it("does not redirect a requested section until authority is current", () => {
+    const unresolved = resolveWorkspaceSettingsCapabilities({
+      owner: false,
+      profilesRead: false,
+      profilesManage: false,
+      staffOnboardingManage: false,
+      retentionRead: false,
+      retentionRetry: false,
+    });
+
+    expect(shouldRedirectWorkspaceSettingsTab("roles", unresolved, false)).toBe(false);
+    expect(shouldRedirectWorkspaceSettingsTab("roles", unresolved, true)).toBe(true);
   });
 });

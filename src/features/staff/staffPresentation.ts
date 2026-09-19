@@ -9,6 +9,7 @@ import type { StaffAuthSubjectTransitionStatus } from "./staffAuthSubjectTransit
 
 export type StaffDetailMember = StaffDirectoryMember | StaffMember;
 export type StaffAssignment = StaffDirectoryAssignment | StaffPropertyAssignment;
+export type StaffDirectoryScope = "workspace" | "property";
 
 export function isFullStaffMember(member: StaffDetailMember): member is StaffMember {
   return "createdAtUtc" in member;
@@ -45,6 +46,13 @@ export function staffDetailTab(
   value: string | null,
 ): "profile" | "assignments" | "account" {
   return value === "assignments" || value === "account" ? value : "profile";
+}
+
+export function staffDirectoryScope(
+  value: string | null,
+  hasSelectedProperty: boolean,
+): StaffDirectoryScope {
+  return value === "property" && hasSelectedProperty ? "property" : "workspace";
 }
 
 export function utcDateKey(date: Date): string {

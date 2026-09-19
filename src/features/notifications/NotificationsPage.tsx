@@ -4,12 +4,13 @@ import {
   ArrowUpRight,
   Bell,
   CheckCheck,
+  ChevronRight,
   CircleAlert,
   Info,
   Megaphone,
   ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { notificationAudienceLabel, notificationSeverityLabel } from "../../api/labels";
 import type {
@@ -25,6 +26,7 @@ import {
   compositeSourceUsable,
   createCompositeSource,
 } from "../../app/compositeSourceState";
+import { useNetworkStatus } from "../../app/networkStatus";
 import { useSession } from "../../app/session";
 import {
   CompositeSourceFallback,
@@ -36,6 +38,7 @@ import {
   ErrorState,
   LoadingState,
   Modal,
+  ModalActions,
   PageHeader,
   StatusBadge,
 } from "../../components/ui/primitives";
@@ -65,15 +68,30 @@ import {
   notificationSummaryQueryKey,
   type NotificationInboxKind,
 } from "./notificationSourceAuthority";
+import {
+  clearNotificationViewSearchParams,
+  notificationInboxSearchParams,
+  notificationPageSearchParams,
+  notificationSelectionSearchParams,
+  notificationUnreadSearchParams,
+  notificationViewState,
+  type NotificationInboxView,
+} from "./notificationViewState";
 
 const PAGE_SIZE = 25;
-type InboxTab = "personal" | "broadcasts";
 
 type NotificationReadCandidate = {
   scopeKey: string;
   kind: NotificationInboxKind;
   item: NotificationInboxItem;
   sourceCurrent: boolean;
+};
+
+type NotificationReadSubmission = NotificationReadCandidate & {
+  focusTarget: "row" | "detail";
+  notificationId: string;
+  pendingToken: string;
+  readAtUtc: string;
 };
 
 type MarkAllSubmission = {
@@ -83,19 +101,19 @@ type MarkAllSubmission = {
 
 export function NotificationsPage() {
   const { request, session } = useSession();
+  const { isOffline } = useNetworkStatus();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<InboxTab>("personal");
-  const [unreadOnly, setUnreadOnly] = useState(false);
-  const [page, setPage] = useState(1);
   const [attentionIds, setAttentionIds] = useState<ReadonlySet<string>>(() => new Set());
   const pendingReadIds = useRef(new Set<string>());
+  const markAllPendingRef = useRef(false);
+  const inboxRef = useRef<HTMLElement>(null);
+  const notificationOpenButtons = useRef(new Map<string, HTMLButtonElement>());
   const scopeKey = notificationScopeKey(session);
   const previousScopeKeyRef = useRef(scopeKey);
-  const selectedPersonalId = searchParams.get("notification");
-  const selectedBroadcastId = selectedPersonalId
-    ? null
-    : searchParams.get("broadcast");
+  const viewState = notificationViewState(searchParams);
+  const { inbox, unreadOnly, page, selectedPersonalId, selectedBroadcastId } = viewState;
+  const tab = inbox === "personal" ? "personal" : "broadcasts";
   const kind: NotificationInboxKind = tab === "personal" ? "history" : "broadcasts";
   const path = notificationInboxPath(kind);
   const query = useQuery({
@@ -119,7 +137,7 @@ export function NotificationsPage() {
 
   const markAll = useMutation<MarkAllNotificationsReadResponse, Error, MarkAllSubmission>({
     mutationFn: ({ scopeKey: targetScopeKey, kind: targetKind }) => {
-      const authorityCurrent = targetKind === kind &&
+      const authorityCurrent = !isOffline && targetKind === kind &&
         notificationReadAllowed(scopeKey, targetScopeKey, listCurrent);
       if (!authorityCurrent) {
         throw new Error("Current notification inbox evidence could not be confirmed. Refresh and try again.");
@@ -139,92 +157,108 @@ export function NotificationsPage() {
         queryKey: notificationInboxQueryKey(submission.scopeKey, submission.kind),
       });
     },
+    onSettled: () => {
+      markAllPendingRef.current = false;
+    },
+    retry: false,
   });
 
-  const acknowledgeVisible = useCallback((candidate: NotificationReadCandidate) => {
-    if (candidate.item.readAtUtc || !notificationReadAllowed(
-      scopeKey,
-      candidate.scopeKey,
-      candidate.sourceCurrent,
-    )) return;
-
-    const id = notificationItemId(candidate.item);
-    const token = `${candidate.scopeKey}:${candidate.kind}:${id}`;
-    const readAtUtc = new Date().toISOString();
-    const updateResponse = (current: NotificationInboxResponse | undefined) =>
-      markNotificationReadLocally(current, id, readAtUtc);
-
-    queryClient.setQueriesData<NotificationInboxResponse>(
-      { queryKey: notificationListQueryPrefix(candidate.scopeKey, candidate.kind) },
-      updateResponse,
-    );
-    queryClient.setQueryData<NotificationInboxItem>(
-      notificationDetailQueryKey(candidate.scopeKey, candidate.kind, id),
-      (current) => current && !current.readAtUtc ? { ...current, readAtUtc } : current,
-    );
-
-    if (pendingReadIds.current.has(token)) return;
-    pendingReadIds.current.add(token);
-    queryClient.setQueryData<NotificationInboxResponse>(
-      notificationSummaryQueryKey(candidate.scopeKey, candidate.kind),
-      (current) => decrementNotificationUnreadCountLocally(current, id, readAtUtc),
-    );
-    void request<void>(`${notificationInboxPath(candidate.kind)}/${id}/read`, { method: "POST" })
-      .then(() => pendingReadIds.current.delete(token))
-      .catch(() => {
-        pendingReadIds.current.delete(token);
-        void queryClient.invalidateQueries({
-          queryKey: notificationInboxQueryKey(candidate.scopeKey, candidate.kind),
-        });
+  const markRead = useMutation<void, Error, NotificationReadSubmission>({
+    mutationFn: (submission) => {
+      const authorityCurrent = !isOffline && submission.kind === kind &&
+        !submission.item.readAtUtc &&
+        notificationReadAllowed(scopeKey, submission.scopeKey, submission.sourceCurrent);
+      if (!authorityCurrent) {
+        throw new Error("Current notification evidence could not be confirmed. Refresh and try again.");
+      }
+      return request<void>(
+        `${notificationInboxPath(submission.kind)}/${submission.notificationId}/read`,
+        { method: "POST" },
+      );
+    },
+    onSuccess: async (_response, submission) => {
+      const updateResponse = (current: NotificationInboxResponse | undefined) =>
+        markNotificationReadLocally(current, submission.notificationId, submission.readAtUtc);
+      queryClient.setQueriesData<NotificationInboxResponse>(
+        { queryKey: notificationListQueryPrefix(submission.scopeKey, submission.kind) },
+        updateResponse,
+      );
+      queryClient.setQueryData<NotificationInboxItem>(
+        notificationDetailQueryKey(
+          submission.scopeKey,
+          submission.kind,
+          submission.notificationId,
+        ),
+        (current) => current && !current.readAtUtc
+          ? { ...current, readAtUtc: submission.readAtUtc }
+          : current,
+      );
+      queryClient.setQueryData<NotificationInboxResponse>(
+        notificationSummaryQueryKey(submission.scopeKey, submission.kind),
+        (current) => decrementNotificationUnreadCountLocally(
+          current,
+          submission.notificationId,
+          submission.readAtUtc,
+        ),
+      );
+      await queryClient.invalidateQueries({
+        queryKey: notificationInboxQueryKey(submission.scopeKey, submission.kind),
       });
-  }, [queryClient, request, scopeKey]);
+      if (submission.focusTarget === "row") {
+        window.requestAnimationFrame(() => {
+          const exactButton = notificationOpenButtons.current.get(submission.notificationId);
+          const nextButton = notificationOpenButtons.current.values().next().value;
+          (exactButton ?? nextButton ?? inboxRef.current)?.focus({ preventScroll: true });
+        });
+      }
+    },
+    onError: async (_error, submission) => {
+      await queryClient.invalidateQueries({
+        queryKey: notificationInboxQueryKey(submission.scopeKey, submission.kind),
+      });
+    },
+    onSettled: (_response, _error, submission) => {
+      pendingReadIds.current.delete(submission.pendingToken);
+    },
+    retry: false,
+  });
 
-  const acknowledgeVisibleInList = useCallback((item: NotificationInboxItem) => {
-    acknowledgeVisible({
-      scopeKey,
-      kind,
-      item,
-      sourceCurrent: listCurrent && notificationItemMatches(items, item),
-    });
-  }, [acknowledgeVisible, items, kind, listCurrent, scopeKey]);
-
-  useEffect(() => setPage(1), [tab, unreadOnly]);
   useEffect(() => setAttentionIds(new Set()), [scopeKey]);
-
-  useEffect(() => {
-    if (selectedPersonalId) setTab("personal");
-    else if (selectedBroadcastId) setTab("broadcasts");
-  }, [selectedBroadcastId, selectedPersonalId]);
 
   useEffect(() => {
     const previousScopeKey = previousScopeKeyRef.current;
     if (scopeKey) previousScopeKeyRef.current = scopeKey;
     if (!previousScopeKey || !scopeKey || previousScopeKey === scopeKey) return;
 
-    setTab("personal");
-    setUnreadOnly(false);
-    setPage(1);
     setAttentionIds(new Set());
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.delete("notification");
-      next.delete("broadcast");
-      return next;
-    }, { replace: true });
+    setSearchParams((current) => clearNotificationViewSearchParams(current), { replace: true });
   }, [scopeKey, setSearchParams]);
 
   useEffect(() => {
     if (listCurrent && query.data && page > 1 && query.data.items.length === 0) {
-      setPage((current) => Math.max(1, current - 1));
+      setSearchParams((current) => notificationPageSearchParams(current, page - 1), { replace: true });
     }
-  }, [listCurrent, page, query.data]);
+  }, [listCurrent, page, query.data, setSearchParams]);
 
   function select(item: NotificationInboxItem | null) {
-    const next = new URLSearchParams(searchParams);
-    next.delete("notification");
-    next.delete("broadcast");
-    if (item) next.set(tab === "personal" ? "notification" : "broadcast", notificationItemId(item));
+    const next = notificationSelectionSearchParams(
+      searchParams,
+      inbox,
+      item ? notificationItemId(item) : null,
+    );
     setSearchParams(next, { replace: true });
+  }
+
+  function changeInbox(nextInbox: NotificationInboxView) {
+    setSearchParams(notificationInboxSearchParams(searchParams, nextInbox), { replace: true });
+  }
+
+  function changeUnreadOnly(nextUnreadOnly: boolean) {
+    setSearchParams(notificationUnreadSearchParams(searchParams, nextUnreadOnly), { replace: true });
+  }
+
+  function changePage(nextPage: number) {
+    setSearchParams(notificationPageSearchParams(searchParams, nextPage), { replace: true });
   }
 
   useEffect(() => {
@@ -247,49 +281,82 @@ export function NotificationsPage() {
     select(item);
   }
 
+  function markAllRead() {
+    if (isOffline || !listCurrent || markRead.isPending || markAll.isPending || markAllPendingRef.current) {
+      return;
+    }
+    markAllPendingRef.current = true;
+    markAll.reset();
+    markAll.mutate({ scopeKey, kind });
+  }
+
+  function markOneRead(candidate: NotificationReadCandidate, focusTarget: "row" | "detail") {
+    const notificationId = notificationItemId(candidate.item);
+    const pendingToken = `${candidate.scopeKey}:${candidate.kind}:${notificationId}`;
+    const authorityCurrent = candidate.kind === kind &&
+      !candidate.item.readAtUtc &&
+      notificationReadAllowed(scopeKey, candidate.scopeKey, candidate.sourceCurrent);
+    if (isOffline || !authorityCurrent || markAll.isPending || markRead.isPending || pendingReadIds.current.size > 0) {
+      return;
+    }
+
+    pendingReadIds.current.add(pendingToken);
+    markRead.reset();
+    markRead.mutate({
+      ...candidate,
+      focusTarget,
+      notificationId,
+      pendingToken,
+      readAtUtc: new Date().toISOString(),
+    });
+  }
+
   const markAllTargetsCurrentInbox = markAll.variables?.scopeKey === scopeKey &&
     markAll.variables.kind === kind;
   const markAllPending = markAll.isPending && markAllTargetsCurrentInbox;
   const markAllError = markAllTargetsCurrentInbox
     ? markAll.error
     : null;
+  const markReadTargetsCurrentInbox = markRead.variables?.scopeKey === scopeKey &&
+    markRead.variables.kind === kind;
+  const markReadError = markReadTargetsCurrentInbox ? markRead.error : null;
+  const selectedNotificationId = selectedPersonalId ?? selectedBroadcastId;
+  const attentionCount = items.reduce((count, item) => (
+    attentionIds.has(notificationAttentionKey(kind, notificationItemId(item))) ? count + 1 : count
+  ), 0);
 
   return <>
     <PageHeader
       eyebrow="Live workspace"
       title="Notifications"
-      description="Stay on top of operational events and workspace announcements."
-      action={listUsable && (query.data?.unreadCount ?? 0) > 0 ? (
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => markAll.mutate({ scopeKey, kind })}
-          disabled={markAllPending || !listCurrent}
-        >
-          <CheckCheck size={17} />
-          Mark all read
-        </button>
-      ) : undefined}
+      description="Operational changes and workspace announcements, kept in one quiet inbox."
     />
     <CompositeSourceNotice
       sources={[listSource]}
       title="Notification inbox is delayed"
     />
-    <section className="card border border-base-300 bg-base-100 shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+    <section
+      ref={inboxRef}
+      className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm"
+      aria-label="Notification inbox"
+      tabIndex={-1}
+    >
+      <div className="flex flex-col gap-3 border-b border-base-300 bg-base-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <SegmentedTabs
-          value={tab}
+          value={inbox}
           ariaLabel="Notification inbox"
-          onValueChange={setTab}
+          onValueChange={changeInbox}
           options={[
             { value: "personal", label: "For you", icon: <Bell size={15} /> },
-            { value: "broadcasts", label: "Announcements", icon: <Megaphone size={15} /> },
+            { value: "announcements", label: "Announcements", icon: <Megaphone size={15} /> },
           ]}
         />
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:justify-end">
           {listUsable && (
-            <span className="text-xs font-medium text-base-content/45">
-              {query.data?.unreadCount ?? 0} unread
+            <span className="text-xs font-semibold text-base-content/50" aria-live="polite">
+              {attentionCount > 0
+                ? `${attentionCount} new this visit`
+                : `${query.data?.unreadCount ?? 0} unread`}
             </span>
           )}
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
@@ -297,10 +364,22 @@ export function NotificationsPage() {
               className="toggle toggle-primary toggle-sm"
               type="checkbox"
               checked={unreadOnly}
-              onChange={(event) => setUnreadOnly(event.target.checked)}
+              onChange={(event) => changeUnreadOnly(event.target.checked)}
             />
             Unread only
           </label>
+          {listUsable && (query.data?.unreadCount ?? 0) > 0 && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm h-8 min-h-8 px-2.5"
+              onClick={markAllRead}
+              disabled={markAllPending || markRead.isPending || !listCurrent || isOffline}
+              title={isOffline ? "Reconnect before marking notifications as read." : undefined}
+            >
+              <CheckCheck size={16} />
+              Mark all read
+            </button>
+          )}
         </div>
       </div>
       {listSource.state === "loading" ? (
@@ -323,7 +402,23 @@ export function NotificationsPage() {
               item={item}
               attention={attentionIds.has(notificationAttentionKey(kind, notificationItemId(item)))}
               onOpen={() => open(item)}
-              onVisible={acknowledgeVisibleInList}
+              onMarkRead={() => markOneRead({
+                scopeKey,
+                kind,
+                item,
+                sourceCurrent: listCurrent && notificationItemMatches(items, item),
+              }, "row")}
+              openButtonRef={(button) => {
+                const id = notificationItemId(item);
+                if (button) notificationOpenButtons.current.set(id, button);
+                else notificationOpenButtons.current.delete(id);
+              }}
+              markReadPending={markRead.isPending &&
+                markRead.variables?.notificationId === notificationItemId(item)}
+              markReadDisabled={!listCurrent || markRead.isPending || markAllPending || isOffline}
+              markReadTitle={isOffline
+                ? "Reconnect before marking this notification as read."
+                : "Mark as read"}
             />
           ))}
         </div>
@@ -334,11 +429,14 @@ export function NotificationsPage() {
           itemLabel={tab === "personal" ? "notification" : "announcement"}
           totalCount={query.data?.totalCount}
           disabled={!listCurrent}
-          onPageChange={setPage}
+          onPageChange={changePage}
         />
       </>}
       {markAllError && (
         <div className="border-t border-base-300 p-4"><ErrorState error={markAllError} /></div>
+      )}
+      {markReadError && !selectedNotificationId && (
+        <div className="border-t border-base-300 p-4"><ErrorState error={markReadError} /></div>
       )}
     </section>
     <NotificationDetail
@@ -346,81 +444,143 @@ export function NotificationsPage() {
       scopeKey={scopeKey}
       id={selectedPersonalId}
       onClose={() => select(null)}
-      onVisible={acknowledgeVisible}
+      onMarkRead={(candidate) => markOneRead(candidate, "detail")}
+      markReadPending={markRead.isPending &&
+        markRead.variables?.kind === "history" &&
+        markRead.variables.notificationId === selectedPersonalId}
+      markReadDisabled={markRead.isPending || markAllPending || isOffline}
+      markReadTitle={isOffline
+        ? "Reconnect before marking this notification as read."
+        : "Mark as read"}
+      markReadError={markRead.variables?.kind === "history" &&
+        markRead.variables.notificationId === selectedPersonalId
+        ? markReadError
+        : null}
     />
     <NotificationDetail
       kind="broadcast"
       scopeKey={scopeKey}
       id={selectedBroadcastId}
       onClose={() => select(null)}
-      onVisible={acknowledgeVisible}
+      onMarkRead={(candidate) => markOneRead(candidate, "detail")}
+      markReadPending={markRead.isPending &&
+        markRead.variables?.kind === "broadcasts" &&
+        markRead.variables.notificationId === selectedBroadcastId}
+      markReadDisabled={markRead.isPending || markAllPending || isOffline}
+      markReadTitle={isOffline
+        ? "Reconnect before marking this announcement as read."
+        : "Mark as read"}
+      markReadError={markRead.variables?.kind === "broadcasts" &&
+        markRead.variables.notificationId === selectedBroadcastId
+        ? markReadError
+        : null}
     />
   </>;
 }
 
-function NotificationRow({ item, attention, onOpen, onVisible }: {
+function NotificationRow({
+  item,
+  attention,
+  onOpen,
+  onMarkRead,
+  openButtonRef,
+  markReadPending,
+  markReadDisabled,
+  markReadTitle,
+}: {
   item: NotificationInboxItem;
   attention: boolean;
   onOpen: () => void;
-  onVisible: (item: NotificationInboxItem) => void;
+  onMarkRead: () => void;
+  openButtonRef: (button: HTMLButtonElement | null) => void;
+  markReadPending: boolean;
+  markReadDisabled: boolean;
+  markReadTitle: string;
 }) {
-  const rowRef = useRef<HTMLButtonElement>(null);
   const unread = !item.readAtUtc;
   const destination = notificationDestination(item);
 
-  useEffect(() => {
-    const row = rowRef.current;
-    if (!unread || !row) return;
-    if (typeof IntersectionObserver === "undefined") {
-      onVisible(item);
-      return;
-    }
-
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.6)) return;
-      observer.disconnect();
-      onVisible(item);
-    }, { threshold: 0.6 });
-    observer.observe(row);
-    return () => observer.disconnect();
-  }, [item, onVisible, unread]);
-
   return (
-    <button
-      ref={rowRef}
-      type="button"
-      className={`grid w-full gap-3 border-l-4 p-5 text-left transition sm:grid-cols-[auto_1fr_auto] sm:items-center sm:px-6 ${attention ? "notification-attention" : unread ? "border-transparent bg-primary/[0.035] hover:bg-base-200/70" : "border-transparent hover:bg-base-200/70"}`}
-      onClick={onOpen}
+    <div
+      className={`group grid min-h-24 grid-cols-[minmax(0,1fr)_auto] border-l-4 transition ${attention ? "notification-attention" : unread ? "border-transparent bg-primary/[0.035] hover:bg-base-200/70" : "border-transparent hover:bg-base-200/70"}`}
     >
-      <SeverityIcon severity={item.severity} />
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className={`truncate ${unread || attention ? "font-bold" : "font-semibold"}`}>{item.title}</p>
-          {attention ? (
-            <span className="badge badge-primary h-5 shrink-0 px-2 text-[0.68rem] font-bold">New</span>
-          ) : unread ? (
-            <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
-          ) : null}
+      <button
+        ref={openButtonRef}
+        type="button"
+        className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 p-4 text-left focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-5"
+        onClick={onOpen}
+      >
+        <SeverityIcon severity={item.severity} />
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className={`min-w-0 truncate ${unread || attention ? "font-bold" : "font-semibold"}`}>{item.title}</p>
+            {attention ? (
+              <span className="badge badge-primary h-5 shrink-0 px-2 text-[0.68rem] font-bold">New</span>
+            ) : unread ? (
+              <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+            ) : null}
+          </div>
+          <p className="mt-1 line-clamp-2 text-sm leading-5 text-base-content/60">{item.body || humanize(item.name)}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-base-content/45">
+            <span>{destination?.resourceLabel ?? humanize(item.module)}</span>
+            {destination && <><span aria-hidden="true">·</span><span>{humanize(item.module)}</span></>}
+            <span aria-hidden="true">·</span>
+            <time dateTime={item.occurredAtUtc} title={formatDateTime(item.occurredAtUtc)}>{formatRelative(item.occurredAtUtc)}</time>
+          </div>
+          <div className="mt-2 sm:hidden"><NotificationSeverityBadge severity={item.severity} /></div>
         </div>
-        <p className="mt-1 line-clamp-2 text-sm text-base-content/55">{item.body || humanize(item.name)}</p>
-        <p className="mt-1 text-xs text-base-content/40">
-          {destination ? `${destination.resourceLabel} · ` : ""}{humanize(item.module)} · {formatRelative(item.occurredAtUtc)}
-        </p>
-      </div>
-      <NotificationSeverityBadge severity={item.severity} />
-    </button>
+        <div className="hidden items-center gap-3 sm:flex">
+          <NotificationSeverityBadge severity={item.severity} />
+          <ChevronRight className="text-base-content/30 transition group-hover:translate-x-0.5 group-hover:text-primary" size={18} aria-hidden="true" />
+        </div>
+      </button>
+      {unread && (
+        <div className="flex items-center border-l border-base-300/70 px-1.5 sm:px-2.5">
+          <button
+            type="button"
+            className="btn btn-ghost h-auto min-h-11 w-14 flex-col gap-0.5 px-1 text-[0.68rem] sm:w-auto sm:flex-row sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            onClick={onMarkRead}
+            disabled={markReadDisabled}
+            aria-label={`Mark ${item.title} as read`}
+            title={markReadTitle}
+          >
+            {markReadPending
+              ? <span className="loading loading-spinner loading-xs" aria-hidden="true" />
+              : <CheckCheck size={16} aria-hidden="true" />}
+            <span className="sm:hidden">{markReadPending ? "Saving" : "Read"}</span>
+            <span className="hidden sm:inline">{markReadPending ? "Marking…" : "Mark read"}</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
-function NotificationDetail({ kind, scopeKey, id, onClose, onVisible }: {
+function NotificationDetail({
+  kind,
+  scopeKey,
+  id,
+  onClose,
+  onMarkRead,
+  markReadPending,
+  markReadDisabled,
+  markReadTitle,
+  markReadError,
+}: {
   kind: "personal" | "broadcast";
   scopeKey: string;
   id: string | null;
   onClose: () => void;
-  onVisible: (candidate: NotificationReadCandidate) => void;
+  onMarkRead: (candidate: NotificationReadCandidate) => void;
+  markReadPending: boolean;
+  markReadDisabled: boolean;
+  markReadTitle: string;
+  markReadError: Error | null;
 }) {
   const { request } = useSession();
   const navigate = useNavigate();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const markReadWasPending = useRef(false);
   const inboxKind: NotificationInboxKind = kind === "personal" ? "history" : "broadcasts";
   const base = notificationInboxPath(inboxKind);
   const item = useQuery({
@@ -442,10 +602,11 @@ function NotificationDetail({ kind, scopeKey, id, onClose, onVisible }: {
   const destination = kind === "personal" && data ? notificationDestination(data) : null;
 
   useEffect(() => {
-    if (data && !data.readAtUtc && detailCurrent) {
-      onVisible({ scopeKey, kind: inboxKind, item: data, sourceCurrent: true });
+    if (markReadWasPending.current && data?.readAtUtc) {
+      closeButtonRef.current?.focus({ preventScroll: true });
     }
-  }, [data, detailCurrent, inboxKind, onVisible, scopeKey]);
+    markReadWasPending.current = markReadPending;
+  }, [data?.readAtUtc, markReadPending]);
 
   function openAffectedItem() {
     if (!destination) return;
@@ -460,17 +621,17 @@ function NotificationDetail({ kind, scopeKey, id, onClose, onVisible }: {
       description={data ? `${humanize(data.module)} · ${formatDateTime(data.occurredAtUtc)}` : "Loading message"}
       onClose={onClose}
     >
-      <CompositeSourceNotice
+      {detailUsable && <CompositeSourceNotice
         sources={[detailSource]}
         title="Notification detail is delayed"
-      />
+      />}
       {detailSource.state === "loading" ? (
         <LoadingState label="Loading message" />
       ) : !detailUsable ? (
-        <CompositeSourceFallback state={detailSource.state} label="notification detail" />
+        <CompositeSourceFallback error={item.error} retry={() => void item.refetch()} state={detailSource.state} label="notification detail" title="Notification could not be opened" />
       ) : data ? (
         <div className="space-y-5">
-          <div className="flex items-center justify-between rounded-2xl bg-base-200 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-base-200/80 p-4">
             <div className="flex items-center gap-3">
               <SeverityIcon severity={data.severity} />
               <div>
@@ -479,44 +640,64 @@ function NotificationDetail({ kind, scopeKey, id, onClose, onVisible }: {
                   {data.readAtUtc
                     ? `Read ${formatDateTime(data.readAtUtc)}`
                     : detailCurrent
-                      ? "Opening message"
+                      ? "Unread"
                       : "Unread in the last loaded snapshot"}
                 </p>
               </div>
             </div>
             <StatusBadge status={data.readAtUtc ? "read" : "unread"} />
           </div>
-          {data.body && <p className="whitespace-pre-wrap text-sm leading-7 text-base-content/70">{data.body}</p>}
+          {data.body && <p className="whitespace-pre-wrap text-sm leading-7 text-base-content/75">{data.body}</p>}
           {destination && (
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition hover:border-primary/40 hover:bg-primary/10"
-              onClick={openAffectedItem}
-            >
-              <span>
-                <span className="block text-sm font-semibold">{destination.actionLabel}</span>
-                <span className="mt-1 block text-xs text-base-content/50">{destination.contextLabel}</span>
-              </span>
-              <ArrowUpRight className="shrink-0 text-primary" size={19} />
-            </button>
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <p className="text-xs font-semibold uppercase text-primary">Affected record</p>
+              <p className="mt-1.5 text-sm font-semibold">{destination.resourceLabel}</p>
+              <p className="mt-1 text-xs leading-5 text-base-content/55">{destination.contextLabel}</p>
+            </div>
           )}
           {"audience" in data && (
-            <div className="rounded-xl border border-base-300 p-4">
+            <div className="rounded-lg border border-base-300 p-4">
               <p className="text-xs text-base-content/40">Audience</p>
               <p className="mt-1 text-sm font-semibold capitalize">{notificationAudienceLabel(data.audience)}</p>
             </div>
           )}
           {hasPayload(data.payload) && (
-            <details className="rounded-xl border border-base-300 p-4">
+            <details className="rounded-lg border border-base-300 p-4">
               <summary className="cursor-pointer text-sm font-semibold">Technical details</summary>
               <pre className="mt-3 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-neutral p-3 font-mono text-xs text-neutral-content">
                 {JSON.stringify(data.payload, null, 2)}
               </pre>
             </details>
           )}
-          <div className="flex justify-end border-t border-base-300 pt-5">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Close</button>
-          </div>
+          {markReadError && <ErrorState error={markReadError} />}
+          <ModalActions>
+            <button ref={closeButtonRef} type="button" className="btn btn-ghost" onClick={onClose}>Close</button>
+            {!data.readAtUtc && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => onMarkRead({
+                  scopeKey,
+                  kind: inboxKind,
+                  item: data,
+                  sourceCurrent: detailCurrent,
+                })}
+                disabled={markReadDisabled || !detailCurrent}
+                title={markReadTitle}
+              >
+                {markReadPending
+                  ? <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                  : <CheckCheck size={18} aria-hidden="true" />}
+                {markReadPending ? "Marking…" : "Mark read"}
+              </button>
+            )}
+            {destination && (
+              <button type="button" className="btn btn-primary" onClick={openAffectedItem}>
+                {destination.actionLabel}
+                <ArrowUpRight size={18} />
+              </button>
+            )}
+          </ModalActions>
         </div>
       ) : null}
     </Modal>
@@ -532,7 +713,7 @@ function SeverityIcon({ severity }: { severity: NotificationSeverity }) {
     info: { icon: <Info size={18} />, tone: "bg-info/15 text-info-content" },
   };
   const selected = config[label] || config.info;
-  return <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${selected.tone}`}>{selected.icon}</span>;
+  return <span role="img" className={`grid size-10 shrink-0 place-items-center rounded-lg ${selected.tone}`} aria-label={`${label} notification`}>{selected.icon}</span>;
 }
 
 function NotificationSeverityBadge({ severity }: { severity: NotificationSeverity }) {

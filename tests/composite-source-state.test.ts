@@ -1,12 +1,44 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import type { ReactElement } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CompositeSourceNotice } from "../src/components/ui/CompositeSourceNotice";
 import {
   compositeSourceCurrent,
   compositeSourceNeedsRetry,
   compositeSourceState,
   compositeSourceUsable,
 } from "../src/app/compositeSourceState";
+
+const network = vi.hoisted(() => ({ isOffline: false }));
+vi.mock("../src/app/networkStatus", () => ({ useNetworkStatus: () => network }));
+beforeEach(() => { network.isOffline = false; });
+describe("owner-opted focusable retry (native browser focus is verified separately)", () => {
+  function retry(keepRetryFocusable: boolean, isFetching = false) {
+    const refetch = vi.fn(async () => undefined);
+    const tree = CompositeSourceNotice({ keepRetryFocusable, sources: [{ label: "Availability", state: "stale", isFetching, refetch }] })!;
+    const button = (tree.props.children as ReactElement[]).find(node => node.type === "button") as ReactElement<{ className: string; disabled: boolean; "aria-disabled"?: boolean; "aria-busy"?: boolean; onClick: () => void }>;
+    return { refetch, button: button.props };
+  }
+  it.each([false, true])("preserves default native disabled and suppresses all pending/offline activation (opt in=%s)", opted => {
+    for (const offline of [false, true]) {
+      network.isOffline = offline;
+      const { refetch, button } = retry(opted, !offline);
+      expect(button.disabled).toBe(!opted);
+      expect(button["aria-disabled"]).toBe(opted ? true : undefined);
+      expect(button["aria-busy"]).toBe(opted && !offline ? true : undefined);
+      expect(button.className.includes("pointer-events-auto")).toBe(opted);
+      expect(button.className).not.toContain("opacity-50");
+      button.onClick(); button.onClick(); button.onClick();
+      expect(refetch).not.toHaveBeenCalled();
+    }
+  });
+  it("allows a settled failure to be retried and makes no automatic request", () => {
+    const { refetch, button } = retry(true);
+    expect(button.disabled).toBe(false); expect(button["aria-disabled"]).toBe(false);
+    expect(refetch).not.toHaveBeenCalled(); button.onClick(); expect(refetch).toHaveBeenCalledOnce();
+  });
+});
 
 describe("composite source state", () => {
   it("keeps loaded data usable after a refresh failure", () => {

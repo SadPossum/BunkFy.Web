@@ -1,9 +1,10 @@
-import { AlertTriangle, LogOut, RotateCcw } from "lucide-react";
+import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
-import { useLocation } from "react-router";
+import { Navigate, useLocation } from "react-router";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { BrandMark } from "../../components/ui/BrandMark";
+import { ErrorState, LoadingState } from "../../components/ui/primitives";
 import { JoinWorkspacePage } from "./JoinWorkspacePage";
 import { useWorkspaceCatalogueSource } from "./WorkspaceCatalogueNotice";
 import { WorkspaceOnboardingPage } from "./WorkspaceOnboardingPage";
@@ -14,7 +15,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   const { logout } = useSession();
   const {
     workspaces,
-    workspacesFetching,
+    workspacesError,
     refetchWorkspaces,
     selectedWorkspace,
     selectedWorkspaceId,
@@ -29,12 +30,22 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
   );
 
   if (mode === "join") return <JoinWorkspacePage />;
-  if (mode === "create") return <WorkspaceOnboardingPage />;
+  if (mode === "create") {
+    return location.pathname === "/workspace/new"
+      ? <WorkspaceOnboardingPage />
+      : <Navigate to="/workspace/new" replace />;
+  }
 
   if (mode === "loading") {
     return (
-      <main className="grid min-h-screen place-items-center" aria-busy="true">
-        <span className="loading loading-spinner loading-lg text-primary" />
+      <main className="grid min-h-screen place-items-center bg-base-200 p-6" aria-busy="true">
+        <section className="w-full max-w-lg rounded-lg border border-base-300 bg-base-100 p-7 shadow-sm sm:p-8">
+          <div className="flex items-center gap-3">
+            <BrandMark variant="simple-white-bold" height={44} framed />
+            <span className="font-display text-xl font-semibold">BunkFy</span>
+          </div>
+          <LoadingState label="Loading your workspaces" />
+        </section>
       </main>
     );
   }
@@ -47,20 +58,14 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
             <BrandMark variant="simple-white-bold" height={44} framed />
             <span className="font-display text-xl font-semibold">BunkFy</span>
           </div>
-          <AlertTriangle className="mt-8 text-warning" size={28} />
-          <h1 className="mt-4 font-display text-2xl font-semibold">Workspace list unavailable</h1>
-          <p className="mt-2 text-sm leading-6 text-base-content/60">
-            BunkFy could not refresh the workspaces available to this account.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <button
-              className="btn btn-primary"
-              disabled={workspacesFetching}
-              onClick={() => void refetchWorkspaces()}
-            >
-              <RotateCcw className={workspacesFetching ? "animate-spin" : ""} size={16} />
-              Try again
-            </button>
+          <div className="mt-8">
+            <ErrorState
+              error={workspacesError}
+              retry={() => void refetchWorkspaces()}
+              title="Workspace list unavailable"
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button className="btn btn-ghost" onClick={() => void logout()}>
               <LogOut size={16} />
               Sign out

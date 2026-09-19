@@ -97,18 +97,36 @@ describe("properties source authority recovery", () => {
     const page = source("features/properties/PropertiesPage.tsx");
     const processing = source("features/properties/PropertyProcessingPanel.tsx");
     const retirement = source("features/properties/TopologyRetirementModal.tsx");
+    const editor = source("features/properties/usePropertyEditor.ts");
 
     expect(page).toContain("<CompositeSourceNotice");
     expect(page).toContain("<CompositeSourceFallback");
     expect(page).toContain("const permissionsCurrent = compositeSourceCurrent(permissionSource)");
-    expect(page).toContain("propertyRecordMatches(selectedProperty, input.property)");
-    expect(page).toContain("roomRecordIsCurrent(roomItems, input.room)");
-    expect(page).toContain("bedRecordIsCurrent(bedItems, selectedRoom, input.bed)");
+    expect(editor).toContain("catalog.current &&");
+    expect(editor).toContain("catalog.isSelectable(input.timeZoneId)");
+    expect(editor).toContain("propertyIdentityRecordEditable(property, input.property)");
+    expect(page).toContain("usePropertyEditor({");
+    expect(page).toContain("<PropertyEditorForms editor={editor}");
+    expect(page).toContain("useTopologyEditor({");
+    const topology = source("features/properties/useTopologyEditor.ts");
+    expect(topology).toContain("topologyTargetAllowed(input.target, latestEvidence.current, input.replay)");
+    expect(page).toContain("useTopologyRetirementEditor({");
+    const retirementEditor = source("features/properties/useTopologyRetirementEditor.ts");
+    expect(retirementEditor).toContain("retirementContextMatches(result, target)");
+    expect(retirementEditor).toContain("retirementActionAllowed(input.action, input.target, latest.current, read.data, read.contextCurrent)");
+    expect(page).toContain("const targetRoomUnavailable = targetRoomId !== null && !exactTargetRoom && roomsCurrent");
+    expect(page).toContain("No other room has been substituted");
+    expect(page).toContain("selectRoomForView(room.roomId)");
     expect(page).not.toContain("if (workspace.propertiesError) return");
     expect(page).not.toContain("rooms.error ?");
     expect(page).not.toContain("beds.error ?");
 
-    expect(processing).toContain("const canActivate = canManage && propertiesMutationAllowed");
+    const timeZoneModal = source("features/properties/PropertyTimeZoneModal.tsx");
+    expect(timeZoneModal).toContain("propertyTimeZoneRequiresConfirmation");
+    expect(timeZoneModal).toContain("disabled={!catalog.current || pending}");
+    expect(timeZoneModal).not.toContain("supportedTimeZones");
+
+    expect(processing).toContain('const canActivate = property.status === "active" && !retired && !actionsDisabled && canManage && propertiesMutationAllowed');
     expect(processing).toContain("compositeSourceCurrent(processingSource)");
     expect(processing).toContain("compositeSourceCurrent(policySource)");
     expect(processing).toContain("authorityCurrent={canActivate}");

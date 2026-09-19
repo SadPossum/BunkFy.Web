@@ -270,6 +270,27 @@ export type Property = NonNullableFields<
 >;
 
 export type PropertyMutationReceipt = Schema<"PropertyMutationReceiptDto">;
+export type PropertyTimeZoneMutationReceipt = Schema<"SetPropertyTimeZoneReceiptDto">;
+export type PropertyTimeZoneStatus = Schema<"PropertyTimeZoneStatus">;
+
+export type PropertyTimeZoneCountry = NonNullableFields<
+  Schema<"PropertyTimeZoneCountryDto">,
+  "code" | "name"
+>;
+
+export type PropertyTimeZoneCatalogItem = Omit<
+  NonNullableFields<Schema<"PropertyTimeZoneCatalogItemDto">, "timeZoneId">,
+  "countries"
+> & {
+  countries: PropertyTimeZoneCountry[];
+};
+
+export type PropertyTimeZoneCatalogPage = Omit<
+  Schema<"PropertyTimeZoneCatalogPageDto">,
+  "timeZones"
+> & {
+  timeZones: PropertyTimeZoneCatalogItem[];
+};
 
 export type PropertyProcessingState = Omit<
   NonNullableFields<Schema<"PropertyProcessingStateDto">, "reasonCode">,
@@ -377,6 +398,13 @@ export type RoomRetirement = Omit<
 
 export type TopologyRetirement = BedRetirement | RoomRetirement;
 
+export type RetirementProcessSummary = NonNullableFields<Schema<"InventoryRetirementProcessSummaryDto">, "reason" | "requestedBy">;
+export type RetirementImpact = NonNullableFields<Schema<"InventoryRetirementImpactDto">, "affectedReservationIds">;
+export type RetirementContext = Omit<Schema<"InventoryRetirementContextDto">, "process" | "impact"> & {
+  process: RetirementProcessSummary | Extract<Schema<"InventoryRetirementContextDto">["process"], null>;
+  impact: RetirementImpact | Extract<Schema<"InventoryRetirementContextDto">["impact"], null>;
+};
+
 export type InventoryUnitAvailability = Omit<
   NonNullableFields<Schema<"InventoryUnitAvailabilityDto">, "activeBlockIds" | "activeAllocationIds">,
   "unit"
@@ -437,7 +465,7 @@ export type Reservation = Omit<
 };
 
 export type ReservationListItem = Omit<
-  NonNullableFields<Schema<"ReservationListItemDto">, "primaryGuestName">,
+  NonNullableFields<Schema<"ReservationListItemDto">, "inventoryUnitIds" | "primaryGuestName">,
   "status" | "sourceKind"
 > & {
   status: ReservationStatus;
@@ -446,6 +474,37 @@ export type ReservationListItem = Omit<
 
 export type ReservationListResponse = Omit<Schema<"ReservationListResponse">, "reservations"> & {
   reservations: ReservationListItem[];
+};
+
+export type ReservationOperationsCount = {
+  reservationCount: number;
+  guestCount: number;
+};
+
+export type ReservationOperationsSnapshot = {
+  propertyId: string;
+  localDate: string;
+  timeZoneId: string;
+  dateSource: Schema<"ReservationOperationsDateSource">;
+  observedAtUtc: string;
+  cohorts: {
+    confirmedArrivalsOnLocalDate: ReservationOperationsCount;
+    scheduledDeparturesOnLocalDate: ReservationOperationsCount;
+    currentlyInHouse: ReservationOperationsCount;
+  };
+  attention: {
+    pendingAllocation: ReservationOperationsCount;
+    allocationRejected: ReservationOperationsCount;
+    cancellationPending: ReservationOperationsCount;
+    noShowPending: ReservationOperationsCount;
+    checkoutPending: ReservationOperationsCount;
+    arrivalBeforeLocalDateStillConfirmed: ReservationOperationsCount;
+    departureBeforeLocalDateStillInHouse: ReservationOperationsCount;
+    total: ReservationOperationsCount;
+  };
+  upcoming: ReservationListItem[];
+  upcomingLimit: number;
+  hasMoreUpcoming: boolean;
 };
 
 export type ReservationMutationReceipt = Omit<Schema<"ReservationMutationReceiptDto">, "status"> & {
@@ -649,6 +708,8 @@ export type GuestProfile = {
   dateOfBirth?: string | null;
   nationalityCountryCode?: string | null;
   preferredLanguageTag?: string | null;
+  // Optional for retained pre-collection responses; current API returns a non-null array.
+  languageTags?: string[] | null;
   notes?: string | null;
   status: GuestStatus;
   version: number;
@@ -668,6 +729,7 @@ export type GuestListItem = Pick<
   | "phone"
   | "nationalityCountryCode"
   | "preferredLanguageTag"
+  | "languageTags"
   | "status"
   | "lastChangedBy"
   | "lastChangedAtUtc"
@@ -710,6 +772,18 @@ export type GuestStayHistoryListResponse = {
 };
 
 export type StaffStatus = Schema<"StaffStatus"> | "active" | "suspended" | "departed";
+
+export type StaffAccountDirectoryEntry = NonNullableFields<
+  Schema<"StaffAccountDirectoryEntryDto">,
+  "authSubjectId" | "displayName"
+>;
+
+export type StaffAccountDirectoryResponse = Omit<
+  Schema<"StaffAccountDirectoryResponse">,
+  "items"
+> & {
+  items: StaffAccountDirectoryEntry[];
+};
 
 export type StaffPropertyAssignment = {
   assignmentId: string;

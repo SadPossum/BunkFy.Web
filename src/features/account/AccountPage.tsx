@@ -1,37 +1,20 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseMutationResult,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
   Building2,
-  Clock3,
-  Copy,
-  KeyRound,
-  Link2,
-  LogOut,
-  Mail,
+  CircleUserRound,
   MonitorSmartphone,
   ShieldCheck,
-  ShieldOff,
-  Smartphone,
-  Unlink,
-  UserRound,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import type {
   AuthenticationMethods,
   AuthenticationSessions,
   ExternalAuthenticationProviderList,
   ExternalIdentity,
-  MultiFactorCodeType,
   MultiFactorStatus,
   StaffMember,
-  StaffMemberMutationReceipt,
-  TotpEnrollment,
 } from "../../api/types";
 import {
   compositeSourceCurrent,
@@ -39,145 +22,146 @@ import {
   createCompositeSource,
   type CompositeSourceState,
 } from "../../app/compositeSourceState";
+import { useTransientResourceFocus } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
-import { useProductCapabilities } from "../../app/productCapabilities";
-import { focusedResourceClass, useTransientResourceFocus } from "../../app/resourceFocus";
 import { useWorkspace } from "../../app/workspace";
-import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import {
-  ErrorState,
-  InitialAvatar,
-  LoadingState,
-  PageHeader,
-  StatusBadge,
-} from "../../components/ui/primitives";
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
+import { PageHeader } from "../../components/ui/primitives";
 import { SelectPicker } from "../../components/ui/SelectPicker";
+import { AccountOverview } from "./AccountOverview";
 import {
-  resolveStaffProfileUpdateAttempt,
-  type StaffProfileUpdateAttempt,
-} from "../staff/staffProfileUpdateAttempt";
-import { StaffProfileFields } from "../workspaces/StaffProfileFields";
-import type { StaffProfileDraft } from "../workspaces/staffOnboarding";
-
-type SecurityAction =
-  | {
-      kind: "set-password";
-      newPassword: string;
-      currentPassword: string | null;
-    }
-  | { kind: "remove-password"; currentPassword: string }
-  | { kind: "request-verification"; emailId: string }
-  | { kind: "confirm-verification"; code: string }
-  | {
-      kind: "unlink-provider";
-      identityId: string;
-      currentPassword: string | null;
-    };
-
-type SecurityMutation = UseMutationResult<void, Error, SecurityAction>;
+  EmailPanel,
+  MultiFactorPanel,
+  PasswordPanel,
+  ProviderPanel,
+  type SecurityAction,
+} from "./AccountSecurityPanels";
+import { AccountSessionsPanel } from "./AccountSessionsPanel";
+import { AccountStaffProfilePanel } from "./AccountStaffProfilePanel";
+import {
+  accountSection,
+  accountSectionSearchParams,
+  type AccountSection,
+} from "./accountSections";
 
 export function AccountPage() {
-  const { beginExternalLink, logout, logoutAll, request, session } =
-    useSession();
+  const { beginExternalLink, logout, logoutAll, request, session } = useSession();
   const { selectedWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusRequested = searchParams.get("focus") === "workspace-profile" && Boolean(selectedWorkspace);
+  const requestedSection = accountSection(searchParams.get("section"), Boolean(selectedWorkspace));
+  const section: AccountSection = focusRequested ? "profile" : requestedSection;
+
+  const needsMethods = section === "overview" || section === "security";
+  const needsProviders = section === "security";
+  const needsSessions = section === "overview" || section === "sessions";
+  const needsMfa = section === "overview" || section === "security";
+  const needsStaffProfile = Boolean(selectedWorkspace) && (section === "overview" || section === "profile");
+
   const methods = useQuery({
     queryKey: ["auth", "methods", session?.tenantId],
     queryFn: () => request<AuthenticationMethods>("/api/auth/methods"),
+    enabled: needsMethods,
   });
   const providers = useQuery({
     queryKey: ["auth", "external-providers"],
-    queryFn: () =>
-      request<ExternalAuthenticationProviderList>(
-        "/api/auth/external/providers",
-      ),
+    queryFn: () => request<ExternalAuthenticationProviderList>("/api/auth/external/providers"),
+    enabled: needsProviders,
     staleTime: 5 * 60_000,
   });
   const sessions = useQuery({
     queryKey: ["auth", "sessions"],
     queryFn: () => request<AuthenticationSessions>("/api/auth/sessions"),
+    enabled: needsSessions,
+  });
+  const mfaStatus = useQuery({
+    queryKey: ["auth", "mfa"],
+    queryFn: () => request<MultiFactorStatus>("/api/auth/mfa"),
+    enabled: needsMfa,
   });
   const staffProfile = useQuery({
     queryKey: ["staff", "me", session?.tenantId],
     queryFn: () => request<StaffMember>("/api/staff/me"),
-    enabled: Boolean(selectedWorkspace),
+    enabled: needsStaffProfile,
     retry: false,
   });
+
   const methodsSource = createCompositeSource({ label: "Sign-in methods", hasData: methods.data !== undefined, isLoading: methods.isLoading, error: methods.error, isFetching: methods.isFetching, refetch: () => methods.refetch() });
   const providerSource = createCompositeSource({ label: "External providers", hasData: providers.data !== undefined, isLoading: providers.isLoading, error: providers.error, isFetching: providers.isFetching, refetch: () => providers.refetch() });
   const sessionSource = createCompositeSource({ label: "Active sessions", hasData: sessions.data !== undefined, isLoading: sessions.isLoading, error: sessions.error, isFetching: sessions.isFetching, refetch: () => sessions.refetch() });
+  const mfaSource = createCompositeSource({ label: "Multi-factor status", hasData: mfaStatus.data !== undefined, isLoading: mfaStatus.isLoading, error: mfaStatus.error, isFetching: mfaStatus.isFetching, refetch: () => mfaStatus.refetch() });
   const staffProfileSource = createCompositeSource({ label: "Workspace profile", hasData: staffProfile.data !== undefined, isLoading: staffProfile.isLoading, error: staffProfile.error, isFetching: staffProfile.isFetching, refetch: () => staffProfile.refetch() });
-  const accountSources = [methodsSource, providerSource, sessionSource, ...(selectedWorkspace ? [staffProfileSource] : [])];
+
+  const activeSources = section === "overview"
+    ? [methodsSource, mfaSource, sessionSource, ...(selectedWorkspace ? [staffProfileSource] : [])]
+    : section === "security"
+      ? [methodsSource, mfaSource, providerSource]
+      : section === "sessions"
+        ? [sessionSource]
+        : [staffProfileSource];
+
   const methodsUsable = compositeSourceUsable(methodsSource.state);
   const providersUsable = compositeSourceUsable(providerSource.state);
   const sessionsUsable = compositeSourceUsable(sessionSource.state);
+  const mfaUsable = compositeSourceUsable(mfaSource.state);
   const staffProfileUsable = compositeSourceUsable(staffProfileSource.state);
   const methodsCurrent = compositeSourceCurrent(methodsSource);
   const providersCurrent = compositeSourceCurrent(providerSource);
+  const sessionsCurrent = compositeSourceCurrent(sessionSource);
+  const mfaCurrent = compositeSourceCurrent(mfaSource);
+  const staffProfileCurrent = compositeSourceCurrent(staffProfileSource);
   const focusedResourceId = useTransientResourceFocus(Boolean(staffProfile.data));
+
   const [confirmAll, setConfirmAll] = useState(false);
-  const [submittingSession, setSubmittingSession] = useState<
-    "current" | "all" | null
-  >(null);
+  const [submittingSession, setSubmittingSession] = useState<"current" | "all" | null>(null);
   const [signOutError, setSignOutError] = useState<unknown>(null);
   const [providerLinkError, setProviderLinkError] = useState<unknown>(null);
-  const [passwordAction, setPasswordAction] = useState<"set" | "remove" | null>(
-    null,
-  );
-  const [unlinkIdentity, setUnlinkIdentity] = useState<ExternalIdentity | null>(
-    null,
-  );
+  const [passwordAction, setPasswordAction] = useState<"set" | "remove" | null>(null);
+  const [unlinkIdentity, setUnlinkIdentity] = useState<ExternalIdentity | null>(null);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
+  const selectSection = useCallback((nextSection: AccountSection) => {
+    setSearchParams(accountSectionSearchParams(searchParams, nextSection), { replace: true });
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
-    const parameters = new URLSearchParams(window.location.search);
-    if (parameters.get("external") === "linked") {
-      setNotice("External account linked.");
-      window.history.replaceState(null, "", "/account");
-      void queryClient.invalidateQueries({ queryKey: ["auth", "methods"] });
-    }
-  }, [queryClient]);
+    if (!focusRequested || searchParams.get("section") === "profile") return;
+    const next = new URLSearchParams(searchParams);
+    next.set("section", "profile");
+    setSearchParams(next, { replace: true });
+  }, [focusRequested, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("external") !== "linked") return;
+    setNotice("External account linked.");
+    const next = new URLSearchParams(searchParams);
+    next.delete("external");
+    next.set("section", "security");
+    setSearchParams(next, { replace: true });
+    void queryClient.invalidateQueries({ queryKey: ["auth", "methods"] });
+  }, [queryClient, searchParams, setSearchParams]);
 
   const security = useMutation({
     mutationFn: async (action: SecurityAction) => {
-      if (!methodsCurrent) {
-        throw new Error("Refresh account security before making this change.");
-      }
+      if (!methodsCurrent) throw new Error("Refresh account security before making this change.");
       if (action.kind === "set-password") {
-        return request<void>("/api/auth/password", {
-          method: "PUT",
-          body: JSON.stringify({
-            newPassword: action.newPassword,
-            currentPassword: action.currentPassword,
-          }),
-        });
+        return request<void>("/api/auth/password", { method: "PUT", body: JSON.stringify({ newPassword: action.newPassword, currentPassword: action.currentPassword }) });
       }
       if (action.kind === "remove-password") {
-        return request<void>("/api/auth/password/remove", {
-          method: "POST",
-          body: JSON.stringify({ currentPassword: action.currentPassword }),
-        });
+        return request<void>("/api/auth/password/remove", { method: "POST", body: JSON.stringify({ currentPassword: action.currentPassword }) });
       }
       if (action.kind === "request-verification") {
-        return request<void>("/api/auth/email-verification", {
-          method: "POST",
-          body: JSON.stringify({ emailId: action.emailId }),
-        });
+        return request<void>("/api/auth/email-verification", { method: "POST", body: JSON.stringify({ emailId: action.emailId }) });
       }
       if (action.kind === "confirm-verification") {
-        return request<void>("/api/auth/email-verification/confirm", {
-          method: "POST",
-          body: JSON.stringify({ code: action.code }),
-        });
+        return request<void>("/api/auth/email-verification/confirm", { method: "POST", body: JSON.stringify({ code: action.code }) });
       }
-      return request<void>(
-        `/api/auth/external-identities/${action.identityId}/unlink`,
-        {
-          method: "POST",
-          body: JSON.stringify({ currentPassword: action.currentPassword }),
-        },
-      );
+      return request<void>(`/api/auth/external-identities/${action.identityId}/unlink`, { method: "POST", body: JSON.stringify({ currentPassword: action.currentPassword }) });
     },
     onSuccess: async (_result, action) => {
       setNotice(actionNotice(action.kind));
@@ -187,20 +171,23 @@ export function AccountPage() {
     },
   });
   const revokeSession = useMutation({
-    mutationFn: (sessionId: string) => request<void>(
-      `/api/auth/sessions/${sessionId}/sign-out`,
-      { method: "POST" },
-    ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["auth", "sessions"] });
-    },
+    mutationFn: (sessionId: string) => request<void>(`/api/auth/sessions/${sessionId}/sign-out`, { method: "POST" }),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["auth", "sessions"] }),
   });
+  const resetSecurity = security.reset;
 
   useEffect(() => {
     if (methodsCurrent) return;
     setPasswordAction(null);
     setUnlinkIdentity(null);
   }, [methodsCurrent]);
+  useEffect(() => {
+    if (section === "security") return;
+    setPasswordAction(null);
+    setUnlinkIdentity(null);
+    setProviderLinkError(null);
+    resetSecurity();
+  }, [resetSecurity, section]);
 
   async function signOut(mode: "current" | "all") {
     setSubmittingSession(mode);
@@ -227,1177 +214,155 @@ export function AccountPage() {
     }
   }
 
+  function openPasswordAction(action: "set" | "remove" | null) {
+    security.reset();
+    setPasswordAction(action);
+  }
+
+  function openUnlink(identity: ExternalIdentity | null) {
+    security.reset();
+    setUnlinkIdentity(identity);
+  }
+
   const authentication = methodsUsable ? methods.data : undefined;
-  const linkedProviderCodes = new Set(
-    authentication?.externalIdentities.map(
-      (identity) => identity.providerCode,
-    ) ?? [],
-  );
-  const availableProviders = (providersUsable ? providers.data?.providers ?? [] : []).filter(
-    (provider) => !linkedProviderCodes.has(provider),
-  );
+  const linkedProviderCodes = new Set(authentication?.externalIdentities.map((identity) => identity.providerCode) ?? []);
+  const availableProviders = (providersUsable ? providers.data?.providers ?? [] : []).filter((provider) => !linkedProviderCodes.has(provider));
+  const navigation = [
+    { value: "overview" as const, label: "Overview", description: "Identity and security", icon: CircleUserRound, visible: true },
+    { value: "profile" as const, label: "Workspace profile", description: "Contact and work details", icon: Building2, visible: Boolean(selectedWorkspace) },
+    { value: "security" as const, label: "Sign-in & recovery", description: "Password, email, MFA", icon: ShieldCheck, visible: true },
+    { value: "sessions" as const, label: "Sessions", description: "Browsers and revocation", icon: MonitorSmartphone, visible: true },
+  ].filter((item) => item.visible);
 
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
         eyebrow="Personal settings"
         title="Account"
-        description="Manage your profile, sign-in methods, and active sessions."
+        description="Review your identity, workspace profile, sign-in safeguards, and active browser sessions."
+        action={<span className="badge h-8 gap-2 border-0 bg-primary px-3 font-semibold text-white"><ShieldCheck size={15} />Signed in</span>}
       />
-      <CompositeSourceNotice sources={accountSources} title="Some account data is delayed" />
+      <CompositeSourceNotice sources={activeSources} title="Some account data is delayed" />
       {notice && (
-        <div className="alert border border-success/25 bg-success/8 text-sm">
+        <div className="alert border border-success/25 bg-success/10 text-sm">
           <BadgeCheck size={18} className="text-success" />
           <span>{notice}</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs ml-auto"
-            onClick={() => setNotice("")}
-          >
-            Dismiss
-          </button>
+          <button type="button" className="btn btn-ghost btn-xs ml-auto" onClick={() => setNotice("")}>Dismiss</button>
         </div>
       )}
 
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <section className="card border border-base-300 bg-base-100 shadow-sm">
-          <div className="card-body p-6">
-            <div className="flex items-center gap-4">
-              <InitialAvatar name={session?.username} variant="solid" />
-              <div className="min-w-0">
-                <h2 className="truncate font-display text-xl font-semibold">
-                  {session?.username}
-                </h2>
-                <p className="mt-1 text-sm text-base-content/50">Your BunkFy account</p>
-              </div>
-            </div>
-            <div className="my-3 h-px bg-base-300" />
-            <div className="space-y-3">
-              <AccountRow
-                icon={<UserRound />}
-                label="Email address"
-                value={session?.username || "Unknown"}
-              />
-              <AccountRow
-                icon={<Building2 />}
-                label="Current workspace"
-                value={selectedWorkspace?.organization.name || "No workspace selected"}
-              />
-              <AccountRow
-                icon={<ShieldCheck />}
-                label="Staff profile"
-                value={!selectedWorkspace
-                  ? "No workspace selected"
-                  : accountSourceValue(staffProfileSource.state, staffProfile.data?.displayName || "Not ready")}
-              />
-              <AccountRow
-                icon={<Clock3 />}
-                label="Member since"
-                value={!selectedWorkspace
-                  ? "No workspace selected"
-                  : accountSourceValue(staffProfileSource.state, staffProfile.data ? new Date(staffProfile.data.createdAtUtc).toLocaleDateString() : "Unavailable")}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="card border border-base-300 bg-base-100 shadow-sm">
-          <div className="card-body p-6">
-            <div className="flex items-start gap-3">
-              <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                <MonitorSmartphone size={21} />
-              </div>
-              <div>
-                <h2 className="font-display text-xl font-semibold">
-                  Active sessions
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-base-content/55">
-                  Review where your account is signed in and sign out any device
-                  you no longer use.
-                </p>
-              </div>
-            </div>
-            {Boolean(signOutError) && <ErrorState error={signOutError} />}
-            {!sessionsUsable ? (
-              <CompositeSourceFallback state={sessionSource.state} label="active sessions" />
-            ) : (
-              <div
-                className="mt-5 max-h-80 divide-y divide-base-300 overflow-y-auto overscroll-contain rounded-lg border border-base-300"
-                aria-label="Active sessions list"
-              >
-                {(sessions.data?.sessions ?? []).map((item) => (
-                  <div key={item.sessionId} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold">{authenticationMethodLabel(item.authenticationMethod)}</p>
-                        {item.isCurrent && <span className="badge badge-sm border-0 bg-primary font-semibold text-white">This browser</span>}
-                      </div>
-                      <p className="mt-1 text-xs text-base-content/50">
-                        Signed in {new Date(item.loginDateTimeUtc).toLocaleString()} · active until {new Date(item.refreshTokenExpiresAtUtc).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {!item.isCurrent && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm text-error"
-                        disabled={revokeSession.isPending}
-                        onClick={() => revokeSession.mutate(item.sessionId)}
-                      >
-                        <LogOut size={15} />
-                        Sign out
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {revokeSession.error && <div className="mt-4"><ErrorState error={revokeSession.error} /></div>}
-            {!confirmAll ? (
-              <div className="mt-6 flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => void signOut("current")}
-                  disabled={submittingSession != null}
-                >
-                  <LogOut size={16} />
-                  {submittingSession === "current"
-                    ? "Signing out..."
-                    : "Sign out this browser"}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-error"
-                  onClick={() => setConfirmAll(true)}
-                  disabled={submittingSession != null}
-                >
-                  Sign out everywhere
-                </button>
-              </div>
-            ) : (
-              <div className="mt-6 border border-warning/30 bg-warning/8 p-4">
-                <h3 className="font-semibold">Sign out on every device?</h3>
-                <p className="mt-1 text-sm leading-6 text-base-content/60">
-                  All refresh sessions will be revoked, including this browser.
-                  You will need to sign in again everywhere.
-                </p>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setConfirmAll(false)}
-                    disabled={submittingSession != null}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-error btn-sm"
-                    onClick={() => void signOut("all")}
-                    disabled={submittingSession != null}
-                  >
-                    {submittingSession === "all" && (
-                      <span className="loading loading-spinner loading-xs" />
-                    )}
-                    Sign out everywhere
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {selectedWorkspace && (
-        staffProfileUsable && staffProfile.data ? (
-          <StaffProfilePanel
-            member={staffProfile.data}
-            focused={focusedResourceId === "workspace-profile"}
-            request={request}
-            onUpdated={(updated) => queryClient.setQueryData(["staff", "me", session?.tenantId], updated)}
-          />
-        ) : (
-          <AccountSourcePanel
-            title="Workspace profile"
-            description="Contact and role details visible to your team."
-            state={staffProfileSource.state}
-            label="workspace profile"
-            className="mt-6"
-          />
-        )
-      )}
-
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
-        {authentication ? (
-          <PasswordPanel
-            methods={authentication}
-            action={passwordAction}
-            mutation={security}
-            canMutate={methodsCurrent}
-            onAction={setPasswordAction}
-          />
-        ) : (
-          <AccountSourcePanel
-            title="Sign-in methods"
-            description="Password, email, and linked-account settings."
-            state={methodsSource.state}
-            label="sign-in methods"
-          />
-        )}
-        <MultiFactorPanel />
-        {authentication && (
-          <EmailPanel
-            methods={authentication}
-            mutation={security}
-            canMutate={methodsCurrent}
-          />
-        )}
-        {authentication && (
-          <ProviderPanel
-            methods={authentication}
-            availableProviders={availableProviders}
-            linkingProvider={linkingProvider}
-            unlinkIdentity={unlinkIdentity}
-            mutation={security}
-            canLink={methodsCurrent && providersCurrent}
-            canUnlink={methodsCurrent}
-            linkError={providerLinkError}
-            onLink={linkProvider}
-            onUnlink={setUnlinkIdentity}
-          />
-        )}
-      </div>
-    </>
-  );
-}
-
-function AccountSourcePanel({ title, description, state, label, className = "" }: { title: string; description: string; state: CompositeSourceState; label: string; className?: string }) {
-  return (
-    <section className={`card border border-base-300 bg-base-100 shadow-sm ${className}`}>
-      <div className="border-b border-base-300 px-5 py-5 sm:px-6">
-        <h2 className="font-display text-xl font-semibold">{title}</h2>
-        <p className="mt-1 text-sm text-base-content/50">{description}</p>
-      </div>
-      <CompositeSourceFallback state={state} label={label} />
-    </section>
-  );
-}
-
-function accountSourceValue(state: CompositeSourceState, value: string): string {
-  if (state === "loading") return "Loading...";
-  if (state === "unavailable") return "Unavailable";
-  return value;
-}
-
-function StaffProfilePanel({
-  member,
-  focused,
-  request,
-  onUpdated,
-}: {
-  member: StaffMember;
-  focused: boolean;
-  request: <T>(path: string, options?: RequestInit) => Promise<T>;
-  onUpdated: (member: StaffMember) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState<StaffProfileDraft>(() => staffDraft(member));
-  const updateAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
-  useEffect(() => setProfile(staffDraft(member)), [member]);
-  useEffect(() => {
-    updateAttempt.current = null;
-  }, [member.staffMemberId]);
-  const update = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        ...profile,
-        legalName: profile.legalName.trim() || null,
-        workEmail: profile.workEmail.trim() || null,
-        workPhone: profile.workPhone.trim() || null,
-        jobTitle: profile.jobTitle.trim() || null,
-        department: profile.department.trim() || null,
-      };
-      updateAttempt.current = await resolveStaffProfileUpdateAttempt(
-        updateAttempt.current,
-        member.staffMemberId,
-        member.version,
-        payload,
-      );
-      await request<StaffMemberMutationReceipt>("/api/staff/me", {
-        method: "PUT",
-        body: JSON.stringify({
-          ...payload,
-          operationId: updateAttempt.current.operationId,
-          expectedVersion: updateAttempt.current.expectedVersion,
-        }),
-      });
-      return request<StaffMember>("/api/staff/me");
-    },
-    onSuccess: (updated) => {
-      updateAttempt.current = null;
-      onUpdated(updated);
-      setEditing(false);
-    },
-  });
-
-  return (
-    <section className={`card mt-6 border border-base-300 bg-base-100 shadow-sm ${focused ? focusedResourceClass : ""}`}>
-      <div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <h2 className="font-display text-xl font-semibold">Workspace profile</h2>
-          <p className="mt-1 text-sm text-base-content/50">Contact and role details visible to your team.</p>
-        </div>
-        {!editing && (
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditing(true)}>
-            Edit profile
-          </button>
-        )}
-      </div>
-      <div className="p-5 sm:p-6">
-        {editing ? (
-          <form onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
-            <StaffProfileFields value={profile} onChange={setProfile} />
-            {update.error && <div className="mt-4"><ErrorState error={update.error} /></div>}
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" className="btn btn-ghost" onClick={() => { updateAttempt.current = null; setProfile(staffDraft(member)); setEditing(false); update.reset(); }} disabled={update.isPending}>Cancel</button>
-              <button className="btn btn-primary" disabled={update.isPending || !profile.displayName.trim()}>
-                {update.isPending && <span className="loading loading-spinner loading-sm" />}
-                Save profile
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <AccountRow icon={<UserRound />} label="Display name" value={member.displayName} />
-            <AccountRow icon={<Mail />} label="Work email" value={member.workEmail || "Not provided"} />
-            <AccountRow icon={<KeyRound />} label="Job title" value={member.jobTitle || "Not provided"} />
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function staffDraft(member: StaffMember): StaffProfileDraft {
-  return {
-    displayName: member.displayName,
-    legalName: member.legalName ?? "",
-    workEmail: member.workEmail ?? "",
-    workPhone: member.workPhone ?? "",
-    jobTitle: member.jobTitle ?? "",
-    department: member.department ?? "",
-  };
-}
-
-function authenticationMethodLabel(value: string): string {
-  return value.toLowerCase() === "password"
-    ? "Password sign-in"
-    : `${providerLabel(value)} sign-in`;
-}
-
-function PasswordPanel({
-  methods,
-  action,
-  mutation,
-  canMutate,
-  onAction,
-}: {
-  methods: AuthenticationMethods;
-  action: "set" | "remove" | null;
-  mutation: SecurityMutation;
-  canMutate: boolean;
-  onAction: (action: "set" | "remove" | null) => void;
-}) {
-  const [validationError, setValidationError] = useState("");
-
-  function setPassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutate) return;
-    const data = new FormData(event.currentTarget);
-    const password = String(data.get("newPassword") ?? "");
-    if (password !== String(data.get("confirmPassword") ?? "")) {
-      setValidationError("Passwords do not match.");
-      return;
-    }
-    setValidationError("");
-    mutation.mutate({
-      kind: "set-password",
-      newPassword: password,
-      currentPassword: methods.hasPassword
-        ? String(data.get("currentPassword") ?? "")
-        : null,
-    });
-  }
-
-  function removePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutate) return;
-    mutation.mutate({
-      kind: "remove-password",
-      currentPassword: String(
-        new FormData(event.currentTarget).get("currentPassword") ?? "",
-      ),
-    });
-  }
-
-  const canRemove =
-    methods.hasPassword && methods.externalIdentities.length > 0;
-  return (
-    <section className="card border border-base-300 bg-base-100 shadow-sm">
-      <div className="card-body p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-              <KeyRound size={20} />
-            </span>
-            <div>
-              <h2 className="font-display text-xl font-semibold">Password</h2>
-              <p className="mt-1 text-sm leading-6 text-base-content/55">
-              {methods.hasPassword
-                ? "A password is configured for this account."
-                : "This account currently signs in through an external provider."}
-              </p>
-            </div>
-          </div>
-          <StatusBadge
-            status={methods.hasPassword ? "configured" : "not set"}
-          />
-        </div>
-        {!action && (
-          <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-base-300 pt-5">
-            {canRemove && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm text-error"
-                onClick={() => onAction("remove")}
-                disabled={!canMutate}
-              >
-                <ShieldOff size={15} />
-                Remove password
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => onAction("set")}
-              disabled={!canMutate}
-            >
-              <KeyRound size={15} />
-              {methods.hasPassword ? "Change password" : "Add password"}
-            </button>
-          </div>
-        )}
-        {action === "set" && (
-          <form
-            className="mt-6 space-y-4 border-t border-base-300 pt-5"
-            onSubmit={setPassword}
-          >
-            {methods.hasPassword && (
-              <PasswordInput
-                name="currentPassword"
-                label="Current password"
-                autoComplete="current-password"
-              />
-            )}
-            <PasswordInput
-              name="newPassword"
-              label="New password"
-              autoComplete="new-password"
-            />
-            <PasswordInput
-              name="confirmPassword"
-              label="Confirm new password"
-              autoComplete="new-password"
-            />
-            {validationError && (
-              <div className="alert alert-error py-3 text-sm">
-                <span>{validationError}</span>
-              </div>
-            )}
-            {mutation.error && <ErrorState error={mutation.error} />}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setValidationError("");
-                  onAction(null);
-                  mutation.reset();
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary btn-sm"
-                disabled={mutation.isPending || !canMutate}
-              >
-                {mutation.isPending && (
-                  <span className="loading loading-spinner loading-xs" />
-                )}
-                Save password
-              </button>
-            </div>
-          </form>
-        )}
-        {action === "remove" && (
-          <form
-            className="mt-6 space-y-4 border border-warning/30 bg-warning/8 p-4"
-            onSubmit={removePassword}
-          >
-            <p className="text-sm leading-6">
-              External sign-in will remain available, but password sign-in will
-              stop immediately.
-            </p>
-            <PasswordInput
-              name="currentPassword"
-              label="Current password"
-              autoComplete="current-password"
-            />
-            {mutation.error && <ErrorState error={mutation.error} />}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  onAction(null);
-                  mutation.reset();
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-error btn-sm"
-                disabled={mutation.isPending || !canMutate}
-              >
-                Remove password
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function MultiFactorPanel() {
-  const {
-    activateTotp,
-    disableTotp,
-    request,
-  } = useSession();
-  const queryClient = useQueryClient();
-  const [enrollment, setEnrollment] = useState<TotpEnrollment | null>(null);
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [disabling, setDisabling] = useState(false);
-  const [disableCodeType, setDisableCodeType] =
-    useState<MultiFactorCodeType>("totp");
-  const status = useQuery({
-    queryKey: ["auth", "mfa"],
-    queryFn: () => request<MultiFactorStatus>("/api/auth/mfa"),
-  });
-  const beginEnrollment = useMutation({
-    mutationFn: () => request<TotpEnrollment>("/api/auth/mfa/totp/enrollment", {
-      method: "POST",
-    }),
-    onSuccess: (result) => {
-      setEnrollment(result);
-      setRecoveryCodes([]);
-    },
-  });
-  const activate = useMutation({
-    mutationFn: (code: string) => activateTotp(code),
-    onSuccess: async (codes) => {
-      setEnrollment(null);
-      setRecoveryCodes(codes);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["auth", "mfa"] }),
-        queryClient.invalidateQueries({ queryKey: ["auth", "sessions"] }),
-      ]);
-    },
-  });
-  const disable = useMutation({
-    mutationFn: ({ codeType, code }: { codeType: MultiFactorCodeType; code: string }) =>
-      disableTotp(codeType, code),
-  });
-
-  function activateEnrollment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
-    activate.mutate(code);
-  }
-
-  function disableAuthentication(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    disable.mutate({
-      codeType: disableCodeType,
-      code: String(data.get("code") ?? "").trim(),
-    });
-  }
-
-  const current = status.data;
-  return (
-    <section className="card border border-base-300 bg-base-100 shadow-sm">
-      <div className="card-body p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Smartphone size={20} />
-            </span>
-            <div>
-              <h2 className="font-display text-xl font-semibold">Multi-factor authentication</h2>
-              <p className="mt-1 text-sm leading-6 text-base-content/55">
-                Protect sensitive actions with an authenticator or recovery code.
-              </p>
-            </div>
-          </div>
-          {current && (
-            <StatusBadge status={current.isActive ? "active" : "not configured"} />
-          )}
-        </div>
-
-        {status.isLoading ? (
-          <div className="mt-5"><LoadingState label="Loading multi-factor status" /></div>
-        ) : status.error ? (
-          <div className="mt-5">
-            <ErrorState error={status.error} retry={() => void status.refetch()} />
-          </div>
-        ) : current && !current.providerAvailable ? (
-          <p className="mt-5 text-sm text-base-content/55">
-            An authenticator provider is not available in this environment.
-          </p>
-        ) : current?.isActive && recoveryCodes.length === 0 ? (
-          <>
-            <div className="mt-5 rounded-lg bg-success/8 p-4">
-              <p className="text-sm font-semibold">Authenticator enabled</p>
-              <p className="mt-1 text-xs leading-5 text-base-content/55">
-                {current.unusedRecoveryCodeCount} recovery code{current.unusedRecoveryCodeCount === 1 ? "" : "s"} remain.
-                Sensitive downloads require a recent MFA sign-in.
-              </p>
-            </div>
-            {!disabling ? (
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm text-error"
-                  onClick={() => setDisabling(true)}
-                >
-                  <ShieldOff size={15} />
-                  Disable MFA
-                </button>
-              </div>
-            ) : (
-              <form className="mt-5 space-y-4 border-t border-base-300 pt-5" onSubmit={disableAuthentication}>
-                <label className="form-control block">
-                  <span className="mb-1.5 block text-sm font-semibold">Verification method</span>
-                  <SelectPicker
-                    ariaLabel="Verification method"
-                    className="w-full"
-                    value={disableCodeType}
-                    onValueChange={(value) =>
-                      setDisableCodeType(value as MultiFactorCodeType)
-                    }
-                    options={[
-                      { value: "totp", label: "Authenticator code" },
-                      { value: "recovery-code", label: "Recovery code" },
-                    ]}
-                  />
-                </label>
-                <label className="form-control block">
-                  <span className="mb-1.5 block text-sm font-semibold">Verification code</span>
-                  <input
-                    name="code"
-                    className="input input-bordered w-full font-mono"
-                    autoComplete="one-time-code"
-                    required
-                  />
-                </label>
-                {disable.error && <ErrorState error={disable.error} />}
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      setDisabling(false);
-                      setDisableCodeType("totp");
-                      disable.reset();
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-error btn-sm text-white"
-                    disabled={disable.isPending}
-                  >
-                    Disable and sign out
-                  </button>
-                </div>
-              </form>
-            )}
-          </>
-        ) : enrollment ? (
-          <form className="mt-5 space-y-5" onSubmit={activateEnrollment}>
-            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
-              <div className="w-fit rounded-lg border border-base-300 bg-white p-3">
-                <QRCodeSVG value={enrollment.provisioningUri} size={152} level="M" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">Scan with your authenticator</p>
-                <p className="mt-1 text-xs leading-5 text-base-content/55">
-                  Or enter this setup key manually:
-                </p>
-                <code className="mt-2 block break-all rounded-lg bg-base-200 px-3 py-2 text-xs">
-                  {enrollment.secret}
-                </code>
-                <p className="mt-2 text-xs text-base-content/45">
-                  Setup expires {new Date(enrollment.expiresAtUtc).toLocaleTimeString()}.
-                </p>
-              </div>
-            </div>
+      <div className="grid gap-5 xl:grid-cols-[252px_minmax(0,1fr)] xl:items-start">
+        <div className="min-w-0">
+          <div className="xl:hidden">
             <label className="form-control block">
-              <span className="mb-1.5 block text-sm font-semibold">Six-digit code</span>
-              <input
-                name="code"
-                className="input input-bordered w-full font-mono"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                required
+              <span className="mb-1.5 block text-sm font-semibold">Account section</span>
+              <SelectPicker
+                value={section}
+                onValueChange={(value) => selectSection(accountSection(value, Boolean(selectedWorkspace)))}
+                ariaLabel="Account section"
+                options={navigation.map((item) => ({ value: item.value, label: item.label, description: item.description }))}
               />
             </label>
-            {activate.error && <ErrorState error={activate.error} />}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setEnrollment(null);
-                  activate.reset();
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary btn-sm"
-                disabled={activate.isPending}
-              >
-                Enable MFA
-              </button>
-            </div>
-          </form>
-        ) : recoveryCodes.length > 0 ? (
-          <div className="mt-5">
-            <div className="rounded-lg border border-warning/30 bg-warning/8 p-4">
-              <p className="text-sm font-semibold">Save these recovery codes now</p>
-              <p className="mt-1 text-xs leading-5 text-base-content/55">
-                Each code works once. They will not be shown again.
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">
-                {recoveryCodes.map((code) => (
-                  <code key={code} className="rounded bg-base-100 px-3 py-2">{code}</code>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => void navigator.clipboard.writeText(recoveryCodes.join("\n"))}
-                >
-                  <Copy size={15} />
-                  Copy codes
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setRecoveryCodes([])}
-                >
-                  I saved them
-                </button>
-              </div>
-            </div>
           </div>
-        ) : (
-          <div className="mt-5 flex flex-col gap-4 rounded-lg bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm leading-6 text-base-content/60">
-              Use any TOTP-compatible authenticator. You will receive one-time recovery codes.
-            </p>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm shrink-0"
-              disabled={beginEnrollment.isPending}
-              onClick={() => beginEnrollment.mutate()}
-            >
-              <KeyRound size={15} />
-              Set up MFA
-            </button>
-          </div>
-        )}
+          <aside className="hidden rounded-lg border border-base-300 bg-base-100 p-2 shadow-sm xl:sticky xl:top-20 xl:block" aria-label="Account sections">
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              const active = section === item.value;
+              return (
+                <button key={item.value} type="button" aria-current={active ? "page" : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${active ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--color-primary)]" : "text-base-content hover:bg-base-200"}`} onClick={() => selectSection(item.value)}>
+                  <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${active ? "bg-primary text-white" : "bg-base-200 text-base-content/55"}`}><Icon size={17} /></span>
+                  <span className="min-w-0"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 block truncate text-xs opacity-55">{item.description}</span></span>
+                </button>
+              );
+            })}
+          </aside>
+        </div>
 
-        {beginEnrollment.error && (
-          <div className="mt-4"><ErrorState error={beginEnrollment.error} /></div>
-        )}
-      </div>
-    </section>
-  );
-}
+        <section className="min-w-0 overflow-visible rounded-lg border border-base-300 bg-base-100 shadow-sm">
+          <div className="p-5 sm:p-6">
+            {section === "overview" && (
+              <AccountOverview
+                username={session?.username ?? "Unknown account"}
+                workspaceName={selectedWorkspace?.organization.name ?? null}
+                staffProfile={staffProfileUsable ? staffProfile.data : undefined}
+                staffProfileState={staffProfileSource.state}
+                methods={authentication}
+                methodsState={methodsSource.state}
+                mfaStatus={mfaUsable ? mfaStatus.data : undefined}
+                mfaState={mfaSource.state}
+                sessions={sessionsUsable ? sessions.data : undefined}
+                sessionsState={sessionSource.state}
+                onOpenSection={selectSection}
+              />
+            )}
 
-function EmailPanel({
-  methods,
-  mutation,
-  canMutate,
-}: {
-  methods: AuthenticationMethods;
-  mutation: SecurityMutation;
-  canMutate: boolean;
-}) {
-  const { emailVerificationEnabled } = useProductCapabilities();
-  const [confirming, setConfirming] = useState(false);
-  useEffect(() => { if (!canMutate) setConfirming(false); }, [canMutate]);
-  function confirm(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canMutate) return;
-    mutation.mutate({
-      kind: "confirm-verification",
-      code: String(new FormData(event.currentTarget).get("code") ?? "").trim(),
-    });
-  }
-  return (
-    <section className="card border border-base-300 bg-base-100 shadow-sm">
-      <div className="card-body p-6">
-        <div className="flex items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-            <Mail size={20} />
-          </span>
-          <div>
-            <h2 className="font-display text-xl font-semibold">
-              Email verification
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-base-content/55">
-              Verified addresses can receive security and account messages.
-            </p>
-          </div>
-        </div>
-        <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
-          {methods.emails.map((email) => (
-            <div
-              key={email.id}
-              className="flex flex-wrap items-center justify-between gap-3 py-4"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{email.email}</p>
-                <p className="mt-1 text-xs text-base-content/45">
-                  {email.isActive ? "Active address" : "Inactive address"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge
-                  status={email.isVerified ? "verified" : "unverified"}
+            {section === "profile" && selectedWorkspace && (
+              staffProfileUsable && staffProfile.data ? (
+                <AccountStaffProfilePanel
+                  member={staffProfile.data}
+                  focused={focusedResourceId === "workspace-profile"}
+                  canMutate={staffProfileCurrent}
+                  request={request}
+                  onUpdated={(updated) => queryClient.setQueryData(["staff", "me", session?.tenantId], updated)}
                 />
-                {emailVerificationEnabled && !email.isVerified && email.isActive && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs text-primary"
-                    disabled={mutation.isPending || !canMutate}
-                    onClick={() =>
-                      mutation.mutate({
-                        kind: "request-verification",
-                        emailId: email.id,
-                      })
-                    }
-                  >
-                    <Mail size={14} />
-                    Send code
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        {!methods.emails.length && (
-          <p className="mt-5 border border-dashed border-base-300 p-5 text-center text-sm text-base-content/50">
-            No email address is attached to this account.
-          </p>
-        )}
-        {mutation.error && (
-          <div className="mt-4">
-            <ErrorState error={mutation.error} />
-          </div>
-        )}
-        {emailVerificationEnabled &&
-          methods.emails.some((email) => !email.isVerified) &&
-          (!confirming ? (
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setConfirming(true)}
-                disabled={!canMutate}
-              >
-                <BadgeCheck size={15} />
-                Enter verification code
-              </button>
-            </div>
-          ) : (
-            <form
-              className="mt-5 border-t border-base-300 pt-5"
-              onSubmit={confirm}
-            >
-              <label className="form-control block">
-                <span className="label-text mb-1.5 block text-sm font-semibold">
-                  Verification code
-                </span>
-                <input
-                  name="code"
-                  className="input input-bordered w-full font-mono"
-                  autoComplete="one-time-code"
-                  required
-                />
-              </label>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setConfirming(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm"
-                  disabled={mutation.isPending || !canMutate}
-                >
-                  Verify email
-                </button>
-              </div>
-            </form>
-          ))}
-      </div>
-    </section>
-  );
-}
+              ) : (
+                <AccountSourcePanel title="Workspace profile" description="Contact and work details visible to your team." state={staffProfileSource.state} label="workspace profile" />
+              )
+            )}
 
-function ProviderPanel({
-  methods,
-  availableProviders,
-  linkingProvider,
-  unlinkIdentity,
-  mutation,
-  canLink,
-  canUnlink,
-  linkError,
-  onLink,
-  onUnlink,
-}: {
-  methods: AuthenticationMethods;
-  availableProviders: string[];
-  linkingProvider: string | null;
-  unlinkIdentity: ExternalIdentity | null;
-  mutation: SecurityMutation;
-  canLink: boolean;
-  canUnlink: boolean;
-  linkError: unknown;
-  onLink: (provider: string) => Promise<void>;
-  onUnlink: (identity: ExternalIdentity | null) => void;
-}) {
-  function unlink(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!unlinkIdentity || !canUnlink) return;
-    mutation.mutate({
-      kind: "unlink-provider",
-      identityId: unlinkIdentity.id,
-      currentPassword: methods.hasPassword
-        ? String(new FormData(event.currentTarget).get("currentPassword") ?? "")
-        : null,
-    });
-  }
-  return (
-    <section className="card border border-base-300 bg-base-100 shadow-sm xl:col-span-2">
-      <div className="card-body p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Link2 size={20} />
-            </span>
-            <div>
-              <h2 className="font-display text-xl font-semibold">
-                External accounts
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-base-content/55">
-                Link optional identity providers without merging accounts by
-                email.
-              </p>
-            </div>
-          </div>
-          {availableProviders.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {availableProviders.map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  disabled={linkingProvider !== null || !canLink}
-                  onClick={() => void onLink(provider)}
-                >
-                  {linkingProvider === provider ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <Link2 size={15} />
-                  )}
-                  Link {providerLabel(provider)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {Boolean(linkError) && <div className="mt-4"><ErrorState error={linkError} /></div>}
-        <div className="mt-5 divide-y divide-base-300 border-y border-base-300">
-          {methods.externalIdentities.map((identity) => (
-            <div
-              key={identity.id}
-              className="flex flex-wrap items-center justify-between gap-3 py-4"
-            >
-              <div>
-                <p className="font-semibold">
-                  {providerLabel(identity.providerCode)}
-                </p>
-                <p className="mt-1 text-xs text-base-content/45">
-                  Linked {formatDateTime(identity.linkedAtUtc)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm text-error"
-                onClick={() => onUnlink(identity)}
-                disabled={!canUnlink || mutation.isPending}
-              >
-                <Unlink size={15} />
-                Unlink
-              </button>
-            </div>
-          ))}
-        </div>
-        {!methods.externalIdentities.length && (
-          <div className="mt-5 flex items-center gap-3 rounded-lg bg-base-200/70 p-4 text-sm text-base-content/55">
-            <Link2 size={18} className="shrink-0 text-base-content/35" />
-            No external accounts are linked.
-          </div>
-        )}
-        {unlinkIdentity && canUnlink && (
-          <form
-            className="mt-5 border border-warning/30 bg-warning/8 p-4"
-            onSubmit={unlink}
-          >
-            <h3 className="font-semibold">
-              Unlink {providerLabel(unlinkIdentity.providerCode)}?
-            </h3>
-            <p className="mt-1 text-sm leading-6 text-base-content/60">
-              BunkFy will reject this change if it would leave the account
-              without a sign-in method.
-            </p>
-            {methods.hasPassword && (
-              <div className="mt-4">
-                <PasswordInput
-                  name="currentPassword"
-                  label="Current password"
-                  autoComplete="current-password"
-                />
+            {section === "security" && (
+              <div className="max-w-5xl">
+                <div className="mb-6 flex items-start gap-3 border-b border-base-300 pb-5">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><ShieldCheck size={20} /></span>
+                  <div><h2 className="font-display text-xl font-semibold">Sign-in and recovery</h2><p className="mt-1 text-sm leading-6 text-base-content/55">Account-owned safeguards stay separate from workspace roles and Staff profile details.</p></div>
+                </div>
+                <div className="divide-y divide-base-300">
+                  {authentication ? <PasswordPanel methods={authentication} action={passwordAction} mutation={security} canMutate={methodsCurrent} onAction={openPasswordAction} /> : <AccountSourcePanel title="Password" description="Password sign-in status and changes." state={methodsSource.state} label="sign-in methods" />}
+                  <MultiFactorPanel status={mfaUsable ? mfaStatus.data : undefined} sourceState={mfaSource.state} canMutate={mfaCurrent} />
+                  {authentication && <EmailPanel methods={authentication} mutation={security} canMutate={methodsCurrent} />}
+                  {authentication && <ProviderPanel methods={authentication} availableProviders={availableProviders} catalogueState={providerSource.state} linkingProvider={linkingProvider} unlinkIdentity={unlinkIdentity} mutation={security} canLink={methodsCurrent && providersCurrent} canUnlink={methodsCurrent} linkError={providerLinkError} onLink={linkProvider} onUnlink={openUnlink} />}
+                </div>
               </div>
             )}
-            {mutation.error && (
-              <div className="mt-4">
-                <ErrorState error={mutation.error} />
-              </div>
-            )}
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  onUnlink(null);
-                  mutation.reset();
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-error btn-sm"
-                disabled={mutation.isPending || !canUnlink}
-              >
-                Unlink account
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </section>
-  );
-}
 
-function PasswordInput({
-  name,
-  label,
-  autoComplete,
-}: {
-  name: string;
-  label: string;
-  autoComplete: string;
-}) {
-  return (
-    <label className="form-control block">
-      <span className="label-text mb-1.5 block text-sm font-semibold">
-        {label}
-      </span>
-      <input
-        name={name}
-        type="password"
-        className="input input-bordered w-full"
-        minLength={8}
-        autoComplete={autoComplete}
-        required
-      />
-    </label>
-  );
-}
-function AccountRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-lg bg-base-200/70 p-4">
-      <span className="grid size-8 shrink-0 place-items-center rounded-md bg-base-100 text-primary shadow-xs [&>svg]:size-4">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-xs text-base-content/40">{label}</p>
-        <p className="mt-1 break-all text-sm font-semibold">{value}</p>
+            {section === "sessions" && (
+              <AccountSessionsPanel
+                sessions={sessionsUsable ? sessions.data?.sessions ?? [] : []}
+                sourceState={sessionSource.state}
+                canRevoke={sessionsCurrent}
+                revokePending={revokeSession.isPending}
+                revokeError={revokeSession.error}
+                signOutError={signOutError}
+                submitting={submittingSession}
+                confirmAll={confirmAll}
+                onConfirmAll={setConfirmAll}
+                onRevoke={(sessionId) => revokeSession.mutate(sessionId)}
+                onSignOut={(mode) => void signOut(mode)}
+              />
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
-function providerLabel(provider: string): string {
-  return provider.charAt(0).toUpperCase() + provider.slice(1);
-}
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-function actionNotice(kind: SecurityAction["kind"]): string {
+
+function AccountSourcePanel({ title, description, state, label }: { title: string; description: string; state: CompositeSourceState; label: string }) {
   return (
-    {
-      "set-password": "Password updated.",
-      "remove-password": "Password removed.",
-      "request-verification": "Verification code requested.",
-      "confirm-verification": "Email address verified.",
-      "unlink-provider": "External account unlinked.",
-    } as const
-  )[kind];
+    <section>
+      <h2 className="font-display text-xl font-semibold">{title}</h2>
+      <p className="mt-1 text-sm text-base-content/50">{description}</p>
+      <div className="mt-5"><CompositeSourceFallback state={state} label={label} /></div>
+    </section>
+  );
+}
+
+function actionNotice(kind: SecurityAction["kind"]): string {
+  return ({
+    "set-password": "Password updated.",
+    "remove-password": "Password removed.",
+    "request-verification": "Verification code requested.",
+    "confirm-verification": "Email address verified.",
+    "unlink-provider": "External account unlinked.",
+  } as const)[kind];
 }

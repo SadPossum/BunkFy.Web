@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Plus, UserRoundMinus } from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, Plus, Star, UserRoundMinus } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Property, StaffMemberMutationReceipt } from "../../api/types";
 import {
@@ -9,7 +9,7 @@ import {
 import { useSession } from "../../app/session";
 import { DatePicker } from "../../components/ui/DatePicker";
 import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
-import { ErrorState, InlineFormActions } from "../../components/ui/primitives";
+import { ErrorState, InlineFormActions, StatusBadge } from "../../components/ui/primitives";
 import {
   staffMutationAllowed,
   staffPropertyTargetMatches,
@@ -213,6 +213,8 @@ export function StaffAssignmentsPanel({
   const ordered = [...member.assignments].sort((a, b) =>
     Number(assignmentIsCurrent(b)) - Number(assignmentIsCurrent(a)) ||
     b.effectiveFrom.localeCompare(a.effectiveFrom));
+  const currentAssignments = ordered.filter(assignmentIsCurrent);
+  const assignmentHistory = ordered.filter((assignment) => !assignmentIsCurrent(assignment));
   const targetCurrentAssignment = target?.member.assignments.find((assignment) =>
     assignment.propertyId === target.property.propertyId && assignmentIsCurrent(assignment));
   const sources = [
@@ -228,11 +230,11 @@ export function StaffAssignmentsPanel({
         sources={sources}
         title="Staff assignment context is delayed"
       />
-      <div className="rounded-2xl border border-base-300 p-4 sm:p-5">
+      <div className="rounded-lg border border-base-300 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-display text-lg font-semibold">Property assignments</h3>
-            <p className="mt-1 text-xs text-base-content/50">Switch the current property in the top bar to manage another assignment.</p>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-base-content/50">Current and past work locations. Assignments do not create workspace membership or grant property access.</p>
           </div>
           {canAssign && selectedProperty && staffStatusKey(member.status) === "active" && !target && (
             <button
@@ -275,6 +277,7 @@ export function StaffAssignmentsPanel({
                     max={today}
                     ariaLabel="Effective from"
                   />
+                  <span className="mt-1.5 block text-xs leading-5 text-base-content/45">The assignment starts immediately; this date records the employment fact.</span>
                 </div>
               </div>
               <label className={`mt-4 flex items-start gap-3 rounded-lg border border-base-300 bg-base-100 p-3 ${hasPrimary ? "opacity-60" : "cursor-pointer"}`}>
@@ -345,27 +348,64 @@ export function StaffAssignmentsPanel({
       </div>
 
       {ordered.length ? (
-        <div className="space-y-3">
-          {ordered.map((assignment) => (
-            <AssignmentCard
-              key={assignment.assignmentId}
-              assignment={assignment}
-              property={properties.find((property) => property.propertyId === assignment.propertyId)}
-            />
-          ))}
+        <div className="space-y-5">
+          <section aria-labelledby="current-staff-assignments">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h4 id="current-staff-assignments" className="text-xs font-bold uppercase text-base-content/45">Current work locations</h4>
+              <span className="text-xs font-medium text-base-content/45">{currentAssignments.length}</span>
+            </div>
+            {currentAssignments.length ? (
+              <div className="divide-y divide-base-300 overflow-hidden rounded-lg border border-base-300 bg-base-100">
+                {currentAssignments.map((assignment) => (
+                  <AssignmentRow
+                    key={assignment.assignmentId}
+                    assignment={assignment}
+                    property={properties.find((property) => property.propertyId === assignment.propertyId)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-base-300 p-6 text-center">
+                <Building2 className="mx-auto text-base-content/30" />
+                <p className="mt-3 text-sm font-semibold">No current work locations</p>
+                <p className="mt-1 text-xs leading-5 text-base-content/50">Choose the relevant property in the workspace shell before adding an assignment.</p>
+              </div>
+            )}
+          </section>
+
+          {assignmentHistory.length > 0 && (
+            <details className="group overflow-hidden rounded-lg border border-base-300 bg-base-100">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                <span>
+                  <span className="block text-sm font-semibold">Assignment history</span>
+                  <span className="mt-1 block text-xs text-base-content/45">{assignmentHistory.length} ended {assignmentHistory.length === 1 ? "assignment" : "assignments"}</span>
+                </span>
+                <ChevronDown className="shrink-0 transition-transform group-open:rotate-180" size={17} />
+              </summary>
+              <div className="divide-y divide-base-300 border-t border-base-300">
+                {assignmentHistory.map((assignment) => (
+                  <AssignmentRow
+                    key={assignment.assignmentId}
+                    assignment={assignment}
+                    property={properties.find((property) => property.propertyId === assignment.propertyId)}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center">
+        <div className="rounded-lg border border-dashed border-base-300 p-8 text-center">
           <Building2 className="mx-auto text-base-content/30" />
           <h3 className="mt-3 font-display text-lg font-semibold">No property assignments</h3>
-          <p className="mt-1 text-sm text-base-content/50">Assign this staff member from the currently selected property.</p>
+          <p className="mt-1 text-sm text-base-content/50">Choose the property where this person works, then add their first assignment.</p>
         </div>
       )}
     </section>
   );
 }
 
-function AssignmentCard({
+function AssignmentRow({
   assignment,
   property,
 }: {
@@ -375,18 +415,24 @@ function AssignmentCard({
   const current = assignmentIsCurrent(assignment);
   const effectiveTo = isFullStaffAssignment(assignment) ? assignment.effectiveTo : null;
   return (
-    <article className={`rounded-2xl border p-4 ${current ? "border-primary/20 bg-primary/5" : "border-base-300 bg-base-100"}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-semibold">{property?.name || "Unknown property"}</h4>
-            {assignment.isPrimary && <span className="badge border-0 bg-primary text-primary-content">Primary</span>}
-            {!current && <span className="badge badge-ghost">Ended</span>}
+    <article className={`p-4 ${current ? "bg-primary/5" : "bg-base-100"}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${current ? "bg-primary/10 text-primary" : "bg-base-200 text-base-content/55"}`}>
+            <Building2 size={17} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="font-semibold">{property?.name || "Property unavailable"}</h4>
+              {assignment.isPrimary && <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary"><Star size={13} />Primary</span>}
+              <StatusBadge status={current ? "Current" : "Ended"} />
+            </div>
+            <p className="mt-1 text-sm text-base-content/55">{assignment.propertyJobTitle || "Uses the workspace job title"}</p>
           </div>
-          <p className="mt-1 text-sm text-base-content/55">{assignment.propertyJobTitle || "No property-specific title"}</p>
         </div>
-        <p className="text-xs text-base-content/45">
-          {formatStaffDate(assignment.effectiveFrom)} / {effectiveTo ? formatStaffDate(effectiveTo) : "Current"}
+        <p className="inline-flex shrink-0 items-center gap-1.5 text-xs text-base-content/45">
+          <CalendarDays size={14} />
+          {formatStaffDate(assignment.effectiveFrom)} to {effectiveTo ? formatStaffDate(effectiveTo) : "present"}
         </p>
       </div>
     </article>

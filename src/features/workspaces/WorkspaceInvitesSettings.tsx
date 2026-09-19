@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Check,
+  ClipboardCheck,
   Copy,
   Link2,
   MailPlus,
@@ -10,6 +11,7 @@ import {
   UserX,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import type {
   IssueWorkspaceEnrollmentLinkRequest,
   Property,
@@ -32,7 +34,7 @@ import {
   CompositeSourceFallback,
   CompositeSourceNotice,
 } from "../../components/ui/CompositeSourceNotice";
-import { Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
+import { ErrorState, Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
@@ -43,6 +45,10 @@ import {
 } from "./workspaceAccessAuthority";
 import { WorkspaceJoinRequestSettings } from "./WorkspaceJoinRequestSettings";
 import { canReplaceJoinSource, isActiveJoinSource, joinSourceStatusLabel } from "./workspaceJoinSources";
+import {
+  workspaceJoiningView,
+  type WorkspaceJoiningView,
+} from "./workspaceSettingsAccess";
 
 const ACTIVE_PROFILE_PAGE_SIZE = 100;
 const SOURCE_PAGE_SIZE = 10;
@@ -75,6 +81,8 @@ export function WorkspaceInvitesSettings({
   onMembershipChanged: () => Promise<void>;
 }) {
   const { request } = useSession();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = workspaceJoiningView(searchParams.get("joining"));
   const [issued, setIssued] = useState<IssuedJoinLink | null>(null);
   const [tokenNotice, setTokenNotice] = useState<string | null>(null);
   const profiles = useQuery({
@@ -82,6 +90,7 @@ export function WorkspaceInvitesSettings({
     queryFn: () => request<WorkspaceAccessProfileListResponse>(
       `/api/workspace-access/profiles?includeArchived=false&page=1&pageSize=${ACTIVE_PROFILE_PAGE_SIZE}`,
     ),
+    enabled: view !== "requests",
   });
   const profileSource = createCompositeSource({
     label: "Active roles",
@@ -98,67 +107,110 @@ export function WorkspaceInvitesSettings({
     propertySource,
   ]);
 
+  function setView(nextView: WorkspaceJoiningView) {
+    const next = new URLSearchParams(searchParams);
+    if (nextView === "invite") next.delete("joining");
+    else next.set("joining", nextView);
+    setSearchParams(next, { replace: true });
+  }
+
   return (
-    <div className="space-y-10">
-      <CompositeSourceNotice
-        sources={[profileSource, propertySource]}
-        title="Some invitation data is delayed"
+    <section>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+            <MailPlus size={20} />
+          </span>
+          <div>
+            <h2 className="font-display text-xl font-semibold">Joining people</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
+              Issue constrained access, manage link lifecycle, and review team requests.
+            </p>
+          </div>
+        </div>
+      </div>
+      <SegmentedTabs
+        stretch
+        className="mt-5"
+        value={view}
+        ariaLabel="Joining workflow"
+        onValueChange={setView}
+        options={[
+          { value: "invite", label: "Invite", icon: <MailPlus size={15} /> },
+          { value: "qr", label: "Team QR", icon: <QrCode size={15} /> },
+          { value: "requests", label: "Requests", icon: <ClipboardCheck size={15} /> },
+        ]}
       />
-      {profilesUsable && profiles.data?.hasMore && (
-        <div className="alert alert-warning py-3 text-sm">
-          This workspace has more than {ACTIVE_PROFILE_PAGE_SIZE} active roles. Archive unused roles before issuing new access.
+
+      {view !== "requests" && (
+        <div className="mt-6 space-y-6">
+          <CompositeSourceNotice
+            sources={[profileSource, propertySource]}
+            title="Some joining data is delayed"
+          />
+          {profilesUsable && profiles.data?.hasMore && (
+            <div className="alert alert-warning py-3 text-sm">
+              This workspace has more than {ACTIVE_PROFILE_PAGE_SIZE} active roles. Archive unused roles before issuing new access.
+            </div>
+          )}
+          {profilesUsable && profiles.data && !profiles.data.hasMore ? (
+            <JoinSourceCreation
+              kind={view === "invite" ? "invitation" : "enrollment"}
+              workspaceId={workspaceId}
+              profiles={profiles.data.items.filter((profile) => profile.status === 1)}
+              properties={properties}
+              canCreate={grantSourcesCurrent}
+              onIssued={(kind, issuance, lifetimeHours) => {
+                if (!issuance.token) {
+                  setTokenNotice("This source was already issued, so its one-time token cannot be shown again. Replace it to create a new link.");
+                  return;
+                }
+                setTokenNotice(null);
+                setIssued({ kind, token: issuance.token, lifetimeHours });
+              }}
+            />
+          ) : !profilesUsable ? (
+            <CompositeSourceFallback state={profileSource.state} label="active roles for new access" />
+          ) : null}
+          {tokenNotice && <div className="alert alert-warning py-3 text-sm">{tokenNotice}</div>}
+          <JoinSourceLifecycle
+            kind={view === "invite" ? "invitation" : "enrollment"}
+            workspaceId={workspaceId}
+            profiles={profilesUsable ? profiles.data?.items ?? [] : []}
+            properties={propertiesUsable ? properties : []}
+            canReplace={canGrant}
+            onIssued={(kind, issuance, lifetimeHours) => {
+              if (!issuance.token) {
+                setTokenNotice("The replacement exists, but its one-time token was already returned and cannot be replayed. Replace it again if the link was lost.");
+                return;
+              }
+              setTokenNotice(null);
+              setIssued({ kind, token: issuance.token, lifetimeHours });
+            }}
+          />
         </div>
       )}
-      {profilesUsable && profiles.data && !profiles.data.hasMore ? (
-        <JoinSourceCreation
+      {view === "requests" && (
+        <WorkspaceJoinRequestSettings
           workspaceId={workspaceId}
-          profiles={profiles.data.items.filter((profile) => profile.status === 1)}
-          properties={properties}
-          canCreate={grantSourcesCurrent}
-          onIssued={(kind, issuance, lifetimeHours) => {
-            if (!issuance.token) {
-              setTokenNotice("This source was already issued, so its one-time token cannot be shown again. Replace it to create a new link.");
-              return;
-            }
-            setTokenNotice(null);
-            setIssued({ kind, token: issuance.token, lifetimeHours });
-          }}
+          canGrant={canGrant}
+          onMembershipChanged={onMembershipChanged}
         />
-      ) : !profilesUsable ? (
-        <CompositeSourceFallback state={profileSource.state} label="active roles for new access" />
-      ) : null}
-      {tokenNotice && <div className="alert alert-warning py-3 text-sm">{tokenNotice}</div>}
-      <JoinSourceLifecycle
-        workspaceId={workspaceId}
-        profiles={profilesUsable ? profiles.data?.items ?? [] : []}
-        properties={propertiesUsable ? properties : []}
-        canReplace={canGrant}
-        onIssued={(kind, issuance, lifetimeHours) => {
-          if (!issuance.token) {
-            setTokenNotice("The replacement exists, but its one-time token was already returned and cannot be replayed. Replace it again if the link was lost.");
-            return;
-          }
-          setTokenNotice(null);
-          setIssued({ kind, token: issuance.token, lifetimeHours });
-        }}
-      />
-      <WorkspaceJoinRequestSettings
-        workspaceId={workspaceId}
-        canGrant={canGrant}
-        onMembershipChanged={onMembershipChanged}
-      />
+      )}
       {issued && <IssuedJoinLinkModal issued={issued} onClose={() => setIssued(null)} />}
-    </div>
+    </section>
   );
 }
 
 function JoinSourceCreation({
+  kind,
   workspaceId,
   profiles,
   properties,
   canCreate,
   onIssued,
 }: {
+  kind: IssuedJoinLink["kind"];
   workspaceId: string;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
@@ -262,8 +314,8 @@ function JoinSourceCreation({
           Refresh roles, properties, and workspace authority before issuing new access.
         </div>
       )}
-      <div className="grid gap-8 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-base-300">
-        <form className="space-y-5 lg:pr-8" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
+      {kind === "invitation" ? (
+        <form className="max-w-2xl space-y-5" onSubmit={(event: FormEvent) => { event.preventDefault(); invite.mutate(); }}>
           <div>
             <MailPlus className="text-primary" size={22} />
             <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
@@ -308,8 +360,8 @@ function JoinSourceCreation({
             <Link2 size={17} />Create invite
           </button>
         </form>
-
-        <form className="space-y-5 border-t border-base-300 pt-8 lg:border-t-0 lg:pl-8 lg:pt-0" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
+      ) : (
+        <form className="max-w-2xl space-y-5" onSubmit={(event: FormEvent) => { event.preventDefault(); enrollment.mutate(); }}>
           <div>
             <QrCode className="text-primary" size={22} />
             <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
@@ -367,18 +419,20 @@ function JoinSourceCreation({
             <QrCode size={17} />Create QR
           </button>
         </form>
-      </div>
+      )}
     </div>
   );
 }
 
 function JoinSourceLifecycle({
+  kind,
   workspaceId,
   profiles,
   properties,
   canReplace,
   onIssued,
 }: {
+  kind: IssuedJoinLink["kind"];
   workspaceId: string;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
@@ -388,7 +442,6 @@ function JoinSourceLifecycle({
   const { request } = useSession();
   const queryClient = useQueryClient();
   const replacementIds = useRef(new Map<string, string>());
-  const [kind, setKind] = useState<"invitation" | "enrollment">("invitation");
   const [page, setPage] = useState(1);
   const sourceKind = kind === "invitation" ? 1 : 2;
   const sources = useQuery({
@@ -455,21 +508,18 @@ function JoinSourceLifecycle({
   }, [page, sources.data?.items.length, sources.isFetching]);
 
   return (
-    <section className="border-t border-base-300 pt-8">
+    <section className="border-t border-base-300 pt-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-display text-xl font-semibold">Issued access links</h2>
-          <p className="mt-1 text-sm leading-6 text-base-content/55">Review lifecycle and replace a lost or unusable source safely.</p>
+          <h2 className="font-display text-xl font-semibold">
+            {kind === "invitation" ? "Issued invitations" : "Issued team QR links"}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-base-content/55">
+            {kind === "invitation"
+              ? "Review recipient links, revoke access, or replace a lost invitation safely."
+              : "Review reusable links, disable enrollment, or replace a lost QR safely."}
+          </p>
         </div>
-        <SegmentedTabs
-          value={kind}
-          ariaLabel="Join source type"
-          onValueChange={setKind}
-          options={[
-            { value: "invitation", label: "Invitations", icon: <MailPlus size={15} /> },
-            { value: "enrollment", label: "Team QR", icon: <QrCode size={15} /> },
-          ]}
-        />
       </div>
       <div className="mt-5">
         <CompositeSourceNotice
@@ -628,7 +678,7 @@ function LifetimeField({
 }
 
 function SettingsError({ error }: { error: unknown }) {
-  return <div className="alert alert-error mt-5 py-3 text-sm">{error instanceof Error ? error.message : "The request could not be completed."}</div>;
+  return <div className="mt-5"><ErrorState error={error} /></div>;
 }
 
 function joinUrl(link: Pick<IssuedJoinLink, "kind" | "token">): string {

@@ -14,6 +14,7 @@ import {
   dataRightsRequestLabel,
   dataRightsRequesterLabel,
   dataRightsSelectedEvidencePath,
+  isDataRightsSelectedEvidenceAuthorityCurrent,
   isDataRightsSelectedEvidenceCurrent,
   dataRightsCaseStatusLabel,
   dataRightsExecutionBatchNeedsLiveRefresh,
@@ -24,6 +25,7 @@ import {
   dataRightsResponseDeadlineState,
   dataRightsScopeKey,
   shortDataRightsCaseId,
+  shouldLoadDataRightsSelectedEvidence,
   type DataRightsAction,
   type DataRightsCapabilities,
 } from "../src/features/data-rights/dataRightsWorkflow";
@@ -105,6 +107,20 @@ describe("privacy request workflow", () => {
       discover: false,
       review: false,
     })).toBeNull();
+  });
+
+  it("loads selected evidence only after records exist", () => {
+    const path = "/api/data-rights/properties/property-1/cases/case-1/review-evidence";
+    expect(shouldLoadDataRightsSelectedEvidence(undefined, path)).toBe(false);
+    expect(shouldLoadDataRightsSelectedEvidence({ selectedSubjectCount: 0 }, path)).toBe(false);
+    expect(shouldLoadDataRightsSelectedEvidence({ selectedSubjectCount: 1 }, null)).toBe(false);
+    expect(shouldLoadDataRightsSelectedEvidence({ selectedSubjectCount: 1 }, path)).toBe(true);
+  });
+
+  it("treats an empty server selection as current authority", () => {
+    expect(isDataRightsSelectedEvidenceAuthorityCurrent({ selectedSubjectCount: 0 }, false)).toBe(true);
+    expect(isDataRightsSelectedEvidenceAuthorityCurrent({ selectedSubjectCount: 1 }, false)).toBe(false);
+    expect(isDataRightsSelectedEvidenceAuthorityCurrent({ selectedSubjectCount: 1 }, true)).toBe(true);
   });
 
   it("requires version-matched and complete selected evidence for review actions", () => {

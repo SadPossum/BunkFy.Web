@@ -5979,6 +5979,196 @@
         }
       }
     },
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryRetirementContextDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestRoomRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/beds/{bedId}/retirement": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bedId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryRetirementContextDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bedId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestBedRetirementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedRetirementDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/properties/{propertyId}/availability": {
       "get": {
         "tags": [
@@ -6055,6 +6245,22 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "overlapsFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "overlapsTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
             }
           },
           {
@@ -6264,64 +6470,6 @@
         }
       }
     },
-    "/api/inventory/properties/{propertyId}/rooms/{roomId}/beds/{bedId}/retirement": {
-      "post": {
-        "tags": [
-          "Inventory"
-        ],
-        "parameters": [
-          {
-            "name": "propertyId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "roomId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "bedId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RequestBedRetirementRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BedRetirementDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}": {
       "get": {
         "tags": [
@@ -6452,55 +6600,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BedRetirementDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
-      "post": {
-        "tags": [
-          "Inventory"
-        ],
-        "parameters": [
-          {
-            "name": "propertyId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "roomId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RequestRoomRetirementRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RoomRetirementDto"
                 }
               }
             }
@@ -9433,6 +9532,37 @@
             }
           },
           {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ReservationListView"
+            }
+          },
+          {
+            "name": "operatingDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "overlapsFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "overlapsTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -10415,6 +10545,35 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StaffDirectoryMemberDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/staff/members/account-directory/resolve": {
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffAccountDirectoryResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAccountDirectoryResponse"
                 }
               }
             }
@@ -11762,6 +11921,102 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/applications/{applicationId}/recovery-attempts": {
+      "post": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/workspace-staff-enrollment/applications/{applicationId}/recovery-attempts/latest": {
+      "get": {
+        "tags": [
+          "Workspace Staff Enrollment"
+        ],
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -13581,6 +13836,9 @@
         "type": "object",
         "properties": {
           "emailVerificationEnabled": {
+            "type": "boolean"
+          },
+          "workspaceStaffOnboardingRecoveryEnabled": {
             "type": "boolean"
           }
         },
@@ -15966,6 +16224,13 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "languageTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16011,6 +16276,13 @@
           "lastChangedAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "languageTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16259,6 +16531,13 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "languageTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16306,6 +16585,13 @@
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
+          },
+          "languageTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16348,6 +16634,13 @@
           },
           "notes": {
             "type": "string",
+            "nullable": true
+          },
+          "languageTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           }
         },
@@ -16725,6 +17018,229 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "InventoryRetirementContextDto": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bedId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isTopologyActive": {
+            "type": "boolean"
+          },
+          "process": {
+            "type": "object",
+            "properties": {
+              "topologyChangeId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "$ref": "#/components/schemas/InventoryRetirementStatus"
+              },
+              "version": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              },
+              "requestedBy": {
+                "type": "string",
+                "nullable": true
+              },
+              "rejectionReasonCode": {
+                "type": "integer",
+                "format": "int32",
+                "nullable": true
+              },
+              "cancellationReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "canceledBy": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAtUtc": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAtUtc": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "completedAtUtc": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "canceledAtUtc": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            },
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "impact": {
+            "type": "object",
+            "properties": {
+              "activeAllocationCount": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "activeManualBlockCount": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "activeBedRetirementCount": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "parentRoomRetirementActive": {
+                "type": "boolean"
+              },
+              "affectedReservationIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "nullable": true
+              },
+              "affectedReservationIdsTruncated": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "impactStatus": {
+            "$ref": "#/components/schemas/InventoryRetirementImpactStatus"
+          },
+          "canRequest": {
+            "type": "boolean"
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "canCancel": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventoryRetirementImpactDto": {
+        "type": "object",
+        "properties": {
+          "activeAllocationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeManualBlockCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeBedRetirementCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parentRoomRetirementActive": {
+            "type": "boolean"
+          },
+          "affectedReservationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "affectedReservationIdsTruncated": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InventoryRetirementImpactStatus": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "InventoryRetirementProcessSummaryDto": {
+        "type": "object",
+        "properties": {
+          "topologyChangeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InventoryRetirementStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejectionReasonCode": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "canceledBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canceledAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "InventoryRetirementStatus": {
         "enum": [
@@ -19491,6 +20007,48 @@
         "additionalProperties": false
       },
       "ReservationDto": {
+        "required": [
+          "allocationId",
+          "allocationRejection",
+          "allocationRequestId",
+          "allocationVersion",
+          "arrival",
+          "checkedInAtUtc",
+          "checkedInBusinessDate",
+          "checkedInBy",
+          "checkedOutAtUtc",
+          "checkedOutBusinessDate",
+          "checkedOutBy",
+          "createdAtUtc",
+          "departure",
+          "detailsRevision",
+          "email",
+          "expectedArrivalTime",
+          "expectedDepartureTime",
+          "guestCount",
+          "guests",
+          "holdsInventory",
+          "inventoryUnitIds",
+          "lastAllocationAmendmentRejection",
+          "lastDetailsChangeOrigin",
+          "noShowAtUtc",
+          "noShowBusinessDate",
+          "noShowBy",
+          "notes",
+          "pendingAllocationAmendmentId",
+          "pendingStayActorId",
+          "pendingStayBusinessDate",
+          "phone",
+          "primaryGuestName",
+          "propertyId",
+          "reservationId",
+          "sourceKind",
+          "sourceReference",
+          "sourceSystem",
+          "status",
+          "updatedAtUtc",
+          "version"
+        ],
         "type": "object",
         "properties": {
           "reservationId": {
@@ -19560,6 +20118,9 @@
           },
           "status": {
             "$ref": "#/components/schemas/ReservationStatus"
+          },
+          "holdsInventory": {
+            "type": "boolean"
           },
           "allocationRequestId": {
             "type": "string",
@@ -19796,6 +20357,13 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "languageTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -19809,6 +20377,21 @@
         "format": "int32"
       },
       "ReservationListItemDto": {
+        "required": [
+          "arrival",
+          "departure",
+          "expectedArrivalTime",
+          "expectedDepartureTime",
+          "guestCount",
+          "holdsInventory",
+          "inventoryUnitCount",
+          "inventoryUnitIds",
+          "primaryGuestName",
+          "propertyId",
+          "reservationId",
+          "sourceKind",
+          "status"
+        ],
         "type": "object",
         "properties": {
           "reservationId": {
@@ -19848,6 +20431,17 @@
           "inventoryUnitCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "inventoryUnitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "holdsInventory": {
+            "type": "boolean"
           },
           "sourceKind": {
             "$ref": "#/components/schemas/ReservationSourceKind"
@@ -19891,6 +20485,17 @@
           }
         },
         "additionalProperties": false
+      },
+      "ReservationListView": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "ReservationMutationReceiptDto": {
         "type": "object",
@@ -21175,6 +21780,61 @@
         "properties": {
           "refreshToken": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffAccountDirectoryEntryDto": {
+        "type": "object",
+        "properties": {
+          "staffMemberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authSubjectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/StaffStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffAccountDirectoryResolveRequest": {
+        "type": "object",
+        "properties": {
+          "authSubjectIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffAccountDirectoryResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffAccountDirectoryEntryDto"
+            },
             "nullable": true
           }
         },
@@ -23129,6 +23789,93 @@
           }
         },
         "additionalProperties": false
+      },
+      "WorkspaceStaffOnboardingRecoveryAttemptDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptOutcome"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryAttemptReason"
+          },
+          "applicationStatus": {
+            "$ref": "#/components/schemas/WorkspaceStaffOnboardingStatus"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retryDirective": {
+            "$ref": "#/components/schemas/WorkspaceStaffOnboardingRecoveryRetryDirective"
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "recordedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffOnboardingRecoveryAttemptOutcome": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "WorkspaceStaffOnboardingRecoveryAttemptReason": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "WorkspaceStaffOnboardingRecoveryAttemptRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedApplicationVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkspaceStaffOnboardingRecoveryRetryDirective": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
       },
       "WorkspaceStaffOnboardingSourceKind": {
         "enum": [

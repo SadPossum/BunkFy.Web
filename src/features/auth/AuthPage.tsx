@@ -38,6 +38,7 @@ import {
   passwordRegistrationAllowed,
   publicAuthenticationErrorMessage,
 } from "./authenticationFlow";
+import { authPasswordLengthHelp, authPasswordPolicy } from "./authPasswordPolicy";
 
 export function AuthPage({ invitation = false }: { invitation?: boolean }) {
   const {
@@ -322,6 +323,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
+                  showPolicy={mode === "register"}
                   onToggle={() => setShowPassword((value) => !value)}
                 />
                 {mode === "register" && (
@@ -330,6 +332,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                     label="Confirm password"
                     show={showPassword}
                     autoComplete="new-password"
+                    showPolicy
                   />
                 )}
                 {invitation && mode === "register" && (
@@ -407,22 +410,36 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                 </div>
               )}
 
-              {registrationSourceCurrent && passwordRegistrationEnabled ? (
-                <p className="mt-6 text-center text-sm text-base-content/55">
-                  {mode === "login"
-                    ? "New to BunkFy?"
-                    : "Already have an account?"}{" "}
-                  <button
-                    type="button"
-                    className="link link-primary font-semibold no-underline hover:underline"
-                    onClick={() => {
-                      setMode(mode === "login" ? "register" : "login");
+              {mode === "register" ? (
+                <>
+                  <AuthModeSwitch
+                    mode={mode}
+                    onToggle={() => {
+                      setMode("login");
                       setError("");
                     }}
-                  >
-                    {mode === "login" ? "Register" : "Sign in"}
-                  </button>
-                </p>
+                  />
+                  {!registrationSourceCurrent && (
+                    <div className="mt-4">
+                      <AuthSourceNotice
+                        state={registrationSource.state}
+                        refreshing={registrationSource.isFetching}
+                        loadingLabel="Checking account registration"
+                        title="Registration availability is delayed"
+                        description="Sign in remains available. Refresh before creating a new account."
+                        onRetry={() => void selfRegistration.refetch()}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : passwordRegistrationAvailable ? (
+                <AuthModeSwitch
+                  mode={mode}
+                  onToggle={() => {
+                    setMode("register");
+                    setError("");
+                  }}
+                />
               ) : registrationSourceCurrent ? (
                 <p className="mt-6 text-center text-sm text-base-content/45">
                   Password registration is not available. Sign in with an existing account
@@ -445,6 +462,27 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
         </div>
       </section>
     </main>
+  );
+}
+
+function AuthModeSwitch({
+  mode,
+  onToggle,
+}: {
+  mode: "login" | "register";
+  onToggle: () => void;
+}) {
+  return (
+    <p className="mt-6 text-center text-sm text-base-content/55">
+      {mode === "login" ? "New to BunkFy?" : "Already have an account?"}{" "}
+      <button
+        type="button"
+        className="link link-primary font-semibold no-underline hover:underline"
+        onClick={onToggle}
+      >
+        {mode === "login" ? "Register" : "Sign in"}
+      </button>
+    </p>
   );
 }
 
@@ -500,12 +538,14 @@ function PasswordField({
   label,
   show,
   autoComplete,
+  showPolicy = false,
   onToggle,
 }: {
   name: string;
   label: string;
   show: boolean;
   autoComplete: string;
+  showPolicy?: boolean;
   onToggle?: () => void;
 }) {
   return (
@@ -521,7 +561,8 @@ function PasswordField({
           placeholder="Password"
           autoComplete={autoComplete}
           required
-          minLength={8}
+          minLength={showPolicy ? authPasswordPolicy.minimumLength : undefined}
+          maxLength={authPasswordPolicy.maximumLength}
         />
         {onToggle && (
           <button
@@ -534,6 +575,11 @@ function PasswordField({
           </button>
         )}
       </div>
+      {showPolicy && (
+        <span className="mt-1.5 block text-xs text-base-content/50">
+          Use {authPasswordLengthHelp()}.
+        </span>
+      )}
     </label>
   );
 }

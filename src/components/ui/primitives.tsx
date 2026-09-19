@@ -1,4 +1,14 @@
-import { AlertCircle, LoaderCircle, X } from "lucide-react";
+import {
+  AlertCircle,
+  Clock3,
+  LoaderCircle,
+  RotateCcw,
+  SearchX,
+  ServerCrash,
+  ShieldX,
+  WifiOff,
+  X,
+} from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   Children,
@@ -17,7 +27,12 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { ApiError } from "../../api/client";
+import { useNetworkStatus } from "../../app/networkStatus";
+import {
+  presentError,
+  type ErrorPresentationKind,
+} from "./errorPresentation";
+import { modalFocusableControls, modalFocusNeedsRepair, modalIsTopmost, modalOwnsPortalFocus } from "./modalFocus";
 
 type ModalFooterContextValue = {
   footerHost: HTMLDivElement | null;
@@ -33,26 +48,30 @@ export function PageHeader({ eyebrow, title, description, action }: {
   action?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        {eyebrow && <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>}
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-base-content sm:text-4xl">{title}</h1>
-        {description && <p className="mt-2 max-w-2xl text-sm leading-6 text-base-content/60">{description}</p>}
+    <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        {eyebrow && <p className="mb-1 break-words text-[13px] font-medium leading-5 text-base-content/65">{eyebrow}</p>}
+        <h1 className="break-words font-display text-2xl font-semibold leading-[30px] text-base-content">{title}</h1>
+        {description && <p className="mt-1 max-w-3xl text-[13px] leading-5 text-base-content/65">{description}</p>}
       </div>
-      {action}
+      {action && <div className="max-w-full shrink-0 [&_.btn]:h-auto [&_.btn]:min-h-11 [&_.btn]:max-w-full [&_.btn]:gap-2 [&_.btn]:whitespace-normal [&_.btn]:py-2 [&_.btn]:text-sm [&_.btn_svg]:shrink-0">{action}</div>}
     </header>
   );
 }
 
-export function Modal({ open, title, description, children, onClose, size = "md" }: {
+export function Modal({ open, title, description, children, onClose, size = "md", closeDisabled = false }: {
   open: boolean;
   title: string;
   description?: string;
   children: ReactNode;
   onClose: () => void;
   size?: "md" | "lg";
+  closeDisabled?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const lifetimeOpen = useRef(false);
+  const closeRef = useRef(onClose);
+  closeRef.current = closeDisabled ? () => undefined : onClose;
   const titleId = useId();
   const descriptionId = useId();
   const [footerHost, setFooterHost] = useState<HTMLDivElement | null>(null);
@@ -63,6 +82,13 @@ export function Modal({ open, title, description, children, onClose, size = "md"
   }, []);
   const footerContext = useMemo(() => ({ footerHost, registerFooter }), [footerHost, registerFooter]);
 
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (open && lifetimeOpen.current && dialog && modalFocusNeedsRepair(dialog, document.activeElement)) {
+      dialog.focus({ preventScroll: true });
+    }
+  });
+
   useEffect(() => {
     if (!open) return;
 
@@ -70,27 +96,42 @@ export function Modal({ open, title, description, children, onClose, size = "md"
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
+    lifetimeOpen.current = true;
+    const observer = new MutationObserver(() => {
+      const dialog = dialogRef.current;
+      if (dialog && modalFocusNeedsRepair(dialog, document.activeElement)) dialog.focus({ preventScroll: true });
+    });
+    if (dialogRef.current) observer.observe(dialogRef.current, {
+      subtree: true, childList: true, attributes: true,
+      attributeFilter: ["disabled", "hidden", "inert", "aria-hidden", "class", "style", "tabindex"],
+    });
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+      const dialog = dialogRef.current;
+      if (!dialog || !modalIsTopmost(dialog) || modalOwnsPortalFocus(dialog, document.activeElement)) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        closeRef.current();
         return;
       }
 
-      if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )).filter((element) => !element.hasAttribute("hidden"));
+      if (event.key !== "Tab") return;
+      const focusable = modalFocusableControls(dialog);
       if (!focusable.length) {
         event.preventDefault();
-        dialogRef.current.focus();
+        dialog.focus({ preventScroll: true });
         return;
       }
 
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && (document.activeElement === dialogRef.current || document.activeElement === first || !dialogRef.current.contains(document.activeElement))) {
+      if (!dialog.contains(document.activeElement) || document.activeElement === dialog) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -101,23 +142,25 @@ export function Modal({ open, title, description, children, onClose, size = "md"
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      lifetimeOpen.current = false;
+      observer.disconnect();
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const widthClass = size === "lg" ? "max-w-4xl" : "max-w-2xl";
   return (
-    <div className="modal modal-open" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
-      <div ref={dialogRef} tabIndex={-1} className={`modal-box flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] ${widthClass} flex-col overflow-hidden border border-base-300 p-0 shadow-2xl outline-none sm:max-h-[90vh]`}>
+    <div className="modal modal-open" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} data-bunkfy-modal>
+      <div ref={dialogRef} tabIndex={-1} data-bunkfy-modal-box className={`modal-box flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] ${widthClass} flex-col overflow-hidden border border-base-300 p-0 shadow-2xl outline-none sm:max-h-[90vh]`}>
         <div className="z-10 flex shrink-0 items-start justify-between gap-4 border-b border-base-300 bg-base-100 px-4 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
             <h2 id={titleId} className="font-display text-xl font-semibold">{title}</h2>
             {description && <p id={descriptionId} className="mt-1 max-w-2xl text-sm leading-5 text-base-content/60">{description}</p>}
           </div>
-          <button type="button" className="btn btn-circle btn-ghost btn-sm shrink-0" onClick={onClose} aria-label="Close dialog"><X size={18} /></button>
+          <button type="button" className="btn btn-circle btn-ghost btn-sm shrink-0" disabled={closeDisabled} onClick={() => closeRef.current()} aria-label="Close dialog"><X size={18} /></button>
         </div>
         <ModalFooterContext.Provider value={footerContext}>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">{children}</div>
@@ -129,7 +172,7 @@ export function Modal({ open, title, description, children, onClose, size = "md"
           />
         </ModalFooterContext.Provider>
       </div>
-      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="modal-backdrop" onClick={() => closeRef.current()} aria-hidden="true" />
     </div>
   );
 }
@@ -138,40 +181,79 @@ export function LoadingState({ label = "Loading workspace" }: { label?: string }
   return <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-base-content/55"><LoaderCircle className="animate-spin text-primary" size={20} />{label}</div>;
 }
 
-export function ErrorState({ error, retry, title = "Something went wrong" }: { error: unknown; retry?: () => void; title?: string }) {
-  const message = friendlyErrorMessage(error);
+export function ErrorState({ error, retry, title }: { error: unknown; retry?: () => void; title?: string }) {
+  const presentation = presentError(error, title);
+  const remainingMs = useRetryDelay(presentation.retryAfterMs, error);
+  const retryBlocked = remainingMs > 0;
+  const retrySeconds = Math.max(1, Math.ceil(remainingMs / 1_000));
+  const Icon = errorIcon(presentation.kind);
+  const tone = errorTone(presentation.kind);
   return (
-    <div className="alert border border-error/20 bg-error/8 text-error">
-      <AlertCircle size={19} />
-      <div><p className="font-semibold">{title}</p><p className="text-sm opacity-80">{message}</p></div>
-      {retry && <button className="btn btn-sm" onClick={retry}>Try again</button>}
+    <div
+      className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-lg border p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] ${tone}`}
+      role="alert"
+      aria-live="polite"
+    >
+      <Icon className="mt-0.5 shrink-0" size={19} />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{presentation.title}</p>
+        <p className="mt-0.5 text-sm leading-5 opacity-80">{presentation.message}</p>
+        {presentation.referenceId && (
+          <p className="mt-2 break-all text-xs opacity-65">
+            Reference <code>{presentation.referenceId}</code>
+          </p>
+        )}
+      </div>
+      {retry && (
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm col-start-2 mt-1 justify-self-end sm:col-start-3 sm:row-start-1 sm:mt-0"
+          disabled={retryBlocked}
+          onClick={retry}
+        >
+          {retryBlocked ? <Clock3 size={15} /> : <RotateCcw size={15} />}
+          {retryBlocked ? `Try again in ${retrySeconds}s` : "Try again"}
+        </button>
+      )}
     </div>
   );
 }
 
-function friendlyErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.code === "Organizations.MembershipConflict") return "You already belong to this workspace.";
-    if (error.code === "Properties.ConfirmationRequired") return "Confirm the change before continuing.";
-    if (error.code === "Properties.PropertyProcessingNotEnabled") return "Data processing is not enabled for this property.";
-    if (error.code === "Properties.CountryPolicy.PolicyExpired") return "This country policy has expired. Choose another configured policy.";
-    if (error.code === "Properties.CountryPolicy.RequiredAcknowledgementMissing") return "Accept every acknowledgement required by the selected policy.";
-    if (error.code?.startsWith("Properties.CountryPolicy.")) return "These policy coordinates are no longer accepted. Refresh and choose a configured policy.";
-    if (error.code === "DataRights.DecisionActorCannotExecute") return "A different authorized staff member must execute this approved request.";
-    if (error.code === "DataRights.VersionConflict") return "This privacy request changed. Review the latest state and try again.";
-    if (error.code === "Retention.ScheduleRetryEvidenceChanged") return "This retention schedule changed. Refresh its latest evidence before retrying.";
-    if (error.code === "Retention.RetryConfirmationRequired") return "Review and confirm the exact failed retention run before retrying.";
-    if (error.code === "Retention.WorkspaceProcessingRestricted") return "This workspace is not accepting operational changes.";
-    if (error.code === "Retention.WorkspaceProcessingAdmissionUnavailable") return "Workspace processing checks are temporarily unavailable. Try again shortly.";
-    if (error.code === "Security.InsufficientAuthentication") return "Confirm your identity with a recent sign-in, then retry.";
-    if (error.status === 403) return "Your account does not have access to this action.";
-    if (error.status === 404) return "The requested item is no longer available.";
-  }
+function useRetryDelay(retryAfterMs: number | undefined, marker: unknown): number {
+  const [remainingMs, setRemainingMs] = useState(retryAfterMs ?? 0);
 
-  const message = error instanceof Error ? error.message : "Please try again.";
-  return message
-    .replace(/\bthe subject\b/gi, "this account")
-    .replace(/\bsubject\b/gi, "account");
+  useEffect(() => {
+    if (!retryAfterMs) {
+      setRemainingMs(0);
+      return;
+    }
+
+    const deadline = Date.now() + retryAfterMs;
+    const update = () => setRemainingMs(Math.max(0, deadline - Date.now()));
+    update();
+    const interval = window.setInterval(update, 250);
+    return () => window.clearInterval(interval);
+  }, [marker, retryAfterMs]);
+
+  return remainingMs;
+}
+
+function errorIcon(kind: ErrorPresentationKind) {
+  if (kind === "network") return WifiOff;
+  if (kind === "access" || kind === "session") return ShieldX;
+  if (kind === "missing") return SearchX;
+  if (kind === "rate-limit") return Clock3;
+  if (kind === "temporary") return ServerCrash;
+  return AlertCircle;
+}
+
+function errorTone(kind: ErrorPresentationKind): string {
+  if (kind === "network") return "border-info/25 bg-info/10 text-info-content";
+  if (kind === "missing") return "border-base-300 bg-base-200/70 text-base-content";
+  if (kind === "rate-limit" || kind === "temporary" || kind === "conflict") {
+    return "border-warning/30 bg-warning/12 text-warning-content";
+  }
+  return "border-error/20 bg-error/8 text-error";
 }
 
 export function EmptyState({ icon, title, description, action }: {
@@ -181,8 +263,8 @@ export function EmptyState({ icon, title, description, action }: {
   action?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-base-300 bg-base-100 p-8 text-center">
-      <div className="mb-4 grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">{icon}</div>
+    <div className="flex min-h-48 flex-col items-center justify-center p-7 text-center sm:p-8">
+      <div className="mb-4 grid size-11 place-items-center rounded-lg bg-primary/10 text-primary">{icon}</div>
       <h3 className="font-display text-lg font-semibold">{title}</h3>
       <p className="mt-2 max-w-sm text-sm leading-6 text-base-content/55">{description}</p>
       {action && <div className="mt-5">{action}</div>}
@@ -203,26 +285,37 @@ export function InitialAvatar({ name, size = "md", variant = "soft" }: {
 
 export function StatusBadge({ status, surface = "light" }: { status: string | number; surface?: "light" | "dark" }) {
   const normalized = String(status).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-  const tone = normalized.includes("confirmed") || normalized === "active" || normalized === "available" || normalized === "checked in" || normalized === "configured" || normalized === "verified" || normalized === "success" || normalized === "succeeded" || normalized === "unread"
-    ? surface === "dark" ? "bg-success text-white" : "bg-primary text-white"
-    : normalized.includes("pending") || normalized.includes("unconfigured") || normalized === "suspended" || normalized === "warning" || normalized === "blocked" || normalized === "overdue"
-      ? "bg-warning-content text-white"
-      : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected") || normalized.includes("archived") || normalized.includes("failed") || normalized === "error" || normalized === "no-show" || normalized === "checked out" || normalized === "released" || normalized === "read"
-        ? "badge-ghost"
-        : "bg-info-content text-white";
-  return <span className={`badge badge-sm border-0 font-semibold capitalize ${tone}`}>{normalized}</span>;
+  const tone = normalized === "unconfirmed"
+    ? "border-base-300 bg-base-200 text-base-content/65"
+    : normalized.includes("cancel") || normalized.includes("retired") || normalized.includes("rejected") || normalized.includes("archived") || normalized.includes("failed") || normalized === "error" || normalized === "no-show"
+    ? "border-error/20 bg-error/10 text-error"
+    : normalized.includes("pending") || normalized.includes("unconfigured") || normalized.includes("needs") || normalized === "suspended" || normalized === "warning" || normalized === "blocked" || normalized === "overdue"
+      ? "border-warning/35 bg-warning/20 text-warning-content"
+      : normalized === "in house" || normalized === "arriving" || normalized === "departing" || normalized === "checked out" || normalized === "released"
+        ? "border-secondary/20 bg-secondary/10 text-secondary"
+        : normalized.includes("confirmed") || normalized === "active" || normalized === "available" || normalized === "checked in" || normalized === "configured" || normalized === "verified" || normalized === "success" || normalized === "succeeded" || normalized === "unread"
+          ? surface === "dark" ? "border-success bg-success text-white" : "border-success/20 bg-success/10 text-success"
+          : "border-base-300 bg-base-200 text-base-content/65";
+  return <span className={`badge badge-sm h-auto min-h-5 shrink-0 whitespace-nowrap border font-semibold capitalize ${tone}`}>{normalized}</span>;
 }
 
-export function FormActions({ submitting, submitLabel, onCancel, disabled = false }: {
+export function FormActions({ submitting, submitLabel, onCancel, disabled = false, cancelDisabled = false }: {
   submitting: boolean;
   submitLabel: string;
   onCancel: () => void;
   disabled?: boolean;
+  cancelDisabled?: boolean;
 }) {
+  const { isOffline } = useNetworkStatus();
   return (
     <ModalActions>
-      <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onCancel}>Cancel</button>
-      <button type="submit" className="btn btn-primary btn-sm min-w-28 sm:btn-md sm:min-w-36" disabled={submitting || disabled}>
+      <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onCancel} disabled={cancelDisabled}>Cancel</button>
+      <button
+        type="submit"
+        className="btn btn-primary btn-sm min-w-28 sm:btn-md sm:min-w-36"
+        disabled={submitting || disabled || isOffline}
+        title={isOffline ? "Reconnect before saving changes." : undefined}
+      >
         {submitting && <span className="loading loading-spinner loading-sm" />}{submitLabel}
       </button>
     </ModalActions>
@@ -234,6 +327,7 @@ export function ModalActions({ children, className = "" }: { children: ReactNode
   const markerRef = useRef<HTMLSpanElement>(null);
   const generatedFormId = useId();
   const [associatedFormId, setAssociatedFormId] = useState<string | null>(null);
+  const { isOffline } = useNetworkStatus();
 
   useEffect(() => footerContext?.registerFooter(), [footerContext?.registerFooter]);
 
@@ -255,7 +349,13 @@ export function ModalActions({ children, className = "" }: { children: ReactNode
   const associatedChildren = Children.map(children, (child) => {
     if (!associatedFormId || !isValidElement(child) || child.type !== "button") return child;
     const button = child as ReactElement<ButtonHTMLAttributes<HTMLButtonElement>>;
-    return button.props.type === "submit" ? cloneElement(button, { form: associatedFormId }) : child;
+    return button.props.type === "submit"
+      ? cloneElement(button, {
+          disabled: button.props.disabled || isOffline,
+          form: associatedFormId,
+          title: isOffline ? "Reconnect before saving changes." : button.props.title,
+        })
+      : child;
   });
 
   return (
@@ -272,9 +372,20 @@ export function ModalActions({ children, className = "" }: { children: ReactNode
 }
 
 export function InlineFormActions({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const { isOffline } = useNetworkStatus();
+  const guardedChildren = Children.map(children, (child) => {
+    if (!isValidElement(child) || child.type !== "button") return child;
+    const button = child as ReactElement<ButtonHTMLAttributes<HTMLButtonElement>>;
+    return button.props.type === "submit"
+      ? cloneElement(button, {
+          disabled: button.props.disabled || isOffline,
+          title: isOffline ? "Reconnect before saving changes." : button.props.title,
+        })
+      : child;
+  });
   return (
     <div className={`mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-base-300 pt-4 ${className}`}>
-      {children}
+      {guardedChildren}
     </div>
   );
 }

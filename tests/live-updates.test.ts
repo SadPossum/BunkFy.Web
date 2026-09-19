@@ -50,9 +50,12 @@ describe("operational notification invalidation", () => {
       payload: { PropertyId: "property-1", ReservationId: "reservation-1" },
     })).toEqual([
       ["reservations", "property-1"],
+      ["reservation-calendar", "property-1"],
+      ["reservation-operations", "property-1"],
       ["availability", "property-1"],
       ["guest-stays", "property-1"],
       ["inventory-rooms", "property-1"],
+      ["room-sales-mode-impact", "property-1"],
       ["rooms", "property-1"],
       ["beds", "property-1"],
       ["reservation", "property-1", "reservation-1"],
@@ -68,6 +71,7 @@ describe("operational notification invalidation", () => {
       ["blocks", "property-2"],
       ["availability", "property-2"],
       ["inventory-rooms", "property-2"],
+      ["room-sales-mode-impact", "property-2"],
       ["rooms", "property-2"],
       ["beds", "property-2"],
     ]);

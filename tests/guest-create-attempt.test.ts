@@ -16,6 +16,13 @@ const payload: GuestCreatePayload = {
 };
 
 describe("guest create attempt", () => {
+  it.each(["ZZ", null])("preserves %s nationality and the exact create operation through normalized retry", nationalityCountryCode => {
+    const values = { ...payload, nationalityCountryCode };
+    const first = resolveGuestCreateAttempt(null, "property-1", values, () => "first");
+    const retry = resolveGuestCreateAttempt(first, "property-1", { ...values, nationalityCountryCode: nationalityCountryCode?.toLowerCase() ?? "" }, () => "second");
+    expect(retry).toBe(first); expect(JSON.parse(first.fingerprint)).toMatchObject({ nationalityCountryCode, preferredLanguageTag: payload.preferredLanguageTag });
+    expect(values).toEqual({ ...payload, nationalityCountryCode });
+  });
   it("reuses one operation id for a normalized equivalent retry", () => {
     const first = resolveGuestCreateAttempt(null, "property-1", payload, () => "operation-1");
     const retry = resolveGuestCreateAttempt(

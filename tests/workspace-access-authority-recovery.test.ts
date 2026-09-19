@@ -40,17 +40,26 @@ describe("workspace access authority recovery", () => {
   });
 
   it("exposes permission and property freshness instead of inferring it from arrays", () => {
-    const permissions = readFileSync(join(repositoryRoot, "src", "app", "permissions.ts"), "utf8");
+    const authority = readFileSync(join(repositoryRoot, "src", "app", "accessAuthority.tsx"), "utf8");
     const workspace = readFileSync(join(repositoryRoot, "src", "app", "workspace.tsx"), "utf8");
     const settings = sourceFile("WorkspaceSettingsPage.tsx");
 
-    expect(permissions).toContain("hasData: query.data !== undefined");
-    expect(permissions).toContain("isFetching: query.isFetching");
-    expect(permissions).toContain("session?.tenantId, subjectKey, ...keys");
+    expect(authority).toContain("hasSnapshot: query.data !== undefined || authorityRejected");
+    expect(authority).toContain("isFetching: query.isFetching && query.data === undefined");
+    expect(authority).toContain("accessAuthorityChecksMatchTenant(session.tenantId, checks)");
+    expect(authority).toContain("refetchOnWindowFocus: \"always\"");
+    expect(authority).toContain("scrubRevokedAccessQueries(queryClient)");
+    expect(authority).toContain("refreshGrantedAccessQueries(queryClient)");
+    expect(authority).toContain("refreshInitialAccessQueries(queryClient)");
+    expect(authority).toContain("const initialAllowedSnapshot = !previous.evaluated && decisionKeys.size > 0");
+    expect(authority).toContain("evaluated: false");
     expect(workspace).toContain("propertiesLoaded: propertiesQuery.data !== undefined");
     expect(workspace).toContain("propertiesFetching: propertiesQuery.isFetching");
     expect(settings).toContain("const propertySource = createCompositeSource");
     expect(settings).toContain("permissionAuthorityCurrent");
+    expect(settings).toContain("shouldRedirectWorkspaceSettingsTab(");
+    expect(settings).toContain('label="workspace settings access"');
+    expect(settings).not.toContain("!permissionsLoading && !canOpenWorkspaceSettingsTab");
   });
 
   it("keeps role lists usable but gates role mutations on current catalogues", () => {
@@ -69,6 +78,23 @@ describe("workspace access authority recovery", () => {
     expect(members).toContain("authoritySources={[memberSource, profileSource, propertySource]}");
     expect(members).toContain("const canSave = authorityCurrent && compositeSourceCurrent(accessSource)");
     expect(members).toContain("disabled={!canSave}");
+  });
+
+  it("submits the latest role and property choices even before React paints them", () => {
+    const members = sourceFile("WorkspaceMembersSettings.tsx");
+
+    expect(members).toContain("function MemberAccessEditorForm(");
+    expect(members).toContain("key={memberAccessSnapshotKey(access.data, initialSelection)}");
+    expect(members).toContain("const [selection, setSelection] = useState(initialSelection)");
+    expect(members).toContain("const pendingSelection = useRef(initialSelection)");
+    expect(members).toContain("function replaceSelection(nextSelection: MemberAccessSelection)");
+    expect(members).toContain("pendingSelection.current = nextSelection");
+    expect(members).toContain("mutationFn: (selection: MemberAccessSelection)");
+    expect(members).toContain("body: JSON.stringify(selection)");
+    expect(members).toContain("propertyIds: [...pendingSelection.current.propertyIds]");
+    expect(members).toContain("function editableMemberSelection(");
+    expect(members).toContain("function memberAccessSnapshotKey(");
+    expect(members).not.toContain("setProfileId(nextSelection.profileId)");
   });
 
   it("keeps lifecycle denial independent from grant-producing invitation actions", () => {

@@ -3,7 +3,6 @@ export type PropertyUpdatePayload = {
   expectedVersion: number;
   name: string;
   code: string;
-  timeZoneId: string;
 };
 
 export type PropertyUpdateAttempt = {
@@ -30,6 +29,5 @@ export function propertyUpdateFingerprint(
     expectedVersion: payload.expectedVersion,
     name: payload.name.trim(),
     code: payload.code.trim().toLowerCase(),
-    timeZoneId: payload.timeZoneId.trim(),
   });
 }

@@ -3,6 +3,7 @@ import {
   resolveReservationLifecycleAttempt,
   type ReservationLifecycleAttemptPayload,
 } from "../src/features/reservations/reservationLifecycleAttempt";
+import { defaultReservationBusinessDate } from "../src/features/reservations/reservationBusinessDate";
 
 const payload: ReservationLifecycleAttemptPayload = {
   propertyId: "property-a",
@@ -64,5 +65,31 @@ describe("reservation lifecycle attempt", () => {
 
     expect(next.operationId).toBe("operation-2");
     expect(next.fingerprint).not.toBe(first.fingerprint);
+  });
+});
+
+describe("reservation lifecycle business date", () => {
+  const reservation = {
+    arrival: "2026-08-20",
+    departure: "2026-08-27",
+    checkedInBusinessDate: "2026-08-21",
+  };
+
+  it("uses the property date while keeping check-in inside the stay", () => {
+    expect(defaultReservationBusinessDate("check-in", reservation, "2026-08-26"))
+      .toBe("2026-08-26");
+    expect(defaultReservationBusinessDate("check-in", reservation, "2026-08-30"))
+      .toBe("2026-08-26");
+    expect(defaultReservationBusinessDate("check-in", reservation, "2026-08-18"))
+      .toBe("2026-08-20");
+  });
+
+  it("does not move checkout or no-show before the reservation lifecycle", () => {
+    expect(defaultReservationBusinessDate("check-out", reservation, "2026-08-20"))
+      .toBe("2026-08-21");
+    expect(defaultReservationBusinessDate("no-show", reservation, "2026-08-18"))
+      .toBe("2026-08-20");
+    expect(defaultReservationBusinessDate("cancel", reservation, "2026-08-26"))
+      .toBe("");
   });
 });

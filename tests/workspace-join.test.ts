@@ -6,6 +6,7 @@ import {
   isWorkspaceStaffOnboardingWithdrawn,
   parseWorkspaceJoinSecret,
   resolveEnrollmentJoin,
+  workspaceJoinVerificationCopy,
   workspaceJoinSourceKind,
 } from "../src/features/workspaces/workspaceJoin";
 
@@ -39,6 +40,19 @@ describe("workspace enrollment outcomes", () => {
   it("maps product join sources to their API contract values", () => {
     expect(workspaceJoinSourceKind("invitation")).toBe(1);
     expect(workspaceJoinSourceKind("enrollment")).toBe(2);
+  });
+
+  it("distinguishes recipient-bound invitations from general staff verification", () => {
+    expect(workspaceJoinVerificationCopy(true)).toEqual({
+      title: "Verify the invited email",
+      description:
+        "This invitation is restricted to its recipient. Verify the matching active email on this account, then BunkFy will continue joining the workspace.",
+    });
+    expect(workspaceJoinVerificationCopy(false)).toEqual({
+      title: "Verify your account email",
+      description:
+        "BunkFy requires a verified account email before staff access is created. Verify the active address on this account, then joining will continue automatically.",
+    });
   });
 
   it("parses invitation secrets from URL fragments without accepting incomplete links", () => {

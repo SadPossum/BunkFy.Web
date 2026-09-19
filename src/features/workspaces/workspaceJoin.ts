@@ -64,6 +64,23 @@ export function workspaceJoinSourceKind(kind: "invitation" | "enrollment"): 1 | 
   return kind === "invitation" ? 1 : 2;
 }
 
+export function workspaceJoinVerificationCopy(recipientBound: boolean): {
+  title: string;
+  description: string;
+} {
+  return recipientBound
+    ? {
+        title: "Verify the invited email",
+        description:
+          "This invitation is restricted to its recipient. Verify the matching active email on this account, then BunkFy will continue joining the workspace.",
+      }
+    : {
+        title: "Verify your account email",
+        description:
+          "BunkFy requires a verified account email before staff access is created. Verify the active address on this account, then joining will continue automatically.",
+      };
+}
+
 export function isWorkspaceStaffOnboardingInProgress(status: number | undefined): boolean {
   return status === 1 || status === 2 || status === 3 || status === 4;
 }

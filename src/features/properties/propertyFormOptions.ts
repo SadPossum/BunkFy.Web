@@ -35,7 +35,7 @@ export function createDefaultBedLabels(
   existingLabels: string[],
   currentLabels: string[] = [],
 ): string[] {
-  const targetCount = Math.max(1, Math.min(50, Math.trunc(count) || 1));
+  const targetCount = Math.max(1, Math.min(100, Math.trunc(count) || 1));
   const labels = currentLabels.slice(0, targetCount);
   const reserved = new Set([...existingLabels, ...labels].map((label) => label.trim()));
   let candidate = 1;

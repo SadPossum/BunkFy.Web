@@ -32,6 +32,34 @@ describe("workspace access readiness", () => {
     );
   });
 
+  it("backs off repeated access denials while the workspace projection converges", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi.fn()
+        .mockRejectedValueOnce(new ApiError("Access denied.", 403, "Properties.AccessDenied"))
+        .mockRejectedValueOnce(new ApiError("Access denied.", 403, "Properties.AccessDenied"))
+        .mockResolvedValueOnce({ items: [], page: 1, pageSize: 1, hasMore: false });
+
+      const ready = waitForWorkspaceAccess(request, "workspace-a", {
+        timeoutMs: 5_000,
+        retryDelayMs: 400,
+        maximumRetryDelayMs: 1_600,
+      });
+
+      await vi.advanceTimersByTimeAsync(399);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(request).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(799);
+      expect(request).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      await ready;
+      expect(request).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("honors a known rate-limit response while access is converging", async () => {
     const request = vi.fn()
       .mockRejectedValueOnce(new ApiError(

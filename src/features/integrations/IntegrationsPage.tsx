@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Cable, ClipboardCheck, Plus, Radio, ShieldAlert, Zap } from "lucide-react";
+import { Activity, Cable, ChevronRight, ClipboardCheck, Plus, Radio, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
-import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
+import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeKey, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
 import type { AdapterConnectionCreateRequest, AdapterConnectionListItem, AdapterConnectionListResponse, AdapterConnectionMutationReceipt, AdapterTypeCapability, AdapterTypeCapabilityListResponse } from "../../api/types";
 import {
   compositeSourceCurrent,
@@ -27,11 +27,18 @@ import {
 } from "./connectionCreateAttempt";
 import { loadAllAdapterConnections } from "./ingestionApi";
 import { IngestionActivity } from "./IngestionActivity";
+import {
+  clearIntegrationViewSearchParams,
+  connectionFilterSearchParams,
+  connectionPageSearchParams,
+  integrationPrimaryTabSearchParams,
+  integrationSelectionSearchParams,
+  integrationViewState,
+  type ConnectionStatusFilter,
+} from "./integrationViewState";
 import { ProposalQueue } from "./ProposalQueue";
 
 const PAGE_SIZE = 30;
-type IntegrationsTab = "connections" | "review" | "activity";
-type ConnectionStatusFilter = "all" | "enabled" | "disabled";
 
 export function IntegrationsPage() {
   const { request, session } = useSession();
@@ -39,10 +46,12 @@ export function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   useTargetProperty(searchParams.get("property"));
-  const [tab, setTab] = useState<IntegrationsTab>(() => integrationsTab(searchParams.get("tab")));
-  const [status, setStatus] = useState<ConnectionStatusFilter>("all");
-  const [page, setPage] = useState(1);
+  const view = integrationViewState(searchParams);
+  const tab = view.tab;
+  const status = view.connectionStatus;
+  const page = view.connectionPage;
   const [createOpen, setCreateOpen] = useState(false);
+  const previousPropertyId = useRef<string | null>(null);
   const scope = session && selectedPropertyId ? propertyAccessScope(session.tenantId, selectedPropertyId) : "";
   const access = usePermissions(scope ? [
     { permission: permissions.ingestionRead, scope },
@@ -64,24 +73,67 @@ export function IntegrationsPage() {
   const canSuggestGuestRecords = access.allows(permissions.guestsRead, scope)
     && access.allows(permissions.guestsCreate, scope)
     && access.allows(permissions.reservationsManageGuests, scope);
-  useEffect(() => setTab(integrationsTab(searchParams.get("tab"))), [searchParams]);
-  useEffect(() => setPage(1), [status, selectedPropertyId]);
+  useEffect(() => {
+    const previous = previousPropertyId.current;
+    previousPropertyId.current = selectedPropertyId ?? null;
+    if (!previous || !selectedPropertyId || previous === selectedPropertyId) return;
+    if (searchParams.get("property") === selectedPropertyId) return;
+    setSearchParams(clearIntegrationViewSearchParams(searchParams), { replace: true });
+  }, [searchParams, selectedPropertyId, setSearchParams]);
   const connectionParams = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (status !== "all") connectionParams.set("status", status === "enabled" ? "1" : "2");
-  const selectedConnectionId = searchParams.get("connection");
+  const selectedConnectionId = view.selectedConnectionId;
   const connections = useQuery({ queryKey: ["ingestion-connections", selectedPropertyId, status, page], queryFn: () => request<AdapterConnectionListResponse>(`/api/ingestion/properties/${selectedPropertyId}/connections?${connectionParams}`), enabled: canRead && tab === "connections" });
   const allConnections = useQuery({ queryKey: ["ingestion-connections", selectedPropertyId, "all-options"], queryFn: (context) => loadAllAdapterConnections(request, selectedPropertyId!, context.signal), enabled: canRead && tab === "activity", staleTime: 15_000 });
   const adapterTypes = useQuery({ queryKey: ["ingestion-adapter-types", selectedPropertyId], queryFn: () => request<AdapterTypeCapabilityListResponse>(`/api/ingestion/properties/${selectedPropertyId}/adapter-types`), enabled: canRead && (tab === "connections" || tab === "activity" || Boolean(selectedConnectionId)), staleTime: 30_000 });
   const connectionSource = createCompositeSource({ label: "Connection directory", hasData: connections.data !== undefined, isLoading: connections.isLoading, error: connections.error, isFetching: connections.isFetching, refetch: () => connections.refetch() });
   const allConnectionSource = createCompositeSource({ label: "Connection filter directory", hasData: allConnections.data !== undefined, isLoading: allConnections.isLoading, error: allConnections.error, isFetching: allConnections.isFetching, refetch: () => allConnections.refetch() });
   const adapterTypeSource = createCompositeSource({ label: "Adapter capabilities", hasData: adapterTypes.data !== undefined, isLoading: adapterTypes.isLoading, error: adapterTypes.error, isFetching: adapterTypes.isFetching, refetch: () => adapterTypes.refetch() });
+  const pageHeaderProps = {
+    eyebrow: selectedProperty?.name ?? "Data sources",
+    title: "Integrations",
+    description: "Connect external booking sources, decide changes that need staff review, and inspect the evidence behind every import.",
+  };
 
-  function selectConnection(id: string | null) { const next = new URLSearchParams(searchParams); if (id) next.set("connection", id); else next.delete("connection"); setSearchParams(next, { replace: true }); }
+  function selectConnection(id: string | null) {
+    setSearchParams(
+      integrationSelectionSearchParams(searchParams, "connection", id),
+      { replace: true },
+    );
+  }
 
-  if (!selectedProperty) return <EmptyState icon={<Cable />} title="Choose a property first" description="Integration connections are configured for one property at a time." />;
-  if (access.isLoading) return <LoadingState label="Checking integration access" />;
-  if (access.error) return <ErrorState error={access.error} />;
-  if (!canRead) return <EmptyState icon={<ShieldAlert />} title="Integration access is restricted" description="Your account does not have permission to view ingestion activity for this property." />;
+  if (!selectedProperty) return (
+    <>
+      <PageHeader {...pageHeaderProps} />
+      <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+        <EmptyState icon={<Cable />} title="Choose a property first" description="Integration connections are configured for one property at a time." />
+      </section>
+    </>
+  );
+  if (access.isLoading) return (
+    <>
+      <PageHeader {...pageHeaderProps} />
+      <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+        <LoadingState label="Checking integration access" />
+      </section>
+    </>
+  );
+  if (access.error) return (
+    <>
+      <PageHeader {...pageHeaderProps} />
+      <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6">
+        <ErrorState error={access.error} retry={() => void access.refetch()} title="Integration access could not be checked" />
+      </section>
+    </>
+  );
+  if (!canRead) return (
+    <>
+      <PageHeader {...pageHeaderProps} />
+      <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
+        <EmptyState icon={<ShieldAlert />} title="Integration access is restricted" description="Your account does not have permission to view ingestion activity for this property." />
+      </section>
+    </>
+  );
 
   const capabilityItems = compositeSourceUsable(adapterTypeSource.state)
     ? adapterTypes.data?.adapterTypes ?? []
@@ -100,9 +152,7 @@ export function IntegrationsPage() {
   return (
     <>
       <PageHeader
-        eyebrow={selectedProperty.name}
-        title="Integrations"
-        description="Connect reservation sources, review suggested changes, and trace every ingestion event."
+        {...pageHeaderProps}
         action={tab === "connections" && canManage ? (
           <button
             type="button"
@@ -120,7 +170,10 @@ export function IntegrationsPage() {
         className="mb-5"
         value={tab}
         ariaLabel="Integration workspace"
-        onValueChange={setTab}
+        onValueChange={(nextTab) => setSearchParams(
+          integrationPrimaryTabSearchParams(searchParams, nextTab),
+          { replace: true },
+        )}
         options={[
           { value: "connections", label: "Connections", icon: <Cable size={15} /> },
           { value: "review", label: "Review", icon: <ClipboardCheck size={15} /> },
@@ -133,18 +186,21 @@ export function IntegrationsPage() {
             sources={[connectionSource, adapterTypeSource]}
             title="Some connection data is delayed"
           />
-          <section className="card border border-base-300 bg-base-100 shadow-sm">
+          <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm" aria-labelledby="connections-heading">
             <div className="flex flex-col gap-3 border-b border-base-300 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
-                <h2 className="font-display text-xl font-semibold">Connections</h2>
-                <p className="mt-1 text-sm text-base-content/50">Configured adapter endpoints and execution modes.</p>
+                <h2 id="connections-heading" className="font-display text-xl font-semibold">Source connections</h2>
+                <p className="mt-1 text-sm text-base-content/55">Each connection owns how one external source reaches this property.</p>
               </div>
               <SelectPicker
                 className="w-full sm:w-44"
                 size="sm"
                 value={status}
                 ariaLabel="Connection status"
-                onValueChange={(value) => setStatus(value as ConnectionStatusFilter)}
+                onValueChange={(value) => setSearchParams(
+                  connectionFilterSearchParams(searchParams, value as ConnectionStatusFilter),
+                  { replace: true },
+                )}
                 options={[
                   { value: "all", label: "All statuses" },
                   { value: "enabled", label: "Enabled" },
@@ -191,7 +247,10 @@ export function IntegrationsPage() {
                   hasMore={connections.data?.hasMore}
                   itemLabel="connection"
                   disabled={connections.isFetching}
-                  onPageChange={setPage}
+                  onPageChange={(nextPage) => setSearchParams(
+                    connectionPageSearchParams(searchParams, nextPage),
+                    { replace: true },
+                  )}
                 />
               </>
             )}
@@ -244,7 +303,40 @@ export function IntegrationsPage() {
   );
 }
 
-function ConnectionRow({ connection, onOpen }: { connection: AdapterConnectionListItem; onOpen: () => void }) { return <button type="button" className="grid w-full gap-3 p-5 text-left transition hover:bg-base-200/70 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6" onClick={onOpen}><div className="flex min-w-0 items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary/15 text-secondary"><Radio size={18} /></div><div className="min-w-0"><p className="truncate font-semibold">{connection.adapterType}</p><p className="mt-1 truncate text-xs text-base-content/45">Connection {connection.connectionId.slice(0, 8).toUpperCase()}</p></div></div><div className="text-xs text-base-content/50 sm:text-right"><p className="font-semibold capitalize text-base-content/70">{adapterExecutionModeLabel(connection.executionMode)}</p><p className="mt-1">{connection.pollingIntervalSeconds ? `Every ${formatDuration(connection.pollingIntervalSeconds)}` : adapterConflictPolicyLabel(connection.conflictPolicy)}</p></div><StatusBadge status={adapterConnectionStatusLabel(connection.status)} /></button>; }
+function ConnectionRow({ connection, onOpen }: { connection: AdapterConnectionListItem; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="group flex w-full items-start gap-3 p-4 text-left transition hover:bg-base-200/65 focus-visible:bg-base-200/65 sm:items-center sm:px-6 sm:py-5"
+      onClick={onOpen}
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary/12 text-secondary" aria-hidden="true">
+        <Radio size={18} />
+      </span>
+      <span className="min-w-0 flex-1 sm:grid sm:grid-cols-[minmax(0,1.15fr)_minmax(10rem,.85fr)_minmax(11rem,1fr)] sm:items-center sm:gap-5">
+        <span className="block min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold">{connection.adapterType}</span>
+            <span className="sm:hidden"><StatusBadge status={adapterConnectionStatusLabel(connection.status)} /></span>
+          </span>
+          <span className="mt-1 block truncate text-xs text-base-content/45">
+            Connection {connection.connectionId.slice(0, 8).toUpperCase()}
+          </span>
+        </span>
+        <span className="mt-3 block text-xs sm:mt-0">
+          <span className="block font-semibold capitalize text-base-content/75">{adapterExecutionModeLabel(connection.executionMode)}</span>
+          <span className="mt-1 block text-base-content/50">{executionModeSummary(connection)}</span>
+        </span>
+        <span className="mt-2 block text-xs sm:mt-0">
+          <span className="block font-semibold text-base-content/75">Change handling</span>
+          <span className="mt-1 block text-base-content/50">{adapterConflictPolicyLabel(connection.conflictPolicy)}</span>
+        </span>
+      </span>
+      <span className="hidden shrink-0 sm:block"><StatusBadge status={adapterConnectionStatusLabel(connection.status)} /></span>
+      <ChevronRight className="mt-2 shrink-0 text-base-content/35 transition-transform group-hover:translate-x-0.5 sm:mt-0" size={18} aria-hidden="true" />
+    </button>
+  );
+}
 
 function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSource, onClose, onCreated }: { open: boolean; propertyId: string; adapterTypes: AdapterTypeCapability[]; adapterTypeSource: CompositeSource; onClose: () => void; onCreated: (connection: AdapterConnectionMutationReceipt) => Promise<void> }) {
   const { request } = useSession();
@@ -263,7 +355,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
     (item) => item.adapterType === adapterType,
   );
   const modes = capability?.executionModes
-    .map(modeKey)
+    .map(adapterExecutionModeKey)
     .filter((value): value is typeof executionMode => value !== "unknown") ?? [];
   const mutation = useMutation({
     mutationFn: (payload: ConnectionCreatePayload & { operationId: string }) => {
@@ -300,7 +392,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
       const first = adapterTypes[0];
       setAdapterType(first?.adapterType ?? "");
       const firstMode = first?.executionModes
-        .map(modeKey)
+        .map(adapterExecutionModeKey)
         .find((value) => value !== "unknown");
       setExecutionMode(firstMode || "polling");
       if (!wasOpen.current) {
@@ -428,9 +520,9 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
               />
             </label>
           </div>
-          <div className="rounded-lg bg-base-200 p-4">
+          <div className="rounded-lg border border-primary/15 bg-primary/5 p-4">
             <div className="flex items-start gap-3">
-              <Zap size={17} className="mt-0.5 text-primary" />
+              <ShieldCheck size={17} className="mt-0.5 text-primary" />
               <div>
                 <p className="text-sm font-semibold">
                   {conflictPolicy === "suggestionsOnly"
@@ -438,8 +530,9 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
                     : "Apply only against an unchanged adapter baseline"}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-base-content/50">
-                  You can change this policy later without recreating the
-                  connection.
+                  {conflictPolicy === "suggestionsOnly"
+                    ? "Nothing changes a reservation until an authorized staff member accepts the proposal."
+                    : "BunkFy applies an update only while the reservation still matches the last accepted adapter revision."}
                 </p>
               </div>
             </div>
@@ -480,8 +573,14 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
 }
 
 function TextField({ label, name, placeholder, required = true }: { label: string; name: string; placeholder?: string; required?: boolean }) { return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} placeholder={placeholder} required={required} /></label>; }
-function modeKey(mode: AdapterTypeCapability["executionModes"][number]): "polling" | "continuous" | "push" | "remotePolling" | "unknown" { if (typeof mode === "string") { const normalized = mode.replace(/[ -](.)/g, (_, letter: string) => letter.toUpperCase()); return (["polling", "continuous", "push", "remotePolling"] as const).find((value) => value.toLowerCase() === normalized.toLowerCase()) ?? "unknown"; } return ({ 1: "polling", 2: "continuous", 3: "push", 4: "remotePolling" } as const)[mode as 1 | 2 | 3 | 4] ?? "unknown"; }
 function emptyToNull(value: FormDataEntryValue | null) { const normalized = String(value ?? "").trim(); return normalized || null; }
 function formatDuration(seconds: number) { if (seconds % 3600 === 0) return `${seconds / 3600}h`; if (seconds % 60 === 0) return `${seconds / 60}m`; return `${seconds}s`; }
+function executionModeSummary(connection: AdapterConnectionListItem) {
+  if (connection.pollingIntervalSeconds) return `Every ${formatDuration(connection.pollingIntervalSeconds)}`;
+  const mode = adapterExecutionModeKey(connection.executionMode);
+  if (mode === "push") return "Source sends updates";
+  if (mode === "remotePolling") return "External worker claims runs";
+  if (mode === "continuous") return "Long-running adapter";
+  return "Schedule not configured";
+}
 function capitalize(value: string) { return value.slice(0, 1).toUpperCase() + value.slice(1); }
-function integrationsTab(value: string | null): IntegrationsTab { return value === "review" || value === "activity" ? value : "connections"; }

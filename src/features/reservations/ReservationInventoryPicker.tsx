@@ -12,6 +12,7 @@ export function ReservationInventoryPicker({
   selectionEnabled,
   selectedUnits,
   onToggle,
+  visible = true,
 }: {
   groups: InventoryRoomGroup[];
   loading: boolean;
@@ -19,9 +20,12 @@ export function ReservationInventoryPicker({
   selectionEnabled: boolean;
   selectedUnits: string[];
   onToggle: (inventoryUnitId: string) => void;
+  visible?: boolean;
 }) {
   const [showUnavailable, setShowUnavailable] = useState(false);
   const [collapsedRooms, setCollapsedRooms] = useState<Set<string>>(() => new Set());
+  // Keep only display preferences across temporary source loss, without retaining inventory DOM.
+  if (!visible) return null;
   const availableCount = groups.reduce((total, group) => total + group.availableCount, 0);
   const totalCount = groups.reduce((total, group) => total + group.totalCount, 0);
   const unavailableCount = totalCount - availableCount;
@@ -75,15 +79,15 @@ export function ReservationInventoryPicker({
       </div>
 
       {loading ? (
-        <div className="rounded-xl bg-base-200 p-5 text-center text-sm text-base-content/55">
+        <div className="rounded-lg bg-base-200 p-5 text-center text-sm text-base-content/55">
           <span className="loading loading-spinner loading-sm mr-2" />Checking inventory
         </div>
       ) : error ? (
         <ErrorState error={error} />
       ) : !groups.length ? (
-        <div className="rounded-xl border border-dashed border-base-300 p-5 text-center text-sm text-base-content/55">No sellable inventory is configured for this property.</div>
+        <div className="rounded-lg border border-dashed border-base-300 p-5 text-center text-sm text-base-content/55">No sellable inventory is configured for this property.</div>
       ) : !visibleGroups.length ? (
-        <div className="rounded-xl border border-dashed border-base-300 bg-base-200/60 p-5 text-center">
+        <div className="rounded-lg border border-dashed border-base-300 bg-base-200/60 p-5 text-center">
           <p className="text-sm font-semibold">No units are available for these dates</p>
           <p className="mt-1 text-xs text-base-content/55">Change the stay dates or show unavailable inventory to review conflicts.</p>
         </div>

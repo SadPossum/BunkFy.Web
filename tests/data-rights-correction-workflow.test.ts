@@ -20,6 +20,7 @@ import {
   correctionExecutionStatus,
   guestCorrectionChanged,
   guestCorrectionValues,
+  guestCorrectionDraftReady,
   isSelectedCorrectionRevisionCurrent,
   reservationCorrectionChanged,
   reservationCorrectionValues,
@@ -30,6 +31,52 @@ import {
 import { CorrectionClaimWindow } from "../src/features/data-rights/PrivacyRequestCorrection";
 
 describe("data-rights correction operator workflow", () => {
+  it("admits only the exact ready Guest draft context, independently of routine fetching", () => {
+    expect(guestCorrectionDraftReady(draftContext())).toBe(true);
+  });
+  it.each([
+    "missing-context", "missing-operator", "operator", "scope", "property", "case-property", "context-case", "context-version",
+    "case-status", "case-count", "case-ready", "selected-ready", "permission", "claim-ready", "missing-claim",
+    "execution-case", "execution-revision", "execution-property", "expired", "foreign-claim", "completed-claim", "invalid-expiry",
+    "selected-case", "selected-count", "selected-owner", "selected-type", "selected-id", "selected-version",
+  ])("rejects %s without relaxing command authority", mode => {
+    const value = draftContext();
+    switch (mode) {
+      case "missing-context": value.context = undefined; break;
+      case "missing-operator": value.operatorScopeKey = ""; break;
+      case "operator": value.operatorScopeKey = "different"; break;
+      case "scope": value.scopeKey = "staff"; break;
+      case "property": value.propertyId = "different"; break;
+      case "case-property": value.dataRightsCase.propertyId = "different"; break;
+      case "context-case": value.context!.caseId = "different"; break;
+      case "context-version": value.context!.caseVersion++; break;
+      case "case-status": value.dataRightsCase.status = 9; break;
+      case "case-count": value.dataRightsCase.selectedSubjectCount = 2; break;
+      case "case-ready": value.context!.caseReady = false; break;
+      case "selected-ready": value.context!.selectedReady = false; break;
+      case "permission": value.permissionCurrent = false; break;
+      case "claim-ready": value.correctionReady = false; break;
+      case "missing-claim": value.execution = undefined; break;
+      case "execution-case": value.execution!.caseId = "different"; break;
+      case "execution-revision": value.execution!.executionRevision++; break;
+      case "execution-property": value.execution!.propertyId = "different"; break;
+      case "expired": value.now = Date.parse(value.execution!.expiresAtUtc) + 1; break;
+      case "foreign-claim": value.execution!.isCurrentActor = false; break;
+      case "completed-claim": value.execution!.status = 2; break;
+      case "invalid-expiry": value.execution!.expiresAtUtc = "invalid"; break;
+      case "selected-case": value.context!.selectedEvidence!.caseVersion++; break;
+      case "selected-count": value.context!.selectedEvidence!.subjects = []; break;
+      case "selected-owner": value.context!.selectedEvidence!.subjects[0].ownerKey = "reservations"; break;
+      case "selected-type": value.context!.selectedEvidence!.subjects[0].recordType = "reservation"; break;
+      case "selected-id": value.context!.selectedEvidence!.subjects[0].recordId = "different"; break;
+      case "selected-version": value.context!.selectedEvidence!.subjects[0].recordVersion++; break;
+    }
+    expect(guestCorrectionDraftReady(value)).toBe(false);
+  });
+  it.each(["ZZ", ""]) ("retains optional nationality %s while preserving correction revision/idempotency and every other value", code => {
+    const initial = guestCorrectionValues(guest), baseline = buildGuestCorrectionRequest(guest, guestExecution, initial);
+    expect(buildGuestCorrectionRequest(guest, guestExecution, { ...initial, nationalityCountryCode: code.toLowerCase() })).toEqual({ ...baseline, nationalityCountryCode: code || null });
+  });
   it("builds a Guest owner request bound to the claim and approved revision", () => {
     const values = {
       ...guestCorrectionValues(guest),
@@ -52,6 +99,7 @@ describe("data-rights correction operator workflow", () => {
       dateOfBirth: "1995-05-20",
       nationalityCountryCode: "GB",
       preferredLanguageTag: "en-GB",
+      languageTags: ["en-GB"],
       notes: "Late arrival",
     });
   });
@@ -282,6 +330,19 @@ const guestExecution: DataRightsCorrectionExecutionDetails = {
   completedAtUtc: null,
   version: 1,
 };
+
+function draftContext(): Parameters<typeof guestCorrectionDraftReady>[0] {
+  const propertyId = guestExecution.propertyId!;
+  return {
+    propertyId, operatorScopeKey: "current-actor", scopeKey: `guest:${propertyId}`,
+    permissionCurrent: true, correctionReady: true, now: Date.parse("2026-07-27T12:05:00Z"),
+    dataRightsCase: { id: guestExecution.caseId, propertyId, version: 10, status: 7, selectedSubjectCount: 1 },
+    execution: structuredClone(guestExecution),
+    context: { operatorScopeKey: "current-actor", scopeKey: `guest:${propertyId}`, caseId: guestExecution.caseId,
+      caseVersion: 10, caseReady: true, selectedReady: true,
+      selectedEvidence: { caseVersion: 10, subjects: [{ ...guestExecution.subject, selectedAtUtc: "2026-07-27T12:00:00Z" }] } },
+  };
+}
 
 const reservationExecution: DataRightsCorrectionExecutionDetails = {
   ...guestExecution,

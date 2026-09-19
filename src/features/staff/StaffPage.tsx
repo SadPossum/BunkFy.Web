@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Building2,
   ChevronRight,
   Plus,
   Search,
   ShieldAlert,
   UsersRound,
+  X,
 } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -13,6 +15,8 @@ import type {
   StaffDirectoryListResponse,
   StaffDirectoryListItem,
   StaffDirectoryMember,
+  StaffPropertyDirectoryListItem,
+  StaffPropertyDirectoryListResponse,
 } from "../../api/types";
 import {
   compositeSourceCurrent,
@@ -54,12 +58,17 @@ import {
 } from "./staffCreateAttempt";
 import { StaffDetail } from "./StaffDetail";
 import { staffMutationAllowed } from "./staffMutationAuthority";
-import { staffDetailTab } from "./staffPresentation";
+import {
+  staffDetailTab,
+  staffDirectoryScope,
+  type StaffDirectoryScope,
+} from "./staffPresentation";
 import { StaffProfileForm } from "./StaffProfileForm";
 
 const PAGE_SIZE = 30;
 const statusOptions = ["active", "suspended", "departed"] as const;
 type StaffStatusFilter = "all" | (typeof statusOptions)[number];
+type StaffDirectoryItem = StaffDirectoryListItem | StaffPropertyDirectoryListItem;
 
 type CreateStaffSubmission = {
   tenantId: string;
@@ -103,7 +112,8 @@ export function StaffPage() {
     { permission: permissions.staffAccountLinksManage, scope: tenantScope },
     { permission: permissions.staffManageLifecycle, scope: tenantScope },
   ] : []);
-  const assignmentAccess = usePermissions(propertyScope ? [
+  const propertyStaffAccess = usePermissions(propertyScope ? [
+    { permission: permissions.staffRead, scope: propertyScope },
     { permission: permissions.staffAssignProperties, scope: propertyScope },
   ] : []);
   const mayRead = tenantAccess.allows(permissions.staffRead, tenantScope);
@@ -121,9 +131,12 @@ export function StaffPage() {
     permissions.staffManageLifecycle,
     tenantScope,
   );
+  const mayReadCurrentProperty = Boolean(
+    propertyScope && propertyStaffAccess.allows(permissions.staffRead, propertyScope),
+  );
   const mayAssignCurrentProperty = Boolean(
     propertyScope &&
-      assignmentAccess.allows(permissions.staffAssignProperties, propertyScope),
+      propertyStaffAccess.allows(permissions.staffAssignProperties, propertyScope),
   );
   const permissionSource = createCompositeSource({
     label: "Staff permissions",
@@ -133,14 +146,14 @@ export function StaffPage() {
     isFetching: tenantAccess.isFetching,
     refetch: tenantAccess.refetch,
   });
-  const assignmentPermissionSource = selectedProperty
+  const propertyStaffPermissionSource = selectedProperty
     ? createCompositeSource({
-        label: `${selectedProperty.name} assignment permission`,
-        hasData: assignmentAccess.hasData,
-        isLoading: assignmentAccess.isLoading,
-        error: assignmentAccess.error,
-        isFetching: assignmentAccess.isFetching,
-        refetch: assignmentAccess.refetch,
+        label: `${selectedProperty.name} Staff permissions`,
+        hasData: propertyStaffAccess.hasData,
+        isLoading: propertyStaffAccess.isLoading,
+        error: propertyStaffAccess.error,
+        isFetching: propertyStaffAccess.isFetching,
+        refetch: propertyStaffAccess.refetch,
       })
     : null;
   const propertySource = createCompositeSource({
@@ -157,6 +170,18 @@ export function StaffPage() {
     "create",
     { permissionsCurrent },
   );
+  const directoryScope = staffDirectoryScope(
+    searchParams.get("scope"),
+    Boolean(selectedProperty),
+  );
+  const propertyPermissionUsable = Boolean(
+    propertyStaffPermissionSource &&
+      compositeSourceUsable(propertyStaffPermissionSource.state),
+  );
+  const propertyPermissionCurrent = Boolean(
+    propertyStaffPermissionSource &&
+      compositeSourceCurrent(propertyStaffPermissionSource),
+  );
 
   const params = new URLSearchParams({
     page: String(page),
@@ -164,13 +189,32 @@ export function StaffPage() {
   });
   if (deferredSearch) params.set("search", deferredSearch);
   if (status !== "all") params.set("status", String(staffStatusValue(status)));
-  const members = useQuery({
-    queryKey: ["staff-members", tenantId, deferredSearch, status, page],
-    queryFn: () => request<StaffDirectoryListResponse>(`/api/staff/members?${params}`),
-    enabled: Boolean(tenantId && mayRead),
+  const members = useQuery<StaffDirectoryListResponse | StaffPropertyDirectoryListResponse>({
+    queryKey: [
+      "staff-members",
+      tenantId,
+      directoryScope,
+      directoryScope === "property" ? selectedProperty?.propertyId ?? "none" : "workspace",
+      deferredSearch,
+      status,
+      page,
+    ],
+    queryFn: () => directoryScope === "property" && selectedProperty
+      ? request<StaffPropertyDirectoryListResponse>(
+          `/api/staff/properties/${selectedProperty.propertyId}/members?${params}`,
+        )
+      : request<StaffDirectoryListResponse>(`/api/staff/members?${params}`),
+    enabled: Boolean(
+      tenantId && mayRead && (
+        directoryScope === "workspace" ||
+        (selectedProperty && mayReadCurrentProperty)
+      ),
+    ),
   });
   const directorySource = createCompositeSource({
-    label: "Staff directory",
+    label: directoryScope === "property"
+      ? `${selectedProperty?.name ?? "Current property"} Staff directory`
+      : "Workspace Staff directory",
     hasData: members.data !== undefined,
     isLoading: members.isLoading,
     error: members.error,
@@ -179,12 +223,14 @@ export function StaffPage() {
   });
   const directoryCurrent = compositeSourceCurrent(directorySource);
   const directoryUsable = compositeSourceUsable(directorySource.state);
-  const items = directoryUsable ? members.data?.items ?? [] : [];
+  const items: StaffDirectoryItem[] = directoryUsable
+    ? members.data?.items ?? []
+    : [];
   const focusedMemberId = useTransientResourceFocus(directoryUsable);
 
   useEffect(() => {
     setPage(1);
-  }, [deferredSearch, status]);
+  }, [deferredSearch, directoryScope, selectedProperty?.propertyId, status]);
 
   useEffect(() => {
     if (directoryCurrent && members.data && page > 1 && members.data.items.length === 0) {
@@ -206,6 +252,7 @@ export function StaffPage() {
       next.delete("member");
       next.delete("section");
       next.delete("focus");
+      next.delete("scope");
       return next;
     }, { replace: true });
   }, [setSearchParams, tenantId]);
@@ -225,8 +272,32 @@ export function StaffPage() {
 
   function selectMember(id: string | null) {
     const next = new URLSearchParams(searchParams);
-    if (id) next.set("member", id);
-    else next.delete("member");
+    if (id) {
+      next.set("member", id);
+      next.delete("section");
+    } else {
+      next.delete("member");
+      next.delete("section");
+      next.delete("focus");
+    }
+    setSearchParams(next, { replace: true });
+  }
+
+  function setDirectoryScope(scope: StaffDirectoryScope) {
+    const next = new URLSearchParams(searchParams);
+    if (scope === "property") next.set("scope", "property");
+    else next.delete("scope");
+    next.delete("member");
+    next.delete("section");
+    next.delete("focus");
+    setPage(1);
+    setSearchParams(next, { replace: true });
+  }
+
+  function setDetailSection(section: "profile" | "assignments" | "account") {
+    const next = new URLSearchParams(searchParams);
+    if (section === "profile") next.delete("section");
+    else next.set("section", section);
     setSearchParams(next, { replace: true });
   }
 
@@ -245,9 +316,9 @@ export function StaffPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Workspace team"
+        eyebrow="Workspace people"
         title="Staff"
-        description="Manage staff profiles, employment state, account links, and property assignments."
+        description="Keep employment profiles, work locations, and lifecycle history accurate. Workspace roles and permissions stay in Workspace settings."
         action={mayRead && mayCreate ? (
           <button
             type="button"
@@ -278,37 +349,93 @@ export function StaffPage() {
       ) : (
         <>
           <CompositeSourceNotice
-            sources={[permissionSource, directorySource]}
+            sources={[
+              permissionSource,
+              ...(directoryScope === "property" && propertyStaffPermissionSource
+                ? [propertyStaffPermissionSource]
+                : []),
+              ...(
+                directoryScope === "workspace" ||
+                (propertyPermissionUsable && mayReadCurrentProperty)
+                  ? [directorySource]
+                  : []
+              ),
+            ]}
             title="Staff data is delayed"
           />
           <section className="card border border-base-300 bg-base-100 shadow-sm">
-            <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-              <SegmentedTabs
-                value={status}
-                ariaLabel="Staff status"
-                onValueChange={setStatus}
-                options={(["all", ...statusOptions] as const).map((option) => ({
-                  value: option,
-                  label: option === "all" ? "All staff" : capitalize(option),
-                }))}
-              />
-              <label className="input input-bordered input-sm flex w-full items-center gap-2 lg:w-72">
-                <Search size={15} className="text-base-content/35" />
-                <input
-                  className="grow"
-                  aria-label="Search staff"
-                  placeholder="Name"
-                  value={search}
-                  maxLength={256}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                {members.isFetching && (
-                  <span className="loading loading-spinner loading-xs text-primary" aria-label="Updating Staff results" />
+            <div className="flex flex-col gap-4 border-b border-base-300 p-4 sm:px-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end">
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-base-content/45">Directory</p>
+                  <SegmentedTabs
+                    value={directoryScope}
+                    ariaLabel="Staff directory scope"
+                    onValueChange={setDirectoryScope}
+                    options={[
+                      { value: "workspace", label: "Workspace", icon: <UsersRound size={15} /> },
+                      {
+                        value: "property",
+                        label: selectedProperty?.name ?? "Current property",
+                        icon: <Building2 size={15} />,
+                        disabled: !selectedProperty,
+                      },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-base-content/45">Employment status</p>
+                  <SegmentedTabs
+                    value={status}
+                    ariaLabel="Staff status"
+                    onValueChange={setStatus}
+                    options={(["all", ...statusOptions] as const).map((option) => ({
+                      value: option,
+                      label: option === "all" ? "All" : capitalize(option),
+                    }))}
+                  />
+                </div>
+              </div>
+              <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:w-auto xl:justify-end">
+                {directoryUsable && (
+                  <p className="shrink-0 text-xs font-medium text-base-content/50" aria-live="polite">
+                    Page {page} · {items.length} {items.length === 1 ? "person" : "people"}
+                  </p>
                 )}
-              </label>
+                <label className="input input-bordered input-sm flex w-full items-center gap-2 sm:w-72">
+                  <Search size={15} className="text-base-content/35" />
+                  <input
+                    className="grow"
+                    aria-label="Search staff"
+                    placeholder="Display name"
+                    value={search}
+                    maxLength={256}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                  {members.isFetching && (
+                    <span className="loading loading-spinner loading-xs text-primary" aria-label="Updating Staff results" />
+                  )}
+                  {search && !members.isFetching && (
+                    <button type="button" className="btn btn-circle btn-ghost btn-xs -mr-1" aria-label="Clear Staff search" onClick={() => setSearch("")}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </label>
+              </div>
             </div>
 
-            {directorySource.state === "loading" ? (
+            {directoryScope === "property" && !propertyPermissionUsable ? (
+              <CompositeSourceFallback
+                state={propertyStaffPermissionSource?.state ?? "unavailable"}
+                label={`${selectedProperty?.name ?? "current property"} Staff access`}
+              />
+            ) : directoryScope === "property" && propertyPermissionCurrent && !mayReadCurrentProperty ? (
+              <EmptyState
+                icon={<ShieldAlert />}
+                title="Property Staff access is restricted"
+                description={`Your account cannot view Staff assignments at ${selectedProperty?.name ?? "the selected property"}.`}
+              />
+            ) : directorySource.state === "loading" ? (
               <LoadingState label="Loading staff" />
             ) : !directoryUsable ? (
               <CompositeSourceFallback state={directorySource.state} label="Staff directory" />
@@ -316,11 +443,21 @@ export function StaffPage() {
               <div className="p-6">
                 <EmptyState
                   icon={<UsersRound />}
-                  title={search || status !== "all" ? "No staff members match" : "No staff profiles yet"}
+                  title={search || status !== "all"
+                    ? "No staff members match"
+                    : directoryScope === "property"
+                      ? `No staff assigned to ${selectedProperty?.name ?? "this property"}`
+                      : "No staff profiles yet"}
                   description={search || status !== "all"
                     ? "Try another search or status."
-                    : "Create the first staff profile, then assign it to a property."}
-                  action={mayCreate && !search && status === "all" ? (
+                    : directoryScope === "property"
+                      ? "View the workspace directory to choose a person, then add this property as a work location."
+                      : "Create the first staff profile, then assign it to a property."}
+                  action={!search && status === "all" && directoryScope === "property" ? (
+                    <button type="button" className="btn btn-sm btn-outline" onClick={() => setDirectoryScope("workspace")}>
+                      <UsersRound size={15} />View workspace staff
+                    </button>
+                  ) : mayCreate && !search && status === "all" ? (
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
@@ -337,6 +474,8 @@ export function StaffPage() {
             ) : (
               <StaffDirectory
                 items={items}
+                scope={directoryScope}
+                propertyName={selectedProperty?.name ?? null}
                 focusedMemberId={focusedMemberId}
                 onSelect={selectMember}
               />
@@ -376,12 +515,13 @@ export function StaffPage() {
           selectedProperty={selectedProperty}
           propertySource={propertySource}
           permissionSource={permissionSource}
-          assignmentPermissionSource={assignmentPermissionSource}
+          assignmentPermissionSource={propertyStaffPermissionSource}
           canReadSensitive={mayReadSensitive}
           canManage={mayManage}
           canManageAccountLinks={mayManageAccountLinks}
           canManageLifecycle={mayManageLifecycle}
           canAssignCurrentProperty={mayAssignCurrentProperty}
+          onSectionChange={setDetailSection}
           onClose={() => selectMember(null)}
         />
       )}
@@ -441,6 +581,7 @@ function CreateStaffModal({
   return (
     <Modal
       open={open}
+      size="lg"
       title="New staff member"
       description="Create the workspace profile first. Account links and property assignments can be added next."
       onClose={close}
@@ -463,10 +604,14 @@ function CreateStaffModal({
 
 function StaffDirectory({
   items,
+  scope,
+  propertyName,
   focusedMemberId,
   onSelect,
 }: {
-  items: StaffDirectoryListItem[];
+  items: StaffDirectoryItem[];
+  scope: StaffDirectoryScope;
+  propertyName: string | null;
   focusedMemberId: string | null;
   onSelect: (staffMemberId: string) => void;
 }) {
@@ -475,10 +620,10 @@ function StaffDirectory({
       <div className="hidden overflow-x-auto md:block">
         <table className="table">
           <thead>
-            <tr className="border-base-300 text-[0.68rem] uppercase tracking-[0.12em] text-base-content/40">
+            <tr className="border-base-300 text-[0.68rem] uppercase text-base-content/40">
               <th className="pl-6">Staff member</th>
-              <th>Role</th>
-              <th>Properties</th>
+              <th>Employment</th>
+              <th>{scope === "property" ? "Current property assignment" : "Work locations"}</th>
               <th>Status</th>
               <th className="pr-6" />
             </tr>
@@ -491,11 +636,8 @@ function StaffDirectory({
                 onClick={() => onSelect(member.staffMemberId)}
               >
                 <td className="pl-6"><StaffIdentity member={member} /></td>
-                <td>
-                  <p className="text-sm font-medium">{member.jobTitle || "No job title"}</p>
-                  <p className="mt-1 text-xs text-base-content/45">{member.department || "No department"}</p>
-                </td>
-                <td><span className="badge badge-ghost font-semibold">{member.currentPropertyCount} current</span></td>
+                <td><EmploymentSummary member={member} /></td>
+                <td><AssignmentSummary member={member} scope={scope} propertyName={propertyName} /></td>
                 <td><StatusBadge status={staffStatusLabel(member.status)} /></td>
                 <td className="pr-6 text-right">
                   <button
@@ -524,12 +666,12 @@ function StaffDirectory({
             onClick={() => onSelect(member.staffMemberId)}
           >
             <div className="flex items-start justify-between gap-3">
-              <StaffIdentity member={member} />
+              <StaffIdentity member={member} showEmployment />
               <StatusBadge status={staffStatusLabel(member.status)} />
             </div>
             <div className="mt-4 flex items-center justify-between gap-3 text-xs text-base-content/50">
-              <span>{member.jobTitle || member.department || "No role details"}</span>
-              <span>{member.currentPropertyCount} properties <ChevronRight className="inline" size={15} /></span>
+              <AssignmentSummary member={member} scope={scope} propertyName={propertyName} compact />
+              <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">View profile <ChevronRight size={14} /></span>
             </div>
           </button>
         ))}
@@ -540,18 +682,81 @@ function StaffDirectory({
 
 function StaffIdentity({
   member,
+  showEmployment = false,
 }: {
   member: Pick<StaffDirectoryListItem, "displayName" | "jobTitle" | "department">;
+  showEmployment?: boolean;
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <InitialAvatar name={member.displayName} size="sm" />
       <div className="min-w-0">
         <p className="truncate font-semibold">{member.displayName}</p>
-        <p className="mt-1 truncate text-xs text-base-content/45">{member.jobTitle || member.department || "Staff directory"}</p>
+        {showEmployment && (
+          <p className="mt-1 truncate text-xs text-base-content/45">{member.jobTitle || member.department || "Employment details not recorded"}</p>
+        )}
       </div>
     </div>
   );
+}
+
+function EmploymentSummary({
+  member,
+}: {
+  member: Pick<StaffDirectoryItem, "jobTitle" | "department">;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-sm font-medium">{member.jobTitle || "Job title not recorded"}</p>
+      <p className="mt-1 truncate text-xs text-base-content/45">{member.department || "Department not recorded"}</p>
+    </div>
+  );
+}
+
+function AssignmentSummary({
+  member,
+  scope,
+  propertyName,
+  compact = false,
+}: {
+  member: StaffDirectoryItem;
+  scope: StaffDirectoryScope;
+  propertyName: string | null;
+  compact?: boolean;
+}) {
+  if (scope === "property" && isPropertyDirectoryItem(member)) {
+    const propertySpecificTitle = member.assignment.propertyJobTitle &&
+      member.assignment.propertyJobTitle !== member.jobTitle
+      ? member.assignment.propertyJobTitle
+      : null;
+    return (
+      <span className={`inline-flex min-w-0 items-center gap-2 ${compact ? "max-w-[13rem]" : ""}`}>
+        <Building2 className="shrink-0 text-primary" size={14} />
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">{propertyName || "Current property"}</span>
+          {!compact && (
+            <span className="mt-1 block truncate text-xs text-base-content/45">
+              {[propertySpecificTitle, member.assignment.isPrimary ? "Primary" : null].filter(Boolean).join(" · ") || "Current assignment"}
+            </span>
+          )}
+        </span>
+      </span>
+    );
+  }
+
+  const count = isPropertyDirectoryItem(member) ? 1 : member.currentPropertyCount;
+  return (
+    <span className="inline-flex items-center gap-2 text-sm">
+      <Building2 className="shrink-0 text-primary" size={14} />
+      <span>{count} current {count === 1 ? "property" : "properties"}</span>
+    </span>
+  );
+}
+
+function isPropertyDirectoryItem(
+  member: StaffDirectoryItem,
+): member is StaffPropertyDirectoryListItem {
+  return "assignment" in member;
 }
 
 function capitalize(value: string): string {

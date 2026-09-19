@@ -227,6 +227,20 @@ export function dataRightsSelectedEvidencePath(
   return null;
 }
 
+export function shouldLoadDataRightsSelectedEvidence(
+  dataRightsCase: Pick<DataRightsCase, "selectedSubjectCount"> | undefined,
+  selectedEvidencePath: string | null,
+): boolean {
+  return Boolean(selectedEvidencePath && dataRightsCase && dataRightsCase.selectedSubjectCount > 0);
+}
+
+export function isDataRightsSelectedEvidenceAuthorityCurrent(
+  dataRightsCase: Pick<DataRightsCase, "selectedSubjectCount">,
+  sourceCurrent: boolean,
+): boolean {
+  return dataRightsCase.selectedSubjectCount === 0 || sourceCurrent;
+}
+
 export function isDataRightsSelectedEvidenceCurrent(
   dataRightsCase: Pick<DataRightsCase, "selectedSubjectCount" | "version">,
   evidence: DataRightsSelectedSubjectsResponse | undefined,

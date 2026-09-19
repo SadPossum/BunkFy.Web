@@ -1,143 +1,326 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BedDouble, Blocks, Building2, CalendarCheck2, CalendarClock, Plus, Users } from "lucide-react";
-import { Link } from "react-router";
-import { Navigate } from "react-router";
-import type { ReservationListResponse } from "../../api/types";
-import { reservationStatusLabel } from "../../api/labels";
-import { LIVE_LIST_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
-import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
-import { useSession } from "../../app/session";
-import { useWorkspace } from "../../app/workspace";
+import { Building2, LayoutDashboard, Map, Plus, ShieldCheck } from "lucide-react";
+import { useLayoutEffect, useRef, type MouseEvent } from "react";
+import { Link, useSearchParams } from "react-router";
+import type {
+  InventoryAvailabilityResponse,
+  ReservationListItem,
+  ReservationOperationsSnapshot,
+} from "../../api/types";
 import {
   compositeSourceUsable,
+  compositeSourceCurrent,
   createCompositeSource,
-  type CompositeSourceState,
 } from "../../app/compositeSourceState";
-import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
-import { EmptyState, ErrorState, InitialAvatar, LoadingState, PageHeader, StatusBadge } from "../../components/ui/primitives";
+import {
+  LIVE_LIST_REFRESH_INTERVAL_MS,
+  reservationNeedsLiveRefresh,
+} from "../../app/liveUpdates";
+import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
+import { useSession } from "../../app/session";
+import { useWorkspace } from "../../app/workspace";
+import { useTargetProperty } from "../../app/resourceFocus";
+import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui/primitives";
 import { loadAllManualInventoryBlocks, loadAllRoomInventory } from "../inventory/inventoryApi";
-import { loadAllRooms } from "../properties/propertiesApi";
+import { ApiError } from "../../api/client";
+import { loadTodayReservationFeed, TodayReservationFeedError, type TodayReservationFeed } from "./todayReservationFeed";
+import { TodayOperationsView } from "./TodayOperationsView";
+import { TodayVisualView } from "./TodayVisualView";
+
+const todayViews = [
+  { value: "operations", label: "Operations", icon: <LayoutDashboard size={16} /> },
+  { value: "visual", label: "Rooms", icon: <Map size={16} /> },
+] as const;
+
+type TodayView = (typeof todayViews)[number]["value"];
 
 export function DashboardPage() {
-  const { request } = useSession();
-  const { selectedProperty, selectedPropertyId, selectedWorkspaceId, propertiesLoading, propertiesError } = useWorkspace();
-  const tenantScope = selectedWorkspaceId ? tenantAccessScope(selectedWorkspaceId) : "";
-  const access = usePermissions(tenantScope ? [
-    { permission: permissions.propertiesRead, scope: tenantScope },
-    { permission: permissions.inventoryRead, scope: tenantScope },
-    { permission: permissions.reservationsRead, scope: tenantScope },
+  const { request, session } = useSession();
+  const {
+    selectedProperty,
+    selectedPropertyId,
+    properties,
+    propertiesLoading,
+    propertiesError,
+    refetchProperties,
+  } = useWorkspace();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPropertyId = searchParams.get("property");
+  const hasRequestedProperty = searchParams.has("property");
+  const unambiguousProperty = searchParams.getAll("property").length <= 1;
+  useTargetProperty(unambiguousProperty ? requestedPropertyId : null);
+  const requestedPropertyExists = !hasRequestedProperty
+    || (unambiguousProperty && properties.some((property) => property.propertyId === requestedPropertyId));
+  const propertyBound = requestedPropertyExists
+    && (!hasRequestedProperty || requestedPropertyId === selectedPropertyId);
+  const view: TodayView = searchParams.get("view") === "visual" ? "visual" : "operations";
+  const accessScope = session && selectedPropertyId
+    ? propertyAccessScope(session.tenantId, selectedPropertyId)
+    : "";
+  const access = usePermissions(accessScope ? [
+    { permission: permissions.inventoryRead, scope: accessScope },
+    { permission: permissions.reservationsRead, scope: accessScope },
+    { permission: permissions.reservationsCreate, scope: accessScope },
+    { permission: permissions.propertiesRead, scope: accessScope },
+    // Stabilize the evaluation set across preview entry/exit, not its decisions.
+    { permission: permissions.reservationsCheckIn, scope: accessScope },
+    { permission: permissions.reservationsCheckOut, scope: accessScope },
   ] : []);
-  const enabled = Boolean(selectedPropertyId);
-  const rooms = useQuery({ queryKey: ["rooms", selectedPropertyId], queryFn: (context) => loadAllRooms(request, selectedPropertyId, context.signal), enabled });
-  const inventory = useQuery({ queryKey: ["inventory-rooms", selectedPropertyId], queryFn: (context) => loadAllRoomInventory(request, selectedPropertyId!, context.signal), enabled });
-  const reservations = useQuery({
-    queryKey: ["reservations", selectedPropertyId, "all"],
-    queryFn: () => request<ReservationListResponse>(`/api/reservations/properties/${selectedPropertyId}?page=1&pageSize=100`),
+  const canReadInventory = access.allows(permissions.inventoryRead, accessScope);
+  const canReadReservations = access.allows(permissions.reservationsRead, accessScope);
+  const permissionCurrent = access.hasData && !access.error;
+  const hasTodayAccess = canReadInventory && canReadReservations;
+  const canOpenSpaces = propertyBound && permissionCurrent && !propertiesError
+    && access.allows(permissions.propertiesRead, accessScope);
+  const enabled = Boolean(propertyBound && selectedPropertyId && permissionCurrent && hasTodayAccess);
+  const authority = `${session?.tenantId}:${session?.subjectId}:${session?.sessionId}:${session?.generation}:${selectedPropertyId}`;
+  const operations = useQuery({
+    queryKey: ["reservation-operations", selectedPropertyId],
+    queryFn: ({ signal }) => request<ReservationOperationsSnapshot>(
+      `/api/reservations/properties/${selectedPropertyId}/operations-snapshot?upcomingLimit=8`,
+      { signal },
+    ),
     enabled,
+    refetchInterval: (query) => query.state.data?.upcoming.some((item) =>
+      reservationNeedsLiveRefresh(item.status))
+      ? LIVE_LIST_REFRESH_INTERVAL_MS
+      : 30_000,
+    refetchIntervalInBackground: false,
+  });
+  const inventory = useQuery({
+    queryKey: ["inventory-rooms", selectedPropertyId],
+    queryFn: ({ signal }) => loadAllRoomInventory(request, selectedPropertyId!, signal),
+    enabled,
+  });
+  const localDate = operations.data?.propertyId === selectedPropertyId ? operations.data.localDate : undefined;
+  const schedule = useQuery<TodayReservationFeed>({
+    queryKey: ["reservations", selectedPropertyId, "today", localDate, authority],
+    queryFn: ({ signal }) => loadTodayReservationFeed(request, selectedPropertyId!, localDate!, signal),
+    enabled: enabled && Boolean(localDate),
+    retry: (count, error) => !readDenied(error) && !(error instanceof TodayReservationFeedError) && count < 1,
     refetchInterval: (query) => query.state.data?.reservations.some((item) => reservationNeedsLiveRefresh(item.status))
       ? LIVE_LIST_REFRESH_INTERVAL_MS
       : false,
     refetchIntervalInBackground: false,
   });
-  const blocks = useQuery({ queryKey: ["blocks", selectedPropertyId, false], queryFn: (context) => loadAllManualInventoryBlocks(request, selectedPropertyId!, false, context.signal), enabled });
-  const roomSource = createCompositeSource({ label: "Rooms", hasData: rooms.data !== undefined, isLoading: rooms.isLoading, error: rooms.error, isFetching: rooms.isFetching, refetch: () => rooms.refetch() });
-  const inventorySource = createCompositeSource({ label: "Inventory", hasData: inventory.data !== undefined, isLoading: inventory.isLoading, error: inventory.error, isFetching: inventory.isFetching, refetch: () => inventory.refetch() });
-  const reservationSource = createCompositeSource({ label: "Reservations", hasData: reservations.data !== undefined, isLoading: reservations.isLoading, error: reservations.error, isFetching: reservations.isFetching, refetch: () => reservations.refetch() });
-  const blockSource = createCompositeSource({ label: "Blocks", hasData: blocks.data !== undefined, isLoading: blocks.isLoading, error: blocks.error, isFetching: blocks.isFetching, refetch: () => blocks.refetch() });
-  const sources = [roomSource, inventorySource, reservationSource, blockSource];
+  const blocks = useQuery({
+    queryKey: ["blocks", selectedPropertyId, false, localDate, localDate ? nextDate(localDate) : null],
+    queryFn: ({ signal }) => loadAllManualInventoryBlocks(
+      request,
+      selectedPropertyId!,
+      false,
+      signal,
+      { from: localDate!, to: nextDate(localDate!) },
+    ),
+    enabled: enabled && Boolean(localDate),
+  });
+  const availability = useQuery({
+    queryKey: ["availability", selectedPropertyId, localDate, localDate ? nextDate(localDate) : null],
+    queryFn: ({ signal }) => request<InventoryAvailabilityResponse>(
+      `/api/inventory/properties/${selectedPropertyId}/availability?arrival=${localDate}&departure=${nextDate(localDate!)}`,
+      { signal },
+    ),
+    enabled: enabled && view === "visual" && Boolean(localDate),
+  });
+  // A retry clears Query's error before its first data arrives. Keep a previously
+  // failed source unconfirmed (and its Retry mounted) during that pending read.
+  const operationSource = createCompositeSource({ label: "Today operations", hasData: Boolean(localDate) && !readDenied(operations.error), isLoading: operations.isLoading && !operations.errorUpdatedAt, error: operations.error, isFetching: operations.isFetching || operations.isPaused, refetch: () => operations.refetch() });
+  const inventorySource = createCompositeSource({ label: "Inventory", hasData: inventory.data !== undefined && inventory.data.rooms.every(room => room.propertyId === selectedPropertyId) && !readDenied(inventory.error), isLoading: inventory.isLoading && !inventory.errorUpdatedAt, error: inventory.error, isFetching: inventory.isFetching || inventory.isPaused, refetch: () => inventory.refetch() });
+  const blockSource = createCompositeSource({ label: "Blocks", hasData: blocks.data !== undefined && blocks.data.blocks.every(block => block.propertyId === selectedPropertyId) && !readDenied(blocks.error), isLoading: blocks.isLoading && !blocks.errorUpdatedAt, error: blocks.error, isFetching: blocks.isFetching || blocks.isPaused, refetch: () => blocks.refetch() });
+  const feedMatches = schedule.data?.propertyId === selectedPropertyId && schedule.data?.localDate === localDate;
+  const feedConflict = feedMatches && Boolean(schedule.data?.conflictingIds.length);
+  const scheduleSource = createCompositeSource({ label: "Complete Today reservation details", hasData: feedMatches && !readDenied(schedule.error) && !(schedule.error instanceof TodayReservationFeedError), isLoading: schedule.isLoading && !schedule.errorUpdatedAt, error: schedule.error || (feedConflict ? new TodayReservationFeedError() : null), isFetching: schedule.isFetching || schedule.isPaused, refetch: () => schedule.refetch() });
+  const availabilitySource = createCompositeSource({ label: "Tonight availability", hasData: availability.data?.propertyId === selectedPropertyId && availability.data.arrival === localDate && availability.data.departure === nextDate(localDate!) && !readDenied(availability.error), isLoading: availability.isLoading && !availability.errorUpdatedAt, error: availability.error, isFetching: availability.isFetching || availability.isPaused, refetch: () => availability.refetch() });
+  const sources = [
+    operationSource,
+    inventorySource,
+    ...(localDate ? [blockSource, scheduleSource] : []),
+    ...(view === "visual" && localDate ? [availabilitySource] : []),
+  ];
 
-  if (propertiesLoading || access.isLoading) return <LoadingState />;
-  if (access.error) return <ErrorState error={access.error} />;
-  if (![permissions.propertiesRead, permissions.inventoryRead, permissions.reservationsRead]
-    .every((permission) => access.allows(permission, tenantScope))) {
-    return <Navigate to="/properties" replace />;
+  const viewControls = useRef<HTMLDivElement>(null);
+  const retryFocus = useRef<{ owner: string; button: HTMLButtonElement; cancel: () => void } | null>(null);
+  const retryOwner = `${authority}:${localDate}:${view}:${searchParams.toString()}:${enabled && !propertiesLoading && !propertiesError}`;
+
+  function rememberRetryFocus(event: MouseEvent<HTMLDivElement>) {
+    const button = event.target instanceof Element ? event.target.closest("button") : null;
+    if (!button || button.disabled || button.getAttribute("aria-disabled") === "true" || document.activeElement !== button) return;
+    retryFocus.current?.cancel();
+    const cancel = () => {
+      document.removeEventListener("focusin", moved);
+      document.removeEventListener("pointerdown", pointer);
+      document.removeEventListener("keydown", key);
+      retryFocus.current = null;
+    };
+    const moved = (focus: FocusEvent) => { if (focus.target !== button) cancel(); };
+    const pointer = (input: PointerEvent) => { if (!(input.target instanceof Element) || input.target.closest("button") !== button) cancel(); };
+    const key = (input: KeyboardEvent) => { if (input.key === "Tab") cancel(); };
+    retryFocus.current = { owner: retryOwner, button, cancel };
+    document.addEventListener("focusin", moved);
+    document.addEventListener("pointerdown", pointer);
+    document.addEventListener("keydown", key);
   }
-  if (propertiesError) return <ErrorState error={propertiesError} />;
-  if (!selectedProperty) return <EmptyState icon={<Building2 />} title="Start with your first property" description="Add a hostel property, then set up rooms, beds, inventory and reservations." action={<Link className="btn btn-primary" to="/properties"><Plus size={17} />Add property</Link>} />;
-  if (sources.every((source) => source.state === "loading")) return <LoadingState label="Preparing today’s overview" />;
 
-  const today = dateKey(new Date());
-  const roomsUsable = compositeSourceUsable(roomSource.state);
-  const inventoryUsable = compositeSourceUsable(inventorySource.state);
-  const reservationsUsable = compositeSourceUsable(reservationSource.state);
-  const blocksUsable = compositeSourceUsable(blockSource.state);
-  const roomItems = roomsUsable ? rooms.data?.rooms ?? [] : [];
-  const inventoryRooms = inventoryUsable ? inventory.data?.rooms ?? [] : [];
-  const reservationItems = reservationsUsable ? reservations.data?.reservations ?? [] : [];
-  const activeBlocks = blocksUsable ? blocks.data?.blocks ?? [] : [];
-  const arrivals = reservationItems.filter((item) => item.arrival === today && reservationStatusKey(item.status) === "confirmed");
-  const inHouse = reservationItems.filter((item) => ["checkedIn", "checkoutPending"].includes(reservationStatusKey(item.status)));
-  const needsAttention = reservationItems.filter((item) => ["pendingAllocation", "allocationRejected", "cancellationPending", "noShowPending", "checkoutPending"].includes(reservationStatusKey(item.status)));
-  const sellableUnits = inventoryRooms.flatMap((room) => room.units).filter((unit) => unit.isSellable && unit.isTopologyActive);
-  const upcoming = reservationItems.filter((item) => item.arrival >= today && ["pendingAllocation", "confirmed"].includes(reservationStatusKey(item.status))).sort((a, b) => a.arrival.localeCompare(b.arrival)).slice(0, 6);
+  useLayoutEffect(() => {
+    const intent = retryFocus.current;
+    if (!intent) return;
+    if (intent.owner !== retryOwner) { intent.cancel(); return; }
+    if (access.isFetching || !sources.every(compositeSourceCurrent) || intent.button.isConnected) return;
+    const target = viewControls.current?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+    const shouldRestore = document.activeElement === document.body && target?.isConnected
+      && !target.disabled && !target.closest('[hidden], [inert], [aria-hidden="true"]')
+      && target.getClientRects().length > 0 && getComputedStyle(target).visibility === "visible";
+    intent.cancel();
+    if (shouldRestore) target.focus({ preventScroll: true });
+  });
+  useLayoutEffect(() => () => retryFocus.current?.cancel(), []);
+
+  function setView(nextView: TodayView) {
+    const next = new URLSearchParams(searchParams);
+    if (nextView === "operations") next.delete("view");
+    else next.set("view", nextView);
+    setSearchParams(next, { replace: true });
+  }
+
+  if (propertiesLoading) return <LoadingState />;
+  if (propertiesError) return <ErrorState error={propertiesError} retry={() => void refetchProperties()} title="Properties could not be loaded" />;
+  if (!requestedPropertyExists) return <EmptyState icon={<ShieldCheck />} title="This property is not available" description="Choose an accessible property to open Today. No other property's details are shown for this link." />;
+  if (!propertyBound) return <LoadingState label="Opening the requested property" />;
+  if (!selectedProperty) {
+    return (
+      <EmptyState
+        icon={<Building2 />}
+        title="Start with your first property"
+        description="Add a hostel property, then set up rooms, beds, inventory, and reservations."
+        action={<Link className="btn btn-primary" to="/properties"><Plus size={17} />Add property</Link>}
+      />
+    );
+  }
+  if (access.error) return <ErrorState error={access.error} retry={() => void access.refetch()} title="Today access could not be checked" />;
+  if (!access.hasData) {
+    return <LoadingState label="Checking Today access" />;
+  }
+  if (!hasTodayAccess) {
+    return (
+      <EmptyState
+        icon={<ShieldCheck />}
+        title="Today access is not assigned"
+        description="Today combines reservation and inventory information, so both read permissions are required for this property."
+      />
+    );
+  }
+
+  const inventoryItems = compositeSourceUsable(inventorySource.state) ? inventory.data?.rooms ?? [] : [];
+  const blockItems = compositeSourceUsable(blockSource.state) ? blocks.data?.blocks ?? [] : [];
+  const snapshot = compositeSourceUsable(operationSource.state) ? operations.data : undefined;
+  const todayReservations: ReservationListItem[] = compositeSourceUsable(scheduleSource.state) ? schedule.data?.reservations ?? [] : [];
+  const liveAvailability = compositeSourceUsable(availabilitySource.state) ? availability.data : undefined;
+  const canCreate = permissionCurrent
+    && access.allows(permissions.reservationsCreate, accessScope);
+  // Presentation only: retain the real currentness/permission gates above.
+  // A paused, failed or incomplete source is not a successful background read.
+  const updating = sources.every(source => source.state === "ready") && !access.isFetching
+    && ![operations, inventory, blocks, schedule, ...(view === "visual" ? [availability] : [])].some(query => query.isPaused)
+    ? [[operationSource, "Summary"], [inventorySource, "Rooms"], [blockSource, "Blocks"], [scheduleSource, "Reservations"], ...(view === "visual" ? [[availabilitySource, "Availability"]] : [])]
+      .filter(([source]) => typeof source !== "string" && source.isFetching)
+      .map(([, label]) => String(label))
+    : [];
+  const routineRefresh = updating.length > 0;
+  const sourceStatus = routineRefresh ? <>
+    {updating.length === 1 ? `${updating[0]}: updating` : `${updating.length} sources: updating`}
+    <span className="sr-only">. Last known {updating.join(", ").toLowerCase()} shown while refreshing. Open a record to check current details.</span>
+  </> : null;
 
   return (
     <>
-      <PageHeader eyebrow={formatLongDate(new Date())} title={`Good day at ${selectedProperty.name}`} description="Here’s the operational picture across reservations and inventory." action={<Link to="/reservations?new=1" className="btn btn-primary"><Plus size={17} />New reservation</Link>} />
-
-      <CompositeSourceNotice sources={sources} title="Some overview data is delayed" />
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<CalendarClock />} label="Arrivals today" value={reservationsUsable ? arrivals.length : null} detail={sourceDetail(reservationSource.state, arrivals.length ? `${arrivals.reduce((sum, item) => sum + item.guestCount, 0)} guests expected` : "No arrivals scheduled", "Reservation data unavailable")} tone="accent" />
-        <StatCard icon={<Users />} label="In house" value={reservationsUsable ? inHouse.length : null} detail={sourceDetail(reservationSource.state, `${inHouse.reduce((sum, item) => sum + item.guestCount, 0)} current guests`, "Reservation data unavailable")} tone="primary" />
-        <StatCard icon={<BedDouble />} label="Sellable units" value={inventoryUsable ? sellableUnits.length : null} detail={sourceDetail(inventorySource.state, roomsUsable ? `Across ${roomItems.length} rooms` : roomSource.state === "loading" ? "Room total loading..." : "Room total unavailable", "Inventory data unavailable")} tone="secondary" />
-        <StatCard icon={<Blocks />} label="Active blocks" value={blocksUsable ? activeBlocks.length : null} detail={sourceDetail(blockSource.state, activeBlocks.length ? "Review inventory impact" : "Inventory is clear", "Block data unavailable")} tone="warning" />
-      </section>
-
-      {reservationsUsable && needsAttention.length > 0 && <Link to="/reservations" className="alert mt-4 border border-warning/25 bg-warning/10 text-base-content transition hover:border-warning/45"><CalendarClock size={19} className="text-warning" /><span><strong>{needsAttention.length} {needsAttention.length === 1 ? "reservation needs" : "reservations need"} attention.</strong> Review allocation or inventory-release progress.</span><ArrowRight size={17} /></Link>}
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <div className="card border border-base-300 bg-base-100 shadow-sm">
-          <div className="card-body p-0">
-            <div className="flex items-center justify-between px-6 pb-4 pt-6"><div><h2 className="font-display text-xl font-semibold">Upcoming stays</h2><p className="mt-1 text-sm text-base-content/50">The next reservations needing attention.</p></div><Link to="/reservations" className="btn btn-ghost btn-sm text-primary">View all <ArrowRight size={16} /></Link></div>
-            {!reservationsUsable
-              ? <CompositeSourceFallback state={reservationSource.state} label="upcoming stays" />
-              : upcoming.length
-                ? <div className="divide-y divide-base-300">{upcoming.map((reservation) => <Link to={`/reservations?reservation=${reservation.reservationId}`} key={reservation.reservationId} className="grid gap-3 px-6 py-4 transition hover:bg-base-200 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div className="flex items-center gap-3"><InitialAvatar name={reservation.primaryGuestName} size="sm" /><div><p className="font-semibold">{reservation.primaryGuestName}</p><p className="mt-1 text-xs text-base-content/45">{reservation.guestCount} {reservation.guestCount === 1 ? "guest" : "guests"} · {reservation.inventoryUnitCount} {reservation.inventoryUnitCount === 1 ? "unit" : "units"}</p></div></div><div className="text-sm"><p className="font-semibold">{formatShortDate(reservation.arrival)} → {formatShortDate(reservation.departure)}</p><p className="mt-1 text-right text-xs text-base-content/45">{nightsBetween(reservation.arrival, reservation.departure)} nights</p></div><StatusBadge status={reservationStatusLabel(reservation.status)} /></Link>)}</div>
-                : <div className="px-6 pb-7"><EmptyState icon={<CalendarCheck2 />} title="No upcoming stays" description="New reservations will appear here as soon as they are created." action={<Link className="btn btn-sm btn-primary" to="/reservations?new=1">Add reservation</Link>} /></div>}
-          </div>
+      <header className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[24px] font-semibold leading-[30px]">Today<span className="sr-only"> at {selectedProperty.name}</span></h1>
+          <p className="text-[13px] leading-[18px] text-base-content/65">{snapshot ? formatLongDate(snapshot.localDate, snapshot.timeZoneId) : "Operating date unconfirmed"}</p>
         </div>
+        {canCreate && <Link to="/reservations?new=1" className="btn btn-primary min-h-[44px] text-[14px] leading-[20px]"><Plus size={17} />New reservation</Link>}
+      </header>
+      <div ref={viewControls} className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <SegmentedTabs
+          value={view}
+          options={todayViews}
+          ariaLabel="Today view"
+          className="[&>button]:min-h-[44px] [&>button]:h-auto [&>button]:text-[14px] [&>button]:leading-[20px]"
+          onValueChange={setView}
+        />
+        {snapshot && <p className="text-[13px] leading-[18px] text-base-content/65">{snapshot.timeZoneId}</p>}
+      </div>
 
-        <div className="card border border-base-300 bg-primary text-primary-content shadow-sm">
-          <div className="card-body p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Property pulse</p>
-            <h2 className="font-display text-2xl font-semibold">{selectedProperty.name}</h2>
-            <p className="text-sm text-primary-content/60">{selectedProperty.code} · {selectedProperty.timeZoneId}</p>
-            <div className="my-3 h-px bg-primary-content/10" />
-            <div className="space-y-4">
-              <PulseRow label="Rooms configured" value={roomsUsable ? roomItems.length : null} state={roomSource.state} />
-              <PulseRow label="Inventory modes set" value={inventoryUsable ? inventoryRooms.filter((room) => !String(room.salesMode).toLowerCase().includes("unconfigured") && room.salesMode !== 1).length : null} suffix={inventoryUsable ? `of ${inventoryRooms.length}` : undefined} state={inventorySource.state} />
-              <PulseRow label="Reservations on record" value={reservationsUsable ? reservationItems.length : null} state={reservationSource.state} />
-            </div>
-            <Link to="/properties" className="btn mt-4 border-0 bg-primary-content text-primary hover:bg-primary-content/90"><Building2 size={17} />Manage property</Link>
-          </div>
-        </div>
-      </section>
+      <div onClickCapture={rememberRetryFocus}>
+        <CompositeSourceNotice sources={sources} title="Some live property data is delayed" keepRetryFocusable />
+      </div>
+
+      {view === "operations" ? (
+        <TodayOperationsView
+          propertyId={selectedPropertyId}
+          canOpenSpaces={canOpenSpaces}
+          snapshot={snapshot}
+          snapshotState={operationSource.state}
+          inventory={inventoryItems}
+          inventoryState={inventorySource.state}
+          blocks={blockItems}
+          blockState={blockSource.state}
+          reservations={todayReservations}
+          reservationState={scheduleSource.state}
+          reservationCurrent={compositeSourceCurrent(scheduleSource)}
+          snapshotCurrent={compositeSourceCurrent(operationSource)}
+          conflictCount={feedConflict ? schedule.data!.conflictingIds.length : 0}
+          routineRefresh={routineRefresh}
+          sourceStatus={sourceStatus}
+        />
+      ) : (
+        <TodayVisualView
+          key={`${authority}:${snapshot?.localDate ?? "unknown"}`}
+          propertyId={selectedPropertyId}
+          propertyName={selectedProperty.name}
+          rooms={inventoryItems}
+          roomState={inventorySource.state}
+          availability={liveAvailability}
+          availabilityState={availabilitySource.state}
+          reservations={todayReservations}
+          reservationState={scheduleSource.state}
+          blocks={blockItems}
+          blockState={blockSource.state}
+          localDate={snapshot?.localDate}
+          current={sources.every(compositeSourceCurrent) && !access.isFetching}
+          canOpenSpaces={canOpenSpaces}
+          reservationCurrent={compositeSourceCurrent(scheduleSource)}
+          conflictCount={feedConflict ? schedule.data!.conflictingIds.length : 0}
+          routineRefresh={routineRefresh}
+          sourceStatus={sourceStatus}
+        />
+      )}
     </>
   );
 }
 
-function StatCard({ icon, label, value, detail, tone }: { icon: React.ReactNode; label: string; value: number | null; detail: string; tone: "accent" | "primary" | "secondary" | "warning" }) {
-  const tones = { accent: "bg-accent/15 text-accent-content", primary: "bg-primary/12 text-primary", secondary: "bg-secondary/15 text-secondary", warning: "bg-warning/15 text-warning-content" };
-  return <div className="card border border-base-300 bg-base-100 shadow-sm"><div className="card-body gap-4 p-5"><div className="flex items-center justify-between"><div className={`grid size-10 place-items-center rounded-xl ${tones[tone]}`}>{icon}</div><span className="min-w-[3ch] text-right text-3xl font-semibold tracking-tight">{value ?? "—"}</span></div><div><p className="text-sm font-semibold">{label}</p><p className="mt-1 text-xs text-base-content/45">{detail}</p></div></div></div>;
+function nextDate(value: string) {
+  return shiftDate(value, 1);
 }
 
-function PulseRow({ label, value, suffix, state }: { label: string; value: number | null; suffix?: string; state: CompositeSourceState }) {
-  const displayValue = state === "loading" ? "..." : value ?? "—";
-  return <div className="flex items-center justify-between"><span className="text-sm text-primary-content/65">{label}</span><span className="font-display text-xl font-semibold">{displayValue} {value !== null && suffix && <span className="text-sm font-normal text-primary-content/45">{suffix}</span>}</span></div>;
+function readDenied(error: unknown) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
 }
 
-function sourceDetail(
-  state: CompositeSourceState,
-  ready: string,
-  unavailable: string,
-): string {
-  if (state === "loading") return "Loading...";
-  if (state === "unavailable") return unavailable;
-  return ready;
+function shiftDate(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
-function formatLongDate(date: Date) { return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(date); }
-function formatShortDate(value: string) { return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T12:00:00`)); }
-function nightsBetween(arrival: string, departure: string) { return Math.max(0, Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000)); }
+function formatLongDate(value: string, timeZoneId: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: timeZoneId,
+  }).format(new Date(`${value}T12:00:00Z`));
+}

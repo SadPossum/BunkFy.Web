@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import type { AccessPermissionCheck, AccessPermissionEvaluationResponse } from "../api/types";
-import { useSession } from "./session";
+export {
+  accessAuthorityChecksMatchTenant as accessChecksMatchTenant,
+  useAccessPermissions as usePermissions,
+} from "./accessAuthority";
 
 export const permissions = {
   accessProfilesRead: "access-control.profiles.read",
@@ -9,6 +10,7 @@ export const permissions = {
   workspaceStaffOnboardingManage: "workspaces.staff-onboarding.manage",
   propertiesRead: "properties.read",
   propertiesManage: "properties.properties.manage",
+  propertyTimeZonesManage: "properties.time-zones.manage",
   roomsManage: "properties.rooms.manage",
   bedsManage: "properties.beds.manage",
   inventoryRead: "inventory.read",
@@ -61,50 +63,4 @@ export function tenantAccessScope(tenantId: string): string {
 
 export function propertyAccessScope(tenantId: string, propertyId: string): string {
   return `${tenantAccessScope(tenantId)}/property:${propertyId}`;
-}
-
-export function accessChecksMatchTenant(
-  tenantId: string | undefined,
-  checks: AccessPermissionCheck[],
-): boolean {
-  if (!tenantId || tenantId === "global") return false;
-
-  const tenantScope = tenantAccessScope(tenantId);
-  return checks.every(({ scope }) =>
-    scope === tenantScope || scope.startsWith(`${tenantScope}/`)
-  );
-}
-
-export function usePermissions(checks: AccessPermissionCheck[]) {
-  const { request, session } = useSession();
-  const keys = checks.map(({ permission, scope }) => `${permission}@${scope}`);
-  const subjectKey = session?.username.trim().toLowerCase() ?? "";
-  const query = useQuery({
-    queryKey: ["access-permissions", session?.tenantId, subjectKey, ...keys],
-    queryFn: () => request<AccessPermissionEvaluationResponse>("/api/access/permissions/evaluate", {
-      method: "POST",
-      body: JSON.stringify({ checks }),
-    }),
-    enabled: Boolean(
-      session && subjectKey && checks.length &&
-      accessChecksMatchTenant(session.tenantId, checks),
-    ),
-    staleTime: 30_000,
-  });
-  const allowed = new Set(
-    (query.data?.permissions ?? [])
-      .filter((decision) => decision.allowed)
-      .map((decision) => `${decision.permission}@${decision.scope}`),
-  );
-
-  return {
-    hasData: query.data !== undefined,
-    isLoading: query.isLoading,
-    isFetching: query.isFetching,
-    error: query.error,
-    refetch: async () => {
-      await query.refetch();
-    },
-    allows: (permission: string, scope: string) => allowed.has(`${permission}@${scope}`),
-  };
 }

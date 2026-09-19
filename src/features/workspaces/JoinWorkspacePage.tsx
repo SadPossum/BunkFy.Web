@@ -7,9 +7,11 @@ import {
   Link2,
   LogOut,
   MailCheck,
+  ShieldCheck,
+  UserRound,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { ApiError } from "../../api/client";
 import type {
@@ -41,6 +43,7 @@ import {
   parseWorkspaceJoinSecret,
   readPreservedWorkspaceJoinSecret,
   resolveEnrollmentJoin,
+  workspaceJoinVerificationCopy,
   workspaceJoinSourceKind,
   type WorkspaceJoinSecret,
   type WorkspaceJoinResolution,
@@ -99,6 +102,8 @@ export function JoinWorkspacePage() {
     retry: false,
   });
   const data = preview.data;
+  const recipientBound = secret?.kind === "invitation" &&
+    (data as OrganizationInvitationPreview | undefined)?.recipientBound === true;
   const sourceId = data && secret
     ? secret.kind === "invitation"
       ? (data as OrganizationInvitationPreview).invitationId
@@ -386,7 +391,7 @@ export function JoinWorkspacePage() {
 
   return (
     <main className="min-h-screen bg-base-200 p-4 sm:p-8">
-      <section className="mx-auto w-full max-w-2xl border border-base-300 bg-base-100 p-7 shadow-sm sm:p-10">
+      <section className="mx-auto w-full max-w-2xl rounded-lg border border-base-300 bg-base-100 p-6 shadow-sm sm:p-10">
         <div className="flex items-center justify-between gap-3">
           <button
             className="btn btn-circle btn-ghost btn-sm"
@@ -440,13 +445,37 @@ export function JoinWorkspacePage() {
         {data && (
           <form className="mt-6" onSubmit={submit}>
             <div className="border-y border-base-300 py-5">
-              <p className="font-semibold">{data.organizationName}</p>
-              <p className="mt-1 text-sm text-base-content/50">
-                {data.organizationSlug}
-              </p>
-              <p className="mt-3 text-xs text-base-content/45">
-                {isEnrollment ? "Team link" : "Invitation"} expires{" "}
-                {new Date(data.expiresAtUtc).toLocaleString()}
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-display text-lg font-semibold">{data.organizationName}</p>
+                  <p className="mt-1 text-sm text-base-content/50">{data.organizationSlug}</p>
+                </div>
+                <span className="badge badge-outline shrink-0">
+                  {isEnrollment ? "Team QR" : "Single-use invite"}
+                </span>
+              </div>
+              <dl className="mt-5 divide-y divide-base-300/70 border-t border-base-300/70">
+                <JoinContextRow
+                  icon={<UserRound size={16} />}
+                  label="Signing in as"
+                  value={session?.username ?? "Current account"}
+                />
+                <JoinContextRow
+                  icon={<ShieldCheck size={16} />}
+                  label="Approval"
+                  value={joinApprovalLabel(secret, data)}
+                />
+                <JoinContextRow
+                  icon={<Link2 size={16} />}
+                  label="Access"
+                  value="Role and property scope set by the workspace owner"
+                />
+              </dl>
+              <p className="mt-4 text-xs leading-5 text-base-content/45">
+                {recipientBound
+                  ? "This invitation can only be accepted by the verified invited account. "
+                  : "This link carries a fixed access plan and cannot be broadened while joining. "}
+                It expires {new Date(data.expiresAtUtc).toLocaleString()}.
               </p>
             </div>
             {!withdrawalResolution && !showAccessProgress && (
@@ -613,6 +642,7 @@ export function JoinWorkspacePage() {
             {verificationRequired && (
               <InvitationVerificationRecovery
                 request={request}
+                recipientBound={recipientBound}
                 onVerified={() => {
                   resetJoin();
                   join.mutate();
@@ -701,9 +731,11 @@ type VerificationAction =
 
 function InvitationVerificationRecovery({
   request,
+  recipientBound,
   onVerified,
 }: {
   request: ReturnType<typeof useSession>["request"];
+  recipientBound: boolean;
   onVerified: () => void;
 }) {
   const { emailVerificationEnabled } = useProductCapabilities();
@@ -718,6 +750,7 @@ function InvitationVerificationRecovery({
   const activeEmail = methods.data?.emails.find(
     (email) => email.isActive && !email.isVerified,
   );
+  const copy = workspaceJoinVerificationCopy(recipientBound);
   const verification = useMutation({
     mutationFn: (action: VerificationAction) =>
       action.kind === "send"
@@ -744,9 +777,10 @@ function InvitationVerificationRecovery({
       <div className="alert border border-warning/30 bg-warning/8 text-sm text-base-content">
         <MailCheck className="text-warning" size={19} />
         <span>
-          This link is restricted to a verified email, but email delivery is
-          disabled in this deployment. Ask the owner for an invite without an
-          email restriction, or use the team QR.
+          This workspace requires a verified email, but email delivery is
+          disabled in this deployment. Sign in with an identity provider that
+          supplies a verified email, or ask the administrator to enable email
+          delivery.
         </span>
       </div>
     );
@@ -758,11 +792,10 @@ function InvitationVerificationRecovery({
         <MailCheck className="mt-0.5 shrink-0 text-warning" size={19} />
         <div>
           <h2 className="font-display text-lg font-semibold">
-            Verify your invited email
+            {copy.title}
           </h2>
           <p className="mt-1 text-sm leading-6 text-base-content/60">
-            This invitation is email-bound. Verify the active address on this
-            account, then BunkFy will continue joining the workspace.
+            {copy.description}
           </p>
         </div>
       </div>
@@ -784,7 +817,7 @@ function InvitationVerificationRecovery({
       {activeEmail && !codeSent && (
         <button
           type="button"
-          className="btn btn-outline btn-sm mt-4"
+          className="btn btn-outline btn-sm mt-4 h-auto min-h-8 w-full justify-start whitespace-normal py-2 text-left leading-5 [overflow-wrap:anywhere] sm:w-auto sm:justify-center sm:text-center"
           disabled={verification.isPending}
           onClick={() =>
             verification.mutate({ kind: "send", emailId: activeEmail.id })
@@ -828,6 +861,36 @@ function InvitationVerificationRecovery({
       )}
     </div>
   );
+}
+
+function JoinContextRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="grid gap-1 py-3 sm:grid-cols-[9.5rem_minmax(0,1fr)] sm:items-start sm:gap-4">
+      <dt className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/45">
+        <span className="text-primary">{icon}</span>
+        {label}
+      </dt>
+      <dd className="break-words text-sm font-medium sm:text-right">{value}</dd>
+    </div>
+  );
+}
+
+function joinApprovalLabel(
+  secret: WorkspaceJoinSecret | null,
+  preview: OrganizationInvitationPreview | OrganizationEnrollmentPreview,
+): string {
+  if (secret?.kind !== "enrollment") return "Immediate after account checks";
+  return (preview as OrganizationEnrollmentPreview).approvalMode === "automatic"
+    ? "Automatic after account checks"
+    : "Workspace owner review required";
 }
 
 function hasPendingEnrollment(token: string, identity: string): boolean {

@@ -41,6 +41,9 @@ export function decrementNotificationUnreadCountLocally(
 ): NotificationInboxResponse | undefined {
   if (!response || response.unreadCount === 0) return response;
 
+  const matchingItem = response.items.find((item) => notificationItemId(item) === notificationId);
+  if (matchingItem?.readAtUtc) return response;
+
   const updated = markNotificationReadLocally(response, notificationId, readAtUtc);
   if (updated !== response) return updated;
   return { ...response, unreadCount: response.unreadCount - 1 } as NotificationInboxResponse;

@@ -5,12 +5,21 @@ type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 export async function waitForWorkspaceAccess(
   request: ApiRequest,
   workspaceId: string,
-  options: { timeoutMs?: number; retryDelayMs?: number } = {},
+  options: {
+    timeoutMs?: number;
+    retryDelayMs?: number;
+    maximumRetryDelayMs?: number;
+  } = {},
 ): Promise<void> {
   if (!workspaceId.trim()) throw new Error("A workspace is required.");
   const timeoutMs = options.timeoutMs ?? 75_000;
-  const retryDelayMs = options.retryDelayMs ?? 250;
+  const retryDelayMs = options.retryDelayMs ?? 400;
+  const maximumRetryDelayMs = Math.max(
+    retryDelayMs,
+    options.maximumRetryDelayMs ?? 1_600,
+  );
   const deadline = Date.now() + timeoutMs;
+  let retryAttempt = 0;
 
   while (true) {
     let nextDelayMs = retryDelayMs;
@@ -21,7 +30,14 @@ export async function waitForWorkspaceAccess(
       return;
     } catch (error) {
       if (!isWorkspaceAccessPending(error)) throw error;
-      nextDelayMs = Math.max(retryDelayMs, error.retryAfterMs ?? 0);
+      nextDelayMs = Math.max(
+        error.retryAfterMs ?? 0,
+        Math.min(
+          retryDelayMs * 2 ** Math.min(retryAttempt, 4),
+          maximumRetryDelayMs,
+        ),
+      );
+      retryAttempt += 1;
     }
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {

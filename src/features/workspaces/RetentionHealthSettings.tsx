@@ -340,7 +340,7 @@ export function RetentionHealthSettings({
       )}
       {scheduleSourceUsable && items.length > 0 && (
         <>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
             <HealthMetric
               icon={<Activity size={18} />}
               label="Schedules"

@@ -42,7 +42,7 @@ describe("notification read state", () => {
     readAtUtc: null,
   } satisfies NotificationHistoryListResponse["items"][number];
 
-  it("optimistically marks one visible item without changing other inbox items", () => {
+  it("records one explicitly acknowledged item without changing other inbox items", () => {
     const response: NotificationHistoryListResponse = {
       items: [
         unreadNotification,
@@ -90,6 +90,22 @@ describe("notification read state", () => {
 
     expect(updated?.unreadCount).toBe(3);
     expect(updated?.items[0].readAtUtc).toBeNull();
+  });
+
+  it("does not decrement another unread item when the summary already contains the target as read", () => {
+    const response: NotificationHistoryListResponse = {
+      items: [{ ...unreadNotification, readAtUtc: "2026-07-15T12:01:00Z" }],
+      page: 1,
+      pageSize: 1,
+      totalCount: 5,
+      unreadCount: 3,
+    };
+
+    expect(decrementNotificationUnreadCountLocally(
+      response,
+      "notification-a",
+      "2026-07-15T12:02:00Z",
+    )).toBe(response);
   });
 });
 

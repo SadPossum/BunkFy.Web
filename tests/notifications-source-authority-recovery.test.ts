@@ -97,6 +97,7 @@ describe("notification source authority recovery", () => {
   it("preserves independent inbox sources and fences every read path", () => {
     const page = source("features/notifications/NotificationsPage.tsx");
     const provider = source("features/notifications/notifications.tsx");
+    const lifecycle = source("features/notifications/notificationStreamLifecycle.ts");
 
     expect(page).toContain("const scopeKey = notificationScopeKey(session);");
     expect(page).toContain("queryKey: notificationListQueryKey(scopeKey, kind, page, unreadOnly)");
@@ -104,10 +105,16 @@ describe("notification source authority recovery", () => {
     expect(page).toContain("const detailSource = createCompositeSource({");
     expect(page).toContain("notificationReadAllowed(scopeKey, targetScopeKey, listCurrent)");
     expect(page).toContain("sourceCurrent: listCurrent && notificationItemMatches(items, item)");
-    expect(page).toContain("notificationSummaryQueryKey(candidate.scopeKey, candidate.kind)");
+    expect(page).toContain("const markRead = useMutation<void, Error, NotificationReadSubmission>({");
+    expect(page).toContain("if (isOffline || !authorityCurrent || markAll.isPending || markRead.isPending || pendingReadIds.current.size > 0)");
+    expect(page).toContain("pendingReadIds.current.add(pendingToken);");
+    expect(page).toContain("pendingReadIds.current.delete(submission.pendingToken);");
+    expect(page).toContain('onMarkRead={(candidate) => markOneRead(candidate, "detail")}');
+    expect(page).toContain("Mark read");
+    expect(page).toContain("notificationSummaryQueryKey(submission.scopeKey, submission.kind)");
     expect(page).toContain("if (scopeKey) previousScopeKeyRef.current = scopeKey;");
     expect(page).toContain("const markAllPending = markAll.isPending && markAllTargetsCurrentInbox;");
-    expect(page).toContain("disabled={markAllPending || !listCurrent}");
+    expect(page).toContain("disabled={markAllPending || markRead.isPending || !listCurrent || isOffline}");
     expect(page).toContain("disabled={!listCurrent}");
     expect(page).toContain("<CompositeSourceNotice");
     expect(page).toContain("<CompositeSourceFallback");
@@ -115,12 +122,27 @@ describe("notification source authority recovery", () => {
     expect(page).not.toContain('["notifications", kind, "unread-summary"]');
     expect(page).not.toContain("query.error ?");
     expect(page).not.toContain("item.error ?");
+    expect(page).not.toContain("IntersectionObserver");
+    expect(page).not.toContain("onVisible");
+    expect(page).not.toContain("acknowledgeVisible");
 
     expect(provider).toContain("const historySeeded = history.data !== undefined;");
     expect(provider).toContain("const broadcastsSeeded = broadcasts.data !== undefined;");
     expect(provider).toContain("if (!scopeKey || !historySeeded) return;");
     expect(provider).toContain("if (!scopeKey || !broadcastsSeeded) return;");
-    expect(provider).toContain("notificationStreamRetryDelay(retryAttempt)");
+    expect(provider).toContain("queryFn: ({ signal }) => request<NotificationHistoryListResponse>(");
+    expect(provider).toContain("queryFn: ({ signal }) => request<NotificationBroadcastListResponse>(");
+    expect(provider).toContain('"/api/notifications?page=1&pageSize=1",\n      { signal },');
+    expect(provider).toContain('"/api/notifications/broadcasts?page=1&pageSize=1",\n      { signal },');
+    expect(provider).toContain("const streamBoundaryKey = sessionIdentityKey(session);");
+    expect(provider).toContain("notificationStreamSupervisor.start({");
+    expect(provider).toContain("stopNotificationStreamOnPageHide(window, lease.stop)");
+    expect(provider).toContain("restartNotificationStreamsOnPersistedPageShow(");
+    expect(provider).not.toContain("useWorkspace");
+    expect(provider).not.toContain("selectedProperty");
+    expect(lifecycle).toContain("await predecessor?.settled.catch(() => undefined);");
+    expect(lifecycle).toContain("cancellation = reader.cancel().then(");
+    expect(lifecycle).toContain("notificationStreamRetryDelay(retryAttempt)");
     expect(provider).not.toContain("!history.isSuccess || !broadcasts.isSuccess");
   });
 });

@@ -3,13 +3,16 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   Building2,
+  ChevronDown,
   CircleUserRound,
   Edit3,
   KeyRound,
   Link2,
   Mail,
+  MoreHorizontal,
   Phone,
   ShieldAlert,
+  ShieldCheck,
   Unlink2,
   UserRoundCheck,
   UserRoundMinus,
@@ -67,6 +70,7 @@ import {
 } from "./staffMutationAuthority";
 import {
   isFullStaffMember,
+  assignmentIsCurrent,
   staffStatusKey,
   type StaffDetailMember,
 } from "./staffPresentation";
@@ -117,6 +121,7 @@ export function StaffDetail({
   canManageAccountLinks,
   canManageLifecycle,
   canAssignCurrentProperty,
+  onSectionChange,
   onClose,
 }: {
   tenantId: string;
@@ -132,6 +137,7 @@ export function StaffDetail({
   canManageAccountLinks: boolean;
   canManageLifecycle: boolean;
   canAssignCurrentProperty: boolean;
+  onSectionChange: (section: StaffDetailTab) => void;
   onClose: () => void;
 }) {
   const { request } = useSession();
@@ -144,6 +150,7 @@ export function StaffDetail({
   const profileAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
   const authSubjectAttempt = useRef<StaffAuthSubjectChangeAttempt | null>(null);
   const lifecycleAttempt = useRef<StaffLifecycleAttempt | null>(null);
+  const employmentMenuRef = useRef<HTMLDetailsElement | null>(null);
   const scopeKey = `${tenantId}:${memberId ?? "none"}`;
   const scopeKeyRef = useRef(scopeKey);
   scopeKeyRef.current = scopeKey;
@@ -429,6 +436,7 @@ export function StaffDetail({
 
   function openLifecycle(action: LifecycleAction) {
     if (!item || !lifecycleActionCurrent || !staffLifecycleActionMatches(item, action)) return;
+    employmentMenuRef.current?.removeAttribute("open");
     lifecycleAttempt.current = null;
     lifecycleMutation.reset();
     setLifecycleTarget({ tenantId, member: item, action });
@@ -442,6 +450,7 @@ export function StaffDetail({
   }
 
   const authNeedsAuthentication = isInsufficientAuthenticationError(authMutation.error);
+  const currentAssignmentCount = item?.assignments.filter(assignmentIsCurrent).length ?? 0;
 
   return (
     <Modal
@@ -453,40 +462,56 @@ export function StaffDetail({
         : "Loading staff profile"}
       onClose={onClose}
     >
-      <CompositeSourceNotice
+      {item && <CompositeSourceNotice
         sources={detailSources}
         title="Staff profile context is delayed"
-      />
+      />}
       {detailLoading ? (
         <LoadingState label="Loading staff profile" />
       ) : !item ? (
-        <CompositeSourceFallback state="unavailable" label="staff profile" />
+        <CompositeSourceFallback
+          error={directory.error ?? profile.error}
+          retry={() => void Promise.all([
+            directory.refetch(),
+            ...(canReadSensitive ? [profile.refetch()] : []),
+          ])}
+          state="unavailable"
+          label="staff profile"
+          title="Staff profile could not be opened"
+        />
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-col gap-4 rounded-2xl bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-lg border border-base-300 bg-base-200/70 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <InitialAvatar name={item.displayName} variant="solid" />
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold">{item.displayName}</p>
-                <p className="text-xs text-base-content/50">{item.jobTitle || item.department || "Staff directory"}</p>
+                <p className="mt-1 truncate text-xs text-base-content/50">
+                  {[item.jobTitle, item.department].filter(Boolean).join(" · ") || "Employment details not recorded"}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={staffStatusLabel(item.status)} />
-              {canManageLifecycle && staffStatusKey(item.status) === "active" && (
-                <button type="button" className="btn btn-ghost btn-sm" disabled={!lifecycleActionCurrent} onClick={() => openLifecycle("suspend")}>
-                  <UserRoundMinus size={15} />Suspend
-                </button>
-              )}
-              {canManageLifecycle && staffStatusKey(item.status) === "suspended" && (
-                <button type="button" className="btn btn-primary btn-sm" disabled={!lifecycleActionCurrent} onClick={() => openLifecycle("resume")}>
-                  <UserRoundCheck size={15} />Resume
-                </button>
-              )}
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-base-content/55">
+                <Building2 size={14} className="text-primary" />
+                {currentAssignmentCount} current {currentAssignmentCount === 1 ? "property" : "properties"}
+              </span>
               {canManageLifecycle && staffStatusKey(item.status) !== "departed" && (
-                <button type="button" className="btn btn-ghost btn-sm text-error" disabled={!lifecycleActionCurrent} onClick={() => openLifecycle("depart")}>
-                  <UserRoundX size={15} />Depart
-                </button>
+                <details ref={employmentMenuRef} className="dropdown dropdown-end">
+                  <summary className="btn btn-outline btn-sm list-none [&::-webkit-details-marker]:hidden">
+                    <MoreHorizontal size={15} />Employment actions<ChevronDown size={14} />
+                  </summary>
+                  <ul className="menu dropdown-content z-30 mt-2 w-56 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+                    {staffStatusKey(item.status) === "active" && (
+                      <li><button type="button" disabled={!lifecycleActionCurrent} onClick={() => openLifecycle("suspend")}><UserRoundMinus size={15} />Suspend employment</button></li>
+                    )}
+                    {staffStatusKey(item.status) === "suspended" && (
+                      <li><button type="button" disabled={!lifecycleActionCurrent} onClick={() => openLifecycle("resume")}><UserRoundCheck size={15} />Resume employment</button></li>
+                    )}
+                    <li><button type="button" className="text-error" disabled={!lifecycleActionCurrent} onClick={() => openLifecycle("depart")}><UserRoundX size={15} />Record departure</button></li>
+                  </ul>
+                </details>
               )}
             </div>
           </div>
@@ -518,22 +543,25 @@ export function StaffDetail({
             stretch
             value={tab}
             ariaLabel="Staff details"
-            onValueChange={setTab}
+            onValueChange={(nextTab) => {
+              setTab(nextTab);
+              onSectionChange(nextTab);
+            }}
             options={[
-              { value: "profile", label: "Profile", icon: <CircleUserRound size={15} /> },
-              { value: "assignments", label: "Assignments", icon: <Building2 size={15} /> },
+              { value: "profile", label: "Profile", compactLabel: "Profile", icon: <CircleUserRound size={15} /> },
+              { value: "assignments", label: "Work locations", compactLabel: "Locations", icon: <Building2 size={15} /> },
               ...(canReadSensitive
-                ? [{ value: "account" as const, label: "Account", icon: <KeyRound size={15} /> }]
+                ? [{ value: "account" as const, label: "Account link", compactLabel: "Account", icon: <KeyRound size={15} /> }]
                 : []),
             ]}
           />
 
           {tab === "profile" && (
-            <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
+            <section className="min-w-0">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h3 className="font-display text-lg font-semibold">Profile</h3>
-                  <p className="mt-1 text-xs text-base-content/50">Workspace identity and role information.</p>
+                  <h3 className="font-display text-lg font-semibold">Employment profile</h3>
+                  <p className="mt-1 text-xs text-base-content/50">Employment, work contact, and internal identity details.</p>
                 </div>
                 {fullProfile && canManage && !editingTarget && staffStatusKey(fullProfile.status) !== "departed" && (
                   <button type="button" className="btn btn-ghost btn-sm text-primary" disabled={!profileActionCurrent} onClick={() => {
@@ -617,9 +645,6 @@ export function StaffDetail({
             )
           )}
 
-          <div className="flex justify-end border-t border-base-300 pt-5">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Close</button>
-          </div>
         </div>
       )}
     </Modal>
@@ -629,21 +654,53 @@ export function StaffDetail({
 function ProfileDetails({ member }: { member: StaffDetailMember }) {
   if (!isFullStaffMember(member)) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <InfoRow icon={<BriefcaseBusiness />} label="Job title" value={member.jobTitle || "Not provided"} />
-        <InfoRow icon={<UsersRound />} label="Department" value={member.department || "Not provided"} />
+      <div>
+        <ProfileGroup title="Employment" icon={<BriefcaseBusiness size={17} />}>
+          {member.jobTitle && <ProfileFact icon={<BriefcaseBusiness size={16} />} label="Job title" value={member.jobTitle} />}
+          {member.department && <ProfileFact icon={<UsersRound size={16} />} label="Department" value={member.department} />}
+          {!member.jobTitle && !member.department && <p className="p-4 text-sm text-base-content/50">No employment details are recorded.</p>}
+        </ProfileGroup>
+        <p className="mt-3 text-xs leading-5 text-base-content/45">Sensitive identity and work-contact details are not available in this view.</p>
       </div>
     );
   }
 
+  const missingEmployment = [
+    !member.jobTitle && "job title",
+    !member.department && "department",
+    !member.employeeNumber && "employee number",
+  ].filter((value): value is string => Boolean(value));
+  const missingIdentity = [
+    !member.legalName && "legal name",
+    !member.workEmail && "work email",
+    !member.workPhone && "work phone",
+  ].filter((value): value is string => Boolean(value));
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <InfoRow icon={<CircleUserRound />} label="Legal name" value={member.legalName || "Not provided"} />
-      <InfoRow icon={<BadgeCheck />} label="Employee number" value={member.employeeNumber || "Not provided"} />
-      <InfoRow icon={<Mail />} label="Work email" value={member.workEmail || "Not provided"} href={member.workEmail ? `mailto:${member.workEmail}` : undefined} />
-      <InfoRow icon={<Phone />} label="Work phone" value={member.workPhone || "Not provided"} href={member.workPhone ? `tel:${member.workPhone}` : undefined} />
-      <InfoRow icon={<BriefcaseBusiness />} label="Job title" value={member.jobTitle || "Not provided"} />
-      <InfoRow icon={<UsersRound />} label="Department" value={member.department || "Not provided"} />
+    <div>
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+        <div className="min-w-0">
+          <ProfileGroup title="Employment" icon={<BriefcaseBusiness size={17} />}>
+            {member.jobTitle && <ProfileFact icon={<BriefcaseBusiness size={16} />} label="Job title" value={member.jobTitle} />}
+            {member.department && <ProfileFact icon={<UsersRound size={16} />} label="Department" value={member.department} />}
+            {member.employeeNumber && <ProfileFact icon={<BadgeCheck size={16} />} label="Employee number" value={member.employeeNumber} />}
+            {!member.jobTitle && !member.department && !member.employeeNumber && <p className="p-4 text-sm text-base-content/50">No employment details are recorded.</p>}
+          </ProfileGroup>
+          {missingEmployment.length > 0 && <p className="mt-2 text-xs leading-5 text-base-content/45">Not recorded: {missingEmployment.join(", ")}.</p>}
+        </div>
+        <div className="min-w-0">
+          <ProfileGroup title="Identity and contact" icon={<CircleUserRound size={17} />}>
+            {member.legalName && <ProfileFact icon={<CircleUserRound size={16} />} label="Legal name" value={member.legalName} />}
+            {member.workEmail && <ProfileFact icon={<Mail size={16} />} label="Work email" value={member.workEmail} href={`mailto:${member.workEmail}`} />}
+            {member.workPhone && <ProfileFact icon={<Phone size={16} />} label="Work phone" value={member.workPhone} href={`tel:${member.workPhone}`} />}
+            {!member.legalName && !member.workEmail && !member.workPhone && <p className="p-4 text-sm text-base-content/50">No additional identity or contact details are recorded.</p>}
+          </ProfileGroup>
+          {missingIdentity.length > 0 && <p className="mt-2 text-xs leading-5 text-base-content/45">Not recorded: {missingIdentity.join(", ")}.</p>}
+        </div>
+      </div>
+      <p className="mt-5 border-t border-base-300 pt-4 text-xs leading-5 text-base-content/45">
+        Last updated {formatStaffDateTime(member.lastChangedAtUtc)} · Profile version {member.version}
+      </p>
     </div>
   );
 }
@@ -671,23 +728,23 @@ function LifecyclePanel({
   const copy = target.action === "suspend"
     ? {
         title: `Suspend ${target.member.displayName}?`,
-        body: "They remain in staff records but should no longer be treated as active staff.",
+        body: "Workspace membership and assigned access profiles are denied before the Staff profile is suspended. The global account and other workspaces are unchanged.",
         button: "Suspend staff member",
       }
     : target.action === "resume"
       ? {
           title: `Resume ${target.member.displayName}?`,
-          body: "This returns the staff profile to active status.",
+          body: "This returns the Staff profile to active and restores the exact access profile set captured at suspension. If a profile is no longer available, workspace access stays denied for review.",
           button: "Resume staff member",
         }
       : {
           title: `Record ${target.member.displayName} as departed?`,
-          body: "All current property assignments end on the effective date. This cannot be reversed from the UI.",
+          body: "All current work assignments end and this workspace membership is removed. The Staff profile and assignment history remain, and departure cannot be reversed from the UI.",
           button: "Record departure",
         };
 
   return (
-    <section className="rounded-lg border border-warning/30 bg-warning/8 p-4">
+    <section className="rounded-lg border border-warning/35 bg-warning/10 p-4">
       <CompositeSourceNotice className="mb-4" sources={sources} title="Staff lifecycle context is delayed" />
       {!authorityCurrent && (
         <div className="mb-4">
@@ -776,14 +833,24 @@ function AccountLinkPanel({
   const normalizedValue = value.trim();
 
   return (
-    <section className="rounded-2xl border border-base-300 p-4 sm:p-5">
-      <div className="flex items-start gap-3">
-        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+    <section className="min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
           <KeyRound size={19} />
         </div>
         <div>
           <h3 className="font-display text-lg font-semibold">Sign-in account link</h3>
-          <p className="mt-1 text-sm leading-6 text-base-content/55">Connect the employment profile to one BunkFy account.</p>
+          <p className="mt-1 text-sm leading-6 text-base-content/55">Trusted correlation between this employment profile and one BunkFy account.</p>
+        </div>
+        </div>
+        <StatusBadge status={member.authSubjectId ? "Linked" : "Not linked"} />
+      </div>
+      <div className="mt-5 flex items-start gap-3 rounded-lg border border-secondary/20 bg-secondary/8 p-4">
+        <ShieldCheck className="mt-0.5 shrink-0 text-secondary" size={18} />
+        <div>
+          <p className="text-sm font-semibold">Account access stays separate</p>
+          <p className="mt-1 text-sm leading-6 text-base-content/60">Linking identifies the account for Staff workflows. It does not create workspace membership, assign roles, grant permissions, change credentials, or affect other workspaces.</p>
         </div>
       </div>
       {!authorityCurrent && canManageAccountLinks && (
@@ -801,6 +868,7 @@ function AccountLinkPanel({
           placeholder="Not linked"
           onChange={(event) => setValue(event.target.value)}
         />
+        <span className="mt-1.5 block text-xs leading-5 text-base-content/45">Use the exact Auth subject ID supplied by a trusted account-recovery or enrollment workflow.</span>
       </label>
       <div className={`mt-4 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${transition.attention ? "border-warning/30 bg-warning/8" : "border-base-300 bg-base-200"}`}>
         <p className="text-sm leading-6 text-base-content/65">{transition.guidance}</p>
@@ -830,7 +898,28 @@ function AccountLinkPanel({
   );
 }
 
-function InfoRow({
+function ProfileGroup({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0">
+      <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-base-content/45">
+        <span className="text-primary">{icon}</span>{title}
+      </h4>
+      <div className="divide-y divide-base-300 overflow-hidden rounded-lg border border-base-300 bg-base-100">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function ProfileFact({
   icon,
   label,
   value,
@@ -842,18 +931,25 @@ function InfoRow({
   href?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-base-300 p-4">
-      <span className="mt-0.5 text-primary">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-xs text-base-content/40">{label}</p>
+    <div className="flex min-w-0 items-start gap-3 p-4">
+      <span className="mt-0.5 shrink-0 text-primary">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-base-content/45">{label}</p>
         {href ? (
-          <a className="mt-1 block truncate text-sm font-semibold text-primary hover:underline" href={href}>{value}</a>
+          <a className="mt-1 block break-words text-sm font-medium text-primary hover:underline" href={href}>{value}</a>
         ) : (
-          <p className="mt-1 truncate text-sm font-semibold">{value}</p>
+          <p className="mt-1 break-words text-sm font-medium">{value}</p>
         )}
       </div>
     </div>
   );
+}
+
+function formatStaffDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function utcDateKey(date: Date): string {

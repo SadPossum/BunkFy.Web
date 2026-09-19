@@ -1,4 +1,5 @@
 import { ApiError } from "../../api/client";
+import { guestLanguageSelection } from "../guests/guestLanguageSelection";
 import type {
   Reservation,
   ReservationGuestRecordLinkProcess,
@@ -19,6 +20,7 @@ export type GuestRecordProfileDetails = {
   dateOfBirth?: string | null;
   nationalityCountryCode?: string | null;
   preferredLanguageTag?: string | null;
+  languageTags?: string[] | null;
   notes?: string | null;
 };
 
@@ -56,6 +58,7 @@ export function guestRecordPayloadFromBooking(
   booking: Pick<Reservation, "primaryGuestName" | "email" | "phone">,
   details: GuestRecordProfileDetails = {},
 ): GuestRecordWritePayload {
+  const preferredLanguageTag = emptyToNull(details.preferredLanguageTag);
   return {
     displayName: booking.primaryGuestName.trim(),
     legalName: emptyToNull(details.legalName),
@@ -63,7 +66,8 @@ export function guestRecordPayloadFromBooking(
     phone: emptyToNull(booking.phone),
     dateOfBirth: emptyToNull(details.dateOfBirth),
     nationalityCountryCode: emptyToNull(details.nationalityCountryCode)?.toUpperCase() ?? null,
-    preferredLanguageTag: emptyToNull(details.preferredLanguageTag),
+    preferredLanguageTag,
+    languageTags: guestLanguageSelection({ ...details, preferredLanguageTag }),
     notes: emptyToNull(details.notes),
   };
 }
@@ -102,6 +106,7 @@ export async function createAndLinkGuestRecord(
   const route = `/api/reservations/properties/${propertyId}/${reservation.reservationId}/guest-record`;
   const body: ReservationGuestRecordWriteRequest = {
     ...options.profile,
+    languageTags: guestLanguageSelection(options.profile),
     operationId: options.operationId,
     expectedReservationVersion: options.expectedReservationVersion,
   };

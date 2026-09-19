@@ -119,22 +119,32 @@ describe("reservations source authority recovery", () => {
     expect(page).toContain("<CompositeSourceNotice");
     expect(page).toContain("createAffectedReservationSource(");
     expect(page).toContain("compositeSourceUsable(affectedSources[index].state)");
-    expect(page).toContain("key={selectedPropertyId}");
+    expect(page).not.toContain("if (!createOpen || !permissionsCurrent || mayCreate) return;");
+    expect(page).toContain('const editor = createOpen && ((propertySelected && selectedProperty) || accessRecovery.phase === "reset")');
+    expect(page).toContain("key={editorKey}");
+    expect(page).toContain('propertyTimeZoneId={selectedProperty?.timeZoneId ?? "UTC"}');
+    expect(page).toContain("businessDateToday={propertyToday}");
     expect(page).not.toContain("const listError =");
 
-    expect(create).toContain("const availabilityCurrent = compositeSourceCurrent(availabilitySource)");
+    expect(create).toContain("const availabilityCurrent = mayLoadInventory && compositeSourceCurrent(availabilitySource)");
     expect(create).toContain("inventorySelectionIsCurrent(");
-    expect(create).toContain("if (!canSubmit)");
-    expect(create).toContain("selectionEnabled={createAuthorityCurrent}");
+    expect(create).toContain("if (!canSubmit || mutation.isPending)");
+    expect(create).toContain("selectionEnabled={showInventoryPicker && createAuthorityCurrent}");
+    expect(create).toContain("defaultPropertyStayRange(timeZoneId)");
+    expect(create).toContain("min={propertyToday}");
+    expect(create).not.toContain("localDateKey(new Date())");
 
-    expect(detail).toContain("const reservationCurrent = compositeSourceCurrent(reservationSource)");
+    expect(detail).toContain("const reservationCurrent = permissionsCurrent && compositeSourceCurrent(reservationSource)");
     expect(detail).toContain("reservationRecordMatches(reservation.data, current)");
     expect(detail).toContain("guestDirectoryCurrent: candidateCurrent");
+    expect(detail).toContain("defaultReservationBusinessDate(action, current, businessDateToday)");
     expect(detail).toContain("<CompositeSourceFallback");
     expect(detail).not.toContain("reservation.error ?");
     expect(detail).not.toContain("if (query.error)");
 
-    expect(guestPicker).toContain("guestCandidateIsCurrent(guestItems, selectedGuest)");
+    expect(guestPicker).toContain("guestCandidateIsCurrent(selectedProfile.data?.guestId === selectedGuest.guestId ? [selectedProfile.data] : [], selectedGuest)");
+    expect(guestPicker).toContain("enabled: !disabled && Boolean(selectedGuest)");
+    expect(guestPicker).toContain("enabled: !disabled && searchSettled");
     expect(guestPicker).toContain("disabled={!sourceCurrent || !selectionEnabled}");
   });
 });

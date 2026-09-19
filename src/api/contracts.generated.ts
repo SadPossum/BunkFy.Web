@@ -5922,6 +5922,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InventoryRetirementContextDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestRoomRetirementRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoomRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/properties/{propertyId}/rooms/{roomId}/beds/{bedId}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                    bedId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InventoryRetirementContextDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    propertyId: string;
+                    roomId: string;
+                    bedId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestBedRetirementRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BedRetirementDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/properties/{propertyId}/availability": {
         parameters: {
             query?: never;
@@ -5974,6 +6104,8 @@ export interface paths {
                 query?: {
                     inventoryUnitId?: string;
                     includeReleased?: boolean;
+                    overlapsFrom?: string;
+                    overlapsTo?: string;
                     page?: number;
                     pageSize?: number;
                 };
@@ -6154,49 +6286,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/inventory/properties/{propertyId}/rooms/{roomId}/beds/{bedId}/retirement": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    propertyId: string;
-                    roomId: string;
-                    bedId: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["RequestBedRetirementRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["BedRetirementDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/inventory/properties/{propertyId}/bed-retirements/{topologyChangeId}": {
         parameters: {
             query?: never;
@@ -6309,48 +6398,6 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["BedRetirementDto"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/inventory/properties/{propertyId}/rooms/{roomId}/retirement": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    propertyId: string;
-                    roomId: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["RequestRoomRetirementRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["RoomRetirementDto"];
                     };
                 };
             };
@@ -9123,6 +9170,10 @@ export interface paths {
                     status?: components["schemas"]["ReservationStatus"][];
                     search?: string;
                     order?: components["schemas"]["ReservationListOrder"];
+                    view?: components["schemas"]["ReservationListView"];
+                    operatingDate?: string;
+                    overlapsFrom?: string;
+                    overlapsTo?: string;
                     page?: number;
                     pageSize?: number;
                 };
@@ -9979,6 +10030,45 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["StaffDirectoryMemberDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/members/account-directory/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StaffAccountDirectoryResolveRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffAccountDirectoryResponse"];
                     };
                 };
             };
@@ -11318,6 +11408,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspace-staff-enrollment/applications/{applicationId}/recovery-attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    applicationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptDto"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptDto"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-staff-enrollment/applications/{applicationId}/recovery-attempts/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    applicationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptDto"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workspace-staff-enrollment/data-rights-corrections/{applicationId}": {
         parameters: {
             query?: never;
@@ -12028,6 +12228,7 @@ export interface components {
         };
         BunkFyProductCapabilitiesResponse: {
             emailVerificationEnabled: boolean;
+            workspaceStaffOnboardingRecoveryEnabled: boolean;
         };
         CancelReservationRequest: {
             /** Format: uuid */
@@ -12911,6 +13112,7 @@ export interface components {
             nationalityCountryCode: string | null;
             preferredLanguageTag: string | null;
             notes: string | null;
+            languageTags: string[] | null;
         };
         GuestListItemDto: {
             /** Format: uuid */
@@ -12925,6 +13127,7 @@ export interface components {
             lastChangedBy: string | null;
             /** Format: date-time */
             lastChangedAtUtc: string;
+            languageTags: string[] | null;
         };
         GuestListResponse: {
             guests: components["schemas"]["GuestListItemDto"][] | null;
@@ -13024,6 +13227,7 @@ export interface components {
             lastChangedAtUtc: string;
             /** Format: date-time */
             archivedAtUtc: string | null;
+            languageTags: string[] | null;
         };
         GuestProfileUpdateRequest: {
             /** Format: uuid */
@@ -13039,6 +13243,7 @@ export interface components {
             notes: string | null;
             /** Format: int64 */
             expectedVersion: number;
+            languageTags: string[] | null;
         };
         GuestProfileWriteRequest: {
             /** Format: uuid */
@@ -13052,6 +13257,7 @@ export interface components {
             nationalityCountryCode: string | null;
             preferredLanguageTag: string | null;
             notes: string | null;
+            languageTags: string[] | null;
         };
         /**
          * Format: int32
@@ -13200,6 +13406,88 @@ export interface components {
          * @enum {integer}
          */
         InventoryBlockTargetKind: 0 | 1 | 2 | 3 | 4 | 5;
+        InventoryRetirementContextDto: {
+            /** Format: uuid */
+            propertyId: string;
+            /** Format: uuid */
+            roomId: string;
+            /** Format: uuid */
+            bedId: string | null;
+            isTopologyActive: boolean;
+            process: {
+                /** Format: uuid */
+                topologyChangeId: string;
+                status: components["schemas"]["InventoryRetirementStatus"];
+                /** Format: int64 */
+                version: number;
+                reason: string | null;
+                requestedBy: string | null;
+                /** Format: int32 */
+                rejectionReasonCode: number | null;
+                cancellationReason: string | null;
+                canceledBy: string | null;
+                /** Format: date-time */
+                createdAtUtc: string;
+                /** Format: date-time */
+                updatedAtUtc: string | null;
+                /** Format: date-time */
+                completedAtUtc: string | null;
+                /** Format: date-time */
+                canceledAtUtc: string | null;
+            } | null;
+            impact: {
+                /** Format: int32 */
+                activeAllocationCount: number;
+                /** Format: int32 */
+                activeManualBlockCount: number;
+                /** Format: int32 */
+                activeBedRetirementCount: number;
+                parentRoomRetirementActive: boolean;
+                affectedReservationIds: string[] | null;
+                affectedReservationIdsTruncated: boolean;
+            } | null;
+            impactStatus: components["schemas"]["InventoryRetirementImpactStatus"];
+            canRequest: boolean;
+            canRetry: boolean;
+            canCancel: boolean;
+        };
+        InventoryRetirementImpactDto: {
+            /** Format: int32 */
+            activeAllocationCount: number;
+            /** Format: int32 */
+            activeManualBlockCount: number;
+            /** Format: int32 */
+            activeBedRetirementCount: number;
+            parentRoomRetirementActive: boolean;
+            affectedReservationIds: string[] | null;
+            affectedReservationIdsTruncated: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        InventoryRetirementImpactStatus: 0 | 1 | 2;
+        InventoryRetirementProcessSummaryDto: {
+            /** Format: uuid */
+            topologyChangeId: string;
+            status: components["schemas"]["InventoryRetirementStatus"];
+            /** Format: int64 */
+            version: number;
+            reason: string | null;
+            requestedBy: string | null;
+            /** Format: int32 */
+            rejectionReasonCode: number | null;
+            cancellationReason: string | null;
+            canceledBy: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            updatedAtUtc: string | null;
+            /** Format: date-time */
+            completedAtUtc: string | null;
+            /** Format: date-time */
+            canceledAtUtc: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -14228,6 +14516,7 @@ export interface components {
             sourceReference: string | null;
             notes: string | null;
             status: components["schemas"]["ReservationStatus"];
+            holdsInventory: boolean;
             /** Format: uuid */
             allocationRequestId: string;
             /** Format: uuid */
@@ -14317,6 +14606,7 @@ export interface components {
             nationalityCountryCode: string | null;
             preferredLanguageTag: string | null;
             notes: string | null;
+            languageTags: string[] | null;
         };
         /**
          * Format: int32
@@ -14341,6 +14631,8 @@ export interface components {
             guestCount: number;
             /** Format: int32 */
             inventoryUnitCount: number;
+            inventoryUnitIds: string[] | null;
+            holdsInventory: boolean;
             sourceKind: components["schemas"]["ReservationSourceKind"];
             status: components["schemas"]["ReservationStatus"];
         };
@@ -14357,6 +14649,11 @@ export interface components {
             pageSize: number;
             hasMore: boolean;
         };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ReservationListView: 0 | 1 | 2 | 3 | 4;
         ReservationMutationReceiptDto: {
             /** Format: uuid */
             reservationId: string;
@@ -14855,6 +15152,22 @@ export interface components {
         };
         SignOutRequest: {
             refreshToken: string | null;
+        };
+        StaffAccountDirectoryEntryDto: {
+            /** Format: uuid */
+            staffMemberId: string;
+            authSubjectId: string | null;
+            displayName: string | null;
+            jobTitle: string | null;
+            status: components["schemas"]["StaffStatus"];
+            /** Format: int64 */
+            version: number;
+        };
+        StaffAccountDirectoryResolveRequest: {
+            authSubjectIds: string[] | null;
+        };
+        StaffAccountDirectoryResponse: {
+            items: components["schemas"]["StaffAccountDirectoryEntryDto"][] | null;
         };
         StaffAssignmentRequest: {
             /** Format: uuid */
@@ -15554,6 +15867,43 @@ export interface components {
             pageSize: number;
             hasMore: boolean;
         };
+        WorkspaceStaffOnboardingRecoveryAttemptDto: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            applicationId: string;
+            outcome: components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptOutcome"];
+            reason: components["schemas"]["WorkspaceStaffOnboardingRecoveryAttemptReason"];
+            applicationStatus: components["schemas"]["WorkspaceStaffOnboardingStatus"];
+            /** Format: int64 */
+            applicationVersion: number;
+            retryDirective: components["schemas"]["WorkspaceStaffOnboardingRecoveryRetryDirective"];
+            /** Format: int32 */
+            retryAfterSeconds: number | null;
+            /** Format: date-time */
+            recordedAtUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffOnboardingRecoveryAttemptOutcome: 0 | 1 | 2 | 3;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffOnboardingRecoveryAttemptReason: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+        WorkspaceStaffOnboardingRecoveryAttemptRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedApplicationVersion: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        WorkspaceStaffOnboardingRecoveryRetryDirective: 0 | 1;
         /**
          * Format: int32
          * @enum {integer}

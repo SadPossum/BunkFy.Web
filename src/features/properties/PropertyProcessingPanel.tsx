@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Database, Globe2, Pause, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ChevronDown, Database, Globe2, MapPin, Pause, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type {
   CountryPolicy,
@@ -42,43 +42,60 @@ import {
   resolvePropertySimpleLifecycleAttempt,
   type PropertyLifecycleAttempt,
 } from "./propertyLifecycleAttempt";
+import { propertyProcessingStateMatchesProperty } from "./propertiesApi";
 
 type PropertyProcessingPanelProps = {
+  embedded?: boolean;
   property: Property;
   canManage: boolean;
   permissionsCurrent: boolean;
   propertyCurrent: boolean;
   onChanged: () => Promise<void> | void;
+  actionsDisabled?: boolean;
+  onEngagementChange?: (engaged: boolean) => void;
+  onPendingChange?: (pending: boolean) => void;
 };
 
 export function PropertyProcessingPanel({
+  embedded = false,
   property,
   canManage,
   permissionsCurrent,
   propertyCurrent,
   onChanged,
+  actionsDisabled = false,
+  onEngagementChange,
+  onPendingChange,
 }: PropertyProcessingPanelProps) {
   const { request } = useSession();
   const queryClient = useQueryClient();
   const [activationOpen, setActivationOpen] = useState(false);
   const [suspensionOpen, setSuspensionOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const activationAttempt = useRef<PropertyLifecycleAttempt | null>(null);
   const suspensionAttempt = useRef<PropertyLifecycleAttempt | null>(null);
   const processing = useQuery({
     queryKey: ["property-processing", property.propertyId],
     queryFn: () => request<PropertyProcessingState>(`/api/properties/${property.propertyId}/processing`),
+    enabled: permissionsCurrent,
   });
+  const processingContextMismatch = !propertyProcessingStateMatchesProperty(
+    processing.data,
+    property.propertyId,
+  );
   const policies = useQuery({
     queryKey: ["country-policies", property.propertyId],
     queryFn: () => request<CountryPolicyListResponse>(`/api/properties/${property.propertyId}/country-policies`),
-    enabled: canManage,
+    enabled: permissionsCurrent && canManage,
     staleTime: 60_000,
   });
   const processingSource = createCompositeSource({
     label: "Processing status",
-    hasData: processing.data !== undefined,
+    hasData: processing.data !== undefined && !processingContextMismatch,
     isLoading: processing.isLoading,
-    error: processing.error,
+    error: processingContextMismatch
+      ? new Error("The processing response did not match this property.")
+      : processing.error,
     isFetching: processing.isFetching,
     refetch: () => processing.refetch(),
   });
@@ -93,17 +110,20 @@ export function PropertyProcessingPanel({
   const processingUsable = compositeSourceUsable(processingSource.state);
   const policiesUsable = compositeSourceUsable(policySource.state);
   const state = processingUsable ? processing.data : undefined;
+  // Retirement is terminal here. A matching retained processing read must not
+  // re-offer configuration while the property directory or read is refreshing.
+  const retired = property.status === "retired" || state?.reasonCode === "Properties.PropertyRetired";
   const binding = state?.governancePolicy ?? null;
   const selectablePolicies = policiesUsable
     ? availableCountryPolicies(policies.data?.items ?? [])
     : [];
-  const canActivate = canManage && propertiesMutationAllowed("activate-processing", {
+  const canActivate = property.status === "active" && !retired && !actionsDisabled && canManage && propertiesMutationAllowed("activate-processing", {
     permissionsCurrent,
     propertyCurrent,
     processingCurrent: compositeSourceCurrent(processingSource),
     policiesCurrent: compositeSourceCurrent(policySource),
   });
-  const canSuspend = canManage && state?.configuredStatus === "enabled" &&
+  const canSuspend = property.status === "active" && !retired && !actionsDisabled && canManage && state?.configuredStatus === "enabled" &&
     propertiesMutationAllowed("suspend-processing", {
       permissionsCurrent,
       propertyCurrent,
@@ -119,15 +139,16 @@ export function PropertyProcessingPanel({
     suspensionAttempt.current = null;
     setActivationOpen(false);
     setSuspensionOpen(false);
+    setDetailsOpen(false);
   }, [property.propertyId]);
 
   useEffect(() => {
-    if (!permissionsCurrent || canManage) return;
+    if (!retired && (!permissionsCurrent || canManage)) return;
     activationAttempt.current = null;
     suspensionAttempt.current = null;
     setActivationOpen(false);
     setSuspensionOpen(false);
-  }, [canManage, permissionsCurrent]);
+  }, [canManage, permissionsCurrent, retired]);
 
   async function refreshProperty() {
     await Promise.all([
@@ -196,6 +217,14 @@ export function PropertyProcessingPanel({
   });
   const activationNeedsAuthentication =
     isInsufficientAuthenticationError(activation.error);
+  useEffect(() => {
+    onEngagementChange?.(activationOpen || suspensionOpen || activation.isPending || suspension.isPending);
+    return () => onEngagementChange?.(false);
+  }, [onEngagementChange, activationOpen, suspensionOpen, activation.isPending, suspension.isPending]);
+  useEffect(() => {
+    onPendingChange?.(activation.isPending || suspension.isPending);
+    return () => onPendingChange?.(false);
+  }, [onPendingChange, activation.isPending, suspension.isPending]);
 
   function retryActivationAfterAuthentication() {
     const input = activation.variables;
@@ -206,9 +235,9 @@ export function PropertyProcessingPanel({
 
   if (!processingUsable || !state) {
     return (
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className={embedded ? "border-t border-base-300 px-4 py-3 sm:px-5" : "card border border-base-300 bg-base-100 shadow-sm"}>
         <CompositeSourceNotice
-          className="mx-5 mt-5 sm:mx-6"
+          className={embedded ? "mb-3 flex" : "mx-5 mt-5 flex sm:mx-6"}
           sources={governanceSources}
           title="Data-processing context is delayed"
         />
@@ -217,33 +246,34 @@ export function PropertyProcessingPanel({
     );
   }
 
-  const needsAttention = state.effectiveStatus === "expired" || state.effectiveStatus === "revoked";
+  const effectiveStatus = retired ? "suspended" : state.effectiveStatus;
+  const needsAttention = effectiveStatus === "expired" || effectiveStatus === "revoked";
 
   return (
     <>
-      <section className={`card border bg-base-100 shadow-sm ${needsAttention ? "border-warning/45" : "border-base-300"}`}>
-        <div className="card-body gap-5 p-5 sm:p-6">
+      <section className={embedded ? "border-t border-base-300" : `card border bg-base-100 shadow-sm ${needsAttention ? "border-warning/45" : "border-base-300"}`}>
+        <div className={embedded ? "space-y-3 px-4 py-3 sm:px-5" : "card-body gap-5 p-5 sm:p-6"}>
           <CompositeSourceNotice
-            className=""
+            className="flex"
             sources={governanceSources}
             title="Data-processing context is delayed"
           />
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 gap-3">
-              <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${needsAttention ? "bg-warning/15 text-warning-content" : state.effectiveStatus === "enabled" ? "bg-success/15 text-success" : "bg-base-200 text-base-content/55"}`}>
-                {needsAttention ? <ShieldAlert size={19} /> : state.effectiveStatus === "enabled" ? <ShieldCheck size={19} /> : <Globe2 size={19} />}
-              </div>
+              {!embedded && <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${needsAttention ? "bg-warning/15 text-warning-content" : effectiveStatus === "enabled" ? "bg-success/15 text-success" : "bg-base-200 text-base-content/55"}`}>
+                {needsAttention ? <ShieldAlert size={19} /> : effectiveStatus === "enabled" ? <ShieldCheck size={19} /> : <Globe2 size={19} />}
+              </div>}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-display text-xl font-semibold">Data processing</h2>
-                  <StatusBadge status={state.effectiveStatus} />
+                  {embedded ? <h3 className="text-sm font-semibold">Data processing</h3> : <h2 className="font-display text-xl font-semibold">Data processing</h2>}
+                  <StatusBadge status={effectiveStatus} />
                 </div>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-base-content/60">
-                  {propertyProcessingMessage(state.effectiveStatus)}
+                  {retired ? "Processing is suspended because this property is retired. Stored configuration and existing records are kept." : propertyProcessingMessage(effectiveStatus)}
                 </p>
               </div>
             </div>
-            {canManage && (
+            {canManage && property.status === "active" && !retired && (
               <div className="flex shrink-0 flex-wrap gap-2">
                 {canSuspend && (
                   <button className="btn btn-sm btn-ghost" onClick={() => setSuspensionOpen(true)}>
@@ -262,9 +292,40 @@ export function PropertyProcessingPanel({
             )}
           </div>
 
-          {binding && <PolicyBindingDetails binding={binding} />}
+          {binding && (
+            <div className="border-t border-base-300 pt-4">
+              {retired && <p className="mb-2 text-xs text-base-content/60">Stored policy{!compositeSourceCurrent(processingSource) ? " · last confirmed" : ""}</p>}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                  <span className="inline-flex items-center gap-2 font-medium">
+                    <MapPin size={15} className="text-primary" />
+                    {countryLabel(binding.operatingCountryCode)}
+                  </span>
+                  {!embedded && <span className="text-base-content/55">
+                    {binding.policyId} v{binding.policyVersion}
+                  </span>}
+                  <span className="text-base-content/55">
+                    Expires {formatDate(binding.policyExpiresAtUtc)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost shrink-0 self-start sm:self-auto"
+                  aria-expanded={detailsOpen}
+                  onClick={() => setDetailsOpen((current) => !current)}
+                >
+                  {detailsOpen ? "Hide policy details" : "Show policy details"}
+                  <ChevronDown
+                    size={15}
+                    className={`transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+              </div>
+              {detailsOpen && <PolicyBindingDetails binding={binding} />}
+            </div>
+          )}
 
-          {canManage && compositeSourceCurrent(policySource) && selectablePolicies.length === 0 && (
+          {canManage && !retired && compositeSourceCurrent(policySource) && selectablePolicies.length === 0 && (
             <div className="alert border border-base-300 bg-base-200/65 text-base-content">
               <Database size={18} className="text-base-content/50" />
               <div>
@@ -277,7 +338,7 @@ export function PropertyProcessingPanel({
       </section>
 
       <PolicyActivationModal
-        open={activationOpen}
+        open={activationOpen && !retired}
         property={property}
         processing={state}
         policies={selectablePolicies}
@@ -300,7 +361,7 @@ export function PropertyProcessingPanel({
         onSubmit={(input) => canActivate && activation.mutate(input)}
       />
       <SuspendProcessingModal
-        open={suspensionOpen}
+        open={suspensionOpen && !retired}
         state={state}
         authorityCurrent={canSuspend}
         pending={suspension.isPending}
@@ -318,7 +379,7 @@ export function PropertyProcessingPanel({
 
 function PolicyBindingDetails({ binding }: { binding: PropertyGovernancePolicyBinding }) {
   return (
-    <dl className="grid gap-x-6 gap-y-4 border-t border-base-300 pt-5 text-sm sm:grid-cols-2 xl:grid-cols-4">
+    <dl className="mt-4 grid gap-x-6 gap-y-4 rounded-lg bg-base-200/55 p-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
       <PolicyCoordinate label="Operating country" value={countryLabel(binding.operatingCountryCode)} />
       <PolicyCoordinate label="Policy" value={`${binding.policyId} v${binding.policyVersion}`} />
       <PolicyCoordinate label="Data region" value={binding.dataRegionId} />

@@ -27,6 +27,7 @@ import {
 import { PrivacyRequestRestrictionTarget } from "./PrivacyRequestRestrictionTarget";
 import {
   dataRightsOperationKind,
+  isDataRightsSelectedEvidenceAuthorityCurrent,
   isDataRightsRestriction,
 } from "./dataRightsWorkflow";
 import {
@@ -73,7 +74,10 @@ export function PrivacyRequestDiscovery({
   onRestrictionTargetCurrentChange: (current: boolean) => void;
 }) {
   const { request } = useSession();
-  const selectedSourceCurrent = compositeSourceCurrent(selectedSource);
+  const selectedSourceCurrent = isDataRightsSelectedEvidenceAuthorityCurrent(
+    dataRightsCase,
+    compositeSourceCurrent(selectedSource),
+  );
   const restriction = isDataRightsRestriction(dataRightsCase);
   const targetBoundRelease =
     dataRightsOperationKind(dataRightsCase) === "restriction-release" &&
@@ -400,11 +404,11 @@ export function PrivacyRequestDiscovery({
         )}
       </div>
 
-      <CompositeSourceNotice
+      {dataRightsCase.selectedSubjectCount > 0 && <CompositeSourceNotice
         className="mt-4"
         sources={[selectedSource]}
         title="Selected record evidence is delayed"
-      />
+      />}
 
       {dataRightsCase.selectedSubjectCount > 0 && selectedLoading && !selectedSubjects.length && (
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-base-200 px-4 py-4 text-sm text-base-content/55">

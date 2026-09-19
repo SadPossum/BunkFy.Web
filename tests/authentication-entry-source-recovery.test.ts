@@ -21,6 +21,9 @@ describe("authentication entry source and callback recovery", () => {
     expect(page).toContain("const latest = await providers.refetch();");
     expect(page).toContain("externalProviderAllowed(latestCurrent, latest.data, provider)");
     expect(page).toContain('(mode === "register" && !passwordRegistrationAvailable)');
+    expect(page).toContain('mode === "register" ? (');
+    expect(page).toContain("<AuthModeSwitch");
+    expect(page).toContain("Sign in remains available. Refresh before creating a new account.");
     expect(page).toContain("Password sign-in remains available");
     expect(page).not.toContain("Connected to {resolveApiBaseUrl()}");
     expect(page).not.toContain("cause instanceof Error ? cause.message");

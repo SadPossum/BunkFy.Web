@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
   type ReactNode,
 } from "react";
 import {
@@ -27,12 +28,21 @@ import type {
 } from "../api/types";
 import {
   hasSessionBoundaryChanged,
-  hasSessionIdentityChanged,
+  hasSessionActorGenerationChanged,
   createSingleFlightRefresh,
   runWithBrowserSessionLock,
   startBrowserSessionSignOut,
   type SessionIdentity,
 } from "./singleFlightRefresh";
+import {
+  bindApiSessionIdentity,
+  createSessionGeneration,
+  readAccessTokenIdentity,
+  resolveRefreshedSessionIdentity,
+  SessionBoundarySupersededError,
+  SessionIdentityMismatchError,
+} from "./sessionTokenIdentity";
+import { refreshFailureInvalidatesSession } from "./sessionRecovery";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   isMultiFactorChallenge,
@@ -40,6 +50,7 @@ import {
 } from "../features/auth/authenticationFlow";
 
 const STORAGE_KEY = "bunkfy.session.identity.v2";
+const SESSION_CHANNEL_NAME = "bunkfy.browser-session.boundary.v1";
 const EXTERNAL_AUTH_KEY = "bunkfy.auth.external.pending.v1";
 const GLOBAL_IDENTITY_SCOPE = "global";
 
@@ -62,6 +73,10 @@ export type ExternalAuthenticationCompletion =
 type SessionContextValue = {
   session: ApiSession | null;
   isRestoring: boolean;
+  restorationError: unknown;
+  restoringIdentity: SessionIdentity | null;
+  retrySessionRestore: () => Promise<void>;
+  abandonSessionRestore: () => void;
   login: (credentials: Credentials) => Promise<MultiFactorChallenge | null>;
   register: (credentials: Credentials) => Promise<void>;
   completeMultiFactorSignIn: (
@@ -98,31 +113,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isRestoring, setIsRestoring] = useState(
     initialIdentity.current !== null,
   );
+  const [restorationError, setRestorationError] = useState<unknown>(null);
+  const [restoringIdentity, setRestoringIdentity] = useState<SessionIdentity | null>(
+    initialIdentity.current,
+  );
+  const restoringIdentityRef = useRef<SessionIdentity | null>(
+    initialIdentity.current,
+  );
   const sessionRef = useRef<ApiSession | null>(null);
   const acceptsRefreshRef = useRef(true);
+  const boundarySequenceRef = useRef(0);
+  const boundarySyncRef = useRef("");
+  const sessionChannelRef = useRef<BroadcastChannel | null>(null);
+  const publishedIdentityRef = useRef(sessionIdentitySignature(initialIdentity.current));
   const externalCompletionRef = useRef<Promise<
     ExternalAuthenticationCompletion
   > | null>(null);
 
-  const setSession = useCallback((next: ApiSession | null) => {
-    if (hasSessionIdentityChanged(sessionRef.current, next)) {
+  const publishSessionIdentity = useCallback((identity: SessionIdentity | null) => {
+    const signature = sessionIdentitySignature(identity);
+    if (publishedIdentityRef.current === signature) return;
+    publishedIdentityRef.current = signature;
+    writeSessionIdentity(identity);
+    sessionChannelRef.current?.postMessage(serializableSessionIdentity(identity));
+  }, []);
+
+  const setSession = useCallback((candidate: ApiSession | null) => {
+    const next = candidate ? bindApiSessionIdentity(candidate, sessionRef.current) : null;
+    const actorChanged = hasSessionActorGenerationChanged(sessionRef.current, next);
+    const boundaryChanged = hasSessionBoundaryChanged(sessionRef.current, next);
+    if (actorChanged) {
       queryClient.removeQueries();
-    } else if (hasSessionBoundaryChanged(sessionRef.current, next)) {
+    } else if (boundaryChanged) {
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== "organizations",
       });
     }
+    if (actorChanged || boundaryChanged) boundarySequenceRef.current += 1;
     sessionRef.current = next;
     setSessionState(next);
-    writeSessionIdentity(next);
-  }, [queryClient]);
+    publishSessionIdentity(next);
+  }, [publishSessionIdentity, queryClient]);
 
   const performRefresh = useCallback(
     async (identity: SessionIdentity): Promise<ApiSession> => {
+      const expectedBoundarySequence = boundarySequenceRef.current;
       return runWithBrowserSessionLock(async () => {
-        if (!acceptsRefreshRef.current) {
-          throw new Error("You are signed out.");
-        }
+        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
 
         const { accessToken } = await apiRequest<BrowserAuthResponse>(
           "/api/auth/browser/refresh",
@@ -131,10 +168,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
           },
         );
-        const refreshed = { ...identity, accessToken };
-        if (!acceptsRefreshRef.current) {
-          throw new Error("You are signed out.");
-        }
+        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
+
+        const tokenIdentity = readAccessTokenIdentity(accessToken);
+        if (!tokenIdentity) throw new SessionIdentityMismatchError();
+        const resolvedIdentity = resolveRefreshedSessionIdentity(
+          identity,
+          readSessionIdentity(),
+          tokenIdentity,
+        );
+        const refreshed = { ...resolvedIdentity, ...tokenIdentity, accessToken };
 
         setSession(refreshed);
         return refreshed;
@@ -149,19 +192,137 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           return await performRefresh(identity);
         } catch (error) {
-          setSession(null);
+          if (sessionFailureInvalidatesActor(error)) setSession(null);
           throw error;
         }
       }),
     [performRefresh, setSession],
   );
 
-  useEffect(() => {
-    const identity = initialIdentity.current;
+  const restoreSession = useCallback(async () => {
+    const identity = restoringIdentityRef.current;
     if (!identity) return;
 
-    void refreshSession(identity).finally(() => setIsRestoring(false));
+    setIsRestoring(true);
+    setRestorationError(null);
+    try {
+      await refreshSession(identity);
+      restoringIdentityRef.current = null;
+      setRestoringIdentity(null);
+    } catch (error) {
+      if (sessionFailureInvalidatesActor(error)) {
+        restoringIdentityRef.current = null;
+        setRestoringIdentity(null);
+      } else {
+        setRestorationError(error);
+      }
+    } finally {
+      setIsRestoring(false);
+    }
   }, [refreshSession]);
+
+  const abandonSessionRestore = useCallback(() => {
+    acceptsRefreshRef.current = false;
+    restoringIdentityRef.current = null;
+    setRestoringIdentity(null);
+    setRestorationError(null);
+    setIsRestoring(false);
+    setSession(null);
+  }, [setSession]);
+
+  useEffect(() => {
+    if (!initialIdentity.current) return;
+    void restoreSession();
+  }, [restoreSession]);
+
+  const synchronizeBrowserBoundary = useCallback(async (nextIdentity: SessionIdentity | null) => {
+    const current = sessionRef.current;
+    if (!hasSessionBoundaryChanged(current, nextIdentity) &&
+      !hasSessionActorGenerationChanged(current, nextIdentity)) {
+      return;
+    }
+
+    const signature = sessionIdentitySignature(nextIdentity);
+    if (boundarySyncRef.current === signature) return;
+    boundarySyncRef.current = signature;
+    publishedIdentityRef.current = signature;
+    boundarySequenceRef.current += 1;
+    queryClient.removeQueries();
+    sessionRef.current = null;
+    setSessionState(null);
+    setRestorationError(null);
+
+    if (!nextIdentity) {
+      acceptsRefreshRef.current = false;
+      restoringIdentityRef.current = null;
+      setRestoringIdentity(null);
+      setIsRestoring(false);
+      boundarySyncRef.current = "";
+      return;
+    }
+
+    acceptsRefreshRef.current = true;
+    restoringIdentityRef.current = nextIdentity;
+    setRestoringIdentity(nextIdentity);
+    setIsRestoring(true);
+    try {
+      await refreshSession(nextIdentity);
+      if (boundarySyncRef.current !== signature) return;
+      restoringIdentityRef.current = null;
+      setRestoringIdentity(null);
+    } catch (error) {
+      if (boundarySyncRef.current !== signature) return;
+      if (sessionFailureInvalidatesActor(error)) {
+        restoringIdentityRef.current = null;
+        setRestoringIdentity(null);
+      } else if (!(error instanceof SessionBoundarySupersededError)) {
+        setRestorationError(error);
+      }
+    } finally {
+      if (boundarySyncRef.current === signature) {
+        boundarySyncRef.current = "";
+        setIsRestoring(false);
+      }
+    }
+  }, [queryClient, refreshSession]);
+
+  useEffect(() => {
+    const channel = typeof BroadcastChannel === "function"
+      ? new BroadcastChannel(SESSION_CHANNEL_NAME)
+      : null;
+    sessionChannelRef.current = channel;
+    if (channel) {
+      channel.onmessage = (event: MessageEvent<unknown>) => {
+        const identity = parseSessionIdentity(event.data);
+        if (event.data === null || identity) void synchronizeBrowserBoundary(identity);
+      };
+    }
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY) return;
+      void synchronizeBrowserBoundary(parseStoredSessionIdentity(event.newValue));
+    };
+    const reconcilePersistedBoundary = () => {
+      if (document.visibilityState !== "visible") return;
+      void synchronizeBrowserBoundary(readSessionIdentity());
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reconcilePersistedBoundary();
+    };
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("online", reconcilePersistedBoundary);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", reconcilePersistedBoundary);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("online", reconcilePersistedBoundary);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", reconcilePersistedBoundary);
+      channel?.close();
+      if (sessionChannelRef.current === channel) sessionChannelRef.current = null;
+    };
+  }, [synchronizeBrowserBoundary]);
 
   const authenticate = useCallback(
     async (
@@ -247,9 +408,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async <T,>(path: string, options: RequestInit = {}) => {
       const active = sessionRef.current;
       if (!active) throw new Error("You are signed out.");
+      const boundarySequence = boundarySequenceRef.current;
 
       try {
-        return await apiRequest<T>(path, options, active);
+        const result = await apiRequest<T>(path, options, active);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        return result;
       } catch (error) {
         if (
           !(error instanceof Error) ||
@@ -258,8 +422,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         )
           throw error;
 
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const refreshed = await refreshSession(active);
-        return await apiRequest<T>(path, options, refreshed);
+        const result = await apiRequest<T>(path, options, refreshed);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        return result;
       }
     },
     [refreshSession],
@@ -410,8 +577,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (path: string, options: RequestInit = {}) => {
       const active = sessionRef.current;
       if (!active) throw new Error("You are signed out.");
+      const boundarySequence = boundarySequenceRef.current;
       try {
-        return await apiDownload(path, options, active);
+        const result = await apiDownload(path, options, active);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        return result;
       } catch (error) {
         if (
           !(error instanceof Error) ||
@@ -419,8 +589,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           error.status !== 401
         )
           throw error;
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const refreshed = await refreshSession(active);
-        return await apiDownload(path, options, refreshed);
+        const result = await apiDownload(path, options, refreshed);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        return result;
       }
     },
     [refreshSession],
@@ -430,8 +603,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (path: string, signal: AbortSignal) => {
       const active = sessionRef.current;
       if (!active) throw new Error("You are signed out.");
+      const boundarySequence = boundarySequenceRef.current;
       try {
-        return await apiStream(path, signal, active);
+        const response = await apiStream(path, signal, active);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        return response;
       } catch (error) {
         if (
           !(error instanceof Error) ||
@@ -440,8 +616,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           signal.aborted
         )
           throw error;
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const refreshed = await refreshSession(active);
-        return await apiStream(path, signal, refreshed);
+        const response = await apiStream(path, signal, refreshed);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        return response;
       }
     },
     [refreshSession],
@@ -546,7 +725,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       const tenantId = workspaceId.trim() || GLOBAL_IDENTITY_SCOPE;
       if (active.tenantId === tenantId) return;
-      setSession({ ...active, tenantId });
+      setSession({ ...active, tenantId, generation: createSessionGeneration() });
     },
     [setSession],
   );
@@ -555,6 +734,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       isRestoring,
+      restorationError,
+      restoringIdentity,
+      retrySessionRestore: restoreSession,
+      abandonSessionRestore,
       login: (credentials) => authenticate("login", credentials),
       register: async (credentials) => {
         await authenticate("register", credentials);
@@ -576,6 +759,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }),
     [
       authenticate,
+      abandonSessionRestore,
       activateTotp,
       beginExternalLink,
       beginExternalSignIn,
@@ -588,6 +772,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logout,
       logoutAll,
       request,
+      restorationError,
+      restoreSession,
+      restoringIdentity,
       selectWorkspace,
       session,
       stepUpWithPassword,
@@ -609,31 +796,74 @@ export function useSession() {
 
 function readSessionIdentity(): SessionIdentity | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-
-    const candidate = JSON.parse(raw) as Partial<SessionIdentity>;
-    return typeof candidate.tenantId === "string" &&
-      typeof candidate.username === "string"
-      ? { tenantId: candidate.tenantId, username: candidate.username }
-      : null;
+    return parseStoredSessionIdentity(localStorage.getItem(STORAGE_KEY));
   } catch {
     return null;
   }
 }
 
 function writeSessionIdentity(session: SessionIdentity | null) {
-  if (session) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        tenantId: session.tenantId,
-        username: session.username,
-      }),
-    );
-  } else {
-    localStorage.removeItem(STORAGE_KEY);
+  try {
+    if (session) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableSessionIdentity(session)));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    // The in-memory session remains usable when durable browser storage is blocked.
   }
+}
+
+function parseStoredSessionIdentity(raw: string | null): SessionIdentity | null {
+  if (!raw) return null;
+  try {
+    return parseSessionIdentity(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function parseSessionIdentity(value: unknown): SessionIdentity | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Partial<SessionIdentity>;
+  if (typeof candidate.tenantId !== "string" || typeof candidate.username !== "string") {
+    return null;
+  }
+  return {
+    tenantId: candidate.tenantId,
+    username: candidate.username,
+    ...(typeof candidate.subjectId === "string" ? { subjectId: candidate.subjectId } : {}),
+    ...(typeof candidate.sessionId === "string" ? { sessionId: candidate.sessionId } : {}),
+    ...(typeof candidate.generation === "string" ? { generation: candidate.generation } : {}),
+  };
+}
+
+function serializableSessionIdentity(identity: SessionIdentity | null): SessionIdentity | null {
+  return identity ? {
+    tenantId: identity.tenantId,
+    username: identity.username,
+    ...(identity.subjectId ? { subjectId: identity.subjectId } : {}),
+    ...(identity.sessionId ? { sessionId: identity.sessionId } : {}),
+    ...(identity.generation ? { generation: identity.generation } : {}),
+  } : null;
+}
+
+function sessionIdentitySignature(identity: SessionIdentity | null): string {
+  return JSON.stringify(serializableSessionIdentity(identity));
+}
+
+function assertSessionBoundaryCurrent(
+  expected: number,
+  boundarySequence: RefObject<number>,
+  acceptsRefresh: RefObject<boolean>,
+) {
+  if (!acceptsRefresh.current || boundarySequence.current !== expected) {
+    throw new SessionBoundarySupersededError();
+  }
+}
+
+function sessionFailureInvalidatesActor(error: unknown): boolean {
+  return refreshFailureInvalidatesSession(error) || error instanceof SessionIdentityMismatchError;
 }
 
 type PendingExternalAuth = {

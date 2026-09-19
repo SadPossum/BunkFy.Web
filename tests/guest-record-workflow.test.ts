@@ -32,6 +32,10 @@ const readyProcess = {
 };
 
 describe("guest record reservation workflow", () => {
+  it.each(["zz", "", null])("preserves optional nationality %s in the existing follow-on contract without language inference", code => {
+    const baseline = guestRecordPayloadFromBooking(reservation);
+    expect(guestRecordPayloadFromBooking(reservation, { nationalityCountryCode: code ?? "" })).toEqual({ ...baseline, nationalityCountryCode: code ? "ZZ" : null });
+  });
   it("builds a minimal durable profile from booking contact details", () => {
     expect(guestRecordPayloadFromBooking(reservation)).toEqual({
       displayName: "Maya Chen",
@@ -41,6 +45,7 @@ describe("guest record reservation workflow", () => {
       dateOfBirth: null,
       nationalityCountryCode: null,
       preferredLanguageTag: null,
+      languageTags: [],
       notes: null,
     });
   });
@@ -60,6 +65,7 @@ describe("guest record reservation workflow", () => {
       dateOfBirth: "1994-06-18",
       nationalityCountryCode: "GB",
       preferredLanguageTag: "en-GB",
+      languageTags: ["en-GB"],
       notes: "Prefers a lower bunk.",
     });
   });
@@ -226,6 +232,7 @@ describe("guest record reservation workflow", () => {
         method: "POST",
         body: JSON.stringify({
           ...profile,
+          languageTags: ["en-GB"],
           operationId: "guest-operation-1",
           expectedReservationVersion: 4,
         }),

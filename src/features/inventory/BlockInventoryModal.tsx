@@ -1,255 +1,166 @@
-import type { UseMutationResult } from "@tanstack/react-query";
-import {
-  BedDouble,
-  Building2,
-  DoorOpen,
-  Layers3,
-  MapPinned,
-  Search,
-} from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { InventoryBlockTarget, RoomInventory } from "../../api/types";
-import { ErrorState, FormActions, Modal } from "../../components/ui/primitives";
+import { BedDouble, Building2, DoorOpen, Layers3, MapPinned, Search } from "lucide-react";
+import { useId, useRef, useState, type FormEvent } from "react";
+import type { CompositeSource } from "../../app/compositeSourceState";
+import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
+import { validStayDateRange, type StayDateRange } from "../../app/propertyDate";
+import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
+import { ErrorState, FormActions } from "../../components/ui/primitives";
 import { DatePicker } from "../../components/ui/DatePicker";
-import {
-  buildBlockTargetOptions,
-  type BlockTargetKind,
-  type BlockTargetOption,
-} from "./inventoryBlocking";
+import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
+import { BlockEditorFrame } from "./BlockEditorFrame";
+import { selectedBlockTargetCurrent } from "./blockEditorModel";
+import type { BlockTargetKind, BlockTargetOption } from "./inventoryBlocking";
+import type { useManualBlockEditor } from "./useManualBlockEditor";
 
-export type CreateBlockGroupPayload = {
-  target: InventoryBlockTarget;
-  arrival: string;
-  departure: string;
-  reason: string;
-};
-
-type BlockInventoryModalProps = {
-  open: boolean;
-  propertyName: string;
-  rooms: RoomInventory[];
-  mutation: UseMutationResult<unknown, Error, CreateBlockGroupPayload>;
-  onClose: () => void;
-};
-
-const targetKinds: Array<{
-  kind: BlockTargetKind;
-  label: string;
-  icon: typeof DoorOpen;
-}> = [
+const targetKinds = [
   { kind: "property", label: "Property", icon: MapPinned },
   { kind: "building", label: "Building", icon: Building2 },
   { kind: "floor", label: "Floor", icon: Layers3 },
   { kind: "room", label: "Room", icon: DoorOpen },
   { kind: "unit", label: "Bed / unit", icon: BedDouble },
-];
+] as const;
 
-export function BlockInventoryModal({
-  open,
-  propertyName,
-  rooms,
-  mutation,
-  onClose,
-}: BlockInventoryModalProps) {
-  const options = useMemo(
-    () => buildBlockTargetOptions(propertyName, rooms),
-    [propertyName, rooms],
-  );
-  const availableKinds = useMemo(
-    () => targetKinds.filter(({ kind }) => options.some((option) => option.kind === kind)),
-    [options],
-  );
-  const [targetKind, setTargetKind] = useState<BlockTargetKind>("room");
-  const [selectedId, setSelectedId] = useState("");
+export function BlockInventoryModal({ editor, initialRange, initialTargetId, sources, inline = false }: {
+  editor: ReturnType<typeof useManualBlockEditor>;
+  initialRange: StayDateRange;
+  initialTargetId?: string;
+  sources: CompositeSource[];
+  inline?: boolean;
+}) {
+  if (editor.editor?.kind !== "create") return null;
+  return <BlockInventoryForm key={editor.editor.editorSession} editor={editor} initialRange={initialRange} initialTargetId={initialTargetId} sources={sources} inline={inline} />;
+}
+
+function BlockInventoryForm({ editor, initialRange, initialTargetId, sources, inline }: {
+  editor: ReturnType<typeof useManualBlockEditor>;
+  initialRange: StayDateRange;
+  initialTargetId?: string;
+  sources: CompositeSource[];
+  inline: boolean;
+}) {
+  const { options, createMutation: mutation } = editor;
+  const initialTarget = options.find((option) => option.id === initialTargetId) ?? null;
+  const [contextualEntry] = useState(() => Boolean(initialTarget));
+  const [choosingTarget, setChoosingTarget] = useState(() => !initialTarget);
+  const targetChooserId = useId();
+  const targetChooser = useRef<HTMLDivElement>(null);
+  const targetSummary = useRef<HTMLHeadingElement>(null);
+  const [targetKind, setTargetKind] = useState<BlockTargetKind>(() => initialTarget?.kind ?? (options.some((option) => option.kind === "room") ? "room" : options[0]?.kind ?? "room"));
+  const [selected, setSelected] = useState<BlockTargetOption | null>(() => initialTarget);
   const [search, setSearch] = useState("");
-  const [arrival, setArrival] = useState(() => defaultRange().arrival);
-  const [departure, setDeparture] = useState(() => defaultRange().departure);
-  const resetMutation = mutation.reset;
-
-  useEffect(() => {
-    if (!open) return;
-    setTargetKind(availableKinds.some(({ kind }) => kind === "room") ? "room" : availableKinds[0]?.kind ?? "property");
-    setSelectedId("");
-    setSearch("");
-    const range = defaultRange();
-    setArrival(range.arrival);
-    setDeparture(range.departure);
-    resetMutation();
-  }, [availableKinds, open, resetMutation]);
-
+  const [arrival, setArrival] = useState(initialRange.arrival);
+  const [departure, setDeparture] = useState(initialRange.departure);
+  const [reason, setReason] = useState("");
+  const reasonInput = useRef<HTMLTextAreaElement>(null);
   const kindOptions = options.filter((option) => option.kind === targetKind);
-  const normalizedSearch = search.trim().toLocaleLowerCase();
-  const visibleOptions = normalizedSearch
-    ? kindOptions.filter((option) => option.searchText.includes(normalizedSearch))
-    : kindOptions;
-  const selectedOption = targetKind === "property"
-    ? kindOptions[0]
-    : kindOptions.find((option) => option.id === selectedId);
+  const visibleOptions = kindOptions.filter((option) => option.searchText.includes(search.trim().toLocaleLowerCase()));
+  const selectedCurrent = selectedBlockTargetCurrent(options, selected);
+  const currentSelected = selectedCurrent ? options.find((option) => option.id === selected?.id) : undefined;
+  const selectedVisible = visibleOptions.some((option) => option.id === selected?.id);
+  const rangeValid = validStayDateRange({ arrival, departure });
+  const needsAuthentication = isInsufficientAuthenticationError(mutation.error);
+  // Refresh withholds submission, not the live controls or their popovers.
+  const locked = mutation.isPending || Boolean(mutation.error);
+  const canSubmit = editor.createCanSubmit(selected) && selectedVisible && rangeValid && !(!reason.trim() && reason.length > 0);
 
   function chooseKind(kind: BlockTargetKind) {
-    setTargetKind(kind);
-    setSelectedId("");
-    setSearch("");
+    setTargetKind(kind); setSearch("");
+    setSelected(kind === "property" ? options.find((option) => option.kind === "property") ?? null : null);
   }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedOption) return;
-    const data = new FormData(event.currentTarget);
-    mutation.mutate({
-      target: selectedOption.target,
-      arrival,
-      departure,
-      reason: String(data.get("reason")),
+  function changeTarget() {
+    setChoosingTarget(true);
+    requestAnimationFrame(() => {
+      const chooser = targetChooser.current;
+      (chooser?.querySelector<HTMLElement>('input[type="search"]') ?? chooser?.querySelector<HTMLElement>("button:not(:disabled)"))?.focus();
+      const list = chooser?.querySelector<HTMLElement>('[role="radiogroup"]');
+      const checked = list?.querySelector<HTMLInputElement>("input:checked")?.closest("label");
+      if (list && checked) list.scrollTop += checked.getBoundingClientRect().top - list.getBoundingClientRect().top;
     });
   }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit || !selected || !reason.trim() || locked) return;
+    editor.create({ target: selected.target, arrival, departure, reason }, selected);
+  }
 
-  return (
-    <Modal
-      open={open}
-      title="Block inventory"
-      description="Choose the physical scope that operations need to take out of service."
-      onClose={onClose}
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <fieldset>
-          <legend className="mb-1.5 text-sm font-semibold">Scope</legend>
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-base-200 p-1 sm:grid-cols-5" aria-label="Inventory block scope">
-            {availableKinds.map(({ kind, label, icon: Icon }) => (
-              <button
-                key={kind}
-                type="button"
-                className={`btn btn-sm w-full rounded-md border-0 ${targetKind === kind ? "bg-base-100 shadow-sm" : "btn-ghost"}`}
-                aria-pressed={targetKind === kind}
-                onClick={() => chooseKind(kind)}
-              >
-                <Icon size={15} />
-                {label}
-              </button>
-            ))}
+  return <BlockEditorFrame inline={inline} title="Add block" description="Take a room, bed or area out of service."
+    onClose={editor.close} opener={editor.opener} feedback={mutation.error}>
+    <CompositeSourceNotice className="mb-3" sources={sources} title="Block information is refreshing or unavailable" />
+    {!editor.ready && !mutation.isPending && <p role="status" className="mb-3 text-sm text-warning-content">Your draft is kept. Current access, inventory and block records are required to submit.</p>}
+    <form onSubmit={submit} className="space-y-4" hidden={needsAuthentication}>
+      {selected && <div className="border-l-2 border-base-300 pl-3" data-selected-block-target>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-base-content/60">{editor.ready && selectedCurrent ? "Selected target" : "Selection unconfirmed"} · {targetLabel(selected.kind)}</p>
+            <h4 ref={targetSummary} tabIndex={-1} data-autofocus={contextualEntry || undefined}
+              className="mt-1 break-words font-semibold outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary">{currentSelected?.label ?? selected.label}</h4>
           </div>
-        </fieldset>
-
-        {targetKind !== "property" && (
-          <label className="input input-bordered flex items-center gap-2">
-            <Search size={17} className="text-base-content/40" />
-            <input
-              type="search"
-              className="grow"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={`Search ${targetLabel(targetKind).toLocaleLowerCase()}`}
-              aria-label={`Search ${targetLabel(targetKind).toLocaleLowerCase()}`}
-            />
-          </label>
-        )}
-
-        <div className="max-h-64 overflow-y-auto rounded-lg border border-base-300" role="radiogroup" aria-label={`${targetLabel(targetKind)} target`}>
-          {visibleOptions.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-base-content/50">No matching inventory</p>
-          ) : visibleOptions.map((option) => (
-            <BlockTargetRow
-              key={option.id}
-              option={option}
-              selected={selectedOption?.id === option.id}
-              onSelect={() => setSelectedId(option.id)}
-            />
+          {contextualEntry && !choosingTarget && <button type="button" className="btn btn-ghost btn-sm" disabled={locked}
+            aria-expanded={choosingTarget} aria-controls={targetChooserId} onClick={changeTarget}>Change target</button>}
+        </div>
+        <p className="mt-1 break-words text-sm text-base-content/65">{currentSelected?.detail ?? selected.detail}</p>
+        <p className="mt-1 text-xs text-base-content/65">{selected.unitIds.length} {selected.unitIds.length === 1 ? "unit" : "units"}{editor.ready && selectedCurrent ? " will be blocked." : " in the last selected scope; confirm current records before submitting."}</p>
+      </div>}
+      <div ref={targetChooser} id={targetChooserId} hidden={!choosingTarget} className="space-y-4">
+      <fieldset disabled={locked}>
+        <legend className="mb-1.5 text-sm font-semibold">Scope</legend>
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-base-200 p-1 sm:grid-cols-5" aria-label="Inventory block scope">
+          {targetKinds.filter(({ kind }) => kind === targetKind || options.some((option) => option.kind === kind)).map(({ kind, label, icon: Icon }) => (
+            <button key={kind} type="button" className={`btn btn-sm w-full rounded-md border-0 ${targetKind === kind ? "bg-base-100 shadow-sm" : "btn-ghost"}`}
+              aria-pressed={targetKind === kind} onClick={() => chooseKind(kind)}><Icon size={15} />{label}</button>
           ))}
         </div>
-
-        {selectedOption && (
-          <div className="flex items-center justify-between gap-4 rounded-lg bg-primary/8 px-4 py-3 text-sm">
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{selectedOption.label}</p>
-              <p className="mt-0.5 text-xs text-base-content/55">{selectedOption.detail}</p>
-            </div>
-            <span className="badge badge-primary badge-outline shrink-0">
-              {selectedOption.unitIds.length} {selectedOption.unitIds.length === 1 ? "unit" : "units"}
-            </span>
-          </div>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <DateInput label="From" value={arrival} onChange={setArrival} />
-          <DateInput label="Until" value={departure} min={arrival} onChange={setDeparture} />
-        </div>
-
-        <label className="form-control block">
-          <span className="label-text mb-1.5 block text-sm font-semibold">Reason</span>
-          <textarea
-            className="textarea textarea-bordered min-h-20 w-full"
-            name="reason"
-            placeholder="Maintenance, private use, deep clean..."
-            required
-          />
-        </label>
-
-        {mutation.error && <ErrorState error={mutation.error} />}
-        <FormActions
-          submitting={mutation.isPending}
-          disabled={!selectedOption}
-          submitLabel={selectedOption && selectedOption.unitIds.length > 1 ? `Block ${selectedOption.unitIds.length} units` : "Block inventory"}
-          onCancel={onClose}
-        />
-      </form>
-    </Modal>
-  );
+      </fieldset>
+      {targetKind !== "property" && <label className="input input-bordered flex w-full items-center gap-2">
+        <Search size={17} className="shrink-0 text-base-content/40" />
+        <input type="search" className="min-w-0 grow" value={search} onChange={(event) => setSearch(event.target.value)}
+          placeholder={`Search ${targetLabel(targetKind).toLocaleLowerCase()}`} aria-label={`Search ${targetLabel(targetKind).toLocaleLowerCase()}`} disabled={locked} />
+      </label>}
+      <div className="max-h-60 overflow-y-auto rounded-lg border border-base-300" role="radiogroup" aria-label={`${targetLabel(targetKind)} target`}>
+        {!visibleOptions.length ? <p className="px-4 py-5 text-sm text-base-content/60">No matching inventory. Change the search or scope.</p> : visibleOptions.map((option) => (
+          <label key={option.id} className={`flex items-center gap-3 border-b border-base-300 px-3 py-3 last:border-b-0 ${selectedCurrent && selected?.id === option.id ? "bg-primary/8" : "hover:bg-base-200/60"}`}>
+            <input type="radio" name="blockTarget" value={option.id} checked={selectedCurrent && selected?.id === option.id} onChange={() => setSelected(option)} disabled={locked} className="radio radio-primary radio-sm shrink-0" />
+            <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{option.label}</span><span className="mt-0.5 block break-words text-xs text-base-content/60">{option.detail}</span></span>
+            <span className="shrink-0 text-xs tabular-nums">{option.unitIds.length}</span>
+          </label>
+        ))}
+      </div>
+      {contextualEntry && <button type="button" className="btn btn-outline btn-sm" disabled={locked || !selectedCurrent || !selectedVisible} onClick={() => {
+        setChoosingTarget(false);
+        requestAnimationFrame(() => targetSummary.current?.focus());
+      }}>Use selected target</button>}
+      </div>
+      {selected && !selectedCurrent && <div role="alert" className="border-l-2 border-warning px-3 py-2 text-sm">
+        <p><strong>{selected.label}</strong> changed or is no longer eligible. Your draft is kept; review the current inventory and deliberately select a target again.</p>
+        <button type="button" className="btn btn-ghost btn-sm mt-2" disabled={mutation.isPending} onClick={() => void editor.refresh()}>Refresh inventory</button>
+      </div>}
+      {selectedCurrent && selected && !selectedVisible && <p className="text-sm text-base-content/65">Clear the target search to review the selected space before submitting.</p>}
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <div><span className="mb-1.5 block text-sm font-semibold">From</span><DatePicker value={arrival} onChange={setArrival} ariaLabel="From" required disabled={locked} /></div>
+        <div><span className="mb-1.5 block text-sm font-semibold">Until</span><DatePicker value={departure} onChange={setDeparture} ariaLabel="Until" min={arrival} required disabled={locked} />
+          <p className="mt-1 text-xs text-base-content/60">Available again on this date, if otherwise eligible.</p></div>
+      </div>
+      {!rangeValid && <p role="alert" className="text-sm text-error">Choose valid dates. Until must be after From.</p>}
+      <label className="block"><span className="mb-1.5 block text-sm font-semibold">Reason</span>
+        <textarea ref={reasonInput} className="textarea textarea-bordered min-h-20 w-full" name="reason" value={reason} onChange={(event) => setReason(event.target.value)}
+          placeholder="Maintenance, private use, deep clean…" required disabled={locked} />
+      </label>
+      {reason.length > 0 && !reason.trim() && <p role="alert" className="text-sm text-error">Enter a reason, not only spaces.</p>}
+      {mutation.error && !needsAuthentication && <><ErrorState error={mutation.error} title="Couldn't add the block" retry={canSubmit ? editor.retryCreate : undefined} />
+        <p className="text-xs text-base-content/60">Try again repeats this exact attempt. Check refreshed records before starting a different block if the outcome is uncertain.</p>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={mutation.isPending} onClick={() => {
+          editor.editCreateDraft();
+          requestAnimationFrame(() => reasonInput.current?.focus());
+        }}>Edit draft</button>
+      </>}
+      {!needsAuthentication && <FormActions submitting={mutation.isPending} cancelDisabled={mutation.isPending} disabled={!canSubmit || Boolean(mutation.error)}
+        submitLabel={selected && selected.unitIds.length > 1 ? `Block ${selected.unitIds.length} units` : "Add block"} onCancel={editor.close} />}
+    </form>
+    {needsAuthentication && <div className="space-y-3"><RecentAuthenticationPrompt error={mutation.error} onAuthenticated={editor.retryCreate} />
+      <button type="button" className="btn btn-ghost btn-sm" onClick={editor.close}>Cancel</button></div>}
+  </BlockEditorFrame>;
 }
 
-function BlockTargetRow({
-  option,
-  selected,
-  onSelect,
-}: {
-  option: BlockTargetOption;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <label className={`flex cursor-pointer items-center gap-3 border-b border-base-300 px-4 py-3 last:border-b-0 hover:bg-base-200/60 ${selected ? "bg-primary/8" : ""}`}>
-      <input
-        type="radio"
-        className="radio radio-primary radio-sm"
-        name="blockTarget"
-        value={option.id}
-        checked={selected}
-        onChange={onSelect}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{option.label}</span>
-        <span className="mt-0.5 block truncate text-xs text-base-content/50">{option.detail}</span>
-      </span>
-      <span className="text-xs tabular-nums text-base-content/45">{option.unitIds.length}</span>
-    </label>
-  );
-}
-
-function DateInput({ label, value, min, onChange }: { label: string; value: string; min?: string; onChange: (value: string) => void }) {
-  return (
-    <div className="form-control block">
-      <span className="label-text mb-1.5 block text-sm font-semibold">{label}</span>
-      <DatePicker className="w-full" value={value} min={min} onChange={onChange} ariaLabel={label} required />
-    </div>
-  );
-}
-
-function targetLabel(kind: BlockTargetKind): string {
-  return ({
-    property: "Property",
-    building: "Building",
-    floor: "Floor",
-    room: "Room",
-    unit: "Bed or unit",
-  } as const)[kind];
-}
-
-function defaultRange() {
-  const arrival = new Date();
-  arrival.setDate(arrival.getDate() + 1);
-  const departure = new Date(arrival);
-  departure.setDate(departure.getDate() + 2);
-  return {
-    arrival: arrival.toISOString().slice(0, 10),
-    departure: departure.toISOString().slice(0, 10),
-  };
+function targetLabel(kind: BlockTargetKind) {
+  return ({ property: "Property", building: "Building", floor: "Floor", room: "Room", unit: "Bed or unit" })[kind];
 }

@@ -39,4 +39,15 @@ describe("integrations source recovery", () => {
     expect(activity).toContain("<CompositeSourceNotice");
     expect(activity).toContain("<CompositeSourceFallback");
   });
+
+  it("keeps the Integrations page identity visible through access recovery states", () => {
+    const integrations = source("IntegrationsPage.tsx");
+
+    expect(integrations).toContain("const pageHeaderProps = {");
+    expect(integrations).toContain("if (access.isLoading) return (");
+    expect(integrations).toContain("if (access.error) return (");
+    expect(integrations).toContain("if (!canRead) return (");
+    expect(integrations).toContain("<PageHeader {...pageHeaderProps} />");
+    expect(integrations).toContain('title="Integration access is restricted"');
+  });
 });

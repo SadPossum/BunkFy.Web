@@ -17,6 +17,7 @@ import "./styles.css";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 20_000, retry: 1, refetchOnWindowFocus: false },
+    mutations: { networkMode: "always", retry: 0 },
   },
 });
 

@@ -33,6 +33,7 @@ import {
   ErrorState,
   LoadingState,
   Modal,
+  ModalActions,
   StatusBadge,
 } from "../../components/ui/primitives";
 import { PrivacyRequestDiscovery } from "./PrivacyRequestDiscovery";
@@ -75,6 +76,7 @@ import {
   dataRightsSelectedEvidencePath,
   dataRightsScopeKey,
   isDataRightsSelectedEvidenceCurrent,
+  shouldLoadDataRightsSelectedEvidence,
   shortDataRightsCaseId,
   type DataRightsCapabilities,
   type DataRightsOperationKind,
@@ -172,9 +174,8 @@ export function PrivacyRequestDetail({
       selectedEvidencePath,
     ),
     queryFn: () => request<DataRightsSelectedSubjectsResponse>(selectedEvidencePath!),
-    enabled: Boolean(
-      caseId &&
-      dataRightsCase &&
+    enabled: Boolean(caseId) && shouldLoadDataRightsSelectedEvidence(
+      dataRightsCase,
       selectedEvidencePath,
     ),
   });
@@ -716,10 +717,10 @@ export function PrivacyRequestDetail({
             <div>
               <CompositeSourceNotice
                 className="mb-3"
-                sources={[permissionSource, caseSource]}
-                title="Privacy request details are delayed"
+                sources={[permissionSource]}
+                title="Privacy request access is delayed"
               />
-              <CompositeSourceFallback state={caseSource.state} label="privacy request" />
+              <CompositeSourceFallback error={caseQuery.error} retry={() => void caseQuery.refetch()} state={caseSource.state} label="privacy request" title="Privacy request could not be opened" />
             </div>
           )
           : (
@@ -760,7 +761,9 @@ export function PrivacyRequestDetail({
                   operatorScopeKey={operatorScopeKey}
                   scopeKey={scopeKey}
                   onCaseUpdated={updateCase}
-                  refreshSelected={() => selected.refetch()}
+                  refreshSelected={() => queryClient.invalidateQueries({
+                    queryKey: ["data-rights-subjects", scopeKey, caseId, operatorScopeKey],
+                  })}
                   refreshCase={() => caseQuery.refetch()}
                   onRestrictionTargetCurrentChange={updateRestrictionTargetCurrent}
                 />
@@ -849,6 +852,11 @@ export function PrivacyRequestDetail({
                   caseCurrent={caseCurrent}
                   selectedEvidenceCurrent={selectedEvidenceCurrent}
                   onCaseUpdated={updateCase}
+                  guestDraftContext={scope.kind === "guest" ? {
+                    operatorScopeKey, scopeKey, caseId: dataRightsCase.id, caseVersion: dataRightsCase.version,
+                    caseReady: caseSource.state === "ready", selectedReady: selectedSource.state === "ready",
+                    selectedEvidence: selected.data,
+                  } : undefined}
                 />
               )}
 
@@ -886,6 +894,11 @@ export function PrivacyRequestDetail({
               )}
             </div>
           )}
+      <ModalActions>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Close
+        </button>
+      </ModalActions>
     </Modal>
   );
 }

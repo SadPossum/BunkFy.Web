@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Settings2, ShieldCheck, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ArrowRight, ExternalLink, Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import type {
   Organization,
   OrganizationMembership,
   Property,
+  StaffAccountDirectoryEntry,
   WorkspaceAccessProfile,
   WorkspaceAccessProfileListResponse,
   WorkspaceMemberAccess,
 } from "../../api/types";
+import { staffStatusLabel } from "../../api/labels";
 import {
   compositeSourceCurrent,
   compositeSourceUsable,
@@ -21,12 +23,17 @@ import {
   CompositeSourceFallback,
   CompositeSourceNotice,
 } from "../../components/ui/CompositeSourceNotice";
-import { Modal, ModalActions } from "../../components/ui/primitives";
+import { ErrorState, InitialAvatar, Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { AccessProfilePicker, PropertyScopeField } from "./WorkspaceAccessControls";
 import { workspaceAccessSourcesCurrent } from "./workspaceAccessAuthority";
 
 const ACTIVE_PROFILE_PAGE_SIZE = 100;
+
+type MemberAccessSelection = {
+  profileId: string;
+  propertyIds: string[];
+};
 
 export function WorkspaceMembersSettings({
   workspace,
@@ -36,6 +43,8 @@ export function WorkspaceMembersSettings({
   properties,
   propertySource,
   memberSource,
+  accountDirectorySource,
+  staffDirectory,
   authorityCurrent,
   page,
   pageSize,
@@ -50,6 +59,8 @@ export function WorkspaceMembersSettings({
   properties: Property[];
   propertySource: CompositeSource;
   memberSource: CompositeSource;
+  accountDirectorySource: CompositeSource | null;
+  staffDirectory: StaffAccountDirectoryEntry[];
   authorityCurrent: boolean;
   page: number;
   pageSize: number;
@@ -63,6 +74,13 @@ export function WorkspaceMembersSettings({
   const transferTarget = memberships.find(
     (membership) => membership.subjectId === transferTargetSubjectId,
   ) ?? null;
+  const staffBySubject = useMemo(
+    () => new Map(staffDirectory.map((staff) => [staff.authSubjectId, staff])),
+    [staffDirectory],
+  );
+  const transferTargetStaff = transferTarget
+    ? staffBySubject.get(transferTarget.subjectId)
+    : undefined;
   const profiles = useQuery({
     queryKey: ["workspace-access", workspace.organizationId, "active-profiles"],
     queryFn: () => request<WorkspaceAccessProfileListResponse>(
@@ -137,7 +155,7 @@ export function WorkspaceMembersSettings({
           <div>
             <h2 className="font-display text-xl font-semibold">Workspace members</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
-              Assign one operational role across the whole workspace or selected properties.
+              Membership controls workspace governance. Staff employment and operational access stay separate.
             </p>
           </div>
         </div>
@@ -148,8 +166,13 @@ export function WorkspaceMembersSettings({
 
       <div className="mt-5">
         <CompositeSourceNotice
-          sources={[memberSource, profileSource, propertySource]}
-          title="Some access data is delayed"
+          sources={[
+            memberSource,
+            profileSource,
+            propertySource,
+            ...(accountDirectorySource ? [accountDirectorySource] : []),
+          ]}
+          title="Some member context is delayed"
         />
       </div>
       {profilesUsable && profiles.data?.hasMore && (
@@ -165,17 +188,32 @@ export function WorkspaceMembersSettings({
               const self = membership.membershipId === currentMembership.membershipId;
               const active = isActive(membership.status);
               const owner = isOwner(membership.role);
-              const displayName = self ? "You" : `Member ${shortSubject(membership.subjectId)}`;
-              const accountLabel = self ? currentUsername : "Workspace identity";
+              const staff = staffBySubject.get(membership.subjectId);
+              const displayName = staff?.displayName ?? (self ? currentUsername : "Workspace member");
+              const accountLabel = staff?.jobTitle ?? (staff ? "Staff profile" : "No linked Staff profile");
               return (
                 <article key={membership.membershipId} className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{displayName}</p>
-                    <p className="mt-1 truncate text-xs text-base-content/45">{accountLabel}</p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <InitialAvatar name={displayName} />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-semibold">{displayName}</p>
+                        {self && <span className="badge border-0 bg-primary font-semibold text-white">You</span>}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-base-content/45">{accountLabel}</p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {self && <span className="badge border-0 bg-primary font-semibold text-white">Current account</span>}
                     <span className="badge badge-outline">{owner ? "Owner" : active ? "Member" : statusLabel(membership.status)}</span>
+                    {staff && <StatusBadge status={staffStatusLabel(staff.status)} />}
+                    {staff && (
+                      <Link
+                        className="btn btn-ghost btn-sm"
+                        to={`/staff?member=${encodeURIComponent(staff.staffMemberId)}`}
+                      >
+                        <ExternalLink size={15} />Staff profile
+                      </Link>
+                    )}
                     {!owner && active && (
                       <button
                         className="btn btn-ghost btn-sm"
@@ -221,6 +259,7 @@ export function WorkspaceMembersSettings({
           key={`${editing.membershipId}-${editing.version}`}
           workspaceId={workspace.organizationId}
           membership={editing}
+          memberLabel={staffBySubject.get(editing.subjectId)?.displayName ?? "workspace member"}
           profiles={profiles.data.items.filter((profile) => profile.status === 1)}
           properties={properties}
           authorityCurrent={accessDirectoriesCurrent}
@@ -232,20 +271,20 @@ export function WorkspaceMembersSettings({
       {transferTarget && (
         <Modal
           open
-          title={`Make member ${shortSubject(transferTarget.subjectId)} the workspace owner?`}
-          description="Ownership controls workspace governance and can be held by more than one active member."
+          title={`Transfer ownership to ${transferTargetStaff?.displayName ?? "this member"}?`}
+          description="This transfers the single workspace owner role. Operational roles and Staff employment are not changed."
           onClose={closeTransferConfirmation}
         >
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="rounded-lg border border-base-300 bg-base-200/55 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-base-content/45">Current account</p>
+              <p className="text-xs font-bold uppercase text-base-content/45">Current account</p>
               <p className="mt-2 font-semibold">{currentUsername}</p>
               <p className="mt-1 text-sm text-base-content/55">Owner to member</p>
             </div>
             <ArrowRight className="mx-auto rotate-90 text-primary sm:rotate-0" size={20} />
             <div className="rounded-lg border border-primary/25 bg-primary/8 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">New owner</p>
-              <p className="mt-2 font-semibold">Member {shortSubject(transferTarget.subjectId)}</p>
+              <p className="text-xs font-bold uppercase text-primary">New owner</p>
+              <p className="mt-2 font-semibold">{transferTargetStaff?.displayName ?? "Workspace member"}</p>
               <p className="mt-1 text-sm text-base-content/55">Member to owner</p>
             </div>
           </div>
@@ -282,6 +321,7 @@ export function WorkspaceMembersSettings({
 function MemberAccessEditor({
   workspaceId,
   membership,
+  memberLabel,
   profiles,
   properties,
   authorityCurrent,
@@ -290,6 +330,7 @@ function MemberAccessEditor({
 }: {
   workspaceId: string;
   membership: OrganizationMembership;
+  memberLabel: string;
   profiles: WorkspaceAccessProfile[];
   properties: Property[];
   authorityCurrent: boolean;
@@ -304,8 +345,6 @@ function MemberAccessEditor({
       `/api/workspace-access/members/${encodeURIComponent(membership.subjectId)}/access`,
     ),
   });
-  const [profileId, setProfileId] = useState("");
-  const [propertyIds, setPropertyIds] = useState<string[]>([]);
   const accessSource = createCompositeSource({
     label: "Member access",
     hasData: access.data !== undefined,
@@ -316,16 +355,12 @@ function MemberAccessEditor({
   });
   const accessUsable = compositeSourceUsable(accessSource.state);
   const canSave = authorityCurrent && compositeSourceCurrent(accessSource);
-  const existingSelection = useMemo(() => access.data ? memberSelection(access.data) : null, [access.data]);
-
-  useEffect(() => {
-    if (!access.data) return;
-    setProfileId(existingSelection?.profileId ?? profiles[0]?.profileId ?? "");
-    setPropertyIds(existingSelection?.propertyIds ?? []);
-  }, [access.data, existingSelection, profiles]);
+  const initialSelection = access.data
+    ? editableMemberSelection(access.data, profiles)
+    : null;
 
   const update = useMutation({
-    mutationFn: () => {
+    mutationFn: (selection: MemberAccessSelection) => {
       if (!canSave) {
         throw new Error("Refresh member access, roles, and properties before saving.");
       }
@@ -333,7 +368,7 @@ function MemberAccessEditor({
         `/api/workspace-access/members/${encodeURIComponent(membership.subjectId)}/access`,
         {
           method: "PUT",
-          body: JSON.stringify({ profileId, propertyIds }),
+          body: JSON.stringify(selection),
         },
       );
     },
@@ -343,16 +378,10 @@ function MemberAccessEditor({
     },
   });
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!canSave) return;
-    update.mutate();
-  }
-
   return (
     <Modal
       open
-      title={`Access for member ${shortSubject(membership.subjectId)}`}
+      title={`Access for ${memberLabel}`}
       description="Saving replaces this member's operational assignment exactly. Workspace ownership is not affected."
       onClose={onClose}
     >
@@ -360,38 +389,19 @@ function MemberAccessEditor({
         sources={[...authoritySources, accessSource]}
         title="Some assignment data is delayed"
       />
-      {accessUsable && access.data ? (
-        <form className="space-y-6" onSubmit={submit}>
-          {new Set(access.data.assignments.map((assignment) => assignment.profileId)).size > 1 && (
-            <div className="alert alert-warning py-3 text-sm">
-              This member has multiple legacy role assignments. Saving will replace them with the single role below.
-            </div>
-          )}
-          <AccessProfilePicker
-            profiles={profiles}
-            value={profileId}
-            onValueChange={setProfileId}
-            disabled={!canSave}
-          />
-          <PropertyScopeField
-            properties={properties}
-            propertyIds={propertyIds}
-            onChange={setPropertyIds}
-            disabled={!canSave}
-          />
-          {update.error && <SettingsError error={update.error} />}
-          <ModalActions>
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button
-              type="submit"
-              className="btn btn-primary min-w-32 text-white"
-              disabled={update.isPending || !profileId || !canSave}
-            >
-              {update.isPending && <span className="loading loading-spinner loading-sm" />}
-              Save access
-            </button>
-          </ModalActions>
-        </form>
+      {accessUsable && access.data && initialSelection ? (
+        <MemberAccessEditorForm
+          key={memberAccessSnapshotKey(access.data, initialSelection)}
+          access={access.data}
+          initialSelection={initialSelection}
+          profiles={profiles}
+          properties={properties}
+          canSave={canSave}
+          submitting={update.isPending}
+          error={update.error}
+          onClose={onClose}
+          onSubmit={(selection) => update.mutate(selection)}
+        />
       ) : (
         <CompositeSourceFallback state={accessSource.state} label="member access" />
       )}
@@ -399,7 +409,113 @@ function MemberAccessEditor({
   );
 }
 
-function memberSelection(access: WorkspaceMemberAccess): { profileId: string; propertyIds: string[] } | null {
+function MemberAccessEditorForm({
+  access,
+  initialSelection,
+  profiles,
+  properties,
+  canSave,
+  submitting,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  access: WorkspaceMemberAccess;
+  initialSelection: MemberAccessSelection;
+  profiles: WorkspaceAccessProfile[];
+  properties: Property[];
+  canSave: boolean;
+  submitting: boolean;
+  error: unknown;
+  onClose: () => void;
+  onSubmit: (selection: MemberAccessSelection) => void;
+}) {
+  const [selection, setSelection] = useState(initialSelection);
+  const pendingSelection = useRef(initialSelection);
+
+  function replaceSelection(nextSelection: MemberAccessSelection) {
+    pendingSelection.current = nextSelection;
+    setSelection(nextSelection);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSave) return;
+    onSubmit({
+      profileId: pendingSelection.current.profileId,
+      propertyIds: [...pendingSelection.current.propertyIds],
+    });
+  }
+
+  return (
+    <form className="space-y-6" onSubmit={submit}>
+      {new Set(access.assignments.map((assignment) => assignment.profileId)).size > 1 && (
+        <div className="alert alert-warning py-3 text-sm">
+          This member has multiple legacy role assignments. Saving will replace them with the single role below.
+        </div>
+      )}
+      <AccessProfilePicker
+        profiles={profiles}
+        value={selection.profileId}
+        onValueChange={(profileId) => replaceSelection({
+          ...pendingSelection.current,
+          profileId,
+        })}
+        disabled={!canSave}
+      />
+      <PropertyScopeField
+        properties={properties}
+        propertyIds={selection.propertyIds}
+        onChange={(propertyIds) => replaceSelection({
+          ...pendingSelection.current,
+          propertyIds,
+        })}
+        disabled={!canSave}
+      />
+      {error != null && <SettingsError error={error} />}
+      <ModalActions>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button
+          type="submit"
+          className="btn btn-primary min-w-32 text-white"
+          disabled={submitting || !selection.profileId || !canSave}
+        >
+          {submitting && <span className="loading loading-spinner loading-sm" />}
+          Save access
+        </button>
+      </ModalActions>
+    </form>
+  );
+}
+
+function editableMemberSelection(
+  access: WorkspaceMemberAccess,
+  profiles: WorkspaceAccessProfile[],
+): MemberAccessSelection {
+  const existing = memberSelection(access);
+  const existingProfileAvailable = profiles.some(
+    (profile) => profile.profileId === existing?.profileId,
+  );
+  return {
+    profileId: existingProfileAvailable
+      ? existing?.profileId ?? ""
+      : profiles[0]?.profileId ?? "",
+    propertyIds: existing?.propertyIds ?? [],
+  };
+}
+
+function memberAccessSnapshotKey(
+  access: WorkspaceMemberAccess,
+  selection: MemberAccessSelection,
+): string {
+  const assignments = access.assignments
+    .map((assignment) => `${assignment.profileId}:${assignment.profileVersion}:${assignment.propertyId ?? "*"}`)
+    .sort()
+    .join("|");
+  return `${selection.profileId}:${assignments}`;
+}
+
+function memberSelection(access: WorkspaceMemberAccess): MemberAccessSelection | null {
   const first = access.assignments[0];
   if (!first) return null;
   const wholeWorkspace = access.assignments.some((assignment) => assignment.propertyId == null);
@@ -412,11 +528,7 @@ function memberSelection(access: WorkspaceMemberAccess): { profileId: string; pr
 }
 
 function SettingsError({ error }: { error: unknown }) {
-  return (
-    <div className="alert alert-error mt-5 py-3 text-sm">
-      {error instanceof Error ? error.message : "The request could not be completed."}
-    </div>
-  );
+  return <div className="mt-5"><ErrorState error={error} /></div>;
 }
 
 function isOwner(role: OrganizationMembership["role"] | undefined): boolean {
@@ -429,8 +541,4 @@ function isActive(status: OrganizationMembership["status"]): boolean {
 
 function statusLabel(status: OrganizationMembership["status"]): string {
   return status === "suspended" ? "Suspended" : "Removed";
-}
-
-function shortSubject(subjectId: string): string {
-  return subjectId.length <= 8 ? subjectId : subjectId.slice(0, 8);
 }

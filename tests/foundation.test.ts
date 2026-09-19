@@ -73,10 +73,12 @@ describe("frontend repository foundation", () => {
     expect(session).toContain("/api/auth/browser/refresh");
     expect(session).not.toContain("refreshToken");
     expect(session).toContain("createSingleFlightRefresh");
+    expect(session).toContain("refreshFailureInvalidatesSession");
     expect(session).toContain("queryClient.removeQueries()");
     expect(session).not.toContain("queryClient.clear()");
     expect(client).toContain("X-Tenant-Id");
     expect(client).toContain('credentials: "include"');
+    expect(client).toContain("assertRequestCanStart");
   });
 
   it("keeps browser external authentication and account security on published API contracts", () => {
@@ -84,6 +86,8 @@ describe("frontend repository foundation", () => {
     const capabilities = readFileSync(join(repositoryRoot, "src", "app", "productCapabilities.tsx"), "utf8");
     const authPage = readFileSync(join(repositoryRoot, "src", "features", "auth", "AuthPage.tsx"), "utf8");
     const account = readFileSync(join(repositoryRoot, "src", "features", "account", "AccountPage.tsx"), "utf8");
+    const accountSecurity = readFileSync(join(repositoryRoot, "src", "features", "account", "AccountSecurityPanels.tsx"), "utf8");
+    const accountSurface = `${account}\n${accountSecurity}`;
 
     expect(session).toContain("/sign-in/challenge");
     expect(session).toContain("/link/challenge");
@@ -97,11 +101,11 @@ describe("frontend repository foundation", () => {
     expect(account).toContain("/api/auth/email-verification");
     expect(capabilities).toContain("/api/product-capabilities");
     expect(capabilities).not.toContain("VITE_BUNKFY_EMAIL_VERIFICATION_ENABLED");
-    expect(account).toContain("emailVerificationEnabled");
-    expect(account).toContain("/external-identities/");
+    expect(accountSurface).toContain("emailVerificationEnabled");
+    expect(accountSurface).toContain("/external-identities/");
   });
 
-  it("keeps workspace membership independent from sensitive staff enrichment", () => {
+  it("keeps workspace membership authoritative while Staff supplies bounded display enrichment", () => {
     const settings = readFileSync(
       join(repositoryRoot, "src", "features", "workspaces", "WorkspaceSettingsPage.tsx"),
       "utf8",
@@ -114,9 +118,14 @@ describe("frontend repository foundation", () => {
     expect(settings).toContain('/api/organizations/${workspace?.organizationId}/members');
     expect(settings).toContain("error: members.error");
     expect(settings).toContain("memberSource={memberSource}");
+    expect(settings).toContain('"/api/staff/members/account-directory/resolve"');
+    expect(settings).toContain("authSubjectIds: memberSubjectIds");
+    expect(settings).toContain('tab === "members"');
     expect(members).toContain("/api/workspace-access/members/");
-    expect(`${settings}\n${members}`).not.toContain('/api/staff/members');
-    expect(`${settings}\n${members}`).not.toContain('authSubjectId');
+    expect(members).toContain("membership.subjectId");
+    expect(members).toContain("staffBySubject.get(membership.subjectId)");
+    expect(`${settings}\n${members}`).not.toContain('/api/staff/members?');
+    expect(`${settings}\n${members}`).not.toContain('/api/staff/members/search');
   });
 
   it("keeps workspace access workflows behind the BunkFy product facade", () => {
@@ -168,7 +177,9 @@ describe("frontend repository foundation", () => {
       "utf8",
     );
 
-    expect(reservations).toContain('reservationParams.append("status"');
+    expect(reservations).toContain('pageSize: String(PAGE_SIZE)');
+    expect(reservations).toContain('reservationParams.set("view"');
+    expect(reservations).toContain('reservationParams.set("operatingDate"');
     expect(reservations).toContain('hasMore={reservations.data?.hasMore}');
     expect(reservations).not.toContain('totalCount={reservations.data?.totalCount}');
     expect(reservations).not.toContain("Load more reservations");

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, LockKeyhole, Pencil, Plus, ShieldCheck, UsersRound } from "lucide-react";
+import { Archive, ChevronDown, Eye, LockKeyhole, Pencil, Plus, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type {
   WorkspaceAccessCatalogue,
@@ -16,7 +16,7 @@ import {
   CompositeSourceFallback,
   CompositeSourceNotice,
 } from "../../components/ui/CompositeSourceNotice";
-import { Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
+import { ErrorState, Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { groupPermissions, updatePermissionSelection } from "./workspaceAccessPermissions";
 
@@ -77,13 +77,13 @@ export function WorkspaceRolesSettings({
 
   useEffect(() => setPage(1), [includeArchived, workspaceId]);
   useEffect(() => {
-    if (!canManage || !catalogueCurrent || !profilesCurrent) {
+    if (!catalogueCurrent || !profilesCurrent || (!canManage && editing === "new")) {
       setEditing(null);
     }
     if (!canManage || !profilesCurrent) {
       setArchiveTarget(null);
     }
-  }, [canManage, catalogueCurrent, profilesCurrent]);
+  }, [canManage, catalogueCurrent, editing, profilesCurrent]);
   useEffect(() => {
     if (!profiles.isFetching && page > 1 && profiles.data?.items.length === 0) {
       setPage((current) => Math.max(1, current - 1));
@@ -98,7 +98,7 @@ export function WorkspaceRolesSettings({
             <ShieldCheck size={20} />
           </span>
           <div>
-            <h2 className="font-display text-xl font-semibold">Roles and permissions</h2>
+            <h2 className="font-display text-xl font-semibold">Access roles</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
               Set operational access without changing workspace ownership.
             </p>
@@ -152,17 +152,18 @@ export function WorkspaceRolesSettings({
                     <span className="inline-flex items-center gap-1"><UsersRound size={13} />{profile.assignmentCount} assignment{profile.assignmentCount === 1 ? "" : "s"}</span>
                   </div>
                 </div>
-                {canManage && profile.status === 1 && (
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      disabled={!catalogueCurrent || !profilesCurrent}
-                      title={!catalogueCurrent || !profilesCurrent ? "Refresh roles and permissions before editing access." : undefined}
-                      onClick={() => setEditing(profile)}
-                    >
-                      <Pencil size={15} />Edit
-                    </button>
-                    {!profile.isSeed && (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    disabled={!catalogueCurrent || !profilesCurrent}
+                    title={!catalogueCurrent || !profilesCurrent ? "Refresh roles and permissions before opening this role." : undefined}
+                    onClick={() => setEditing(profile)}
+                  >
+                    {profile.isSeed || !canManage || profile.status !== 1
+                      ? <><Eye size={15} />View</>
+                      : <><Pencil size={15} />Edit</>}
+                  </button>
+                  {canManage && profile.status === 1 && !profile.isSeed && (
                       <button
                         className="btn btn-ghost btn-sm text-error"
                         disabled={profile.assignmentCount > 0 || !profilesCurrent}
@@ -175,9 +176,8 @@ export function WorkspaceRolesSettings({
                       >
                         <Archive size={15} />Archive
                       </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -195,12 +195,13 @@ export function WorkspaceRolesSettings({
         <CompositeSourceFallback state={profileSource.state} label="workspace roles" />
       )}
 
-      {canManage && editing && catalogue.data && catalogueCurrent && profilesCurrent && (
+      {editing && catalogue.data && catalogueCurrent && profilesCurrent && (
         <ProfileEditor
           key={editing === "new" ? "new" : `${editing.profileId}-${editing.version}`}
           profile={editing === "new" ? null : editing}
           catalogue={catalogue.data}
           request={request}
+          readOnly={editing !== "new" && (editing.isSeed || !canManage || editing.status !== 1)}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -238,12 +239,14 @@ function ProfileEditor({
   profile,
   catalogue,
   request,
+  readOnly,
   onClose,
   onSaved,
 }: {
   profile: WorkspaceAccessProfile | null;
   catalogue: WorkspaceAccessCatalogue;
   request: ReturnType<typeof useSession>["request"];
+  readOnly: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -277,6 +280,7 @@ function ProfileEditor({
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (readOnly) return;
     save.mutate();
   }
 
@@ -284,11 +288,19 @@ function ProfileEditor({
     <Modal
       open
       size="lg"
-      title={profile ? `Edit ${profile.displayName}` : "New workspace role"}
-      description="Permissions are constrained by your own access and the BunkFy product catalogue."
+      title={profile ? (readOnly ? profile.displayName : `Edit ${profile.displayName}`) : "New workspace role"}
+      description={readOnly
+        ? "Review the permissions this role grants. Built-in roles are protected by BunkFy."
+        : "Permissions are constrained by your own access and the BunkFy product catalogue."}
       onClose={onClose}
     >
       <form onSubmit={submit}>
+        {readOnly && profile?.isSeed && (
+          <div className="mb-5 flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/8 p-4 text-sm text-base-content/65">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
+            Built-in roles cannot be edited or archived. Create a custom role when this permission set does not fit.
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="form-control block">
             <span className="mb-1.5 block text-sm font-semibold">Role name</span>
@@ -299,6 +311,7 @@ function ProfileEditor({
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="Night manager"
               autoFocus
+              disabled={readOnly}
             />
           </label>
           <label className="form-control block">
@@ -309,6 +322,7 @@ function ProfileEditor({
               maxLength={500}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="What this role is for"
+              disabled={readOnly}
             />
           </label>
         </div>
@@ -320,11 +334,22 @@ function ProfileEditor({
           </div>
           <span className="badge badge-outline shrink-0">{selectedPermissions.length} selected</span>
         </div>
-        <div className="divide-y divide-base-300">
-          {groups.map((group) => (
-            <fieldset key={group.group} className="py-5">
-              <legend className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-base-content/45">{group.group}</legend>
-              <div className="grid gap-2 lg:grid-cols-2">
+        <div className="mt-4 space-y-2">
+          {groups.map((group) => {
+            const selectedCount = group.permissions.filter((permission) =>
+              selectedPermissions.includes(permission.code)).length;
+            return (
+            <details key={group.group} className="group overflow-hidden rounded-lg border border-base-300 bg-base-100" open={selectedCount > 0}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-base-200/65">
+                <span>
+                  <span className="block text-sm font-semibold">{group.group}</span>
+                  <span className="mt-0.5 block text-xs text-base-content/45">
+                    {selectedCount} of {group.permissions.length} selected
+                  </span>
+                </span>
+                <ChevronDown size={17} className="shrink-0 text-base-content/45 transition group-open:rotate-180" />
+              </summary>
+              <div className="grid gap-2 border-t border-base-300 p-3 lg:grid-cols-2">
                 {group.permissions.map((permission) => {
                   const checked = selectedPermissions.includes(permission.code);
                   return (
@@ -336,6 +361,7 @@ function ProfileEditor({
                         type="checkbox"
                         className="checkbox checkbox-primary checkbox-sm mt-0.5"
                         checked={checked}
+                        disabled={readOnly}
                         onChange={(event) => setSelectedPermissions((current) => updatePermissionSelection(
                           current,
                           permission.code,
@@ -356,17 +382,20 @@ function ProfileEditor({
                   );
                 })}
               </div>
-            </fieldset>
-          ))}
+            </details>
+            );
+          })}
         </div>
 
         {save.error && <SettingsError error={save.error} />}
         <ModalActions>
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary min-w-32 text-white" disabled={save.isPending || !displayName.trim()}>
-            {save.isPending && <span className="loading loading-spinner loading-sm" />}
-            {profile ? "Save role" : "Create role"}
-          </button>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>{readOnly ? "Close" : "Cancel"}</button>
+          {!readOnly && (
+            <button type="submit" className="btn btn-primary min-w-32 text-white" disabled={save.isPending || !displayName.trim()}>
+              {save.isPending && <span className="loading loading-spinner loading-sm" />}
+              {profile ? "Save role" : "Create role"}
+            </button>
+          )}
         </ModalActions>
       </form>
     </Modal>
@@ -374,9 +403,5 @@ function ProfileEditor({
 }
 
 function SettingsError({ error }: { error: unknown }) {
-  return (
-    <div className="alert alert-error mt-5 py-3 text-sm">
-      {error instanceof Error ? error.message : "The request could not be completed."}
-    </div>
-  );
+  return <div className="mt-5"><ErrorState error={error} /></div>;
 }

@@ -1,15 +1,18 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { DatabaseZap, MailPlus, Settings2, ShieldCheck, UsersRound } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { DatabaseZap, Settings2, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import type {
   Organization,
   OrganizationMemberListResponse,
   OrganizationMembership,
+  StaffAccountDirectoryResponse,
 } from "../../api/types";
 import {
   compositeSourceCurrent,
   createCompositeSource,
 } from "../../app/compositeSourceState";
+import { useNetworkStatus } from "../../app/networkStatus";
 import { useSession } from "../../app/session";
 import {
   permissions,
@@ -17,18 +20,22 @@ import {
   usePermissions,
 } from "../../app/permissions";
 import { useWorkspace } from "../../app/workspace";
-import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
-import { PageHeader } from "../../components/ui/primitives";
-import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import {
+  CompositeSourceFallback,
+  CompositeSourceNotice,
+} from "../../components/ui/CompositeSourceNotice";
+import { ErrorState, PageHeader } from "../../components/ui/primitives";
+import { SelectPicker } from "../../components/ui/SelectPicker";
 import { WorkspaceInvitesSettings } from "./WorkspaceInvitesSettings";
 import { WorkspaceMembersSettings } from "./WorkspaceMembersSettings";
 import { useWorkspaceCatalogueSource } from "./WorkspaceCatalogueNotice";
 import { RetentionHealthSettings } from "./RetentionHealthSettings";
 import { WorkspaceRolesSettings } from "./WorkspaceRolesSettings";
 import {
-  canOpenWorkspaceSettingsTab,
   resolveWorkspaceSettingsCapabilities,
+  shouldRedirectWorkspaceSettingsTab,
   type WorkspaceSettingsTab,
+  workspaceSettingsTab,
 } from "./workspaceSettingsAccess";
 import {
   resolveWorkspaceUpdateAttempt,
@@ -50,7 +57,8 @@ export function WorkspaceSettingsPage() {
     refetchProperties,
     refetchWorkspaces,
   } = useWorkspace();
-  const [tab, setTab] = useState<WorkspaceSettingsTab>("general");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = workspaceSettingsTab(searchParams.get("section"));
   const [memberPage, setMemberPage] = useState(1);
   const workspaceSource = useWorkspaceCatalogueSource();
   const workspaceAuthorityCurrent = compositeSourceCurrent(workspaceSource);
@@ -66,7 +74,6 @@ export function WorkspaceSettingsPage() {
       { permission: permissions.retentionRetry, scope: tenantScope },
     ]
     : []);
-  const permissionsLoading = !owner && permissionAccess.isLoading;
   const permissionSource = owner ? null : createCompositeSource({
     label: "Workspace permissions",
     hasData: permissionAccess.hasData,
@@ -104,6 +111,32 @@ export function WorkspaceSettingsPage() {
     ),
     enabled: Boolean(workspace && owner && tab === "members"),
   });
+  const memberSubjectIds = useMemo(
+    () => (members.data?.items ?? []).map((membership) => membership.subjectId),
+    [members.data?.items],
+  );
+  const accountDirectory = useQuery({
+    queryKey: [
+      "staff-account-directory",
+      workspace?.organizationId,
+      memberPage,
+      memberSubjectIds.join("|"),
+    ],
+    queryFn: () => request<StaffAccountDirectoryResponse>(
+      "/api/staff/members/account-directory/resolve",
+      {
+        method: "POST",
+        body: JSON.stringify({ authSubjectIds: memberSubjectIds }),
+      },
+    ),
+    enabled: Boolean(
+      workspace &&
+      owner &&
+      tab === "members" &&
+      memberSubjectIds.length,
+    ),
+    retry: false,
+  });
   const memberSource = createCompositeSource({
     label: "Workspace members",
     hasData: members.data !== undefined,
@@ -112,13 +145,33 @@ export function WorkspaceSettingsPage() {
     isFetching: members.isFetching,
     refetch: () => members.refetch(),
   });
+  const accountDirectorySource = memberSubjectIds.length ? createCompositeSource({
+    label: "Linked Staff profiles",
+    hasData: accountDirectory.data !== undefined,
+    isLoading: accountDirectory.isLoading,
+    error: accountDirectory.error,
+    isFetching: accountDirectory.isFetching,
+    refetch: () => accountDirectory.refetch(),
+  }) : null;
+
+  const selectTab = useCallback((nextTab: WorkspaceSettingsTab) => {
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === "general") next.delete("section");
+    else next.set("section", nextTab);
+    if (nextTab !== "invites") next.delete("joining");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => setMemberPage(1), [workspace?.organizationId]);
   useEffect(() => {
-    if (!permissionsLoading && !canOpenWorkspaceSettingsTab(tab, capabilities)) {
-      setTab("general");
+    if (shouldRedirectWorkspaceSettingsTab(
+      tab,
+      capabilities,
+      permissionAuthorityCurrent,
+    )) {
+      selectTab("general");
     }
-  }, [capabilities, permissionsLoading, tab]);
+  }, [capabilities, permissionAuthorityCurrent, selectTab, tab]);
   useEffect(() => {
     if (!members.isFetching && memberPage > 1 && members.data?.items.length === 0) {
       setMemberPage((current) => Math.max(1, current - 1));
@@ -129,7 +182,11 @@ export function WorkspaceSettingsPage() {
 
   async function refreshWorkspace() {
     if (owner) {
-      await Promise.all([refetchWorkspaces(), members.refetch()]);
+      await Promise.all([
+        refetchWorkspaces(),
+        members.refetch(),
+        ...(memberSubjectIds.length ? [accountDirectory.refetch()] : []),
+      ]);
       return;
     }
 
@@ -142,12 +199,50 @@ export function WorkspaceSettingsPage() {
     await Promise.all(refreshes);
   }
 
+  const navigation = [
+    {
+      value: "general" as const,
+      label: "Workspace",
+      description: "Name and identity",
+      icon: Settings2,
+      visible: true,
+    },
+    {
+      value: "members" as const,
+      label: "Members",
+      description: "Governance and access",
+      icon: UsersRound,
+      visible: capabilities.canReadMembers,
+    },
+    {
+      value: "roles" as const,
+      label: "Access roles",
+      description: "Reusable permission sets",
+      icon: ShieldCheck,
+      visible: capabilities.canReadRoles,
+    },
+    {
+      value: "invites" as const,
+      label: "Joining",
+      description: "Invites, team QR, requests",
+      icon: UserPlus,
+      visible: capabilities.canManageInvites,
+    },
+    {
+      value: "retention" as const,
+      label: "Data retention",
+      description: "Workspace governance",
+      icon: DatabaseZap,
+      visible: capabilities.canReadRetention,
+    },
+  ].filter((item) => item.visible);
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Workspace settings"
         title={workspace.name}
-        description={`Manage team access and workspace identity for ${workspace.slug}.`}
+        description="Manage workspace identity, governance membership, operational access, joining, and data retention."
         action={(
           <span className={`badge h-8 gap-2 border-0 px-3 font-semibold text-white ${owner && workspaceAuthorityCurrent ? "bg-primary" : owner ? "bg-warning-content" : "bg-neutral"}`}>
             <ShieldCheck size={15} />
@@ -162,28 +257,59 @@ export function WorkspaceSettingsPage() {
         />
       )}
 
-      <section className="card overflow-visible border border-base-300 bg-base-100 shadow-sm">
-        <div className="border-b border-base-300 p-3 sm:px-5">
-          <SegmentedTabs
-            value={tab}
-            ariaLabel="Workspace settings"
-            onValueChange={setTab}
-            options={[
-              { value: "general", label: "General", icon: <Settings2 size={15} /> },
-              { value: "members", label: "Members", icon: <UsersRound size={15} />, disabled: !capabilities.canReadMembers },
-              { value: "roles", label: "Roles", icon: <ShieldCheck size={15} />, disabled: permissionsLoading || !capabilities.canReadRoles },
-              { value: "invites", label: "Invites", icon: <MailPlus size={15} />, disabled: permissionsLoading || !capabilities.canManageInvites },
-              {
-                value: "retention",
-                label: "Retention",
-                icon: <DatabaseZap size={15} />,
-                disabled: permissionsLoading || !capabilities.canReadRetention,
-              },
-            ]}
-          />
+      <div className="grid gap-5 xl:grid-cols-[252px_minmax(0,1fr)] xl:items-start">
+        <div className="min-w-0">
+          <div className="xl:hidden">
+            <label className="form-control block">
+              <span className="mb-1.5 block text-sm font-semibold">Settings section</span>
+              <SelectPicker
+                value={tab}
+                onValueChange={(value) => selectTab(workspaceSettingsTab(value))}
+                ariaLabel="Workspace settings section"
+                options={navigation.map((item) => ({
+                  value: item.value,
+                  label: item.label,
+                  description: item.description,
+                }))}
+              />
+            </label>
+          </div>
+          <aside
+            className="hidden rounded-lg border border-base-300 bg-base-100 p-2 shadow-sm xl:sticky xl:top-20 xl:block"
+            aria-label="Workspace settings sections"
+          >
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              const active = tab === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${active ? "bg-primary/10 text-primary shadow-[inset_3px_0_0_var(--color-primary)]" : "text-base-content hover:bg-base-200"}`}
+                  onClick={() => selectTab(item.value)}
+                >
+                  <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${active ? "bg-primary text-white" : "bg-base-200 text-base-content/55"}`}>
+                    <Icon size={17} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{item.label}</span>
+                    <span className="mt-0.5 block truncate text-xs opacity-55">{item.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </aside>
         </div>
 
-        <div className="p-5 sm:p-6">
+        <section className="min-w-0 overflow-visible rounded-lg border border-base-300 bg-base-100 shadow-sm">
+          <div className="p-5 sm:p-6">
+          {tab !== "general" && !permissionAuthorityCurrent && permissionSource && (
+            <CompositeSourceFallback
+              state={permissionSource.state}
+              label="workspace settings access"
+            />
+          )}
           {tab === "general" && (
             <GeneralSettings
               key={workspace.organizationId}
@@ -202,6 +328,8 @@ export function WorkspaceSettingsPage() {
               properties={properties}
               propertySource={propertySource}
               memberSource={memberSource}
+              accountDirectorySource={accountDirectorySource}
+              staffDirectory={accountDirectory.data?.items ?? []}
               authorityCurrent={workspaceAuthorityCurrent}
               page={memberPage}
               pageSize={MEMBERS_PAGE_SIZE}
@@ -233,8 +361,9 @@ export function WorkspaceSettingsPage() {
               onRefreshAuthority={refreshRetentionAuthority}
             />
           )}
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
@@ -250,6 +379,7 @@ function GeneralSettings({
   authorityCurrent: boolean;
   onSaved: () => Promise<void>;
 }) {
+  const { isOffline } = useNetworkStatus();
   const { request } = useSession();
   const canManage = owner && authorityCurrent;
   const [name, setName] = useState(workspace.name);
@@ -317,7 +447,12 @@ function GeneralSettings({
       {update.error && <SettingsError error={update.error} />}
       {canManage && (
         <div className="mt-5 flex justify-end border-t border-base-300 pt-5">
-          <button className="btn btn-primary text-white" onClick={() => update.mutate()} disabled={update.isPending || !name.trim() || !slug.trim()}>
+          <button
+            className="btn btn-primary text-white"
+            onClick={() => update.mutate()}
+            disabled={isOffline || update.isPending || !name.trim() || !slug.trim()}
+            title={isOffline ? "Reconnect before saving changes." : undefined}
+          >
             {update.isPending && <span className="loading loading-spinner loading-sm" />}Save changes
           </button>
         </div>
@@ -327,7 +462,7 @@ function GeneralSettings({
 }
 
 function SettingsError({ error }: { error: unknown }) {
-  return <div className="alert alert-error mt-5 py-3 text-sm">{error instanceof Error ? error.message : "The request could not be completed."}</div>;
+  return <div className="mt-5"><ErrorState error={error} /></div>;
 }
 
 function isOwner(role: OrganizationMembership["role"] | undefined): boolean {
