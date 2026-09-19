@@ -502,6 +502,31 @@ describe("calendar timeline focus clearance", () => {
 });
 
 describe("calendar interval presentation", () => {
+  it("contains reservation identity in a non-clipping slot without moving endpoint ownership or adding controls", () => {
+    const html = renderToStaticMarkup(createElement(CalendarIntervalContent, {
+      kind: "reservation", label: "Élodie long guest identity", operation: "Reserved", conflict: true,
+      columnSpan: 4, startsBeforeWindow: false, endsAfterWindow: false, showsArrival: true, showsDeparture: true,
+    }));
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const label = doc.querySelector<HTMLElement>("[data-calendar-visible-label]")!;
+    expect(label.textContent).toBe("Élodie long guest identity"); expect(label.style.left).toBe("248px");
+    expect(label.classList.contains("sticky")).toBe(true); expect(label.classList.contains("w-0")).toBe(true);
+    expect(label.firstElementChild!.classList.contains("truncate")).toBe(true);
+    expect(label.parentElement!.className).toBe("min-w-0 flex-1 overflow-clip");
+    expect(label.querySelector("[data-calendar-endpoint]")).toBeNull();
+    expect(doc.querySelectorAll("[data-calendar-endpoint]")).toHaveLength(2);
+    expect(doc.querySelectorAll("button,a,[tabindex]")).toHaveLength(0);
+  });
+
+  it.each(["block", "request"] as const)("does not change %s label geometry", kind => {
+    const html = renderToStaticMarkup(createElement(CalendarIntervalContent, {
+      kind, label: "Existing label", operation: "Existing operation", conflict: false,
+      columnSpan: 3, startsBeforeWindow: false, endsAfterWindow: false, showsArrival: true, showsDeparture: true,
+    }));
+    expect(html).toContain('<span class="min-w-0 flex-1 truncate">Existing label</span>');
+    expect(html).not.toContain("data-calendar-visible-label");
+  });
+
   it("shows both scheduled endpoints on a one-night reservation bar", () => {
     const html = renderToStaticMarkup(createElement(CalendarIntervalContent, {
       kind: "reservation",

@@ -84,6 +84,7 @@ import { CALENDAR_DAY_WIDTH, CALENDAR_RESOURCE_WIDTH, calendarDayCoverage, calen
 
 type CalendarBookAction = (resource: CalendarResource, day: string, viewport?: CalendarViewport) => void;
 const CalendarAttentionContext = createContext<ReadonlyMap<string, readonly ReservationAttention[]>>(new Map());
+const calendarVisibleLabelStyle = { left: CALENDAR_RESOURCE_WIDTH + 8 };
 
 type QuickLookKey =
   | { kind: "reservation"; id: string; day: string; resourceId?: string }
@@ -1255,14 +1256,18 @@ function CalendarCompletedButton({ reservation, resource, day, propertyId, dateK
     aria-label={label} title={label} aria-expanded={expanded} aria-controls="operational-preview"
     data-operational-preview-trigger={calendarTriggerKey("reservation", reservation.reservationId, day, resource?.inventoryUnitId, propertyId, dateKey)}
     onClick={onClick}>
-    <span data-calendar-history-label className={layout ? "sticky block w-fit max-w-full" : "block"}
-      style={layout ? { left: CALENDAR_RESOURCE_WIDTH + 8, maxWidth: "min(100%, 384px)" } : undefined}>
+    <span className={layout ? "block overflow-clip" : "block"}>
+    <span data-calendar-history-label className={layout ? "sticky block w-0" : "block"}
+      style={layout ? calendarVisibleLabelStyle : undefined}>
+    <span className={layout ? "block w-max max-w-96" : "block"}>
     <span className="flex min-w-0 items-center gap-1">
       {layout?.startsBeforeWindow && <ChevronLeft size={12} className="shrink-0" aria-hidden="true" />}
       <strong className={layout ? "min-w-0 flex-1 truncate font-medium" : "min-w-0 flex-1 break-words font-medium"}>{reservation.primaryGuestName}</strong>
       {layout?.endsAfterWindow && <ChevronRight size={12} className="shrink-0" aria-hidden="true" />}
     </span>
     <span className={layout ? "block truncate" : "block break-words"}>Completed · scheduled {formatCalendarDateRange(reservation.arrival, reservation.departure)}</span>
+    </span>
+    </span>
     </span>
   </button>;
 }
@@ -1708,7 +1713,16 @@ export function CalendarIntervalContent({
         <span className={columnSpan === 1 && attention.length ? "sr-only" : undefined}>{startLabel}</span>
       </span>
       {conflict && <CircleAlert size={13} className="shrink-0" aria-hidden="true" />}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {kind === "reservation" ? (
+        // A zero-width anchor keeps the name's beginning at the readable edge.
+        // Clip its text at the reserved controls, without a new scroll container
+        // (overflow-hidden would prevent stickiness to the timeline viewport).
+        <span className="min-w-0 flex-1 overflow-clip">
+          <span data-calendar-visible-label className="sticky block w-0" style={calendarVisibleLabelStyle}>
+            <span className="block w-max max-w-96 truncate">{label}</span>
+          </span>
+        </span>
+      ) : <span className="min-w-0 flex-1 truncate">{label}</span>}
       {columnSpan >= 3 && (
         <span className="shrink-0 text-[0.6rem] font-bold uppercase tracking-wide opacity-70">
           {conflict ? "Conflict" : operation}
