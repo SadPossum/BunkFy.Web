@@ -22,6 +22,7 @@ function render(props: Partial<ComponentProps<typeof DatePicker>> = {}) {
 }
 function invoke(node: Node, handler: string, event?: unknown) { (node.props[handler] as (value?: unknown) => void)(event); }
 function openYears(props: Partial<ComponentProps<typeof DatePicker>> = {}) { invoke(render(props).find(`${props.ariaLabel ?? base.ariaLabel} choose year`), "onClick"); }
+function openMonths(props: Partial<ComponentProps<typeof DatePicker>> = {}) { invoke(render(props).find(`${props.ariaLabel ?? base.ariaLabel} month`), "onClick"); }
 function goYear(props: Partial<ComponentProps<typeof DatePicker>> = {}) { invoke(render(props).tree.find(node => node.type === "button" && node.props.children === "Go")!, "onClick"); }
 beforeEach(() => { hooks.cursor = 0; hooks.values = []; hooks.effects = []; change.mockReset(); });
 afterEach(() => vi.unstubAllGlobals());
@@ -88,6 +89,52 @@ describe("explicit date commit focus handoff", () => {
 });
 
 describe("direct month/year navigation", () => {
+  it("uses compact captions and twelve full month buttons within the existing popup", () => {
+    invoke(render().root, "onOpenChange", true);
+    openMonths();
+    const tree = render(), months = tree.tree.filter(node => node.props["data-month"] !== undefined);
+    expect(months).toHaveLength(12);
+    expect(tree.tree.some(node => node.type === "select")).toBe(false);
+    expect(tree.find("Arrival date month").props.className).toContain("text-base");
+    expect(tree.find("Arrival date choose year").props.className).toContain("text-base");
+    expect(months[8].props["aria-pressed"]).toBe(true);
+    expect(months[8].props.children).toBe(new Intl.DateTimeFormat(undefined, { month: "long" }).format(date("2000-09-01")));
+    expect(months.every(node => String(node.props.className).includes("min-h-11"))).toBe(true);
+    expect(change).not.toHaveBeenCalled();
+  });
+  it("focuses the selected month and returns to its caption on first Escape", () => {
+    invoke(render().root, "onOpenChange", true);
+    const chosenFocus = vi.fn(), captionFocus = vi.fn();
+    const popup = { scrollTop: 100, querySelector: vi.fn(() => ({ focus: chosenFocus })) };
+    (render().find("Arrival date calendar").props.ref as { current: unknown }).current = popup;
+    (render().find("Arrival date month").props.ref as { current: unknown }).current = { focus: captionFocus };
+    openMonths(); render();
+    expect(popup.querySelector).toHaveBeenCalledWith('[data-month="8"]');
+    expect(chosenFocus).toHaveBeenCalledOnce();
+    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    invoke(render().find("Arrival date calendar"), "onEscapeKeyDown", event);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(captionFocus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+    expect(popup.scrollTop).toBe(0);
+    expect(render().root.props.open).toBe(true);
+    expect(render().find("Arrival date month").props["aria-expanded"]).toBe(false);
+    event.preventDefault.mockClear(); invoke(render().find("Arrival date calendar"), "onEscapeKeyDown", event);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(change).not.toHaveBeenCalled();
+  });
+  it("switches between month and year choices without showing both and bounds year navigation", () => {
+    const props = { min: "2025-03-15", max: "2027-10-20" };
+    render(props); openMonths(props);
+    invoke(render(props).find("Previous year"), "onClick");
+    expect((render(props).calendar.props.month as Date).getFullYear()).toBe(2025);
+    expect(render(props).find("Previous year").props.disabled).toBe(true);
+    expect(render(props).tree.find(node => node.props["data-month"] === 1)?.props.disabled).toBe(true);
+    openYears(props);
+    expect(render(props).find("Arrival date month choices")).toBeUndefined();
+    openMonths(props);
+    expect(render(props).find("Arrival date year choices")).toBeUndefined();
+    expect(change).not.toHaveBeenCalled();
+  });
   it("navigates to2099 with Enter without selecting a day, closing or submitting the parent", () => {
     invoke(render().root, "onOpenChange", true);
     openYears();
@@ -105,7 +152,8 @@ describe("direct month/year navigation", () => {
     openYears();
     invoke(render().find("Arrival date year"), "onChange", { target: { value: "1901" } });
     goYear();
-    invoke(render().find("Arrival date month"), "onChange", { target: { value: "1" } });
+    openMonths();
+    invoke(render().tree.find(node => node.props["data-month"] === 1)!, "onClick");
     expect(toDateKey(render().calendar.props.month as Date)).toBe("1901-02-01");
     expect(toDateKey(render().calendar.props.selected as Date)).toBe(base.value); expect(change).not.toHaveBeenCalled();
   });
@@ -130,8 +178,8 @@ describe("direct month/year navigation", () => {
     expect(toDateKey(render(props).calendar.props.month as Date)).toBe("2027-03-01");
     expect(toDateKey(render(props).calendar.props.selected as Date)).toBe(base.value);
     expect(render(props).calendar.props.disabled).toEqual([{ before: date(props.min) }, { after: date(props.max) }]);
-    const months = nodes(render(props).find("Arrival date month"));
-    expect(months.find(node => node.type === "option" && node.props.value === 1)?.props.disabled).toBe(true);
+    openMonths(props);
+    expect(render(props).tree.find(node => node.props["data-month"] === 1)?.props.disabled).toBe(true);
     expect(change).not.toHaveBeenCalled();
   });
   it.each([{ min: "2026-09-08", year: "2099" }, { max: "2026-09-08", year: "1800" }])("supports one-sided date bounds without a new year window", ({ min, max, year }) => {
@@ -149,7 +197,7 @@ describe("direct month/year navigation", () => {
     expect(render({ disabled: true }).find("Arrival date choose year").props.disabled).toBe(true); expect(change).not.toHaveBeenCalled();
   });
   it.each(["Arrival date", "Departure date", "Business date", "Block arrival", "Date of birth"])("keeps explicit month/year labels for %s consumers", ariaLabel => {
-    const result = render({ ariaLabel }); expect(result.find(`${ariaLabel} month`).type).toBe("select"); expect(result.find(`${ariaLabel} choose year`).type).toBe("button");
+    const result = render({ ariaLabel }); expect(result.find(`${ariaLabel} month`).type).toBe("button"); expect(result.find(`${ariaLabel} choose year`).type).toBe("button");
     expect(result.find(`${ariaLabel} year`)).toBeUndefined();
     openYears({ ariaLabel }); expect(render({ ariaLabel }).find(`${ariaLabel} year`).type).toBe("input");
   });

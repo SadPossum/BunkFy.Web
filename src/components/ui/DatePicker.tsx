@@ -41,11 +41,16 @@ export function DatePicker({
   const [yearText, setYearText] = useState(() => String(initialMonth().getFullYear()));
   const [yearError, setYearError] = useState(false);
   const [yearView, setYearView] = useState(false);
+  const [monthView, setMonthView] = useState(false);
   const [yearPage, setYearPage] = useState(() => datePickerYearPage(initialMonth().getFullYear()));
   const yearTrigger = useRef<HTMLButtonElement>(null);
+  const monthTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (yearView) content.current?.querySelector<HTMLButtonElement>(`[data-year="${month.getFullYear()}"]`)?.focus();
   }, [yearView]);
+  useEffect(() => {
+    if (monthView) content.current?.querySelector<HTMLButtonElement>(`[data-month="${month.getMonth()}"]`)?.focus();
+  }, [monthView]);
   useEffect(() => {
     if (yearError && content.current) content.current.scrollTop = content.current.scrollHeight;
   }, [yearError]);
@@ -57,6 +62,7 @@ export function DatePicker({
     if (next && disabled) return;
     if (next) navigateMonth(initialMonth());
     setYearView(false);
+    setMonthView(false);
     setOpen(next);
   }
   useEffect(() => {
@@ -76,13 +82,23 @@ export function DatePicker({
   }
   function toggleYears() {
     if (yearView) closeYears();
-    else { setYearText(String(month.getFullYear())); setYearPage(datePickerYearPage(month.getFullYear())); setYearError(false); setYearView(true); }
+    else { setMonthView(false); setYearText(String(month.getFullYear())); setYearPage(datePickerYearPage(month.getFullYear())); setYearError(false); setYearView(true); }
   }
-  const previous = new Date(month); previous.setMonth(previous.getMonth() - 1);
-  const next = new Date(month); next.setMonth(next.getMonth() + 1);
-  const previousDisabled = yearView ? yearPage <= firstMonth.getFullYear() : datePickerMonth(previous, firstMonth, lastMonth).getTime() === month.getTime();
-  const nextDisabled = yearView ? yearPage + 12 > lastMonth.getFullYear() : datePickerMonth(next, firstMonth, lastMonth).getTime() === month.getTime();
-  const headingControl = "relative flex h-11 min-w-0 items-center gap-1 rounded-md px-1 font-semibold hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
+  function closeMonths() {
+    if (content.current) content.current.scrollTop = 0;
+    monthTrigger.current?.focus({ preventScroll: true }); setMonthView(false);
+  }
+  function toggleMonths() {
+    if (monthView) closeMonths();
+    else { setYearView(false); setYearError(false); setMonthView(true); }
+  }
+  const previous = new Date(month);
+  const next = new Date(month);
+  if (monthView) { previous.setFullYear(previous.getFullYear() - 1); next.setFullYear(next.getFullYear() + 1); }
+  else { previous.setMonth(previous.getMonth() - 1); next.setMonth(next.getMonth() + 1); }
+  const previousDisabled = yearView ? yearPage <= firstMonth.getFullYear() : monthView ? month.getFullYear() <= firstMonth.getFullYear() : datePickerMonth(previous, firstMonth, lastMonth).getTime() === month.getTime();
+  const nextDisabled = yearView ? yearPage + 12 > lastMonth.getFullYear() : monthView ? month.getFullYear() >= lastMonth.getFullYear() : datePickerMonth(next, firstMonth, lastMonth).getTime() === month.getTime();
+  const headingControl = "relative flex h-11 min-w-0 items-center gap-1 rounded-md px-1 text-base font-semibold hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40";
   function commitValue(next: string) {
     const button = trigger.current;
     // Hand focus back before the parent value render removes the focused day.
@@ -134,31 +150,31 @@ export function DatePicker({
             aria-label={`${ariaLabel} calendar`}
             className="z-[1200] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto overscroll-contain scroll-p-2 rounded-lg border border-base-300 bg-base-100 p-2 shadow-2xl outline-none"
             style={{ maxHeight: "min(var(--radix-popover-content-available-height), calc(100dvh - 1.5rem))" }}
-            onEscapeKeyDown={(event) => { event.stopPropagation(); if (yearView) { event.preventDefault(); closeYears(); } }}
+            onEscapeKeyDown={(event) => { event.stopPropagation(); if (yearView) { event.preventDefault(); closeYears(); } else if (monthView) { event.preventDefault(); closeMonths(); } }}
           >
-            <div className="flex items-center justify-between gap-0.5 pb-1 text-lg sm:text-xl">
+            <div className="flex items-center justify-between gap-0.5 pb-1">
               <div className="flex min-w-0 items-center gap-0.5">
-              <label className={`${headingControl} focus-within:outline-2 focus-within:outline-primary`}>
-                <span aria-hidden="true" className="truncate">{new Intl.DateTimeFormat(undefined, { month: "long" }).format(month)}</span>
-                <ChevronDown aria-hidden="true" size={12} className="shrink-0" />
-                <select aria-label={`${ariaLabel} month`} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" value={month.getMonth()} disabled={disabled} onChange={(event) => {
-                  const next = new Date(month); next.setMonth(Number(event.target.value)); navigateMonth(next);
-                }}>
-                  {Array.from({ length: 12 }, (_, index) => {
-                    const candidate = new Date(month); candidate.setMonth(index);
-                    return <option key={index} value={index} disabled={datePickerMonth(candidate, firstMonth, lastMonth).getMonth() !== index}>{new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date(2000, index, 1))}</option>;
-                  })}
-                </select>
-              </label>
+              <button ref={monthTrigger} type="button" aria-label={`${ariaLabel} month`} aria-expanded={monthView} disabled={disabled} className={headingControl} onClick={toggleMonths}>
+                <span className="truncate">{new Intl.DateTimeFormat(undefined, { month: "long" }).format(month)}</span>
+                <ChevronDown aria-hidden="true" size={12} className={`shrink-0 ${monthView ? "rotate-180" : ""}`} />
+              </button>
               <button ref={yearTrigger} type="button" aria-label={`${ariaLabel} choose year`} aria-expanded={yearView} disabled={disabled} className={`${headingControl} shrink-0 tabular-nums`} onClick={toggleYears}>
                 {month.getFullYear()}<ChevronDown aria-hidden="true" size={12} className={yearView ? "rotate-180" : ""} />
               </button>
               </div>
               <div className="flex shrink-0">
-                <button type="button" aria-label={yearView ? "Previous 12 years" : "Previous month"} disabled={disabled || previousDisabled} className={`${headingControl} w-11 justify-center text-primary`} onClick={() => yearView ? setYearPage(yearPage - 12) : navigateMonth(previous)}><ChevronLeft aria-hidden="true" size={20} /></button>
-                <button type="button" aria-label={yearView ? "Next 12 years" : "Next month"} disabled={disabled || nextDisabled} className={`${headingControl} w-11 justify-center text-primary`} onClick={() => yearView ? setYearPage(yearPage + 12) : navigateMonth(next)}><ChevronRight aria-hidden="true" size={20} /></button>
+                <button type="button" aria-label={yearView ? "Previous 12 years" : monthView ? "Previous year" : "Previous month"} disabled={disabled || previousDisabled} className={`${headingControl} w-11 justify-center text-primary`} onClick={() => yearView ? setYearPage(yearPage - 12) : navigateMonth(previous)}><ChevronLeft aria-hidden="true" size={20} /></button>
+                <button type="button" aria-label={yearView ? "Next 12 years" : monthView ? "Next year" : "Next month"} disabled={disabled || nextDisabled} className={`${headingControl} w-11 justify-center text-primary`} onClick={() => yearView ? setYearPage(yearPage + 12) : navigateMonth(next)}><ChevronRight aria-hidden="true" size={20} /></button>
               </div>
             </div>
+            {monthView && <div role="group" aria-label={`${ariaLabel} month choices`} className="grid grid-cols-3 gap-1 py-2">
+              {Array.from({ length: 12 }, (_, index) => {
+                const candidate = new Date(month); candidate.setMonth(index);
+                return <button key={index} data-month={index} type="button" aria-pressed={index === month.getMonth()} disabled={disabled || datePickerMonth(candidate, firstMonth, lastMonth).getMonth() !== index} className={`min-h-11 min-w-0 rounded-md px-1 py-2 text-sm leading-5 [overflow-wrap:anywhere] hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-30 ${index === month.getMonth() ? "bg-primary/10 font-semibold text-primary" : ""}`} onClick={() => { navigateMonth(candidate); closeMonths(); }}>
+                  {new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date(2000, index, 1))}
+                </button>;
+              })}
+            </div>}
             {yearView && <div role="group" aria-label={`${ariaLabel} year choices`} className="space-y-3 py-2">
               <p aria-live="polite" className="text-center text-sm text-base-content/65">{yearPage}–{Math.min(yearPage + 11, 9999)}</p>
               <div className="grid grid-cols-3 gap-1">
@@ -177,7 +193,7 @@ export function DatePicker({
               </div>
               {yearError && <p role="status" className="text-sm text-error">Enter a year from {firstMonth.getFullYear()} to {lastMonth.getFullYear()}.</p>}
             </div>}
-            <div hidden={yearView}>
+            <div hidden={yearView || monthView}>
             <DayPicker
               className="bunkfy-day-picker w-full"
               classNames={{ month_caption: "sr-only", months: "w-full", month: "w-full", month_grid: "w-full table-fixed border-collapse" }}
@@ -198,7 +214,7 @@ export function DatePicker({
               }}
             />
             </div>
-            {!yearView && !required && value && (
+            {!yearView && !monthView && !required && value && (
               <div className="border-t border-base-300 px-2 pt-2 text-right">
                 <button
                   type="button"
