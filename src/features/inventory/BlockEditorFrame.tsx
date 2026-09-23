@@ -44,6 +44,42 @@ export function BlockEditorFrame({ inline = false, title, description, onClose, 
     if (message) { message.tabIndex = -1; message.classList.add("focus:outline-2", "focus:outline-primary", "outline-offset-2"); message.focus(); }
     else if (control?.getClientRects().length) control.focus();
   }, [feedback]);
+  useEffect(() => {
+    if (!inline) return;
+    let width = window.innerWidth, height = window.innerHeight;
+    let pending: number | null = null;
+    const resize = () => {
+      if (width === window.innerWidth && height === window.innerHeight) return;
+      width = window.innerWidth; height = window.innerHeight;
+      if (pending !== null) cancelAnimationFrame(pending);
+      const root = element.current, target = document.activeElement;
+      if (!(target instanceof HTMLElement) || target === root || !root?.contains(target)) return;
+      pending = requestAnimationFrame(() => {
+        pending = null;
+        if (element.current !== root || !target.isConnected || document.activeElement !== target
+          || !root.contains(target) || !target.getClientRects().length
+          || target.matches(":disabled") || target.closest('[hidden], [inert], [aria-hidden="true"]')
+          || getComputedStyle(target).visibility !== "visible") return;
+        const navigation = document.querySelector<HTMLElement>('nav[aria-label="Mobile navigation"]');
+        let top = document.querySelector(".app-topbar")?.getBoundingClientRect().bottom ?? 0;
+        let bottom = navigation?.getClientRects().length ? navigation.getBoundingClientRect().top : window.innerHeight;
+        for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+          if (!/^(auto|scroll|hidden|clip)$/.test(getComputedStyle(parent).overflowY)) continue;
+          const bounds = parent.getBoundingClientRect();
+          top = Math.max(top, bounds.top + parent.clientTop);
+          bottom = Math.min(bottom, bounds.top + parent.clientTop + parent.clientHeight);
+        }
+        const bounds = target.getBoundingClientRect();
+        if (bounds.top < top + 12 || bounds.bottom > bottom - 12) {
+          // Reflow can move an active field behind chrome or a wide inspector's
+          // edge. Reveal it through its native scroll owners without refocusing.
+          target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+        }
+      });
+    };
+    window.addEventListener("resize", resize);
+    return () => { window.removeEventListener("resize", resize); if (pending !== null) cancelAnimationFrame(pending); };
+  }, [inline]);
   const content = <section ref={element} tabIndex={-1} data-inline-block-editor={inline || undefined} aria-labelledby={inline ? headingId : undefined}
     onFocusCapture={inline ? (event) => {
       const target = event.target;

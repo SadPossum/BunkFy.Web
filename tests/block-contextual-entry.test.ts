@@ -51,6 +51,7 @@ describe("contextual block entry presentation (static markup, not browser eviden
     expect(html).not.toMatch(/<div id="[^"]+" hidden="" class="space-y-4">/);
     expect(html).toContain('role="radiogroup"');
     expect(html).not.toContain('checked=""');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Use selected target<\/button>/);
     for (const scope of ["Property", "Building", "Floor", "Room", "Bed / unit"]) expect(html).toContain(scope);
   });
   it("qualifies a cached selection while current submission authority is unavailable", () => {
@@ -67,6 +68,8 @@ describe("contextual block entry presentation (static markup, not browser eviden
     expect(source).toContain("editor.createCanSubmit(selected) && selectedVisible && rangeValid");
     expect(source).toContain("key={editor.editor.editorSession}");
     expect(source).toContain("Use selected target");
+    expect(source).not.toContain("contextualEntry && <button");
+    expect(source).not.toContain("contextualEntry && !choosingTarget");
     expect(source).toContain("targetSummary.current?.focus()");
     expect(source).not.toContain("useEffect");
     expect(source).not.toContain("editor.openCreate(");

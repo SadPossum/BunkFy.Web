@@ -88,14 +88,14 @@ function BlockInventoryForm({ editor, initialRange, initialTargetId, sources, in
     <CompositeSourceNotice className="mb-3" sources={sources} title="Block information is refreshing or unavailable" />
     {!editor.ready && !mutation.isPending && <p role="status" className="mb-3 text-sm text-warning-content">Your draft is kept. Current access, inventory and block records are required to submit.</p>}
     <form onSubmit={submit} className="space-y-4" hidden={needsAuthentication}>
-      {selected && <div className="border-l-2 border-base-300 pl-3" data-selected-block-target>
+      {selected && <div hidden={choosingTarget} className="border-l-2 border-base-300 pl-3" data-selected-block-target>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-xs text-base-content/60">{editor.ready && selectedCurrent ? "Selected target" : "Selection unconfirmed"} · {targetLabel(selected.kind)}</p>
             <h4 ref={targetSummary} tabIndex={-1} data-autofocus={contextualEntry || undefined}
               className="mt-1 break-words font-semibold outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary">{currentSelected?.label ?? selected.label}</h4>
           </div>
-          {contextualEntry && !choosingTarget && <button type="button" className="btn btn-ghost btn-sm" disabled={locked}
+          {!choosingTarget && <button type="button" className="btn btn-ghost btn-sm" disabled={locked}
             aria-expanded={choosingTarget} aria-controls={targetChooserId} onClick={changeTarget}>Change target</button>}
         </div>
         <p className="mt-1 break-words text-sm text-base-content/65">{currentSelected?.detail ?? selected.detail}</p>
@@ -125,10 +125,10 @@ function BlockInventoryForm({ editor, initialRange, initialTargetId, sources, in
           </label>
         ))}
       </div>
-      {contextualEntry && <button type="button" className="btn btn-outline btn-sm" disabled={locked || !selectedCurrent || !selectedVisible} onClick={() => {
+      <button type="button" className="btn btn-outline btn-sm" disabled={locked || !editor.ready || !selectedCurrent || !selectedVisible} onClick={() => {
         setChoosingTarget(false);
         requestAnimationFrame(() => targetSummary.current?.focus());
-      }}>Use selected target</button>}
+      }}>Use selected target</button>
       </div>
       {selected && !selectedCurrent && <div role="alert" className="border-l-2 border-warning px-3 py-2 text-sm">
         <p><strong>{selected.label}</strong> changed or is no longer eligible. Your draft is kept; review the current inventory and deliberately select a target again.</p>
