@@ -143,14 +143,17 @@ describe("Spaces editing comfort — rendered composition, not browser acceptanc
     expect(inspector).not.toContain(">Room</dt>");
     expect(inspector.match(/Demo House · First floor/g)).toHaveLength(1);
   });
-  it.each(["room", "bed"] as const)("replaces only matching %s facts and keeps the Edit opener in the same header", kind => {
+  it.each(["room", "bed"] as const)("focuses the %s task while retaining hidden read siblings and its exact opener", kind => {
     const before = render();
     state.target = kind === "room" ? { kind, property: property() as Property, room: physicalRoom }
       : { kind, property: property() as Property, room: physicalRoom, bed: bed as never };
     const editing = render();
     expect(editing.match(/data-topology-editor=/g)).toHaveLength(1);
-    expect(editing).not.toContain(kind === "room" ? "data-space-room-facts" : "data-space-bed-facts");
-    expect(editing).toContain(kind === "room" ? "data-space-bed-facts" : "data-space-room-facts");
+    expect(editing).toContain('data-space-room-facts');
+    expect(editing).toContain('data-space-bed-facts');
+    expect(editing).toMatch(/<div[^>]*data-topology-read-siblings[^>]*hidden=""[^>]*inert=""/);
+    expect(editing).toMatch(/data-space-room-facts[^>]*hidden=""/);
+    expect(editing).toMatch(/data-space-bed-facts[^>]*hidden=""/);
     expect(button(editing, "Edit " + kind)).toContain("disabled");
     expect(editing.indexOf(button(editing, "Edit " + kind)!)).toBeLessThan(editing.indexOf("data-topology-editor"));
     expect(button(editing, "Save " + kind)).toBeDefined(); expect(button(editing, "Cancel")).toBeDefined();

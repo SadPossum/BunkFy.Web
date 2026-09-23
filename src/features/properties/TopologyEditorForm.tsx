@@ -35,7 +35,13 @@ function EditorForm({ editor, beds, inline }: { editor: TopologyEditor; beds: re
   useEffect(() => {
     const trigger = editor.opener.current;
     const fallback = section.current?.closest("[data-topology-region]")?.querySelector<HTMLElement>("h2");
-    if (inline) (section.current?.querySelector<HTMLElement>("input:not(:disabled)") ?? section.current)?.focus();
+    if (inline) {
+      (section.current?.querySelector<HTMLElement>("input:not(:disabled)") ?? section.current)?.focus({ preventScroll: true });
+      // Reveal the selected identity and this one local task on entry. Ordinary
+      // draft/currentness renders never repeat the entry scroll or change focus.
+      const task = section.current?.closest<HTMLElement>("[data-topology-task]") ?? section.current;
+      task?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+    }
     return () => { requestAnimationFrame(() => {
       if (editor.opener.current !== trigger || document.activeElement !== document.body) return;
       const available = (node: HTMLElement | null | undefined) => Boolean(node?.isConnected && !node.matches(":disabled") && !node.closest("[inert]") && node.getClientRects().length);
@@ -97,8 +103,8 @@ function EditorForm({ editor, beds, inline }: { editor: TopologyEditor; beds: re
           }} />
         </label>}
         {!target.bed && <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="min-w-0 text-sm"><span className="font-semibold">{labels.length} automatic labels</span><br />
-            <span className="text-xs text-base-content/65">{labels.slice(0, 8).join(", ")}{labels.length > 8 ? `, +${labels.length - 8} more` : ""}</span></p>
+          <p className="min-w-0 text-sm"><span className="font-semibold">Labels to create</span><br />
+            <span className="break-words text-base-content/65">{labels.slice(0, 8).join(", ")}{labels.length > 8 ? `, +${labels.length - 8} more` : ""}</span></p>
           <button type="button" className="btn btn-sm btn-outline" aria-expanded={customize} onClick={() => setCustomize(!customize)}>{customize ? "Hide labels" : "Customize labels"}</button>
         </div>}
         {customize && <div className="grid max-h-72 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">

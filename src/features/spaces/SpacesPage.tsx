@@ -891,15 +891,17 @@ function RoomDetail({
   const editingBed = editor.target?.kind === "bed" && Boolean(editor.target.bed);
   const editingRoom = editor.target?.kind === "room" && Boolean(editor.target.room);
   const addingBeds = editor.target?.kind === "bed" && !editor.target.bed;
-  return <div>
+  const topologyTask = editingBed || editingRoom || addingBeds;
+  return <div data-topology-task={topologyTask || undefined} className="scroll-my-20">
     <div className="border-b border-base-300 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0"><h3 data-inspector-heading tabIndex={-1} className="break-words text-lg font-semibold outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary">{selectedUnit?.label ?? room.name}</h3>
           {selectedUnit && <p className="mt-1 break-words text-sm text-base-content/65">{room.name}</p>}</div>
         {bed && editor.mayManageBeds && <button className="btn btn-outline btn-sm" aria-label={"Edit bed " + bed.label}
+          hidden={topologyTask}
           disabled={!editor.canEditBed(bed) || locked} onClick={(event) => editor.openBeds(bed, event.currentTarget)}>Edit bed</button>}
       </div>
-      {!editingBed && selectedUnit && <p data-space-bed-facts className="mt-2 text-sm">Physical status: <PhysicalFact unit={selectedUnit} /></p>}
+      {selectedUnit && <p data-space-bed-facts hidden={topologyTask} className="mt-2 text-sm">Physical status: <PhysicalFact unit={selectedUnit} /></p>}
     </div>
     {editingBed && <TopologyEditorForm editor={editor} beds={physicalBeds} inline />}
     <CompositeSourceNotice className="m-4 flex" sources={detailSources} title="Physical bed details are not current" />
@@ -910,21 +912,23 @@ function RoomDetail({
       <p className="font-semibold">Requested space changed or is unavailable</p><p className="mt-1 text-base-content/60">The room remains exact, but no child matches every requested ID.</p>
       <button className="btn btn-ghost btn-sm mt-2" disabled={locked} onClick={onClearUnavailableTarget}>Clear unavailable target</button></div>}
     {issueCount > 0 && <p role="status" className="px-4 py-3 text-sm text-warning-content">Some child records could not be matched. Unmatched facts are not used for editing.</p>}
-    <section aria-label="Room facts" className="border-t border-base-300">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <section aria-label={topologyTask ? undefined : "Room facts"} hidden={editingBed} inert={editingBed} className="border-t border-base-300">
+        <div hidden={topologyTask} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <h4 className="text-base font-semibold">Room facts</h4>
-        {/* Keep the invoking buttons mounted while their fact body is replaced. */}
+        {/* The exact opener stays mounted; unrelated read state is only hidden. */}
         <div className="flex min-w-0 flex-wrap gap-2">
           {editor.mayManageRooms && physicalRoom && <button className="btn btn-outline btn-sm" disabled={!editor.canEditRoom || locked} onClick={(event) => editor.openRoom(physicalRoom, event.currentTarget)}>Edit room</button>}
           {editor.mayManageBeds && <button className="btn btn-outline btn-sm" disabled={!editor.canAddBeds || locked} onClick={(event) => editor.openBeds(undefined, event.currentTarget)}>Add beds</button>}
         </div>
         </div>
-        {editingRoom || addingBeds ? <TopologyEditorForm editor={editor} beds={physicalBeds} inline /> : <dl data-space-room-facts className="grid min-w-0 gap-3 px-4 pb-4 text-sm sm:grid-cols-2">
+        {(editingRoom || addingBeds) && <TopologyEditorForm editor={editor} beds={physicalBeds} inline />}
+        <dl data-space-room-facts hidden={topologyTask} className={(topologyTask ? "hidden " : "grid ") + "min-w-0 gap-3 px-4 pb-4 text-sm sm:grid-cols-2"}>
           <div className="min-w-0"><dt className="text-[0.8125rem] text-base-content/65">Location</dt><dd className="mt-1 break-words font-medium">{room.location || "Not specified"}</dd></div>
           <div className="min-w-0"><dt className="text-[0.8125rem] text-base-content/65">Physical room</dt><dd className="mt-1 break-words">{room.physicalStatus ?? "Unknown"}</dd></div>
           <div className="min-w-0"><dt className="text-[0.8125rem] text-base-content/65">Physical beds</dt><dd className="mt-1">{bedEvidence === "current" ? physicalBeds.length : "Unconfirmed"}</dd></div>
-        </dl>}
+        </dl>
     </section>
+    <div data-topology-read-siblings hidden={topologyTask} inert={topologyTask}>
     {operationalContent}
     <section aria-label="Selling" className="border-t border-base-300">
       <h4 className="px-4 py-3 text-base font-semibold">Selling</h4>
@@ -950,6 +954,7 @@ function RoomDetail({
               onClick={(event) => retirementEditor.open({ propertyId: retirementEditor.propertyId, roomId: room.roomId, kind: "room", label: room.name }, event.currentTarget)}>Retire room</button>
           </div>
         </section>}
+    </div>
   </div>;
 }
 
