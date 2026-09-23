@@ -20,7 +20,7 @@ const state = vi.hoisted(() => ({ creator: false, stateIndex: 0, refIndex: 0, sn
   emptyInventory: false, availabilityMode: "current", roomInventoryMode: "current",
   queryOptions: new Map<string, { queryKey: string[]; enabled: boolean }>(), availabilityRefetch: vi.fn(async () => undefined), roomRefetch: vi.fn(async () => undefined),
   range: { arrival: "2026-09-08", departure: "2026-09-10" }, responseRange: { arrival: "2026-09-08", departure: "2026-09-10" },
-  sourceKind: "direct", sourceSystem: "", sourceReference: "", mutate: vi.fn(), includeUnavailable: false,
+  sourceKind: "direct", sourceSystem: "", sourceReference: "", mutate: vi.fn(), includeUnavailable: false, unitUnavailable: false,
   picker: false, pickerIndex: 0, pickerSlots: [] as unknown[], setters: new Map<number, ReturnType<typeof vi.fn>>(),
   mutationOptions: null as unknown, refs: [] as { current: unknown }[] }));
 vi.mock("react", async (load) => {
@@ -49,13 +49,15 @@ vi.mock("react", async (load) => {
       return [value, setter];
     },
     useRef: (initial: unknown) => {
+      if (state.picker) return { current: initial };
       if (!state.creator) return actual.useRef(initial);
       const index = state.refIndex++;
       const ref = { current: index === 0 ? state.owned ? operationId : null : index === 5 ? state.attempt : initial };
       state.refs[index] = ref; return ref;
     },
     useEffect: (effect: Parameters<typeof actual.useEffect>[0], deps: Parameters<typeof actual.useEffect>[1]) => { if (!state.creator) actual.useEffect(effect, deps); },
-    useLayoutEffect: (effect: Parameters<typeof actual.useLayoutEffect>[0], deps: Parameters<typeof actual.useLayoutEffect>[1]) => { if (!state.creator) actual.useLayoutEffect(effect, deps); },
+    useLayoutEffect: (effect: Parameters<typeof actual.useLayoutEffect>[0], deps: Parameters<typeof actual.useLayoutEffect>[1]) => { if (!state.creator && !state.picker) actual.useLayoutEffect(effect, deps); },
+    useId: () => state.picker ? "synthetic-picker-heading" : actual.useId(),
     useMemo: (factory: () => unknown, deps: unknown[]) => state.creator ? factory() : actual.useMemo(factory, deps),
   };
 });
@@ -76,7 +78,7 @@ vi.mock("@tanstack/react-query", () => ({
     return {
       data: mode === "disabled" || mode === "loading" || mode === "unavailable" ? undefined : availability
         ? { propertyId: responseProperty, ...state.responseRange, units: state.emptyInventory ? [] : [
-          { unit, isAvailable: !state.availabilityError, activeBlockIds: [], activeAllocationIds: [] },
+          { unit, isAvailable: !state.availabilityError && !state.unitUnavailable, activeBlockIds: [], activeAllocationIds: [] },
           ...(state.includeUnavailable ? [{ unit: { ...unit, inventoryUnitId: id(10), label: "104-E" }, isAvailable: false, activeBlockIds: [], activeAllocationIds: [] }] : []),
         ] }
         : { rooms: state.emptyInventory && mode !== "mismatch" ? [] : [{ ...room, propertyId: responseProperty }] },
@@ -141,7 +143,7 @@ function submitTree() {
 const submitButtons = (html: string) => html.match(/<button\b[^>]*type="submit"[^>]*>/g) ?? [];
 const cancelButton = (html: string) => html.match(/<button\b[^>]*>Cancel<\/button>/)?.[0];
 beforeEach(() => { Object.assign(state, { creator: false, snapshot: { kind: "none" }, step: "reservation", guestSave: false, units: [], name: "", owned: false, uncertain: false, pending: false, entered: false, availabilityError: null, emptyInventory: false, availabilityMode: "current", roomInventoryMode: "current", attempt: null, session,
-  sourceKind: "direct", sourceSystem: "", sourceReference: "", includeUnavailable: false, range: { ...stay }, responseRange: { ...stay }, picker: false, pickerIndex: 0, pickerSlots: [] });
+  sourceKind: "direct", sourceSystem: "", sourceReference: "", includeUnavailable: false, unitUnavailable: false, range: { ...stay }, responseRange: { ...stay }, picker: false, pickerIndex: 0, pickerSlots: [] });
   state.request.mockClear(); state.mutate.mockClear(); state.setters.clear(); state.queryOptions.clear(); state.availabilityRefetch.mockClear(); state.roomRefetch.mockClear(); });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -246,6 +248,24 @@ describe("invalid reservation dates are validation, not failed availability", ()
 });
 
 describe("reservation form ownership renders one coherent footer", () => {
+  it("completes selection explicitly, withholds stale labels and preserves the parent IDs", () => {
+    state.units = [unitId]; state.name = "Summary guest";
+    const initial = pickerEntry()!;
+    const done = elements(pickerTree(initial)).find(({ element }) => element.type === "button" && element.props.children === "Done choosing")!.element;
+    (done.props.onClick as () => void)();
+    expect(state.pickerSlots[2]).toBe(true);
+    let html = renderToStaticMarkup(pickerTree(pickerEntry()!));
+    expect(html).toContain("Dorm 104 · 104-D"); expect(html).toContain("Change rooms or beds");
+    state.roomInventoryMode = "fetching";
+    html = renderToStaticMarkup(pickerTree(pickerEntry()!));
+    expect(html).toContain("awaiting current confirmation"); expect(html).not.toContain("Dorm 104"); expect(html).not.toContain("104-D");
+    expect(state.units).toEqual([unitId]); expect(state.setters.get(2)).not.toHaveBeenCalled();
+    state.roomInventoryMode = "current";
+    html = renderToStaticMarkup(pickerTree(pickerEntry()!)); expect(html).toContain("Dorm 104 · 104-D");
+    const change = elements(pickerTree(pickerEntry()!)).find(({ element }) => element.type === "button" && element.props.children === "Change rooms or beds")!.element;
+    (change.props.onClick as () => void)();
+    html = renderToStaticMarkup(pickerTree(pickerEntry()!)); expect(html).toContain('aria-expanded="true"'); expect(state.units).toEqual([unitId]);
+  });
   it("renders one honest access reset, accessible retry and Cancel without fields or submit", () => {
     state.name = "Cleared guest";
     const html = render({ permissionSource: { label: "Permissions", state: "loading", isFetching: true, refetch: vi.fn() }, canCreateReservation: false,
@@ -310,7 +330,7 @@ describe("reservation form ownership renders one coherent footer", () => {
     (toggle.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
     const section = elements(pickerTree(initial)).find(({ element }) => typeof element.props.onCollapse === "function")!.element;
     (section.props.onCollapse as () => void)();
-    expect(state.pickerSlots).toEqual([true, new Set([roomId])]);
+    expect(state.pickerSlots).toEqual([true, new Map([[roomId, false]]), false]);
 
     for (const mode of ["fetching", "stale", "paused", "current"]) {
       state[source] = mode;
@@ -323,7 +343,7 @@ describe("reservation form ownership renders one coherent footer", () => {
       const localHtml = renderToStaticMarkup(pickerTree(entry));
       expect(localHtml).toMatch(/aria-label="Show unavailable inventory"[^>]*checked=""/);
       expect(localHtml).toContain('aria-expanded="false"');
-      expect(state.pickerSlots).toEqual([true, new Set([roomId])]);
+      expect(state.pickerSlots).toEqual([true, new Map([[roomId, false]]), false]);
       const html = render();
       expect(html).toContain('value="Retained picker guest"');
       if (mode === "current") {
@@ -355,7 +375,7 @@ describe("reservation form ownership renders one coherent footer", () => {
       const props = { permissionSource: { label: "Permissions", state: sourceState, isFetching: sourceState === "ready", refetch: vi.fn() } };
       const entry = expectHiddenPicker(creatorTree(props));
       expect(entry.path).toBe(initial.path); expect(entry.element.key).toBe(initial.element.key);
-      expect(state.pickerSlots).toEqual([true, new Set([roomId])]);
+      expect(state.pickerSlots).toEqual([true, new Map([[roomId, false]]), false]);
       const html = render(props);
       expect(html).toContain("Your draft stays here"); expect(html).toContain('value="Same editor guest"');
       expect(html).not.toContain("104-D"); expect(html).not.toContain("1 selected");
@@ -368,13 +388,14 @@ describe("reservation form ownership renders one coherent footer", () => {
     const restored = pickerEntry()!; expect(restored.path).toBe(initial.path);
     const html = renderToStaticMarkup(pickerTree(restored));
     expect(html).toMatch(/aria-label="Show unavailable inventory"[^>]*checked=""/); expect(html).toContain('aria-expanded="false"');
-    expect(state.pickerSlots).toEqual([true, new Set([roomId])]); expect(state.units).toEqual([unitId]);
+    expect(state.pickerSlots).toEqual([true, new Map([[roomId, false]]), false]); expect(state.units).toEqual([unitId]);
     expect(restored.element.props.selectedUnits).toEqual([unitId]); expect(restored.element.props.selectionEnabled).toBe(true);
     expect(state.mutate).not.toHaveBeenCalled(); expect(state.request).not.toHaveBeenCalled();
   });
   it("defaults the picker visible but never retains its owner across initial denial, access reset or foreign save recovery", () => {
     const props = pickerEntry()!.element.props as ComponentProps<typeof ReservationInventoryPicker>;
-    expect(renderToStaticMarkup(createElement(ReservationInventoryPicker, { ...props, visible: undefined }))).toContain("104-D");
+    expect(renderToStaticMarkup(createElement(ReservationInventoryPicker, { ...props, visible: undefined }))).toContain("Dorm 104");
+    expect(renderToStaticMarkup(createElement(ReservationInventoryPicker, { ...props, visible: undefined }))).not.toContain("104-D"); // Nonselected rooms start collapsed.
     expect(pickerEntry(creatorTree({ canCreateReservation: false }))).toBeUndefined();
     state.entered = true;
     expect(pickerEntry(creatorTree({ accessReset: { accessCurrent: false, canStartFresh: false, onRetry: vi.fn(), onStartFresh: vi.fn() } }))).toBeUndefined();
@@ -493,13 +514,26 @@ describe("reservation form ownership renders one coherent footer", () => {
     const html = render(); expect(html).toContain('aria-label="Reservation save recovery"'); expect(submitButtons(html)).toHaveLength(0);
     expect(html).not.toContain("Primary guest"); expect(html).not.toContain("Select at least one available unit."); expect(cancelButton(html)).toBeDefined();
   });
-  it("keeps the original mounted fields and enabled exact Retry even when its held bed is no longer current-free", () => {
+  it.each(["unavailable read","fresh unavailable bed"])("keeps original fields and enabled exact Retry with %s", reason => {
     state.snapshot = { kind: "record", record: record() }; state.owned = true; state.uncertain = true;
-    state.units = [unitId]; state.name = "Synthetic booking"; state.availabilityError = new Error("Controlled unavailable read");
+    state.units = [unitId]; state.name = "Synthetic booking";
+    if(reason==="unavailable read") state.availabilityError = new Error("Controlled unavailable read");
+    else state.unitUnavailable = true;
     state.attempt = { operationId, fingerprint: reservationCreateFingerprint({ ...stay, expectedArrivalTime: null, expectedDepartureTime: null,
       inventoryUnitIds: [unitId], primaryGuestName: state.name, email: null, phone: null, guestCount: 1, sourceKind: 1, sourceSystem: null, sourceReference: null, notes: null }) };
     const html = render(); expect(html).toContain("Primary guest"); expect(html).toContain("Retry same reservation");
     expect(submitButtons(html)).toHaveLength(1); expect(submitButtons(html)[0]).not.toContain("disabled"); expect(state.request).not.toHaveBeenCalled();
+    expect(state.units).toEqual([unitId]);
+    state.units=[]; expect(submitButtons(render())[0]).toContain('disabled=""'); submitTree();
+    expect(state.mutate).not.toHaveBeenCalled(); expect(state.request).not.toHaveBeenCalled();
+  });
+  it("keeps actual Create blocked for a fresh unavailable selection without clearing it implicitly",()=>{
+    state.units=[unitId]; state.name="Synthetic booking"; state.unitUnavailable=true;
+    expect(submitButtons(render())[0]).toContain('disabled=""'); submitTree();
+    expect(state.units).toEqual([unitId]); expect(state.mutate).not.toHaveBeenCalled();
+    const props=pickerEntry()!.element.props as ComponentProps<typeof ReservationInventoryPicker>;
+    expect(props.selectionEnabled).toBe(true); props.onToggle(unitId); expect(state.units).toEqual([]);
+    expect(submitButtons(render())[0]).toContain('disabled=""'); expect(state.request).not.toHaveBeenCalled();
   });
   it("explicit cleanup restores normal form actions and validation", () => {
     state.snapshot = { kind: "record", record: record() }; expect(submitButtons(render())).toHaveLength(0);

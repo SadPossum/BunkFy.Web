@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, UserPlus } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import type { GuestListItem, InventoryAvailabilityResponse, ReservationMutationReceipt } from "../../api/types";
 import { reservationSourceValue } from "../../api/labels";
 import { assertRequestCanStart } from "../../api/requestConnectivity";
@@ -18,6 +18,7 @@ import {
 import { useSession } from "../../app/session";
 import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { FormGrid, FormSection, FormSpan } from "../../components/ui/FormLayout";
 import { ErrorState, Modal, ModalActions } from "../../components/ui/primitives";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
@@ -31,7 +32,7 @@ import {
   type ReservationGuestRecordAttempt,
 } from "./guestRecordWorkflow";
 import { groupAvailabilityByRoom } from "./inventoryGrouping";
-import { ReservationInventoryPicker } from "./ReservationInventoryPicker";
+import { focusReservationFormTarget, ReservationInventoryPicker } from "./ReservationInventoryPicker";
 import {
   inventorySelectionIsCurrent,
   reservationCreateReceiptMatches,
@@ -401,6 +402,13 @@ export function CreateReservationModal({
     },
   });
   const savePending = mutation.isPending || previousSavePending;
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const stepFocusIntent = useRef(false);
+  useLayoutEffect(() => {
+    if (!stepFocusIntent.current) return;
+    stepFocusIntent.current = false;
+    focusReservationFormTarget(stepHeading.current, true);
+  }, [step]);
   useLayoutEffect(() => { if (mutation.error) focusModalRecoveryFeedback(errorFeedback.current); }, [mutation.error]);
   useEffect(() => {
     if (recovery.snapshot.kind !== "none" || mutation.isPending || ownedOperationId.current === null) return;
@@ -411,7 +419,7 @@ export function CreateReservationModal({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (step === "reservation" && saveGuestRecord) {
-      if (canSubmit) setStep("guest");
+      if (canSubmit) { stepFocusIntent.current = true; setStep("guest"); }
       return;
     }
 
@@ -516,7 +524,8 @@ export function CreateReservationModal({
                 setChooseOtherInventory((value) => !value);
               }}>{chooseOtherInventory ? "Back to requested space" : "Change inventory"}</button>
             </div>}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <FormSection title="Stay" headingRef={stepHeading}>
+            <FormGrid>
               <div className="space-y-3">
                 <DateField label="Arrival date" value={range.arrival} min={propertyToday} onChange={(arrival) => { setRange((current) => ({ ...current, arrival })); setSelectedUnits([]); preselectedRange.current = ""; }} />
                 <TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} />
@@ -525,10 +534,11 @@ export function CreateReservationModal({
                 <DateField label="Departure date" value={range.departure} min={nextDate(range.arrival)} onChange={(departure) => { setRange((current) => ({ ...current, departure })); setSelectedUnits([]); preselectedRange.current = ""; }} />
                 <TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} />
               </div>
-            </div>
+            </FormGrid>
             {invalidDates && <p className="text-sm text-error">Departure must be after arrival.</p>}
+            </FormSection>
 
-            <div className="space-y-3" hidden={!choosingInventory || !mayLoadInventory}>
+            <div className="space-y-3 border-y border-base-300 py-5" hidden={!choosingInventory || !mayLoadInventory}>
               {choosingInventory && mayLoadInventory && !inventoryCurrent && <p className="rounded border border-base-300 p-3 text-sm" role="status">{invalidDates
                 ? "Choose a departure date after arrival to check available rooms and beds."
                 : "Inventory is not currently confirmed. Any rooms and availability shown below are from the last matching result. Selection and new creation are disabled until current information is available."}</p>}
@@ -540,6 +550,7 @@ export function CreateReservationModal({
                 loading={false}
                 error={null}
                 selectionEnabled={showInventoryPicker && createAuthorityCurrent}
+                current={inventoryCurrent && reservationSelectionMatchesRooms(selectedUnits, roomInventory.data?.rooms ?? [], availability.data)}
                 selectedUnits={showInventoryPicker ? selectedUnits : []}
                 onToggle={(inventoryUnitId) => {
                   if (!showInventoryPicker || !createAuthorityCurrent) return;
@@ -548,22 +559,26 @@ export function CreateReservationModal({
               />
             </div>
 
-            {permissionsCurrent && canReadGuests ? <GuestRecordPicker
+            <FormSection title="Guest and contact">
+            <FormGrid>
+            <FormSpan>{permissionsCurrent && canReadGuests ? <GuestRecordPicker
               propertyId={propertyId}
               selectedGuest={selectedGuest}
               onSelect={chooseGuest}
               onSelectionAuthorityChange={setSelectedGuestCurrent}
               disabled={!permissionsCurrent || !canReadGuests}
               selectionEnabled={permissionsCurrent && canManageGuests}
-            /> : <p className="text-sm text-base-content/55">Guest Record access is not currently confirmed. Entering a guest name does not save a profile.</p>}
-            <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
+            /> : <p className="text-sm text-base-content/55">Guest Record access is not currently confirmed. Entering a guest name does not save a profile.</p>}</FormSpan>
+            <FormSpan><FormGrid layout="primaryCompact">
               <ControlledTextField label="Primary guest" value={guestName} onChange={setGuestName} placeholder="Guest name" autoComplete="name" />
               <ControlledTextField label="Guests" type="number" min="1" value={guestCount} onChange={setGuestCount} />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            </FormGrid></FormSpan>
               <ControlledTextField label="Email (optional)" type="email" required={false} value={email} onChange={setEmail} placeholder="guest@example.com" autoComplete="email" />
               <ControlledTextField label="Phone (optional)" type="tel" required={false} value={phone} onChange={setPhone} placeholder="+1 555 0100" autoComplete="tel" />
-            </div>
+            </FormGrid>
+            </FormSection>
+            <FormSection className="border-t border-base-300">
+            <div className="space-y-4">
             <fieldset className="min-w-0">
               <legend className="mb-2 text-sm font-semibold">Booking source</legend>
               <div className="grid grid-cols-2 gap-2">
@@ -574,10 +589,10 @@ export function CreateReservationModal({
               </div>
             </fieldset>
             {sourceKind === "external" && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <FormGrid>
                 <ControlledTextField label="Source system" value={sourceSystem} onChange={setSourceSystem} placeholder="Booking.com" />
                 <ControlledTextField label="Source reference" value={sourceReference} onChange={setSourceReference} placeholder="ABC-123" />
-              </div>
+              </FormGrid>
             )}
             <ControlledTextArea label="Reservation notes (optional)" value={reservationNotes} onChange={setReservationNotes} placeholder="Arrival details, preferences or booking notes" />
 
@@ -591,9 +606,12 @@ export function CreateReservationModal({
                 </span>
               </label>
             )}
+            </div>
+            </FormSection>
           </>
         ) : (
           <GuestProfileStep
+            headingRef={stepHeading}
             nationalityDisabled={mutation.isPending || !mayLoadInventory || !canCreateGuests || !canManageGuests}
             guestName={guestName}
             email={email}
@@ -621,7 +639,7 @@ export function CreateReservationModal({
           submitting={savePending}
           disabled={!canSubmit}
           retrying={exactReplay}
-          onBack={() => setStep("reservation")}
+          onBack={() => { stepFocusIntent.current = true; setStep("reservation"); }}
           onCancel={onClose}
         />
         {showReservationForm && step === "reservation" && availabilityUsable && !selectedUnits.length && <p className="-mt-3 text-right text-xs text-warning">Select at least one available unit.</p>}
@@ -646,6 +664,7 @@ function ReservationStepIndicator({ step }: { step: ReservationStep }) {
 }
 
 function GuestProfileStep({
+  headingRef,
   nationalityDisabled,
   guestName,
   email,
@@ -662,6 +681,7 @@ function GuestProfileStep({
   onLanguageChange,
   onNotesChange,
 }: {
+  headingRef: Ref<HTMLHeadingElement>;
   nationalityDisabled: boolean;
   guestName: string;
   email: string;
@@ -680,23 +700,23 @@ function GuestProfileStep({
 }) {
   const recoveryHeading = useRef<HTMLDivElement>(null);
   return (
-    <div className="space-y-4">
-      <div ref={recoveryHeading} tabIndex={-1} className="flex items-center gap-3 rounded border-b border-base-300 pb-4 outline-none focus:ring-2 focus:ring-primary">
+    <FormSection title="Guest Record" headingRef={headingRef}>
+    <FormGrid>
+      <FormSpan><div ref={recoveryHeading} tabIndex={-1} className="flex items-start gap-3 rounded border-b border-base-300 pb-4 outline-none focus:ring-2 focus:ring-primary">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-content">{guestName.trim().slice(0, 1).toUpperCase()}</span>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{guestName}</p>
-          <p className="mt-1 truncate text-xs text-base-content/50">{email || phone || "No contact details"}</p>
+          <p className="font-semibold [overflow-wrap:anywhere]">{guestName}</p>
+          <p className="mt-1 text-sm text-base-content/65 [overflow-wrap:anywhere]">{email || phone || "No contact details"}</p>
         </div>
-      </div>
-      <ControlledTextField label="Legal name (optional)" value={legalName} onChange={onLegalNameChange} placeholder="As shown on identification" autoComplete="name" required={false} maxLength={256} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      </div></FormSpan>
+      <FormSpan><ControlledTextField label="Legal name (optional)" value={legalName} onChange={onLegalNameChange} placeholder="As shown on identification" autoComplete="name" required={false} maxLength={256} /></FormSpan>
         <DateField label="Date of birth (optional)" value={dateOfBirth} max={maximumDateOfBirth} required={false} onChange={onDateOfBirthChange} />
         <div className="form-control min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">Nationality (optional)</span><NationalityPicker value={nationalityCountryCode} onChange={onNationalityChange} disabled={nationalityDisabled} /></div>
-      </div>
-      <LanguagePicker value={languageTags} onChange={onLanguageChange} disabled={nationalityDisabled}
-        onDisabledClose={() => recoveryHeading.current?.focus()} />
-      <ControlledTextArea label="Guest notes (optional)" value={notes} onChange={onNotesChange} placeholder="Preferences or operational notes visible to staff" maxLength={4000} />
-    </div>
+      <FormSpan><LanguagePicker value={languageTags} onChange={onLanguageChange} disabled={nationalityDisabled}
+        onDisabledClose={() => recoveryHeading.current?.focus()} /></FormSpan>
+      <FormSpan><ControlledTextArea label="Guest notes (optional)" value={notes} onChange={onNotesChange} placeholder="Preferences or operational notes visible to staff" maxLength={4000} /></FormSpan>
+    </FormGrid>
+    </FormSection>
   );
 }
 

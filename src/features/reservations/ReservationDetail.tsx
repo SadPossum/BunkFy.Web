@@ -18,6 +18,8 @@ import type { RouteNavigationLease } from "../../app/routeNavigationLease";
 import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { ErrorState, InitialAvatar, InlineFormActions, LoadingState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { FormGrid, FormSection, FormSpan } from "../../components/ui/FormLayout";
+import { modalIsTopmost } from "../../components/ui/modalFocus";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { GuestRecordPicker } from "./GuestRecordPicker";
@@ -324,7 +326,7 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
             <button type="button" className="btn btn-ghost btn-sm mt-2" onClick={navigation.review}>Review navigation</button>
           </section>}
           {item ? <>
-            <section aria-label="Stay summary" className="min-w-0 border-b border-base-300 pb-4">
+            <section aria-label="Stay summary" className="min-w-0 space-y-4 border-b border-base-300 pb-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h3 className="text-xs font-bold uppercase text-base-content/60">Stay</h3>
@@ -333,18 +335,18 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
                 </div>
                 <StatusBadge status={reservationStatusLabel(item.status)} />
               </div>
-              <div className="mt-4"><ReservationOverview reservation={item} inventoryLabels={inventoryLabels} inventoryLabelState={inventoryLabelState} inventoryLabelSource={inventorySource} /></div>
+              <ReservationOverview reservation={item} inventoryLabels={inventoryLabels} inventoryLabelState={inventoryLabelState} inventoryLabelSource={inventorySource} />
+              <ReservationActions reservation={item} editorIdentity={editorIdentity} capabilities={capabilities} authorityCurrent={lifecycleCommandAuthorityCurrent && !details.editor}
+                pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error}
+                onBegin={beginAction} onDateChange={setBusinessDate}
+                onConfirm={() => pendingAction && !details.editor && lifecycleCommandAuthorityCurrent && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })}
+                onCancel={() => { lifecycleAttempt.current = null; setPendingAction(null); setPendingActionVersion(null); actionMutation.reset(); }} />
             </section>
-            <ReservationActions reservation={item} capabilities={capabilities} authorityCurrent={lifecycleCommandAuthorityCurrent && !details.editor}
-              pendingAction={pendingAction} businessDate={businessDate} submitting={actionMutation.isPending} error={actionMutation.error}
-              onBegin={beginAction} onDateChange={setBusinessDate}
-              onConfirm={() => pendingAction && !details.editor && lifecycleCommandAuthorityCurrent && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })}
-              onCancel={() => { lifecycleAttempt.current = null; setPendingAction(null); setPendingActionVersion(null); actionMutation.reset(); }} />
           </> : <CompositeSourceFallback error={reservation.error} retry={() => void reservation.refetch()} state={reservationSource.state} label="reservation details" title="Reservation could not be opened" />}
 
           <section ref={detailsArea} className="min-w-0 border-b border-base-300 pb-5" aria-labelledby="booking-details-heading">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0"><h3 id="booking-details-heading" className="font-display text-lg font-semibold">Booking details</h3><p className="mt-1 text-sm text-base-content/60">Booking contact and staff notes. Guest Record is separate.</p></div>
+              <div className="min-w-0"><h3 id="booking-details-heading" className="text-base font-semibold">Booking details</h3><p className="mt-1 text-sm text-base-content/60">Booking contact and staff notes. Guest Record is separate.</p></div>
               {capabilities.manage && !details.editor && item && <button ref={editButton} type="button" className="btn btn-outline btn-sm min-h-11" disabled={!detailsAuthorityCurrent || Boolean(pendingAction)} onClick={(event) => {
                 enterDetailsFocus.current?.cancel(); enterDetailsFocus.current = null;
                 if (event.detail === 0 && document.activeElement === editButton.current) enterDetailsFocus.current = captureReservationDetailsFocus(detailsArea.current, editorIdentity);
@@ -364,11 +366,11 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
           {item && <ReservationActivity reservation={item} />}
 
           <section className="min-w-0 border-t border-base-300 pt-2">
-            <button type="button" className="btn btn-ghost min-h-11 w-full justify-between whitespace-normal text-left" aria-expanded={historyOpen} aria-controls="booking-details-history" onClick={() => setHistoryOpen(!historyOpen)}><span>Booking details history</span><ChevronRight size={17} className={historyOpen ? "rotate-90 shrink-0" : "shrink-0"} /></button>
+            <button type="button" className="btn btn-ghost min-h-11 w-full justify-between whitespace-normal px-0 text-left text-base font-semibold" aria-expanded={historyOpen} aria-controls="booking-details-history" onClick={() => setHistoryOpen(!historyOpen)}><span>Booking details history</span><ChevronRight size={17} className={historyOpen ? "rotate-90 shrink-0" : "shrink-0"} /></button>
             {historyOpen && <div id="booking-details-history" className="mt-3"><p className="mb-3 text-sm text-base-content/60">Ordinary booking-details changes, not a complete lifecycle audit.</p><ReservationHistory query={history} source={historySource} page={historyPage} onPageChange={setHistoryPage} /></div>}
           </section>
           <section className="min-w-0 border-t border-base-300 pt-2">
-            <button type="button" className="btn btn-ghost min-h-11 w-full justify-between whitespace-normal text-left" aria-expanded={guestOpen} aria-controls="booking-guest-record" onClick={() => setGuestOpen(!guestOpen)}><span>Guest record</span><ChevronRight size={17} className={guestOpen ? "rotate-90 shrink-0" : "shrink-0"} /></button>
+            <button type="button" className="btn btn-ghost min-h-11 w-full justify-between whitespace-normal px-0 text-left text-base font-semibold" aria-expanded={guestOpen} aria-controls="booking-guest-record" onClick={() => setGuestOpen(!guestOpen)}><span>Guest record</span><ChevronRight size={17} className={guestOpen ? "rotate-90 shrink-0" : "shrink-0"} /></button>
             {guestOpen && <div id="booking-guest-record" className="mt-3">{!capabilities.readGuests ? <p className="text-sm text-base-content/65">Guest Record access is not assigned. Booking contact remains separate.</p> : item ? <LinkedGuestRecord propertyId={propertyId} reservation={item} currentReservation={reservation.data} permissionsCurrent={permissionsCurrent} reservationCurrent={reservationCurrent} canRead={capabilities.readGuests} canCreate={capabilities.createGuests} canManage={capabilities.manageGuests} onUpdated={refresh} /> : <p className="text-sm">Refresh current reservation details before opening its Guest Record.</p>}</div>}
           </section>
           <div className="flex justify-end border-t border-base-300 pt-4"><button type="button" className="btn btn-ghost min-h-11" onClick={onClose}>Close</button></div>
@@ -385,8 +387,9 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
   );
 }
 
-function ReservationActions({ reservation, capabilities, authorityCurrent, pendingAction, businessDate, submitting, error, onBegin, onDateChange, onConfirm, onCancel }: {
+function ReservationActions({ reservation, editorIdentity, capabilities, authorityCurrent, pendingAction, businessDate, submitting, error, onBegin, onDateChange, onConfirm, onCancel }: {
   reservation: Reservation;
+  editorIdentity: string;
   capabilities: ReservationCapabilities;
   authorityCurrent: boolean;
   pendingAction: ReservationAction | null;
@@ -398,6 +401,17 @@ function ReservationActions({ reservation, capabilities, authorityCurrent, pendi
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const actionButtons = useRef(new Map<ReservationAction, HTMLButtonElement>());
+  const returnFocus = useRef<{ action: ReservationAction; intent: ReservationDetailsFocusIntent } | null>(null);
+  useLayoutEffect(() => () => {
+    returnFocus.current?.intent.cancel(); returnFocus.current = null;
+  }, [editorIdentity]);
+  useLayoutEffect(() => {
+    if (pendingAction || !returnFocus.current) return;
+    const { action, intent } = returnFocus.current;
+    returnFocus.current = null;
+    finishReservationDetailsFocus(intent, actionButtons.current.get(action) ?? null, editorIdentity, authorityCurrent && !submitting);
+  }, [pendingAction, editorIdentity, authorityCurrent, submitting]);
   const status = reservationStatusKey(reservation.status);
   const actions: { action: ReservationAction; label: string; icon: ReactNode; tone: string }[] = [];
   if (status === "confirmed" && capabilities.checkIn) actions.push({ action: "check-in", label: "Check in", icon: <LogIn size={16} />, tone: "btn-primary" });
@@ -413,7 +427,14 @@ function ReservationActions({ reservation, capabilities, authorityCurrent, pendi
         {pendingAction !== "cancel" && <div className="form-control mt-4 block max-w-xs"><span className="label-text mb-1.5 block text-sm font-semibold">Business date</span><DatePicker className="w-full" value={businessDate} min={pendingAction === "check-out" ? reservation.checkedInBusinessDate || reservation.arrival : reservation.arrival} max={pendingAction === "check-in" ? dateBefore(reservation.departure) : undefined} onChange={onDateChange} ariaLabel="Business date" required disabled={!authorityCurrent || submitting} /></div>}
         {Boolean(error) && <div className="mt-4"><ErrorState error={error} /></div>}
         {!authorityCurrent && <p className="mt-4 text-sm font-medium text-warning">Refresh current reservation access and details before confirming.</p>}
-        <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={submitting}>Keep reservation</button><button type="button" className={`btn btn-sm ${pendingAction === "cancel" || pendingAction === "no-show" ? "btn-error" : "btn-primary"}`} onClick={onConfirm} disabled={submitting || !authorityCurrent || (pendingAction !== "cancel" && !businessDate)}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.confirmLabel}</button></div>
+        <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-ghost btn-sm" onClick={event => {
+          returnFocus.current?.intent.cancel(); returnFocus.current = null;
+          if (event.detail === 0 && document.activeElement === event.currentTarget) {
+            const intent = captureReservationDetailsFocus(event.currentTarget, editorIdentity);
+            if (intent) returnFocus.current = { action: pendingAction, intent };
+          }
+          onCancel();
+        }} disabled={submitting}>Keep reservation</button><button type="button" className={`btn btn-sm ${pendingAction === "cancel" || pendingAction === "no-show" ? "btn-error" : "btn-primary"}`} onClick={onConfirm} disabled={submitting || !authorityCurrent || (pendingAction !== "cancel" && !businessDate)}>{submitting && <span className="loading loading-spinner loading-xs" />}{copy.confirmLabel}</button></div>
       </section>
     );
   }
@@ -423,7 +444,7 @@ function ReservationActions({ reservation, capabilities, authorityCurrent, pendi
     return null;
   }
 
-  return <div className="flex flex-wrap gap-2" aria-label="Reservation actions">{actions.map(({ action, label, icon, tone }) => <button key={action} type="button" className={`btn btn-sm ${tone}`} disabled={!authorityCurrent} onClick={() => onBegin(action, reservation)}>{icon}{label}</button>)}</div>;
+  return <div className="flex flex-wrap gap-2" aria-label="Reservation actions">{actions.map(({ action, label, icon, tone }) => <button key={action} ref={button => { if (button) actionButtons.current.set(action, button); else actionButtons.current.delete(action); }} type="button" className={`btn btn-sm ${tone}`} disabled={!authorityCurrent} onClick={() => onBegin(action, reservation)}>{icon}{label}</button>)}</div>;
 }
 
 type InventoryLabelState = "current" | "access-unavailable" | "access-unconfirmed" | "loading" | "unconfirmed";
@@ -459,7 +480,7 @@ export function GuestDetailsReadOnly({ reservation }: { reservation: Reservation
 
 function ReservationActivity({ reservation }: { reservation: Reservation }) {
   return <section className="min-w-0">
-    <h3 className="mb-3 text-sm font-semibold">Source and stay activity</h3>
+    <h3 className="mb-3 text-base font-semibold">Source and stay activity</h3>
     <dl className="grid min-w-0 gap-x-6 gap-y-3 sm:grid-cols-2">
       <BookingFact label="Booking source" value={`${reservationSourceLabel(reservation.sourceKind)}${reservation.sourceSystem ? ` · ${reservation.sourceSystem}` : ""}`} />
       <BookingFact label="Booked" value={formatDateTime(reservation.createdAtUtc)} />
@@ -479,15 +500,65 @@ function BookingFact({ label, value, href }: { label: string; value: string; hre
 type DetailsEditor = ReturnType<typeof useReservationDetailsEditor>;
 export function GuestDetailsForm({ details, current, authorityCurrent, onRefresh, onCancel = details.cancel, onSubmitIntent }: { details: DetailsEditor; current?: Reservation; authorityCurrent: boolean; onRefresh: () => void; onCancel?: () => void; onSubmitIntent?: () => void }) {
   const owner = details.editor;
+  const form = useRef<HTMLFormElement>(null);
+  const editing = Boolean(owner);
+  useEffect(() => {
+    const editor = form.current, modal = editor?.closest<HTMLElement>("[data-bunkfy-modal-box]");
+    if (!editing || !authorityCurrent || details.unresolved || !editor || !modal) return;
+    let port = editor.parentElement;
+    while (port && port !== modal && !/^(auto|scroll)$/.test(getComputedStyle(port).overflowY)) port = port.parentElement;
+    if (!port || port === modal) return;
+    const scrollport = port;
+    let width = window.innerWidth, height = window.innerHeight;
+    let visibleField: HTMLElement | null = null;
+    let pointerDown = false;
+    const remember = () => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !editor.contains(active)
+        || !active.matches("input, textarea, select") || active.matches(":disabled, [readonly]")) { visibleField = null; return; }
+      const rect = active.getBoundingClientRect(), bounds = scrollport.getBoundingClientRect();
+      visibleField = rect.top >= bounds.top && rect.bottom <= bounds.bottom ? active : null;
+    };
+    const shrink = () => {
+      const smaller = window.innerWidth < width || window.innerHeight < height;
+      width = window.innerWidth; height = window.innerHeight;
+      const target = visibleField;
+      if (smaller && !pointerDown && target?.isConnected && editor.isConnected && document.activeElement === target && modalIsTopmost(modal)) {
+        const rect = target.getBoundingClientRect(), bounds = scrollport.getBoundingClientRect();
+        const top = bounds.top + 8, bottom = bounds.bottom - 8;
+        scrollport.scrollTop += rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0;
+      }
+      remember();
+    };
+    const startPointer = () => { pointerDown = true; };
+    const endPointer = () => { pointerDown = false; remember(); };
+    const clear = () => { visibleField = null; };
+    remember();
+    editor.addEventListener("focusin", remember); editor.addEventListener("focusout", clear);
+    scrollport.addEventListener("scroll", remember, { passive: true });
+    scrollport.addEventListener("pointerdown", startPointer);
+    document.addEventListener("pointerup", endPointer); document.addEventListener("pointercancel", endPointer);
+    window.addEventListener("resize", shrink);
+    return () => {
+      editor.removeEventListener("focusin", remember); editor.removeEventListener("focusout", clear);
+      scrollport.removeEventListener("scroll", remember); scrollport.removeEventListener("pointerdown", startPointer);
+      document.removeEventListener("pointerup", endPointer); document.removeEventListener("pointercancel", endPointer);
+      window.removeEventListener("resize", shrink);
+    };
+  }, [editing, authorityCurrent, details.unresolved]);
   if (!owner) return null;
   const disabled = !authorityCurrent || details.unresolved;
   const text = (field: keyof BookingDetailsDraft, label: string, type = "text", required = false) => <label className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full min-w-0" name={field} type={type} value={owner.draft[field]} onChange={event => details.change(field, event.target.value)} required={required} min={type === "number" ? 1 : undefined} disabled={disabled} /></label>;
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); onSubmitIntent?.(); void details.submit(); }
-  return <form className="min-w-0 space-y-4" onSubmit={submit}>
-    <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_140px]">{text("primaryGuestName", "Primary guest", "text", true)}{text("guestCount", "Guests", "number", true)}</div>
-    <div className="grid min-w-0 gap-4 sm:grid-cols-2">{text("email", "Email", "email")}{text("phone", "Phone", "tel")}</div>
-    <div className="grid min-w-0 gap-4 sm:grid-cols-2"><TimeField label="Expected arrival time (optional)" value={owner.draft.expectedArrivalTime} onChange={value => details.change("expectedArrivalTime", value)} disabled={disabled} /><TimeField label="Expected departure time (optional)" value={owner.draft.expectedDepartureTime} onChange={value => details.change("expectedDepartureTime", value)} disabled={disabled} /></div>
-    <label className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-24 w-full min-w-0" name="notes" value={owner.draft.notes} onChange={event => details.change("notes", event.target.value)} disabled={disabled} /></label>
+  return <form ref={form} className="min-w-0 space-y-4" onSubmit={submit}>
+    <div className="divide-y divide-base-300">
+      <FormSection title="Guest and contact" headingLevel={4}><FormGrid>
+        <FormSpan><FormGrid layout="primaryCompact">{text("primaryGuestName", "Primary guest", "text", true)}{text("guestCount", "Guests", "number", true)}</FormGrid></FormSpan>
+        {text("email", "Email", "email")}{text("phone", "Phone", "tel")}
+      </FormGrid></FormSection>
+      <FormSection title="Expected stay times" headingLevel={4}><FormGrid><TimeField label="Expected arrival time (optional)" value={owner.draft.expectedArrivalTime} onChange={value => details.change("expectedArrivalTime", value)} disabled={disabled} /><TimeField label="Expected departure time (optional)" value={owner.draft.expectedDepartureTime} onChange={value => details.change("expectedDepartureTime", value)} disabled={disabled} /></FormGrid></FormSection>
+      <FormSection><label className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">Notes</span><textarea className="textarea textarea-bordered min-h-24 w-full min-w-0" name="notes" value={owner.draft.notes} onChange={event => details.change("notes", event.target.value)} disabled={disabled} /></label></FormSection>
+    </div>
     {!authorityCurrent && <p role="status" className="text-sm text-base-content">Current reservation access or details are delayed. Your draft stays here; saving is disabled.</p>}
     {details.unresolved && <p role="status" className="text-sm font-medium">{owner.sending ? "Saving these booking details. Wait for the result before leaving." : "This change was sent, but its result is not confirmed. Retry the same change; do not start a replacement save."}</p>}
     {details.revisionChanged && !details.unresolved && <div className="rounded border border-warning/30 p-3 text-sm"><p>Booking details changed while you were editing. Your draft has not been replaced. Review the current reservation before a new save.</p>{current && <details className="mt-3"><summary className="cursor-pointer py-2 font-semibold">Review current booking details</summary><dl className="my-3 grid min-w-0 gap-3 sm:grid-cols-2"><BookingFact label="Primary guest" value={current.primaryGuestName} /><BookingFact label="Guests" value={String(current.guestCount)} /><BookingFact label="Expected arrival" value={current.expectedArrivalTime ? formatTime(current.expectedArrivalTime) : "Not scheduled"} /><BookingFact label="Expected departure" value={current.expectedDepartureTime ? formatTime(current.expectedDepartureTime) : "Not scheduled"} /></dl><GuestDetailsReadOnly reservation={current} /></details>}<button type="button" className="btn btn-outline btn-sm mt-2 min-h-11 whitespace-normal" disabled={!authorityCurrent} onClick={details.useCurrentDetails}>Replace draft with current details</button></div>}

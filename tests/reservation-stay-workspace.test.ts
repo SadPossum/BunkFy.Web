@@ -37,6 +37,15 @@ function view(overrides: Partial<Parameters<typeof ReservationDetail>[0]> = {}) 
   return renderToStaticMarkup(createElement(ReservationDetail, { propertyId: "p", reservationId: "r", editorIdentity: "actor:p:r", navigation,
     capabilities, permissionSource: source, canReadInventory: true, businessDateToday: "2026-09-07", onClose: vi.fn(), ...overrides }));
 }
+function stayMarkup(html: string) {
+  const start=html.indexOf('<section aria-label="Stay summary"');
+  let depth=0;
+  for(const tag of html.slice(start).matchAll(/<\/?section\b[^>]*>/g)) {
+    depth+=tag[0].startsWith("</")?-1:1;
+    if(depth===0) return html.slice(start,start+tag.index!+tag[0].length);
+  }
+  throw new Error("Stay section boundary not found");
+}
 function form(overrides: Partial<ReturnType<typeof useReservationDetailsEditor>> = {}, current = true) {
   const draft = { ...bookingDetailsDraft(record()), notes: "Unsaved\nLocal notes", expectedArrivalTime: "16:45" };
   const details = { editor: { baseline: bookingDetailsDraft(record()), draft, detailsRevision: 3, attempt: null, sending: false, error: null },
@@ -47,6 +56,19 @@ beforeEach(() => { data.queries = []; data.item = record(); data.request.mockRes
   data.inventory = { rooms: [{ propertyId: "p", roomId: "room", roomName: "Dormitory 104", units: [{ propertyId: "p", roomId: "room", inventoryUnitId: "u", label: "104-F", kind: "bed" }] }] }; });
 
 describe("flat reservation stay workspace", () => {
+  it.each(["confirmed","checkedIn","checkoutPending"] as const)("B2 groups %s lifecycle content inside the Stay closing boundary",status=>{
+    data.item={...record(),status};
+    const html=view(),stay=stayMarkup(html);
+    expect(stay).toContain(status==="checkoutPending"?"BunkFy is processing this reservation":'aria-label="Reservation actions"');
+    expect(stay).toContain(status==="checkedIn"?"Check out":status==="confirmed"?"Check in":"Actions will appear when it finishes");
+    expect(stay).not.toContain('border-t'); expect(stay).not.toContain("Booking details");
+  });
+  it.each(["checkedOut","cancelled","noShow"] as const)("B2 keeps terminal %s without an empty lifecycle shell",status=>{
+    data.item={...record(),status,holdsInventory:false};
+    const stay=stayMarkup(view());
+    expect(stay).toContain("Stay inventory"); expect(stay).not.toContain("Reservation actions");
+    expect(stay).not.toContain("BunkFy is processing"); expect(stay).not.toContain("Check out");
+  });
   it("puts exact held inventory with dates/status before lifecycle, one inline Edit and secondary disclosures", () => {
     const html = view(); expect(html.match(/>Edit booking details</g)).toHaveLength(1); expect(html).not.toContain('role="tab"');
     expect(html.indexOf("Stay summary")).toBeLessThan(html.indexOf("Reservation actions")); expect(html.indexOf("Dormitory 104 · 104-F")).toBeLessThan(html.indexOf("Reservation actions"));
@@ -95,7 +117,10 @@ describe("flat reservation stay workspace", () => {
   });
   it("controlled fields retain expected time and notes with shrinkable narrow layout, no revision remount", () => {
     const html = form(); expect(html).toContain("04:45 PM"); expect(html).toContain("Unsaved\nLocal notes"); expect(html).toContain("min-w-0");
-    expect(html).toContain("sm:grid-cols-[minmax(0,1fr)_140px]"); expect(html).toMatch(/<textarea[^>]*min-w-0[^>]*>Unsaved/); expect(html).not.toContain('name="arrival"'); expect(html).not.toContain('name="departure"');
+    expect(html).toContain("sm:grid-cols-[minmax(0,1fr)_minmax(0,10rem)]"); expect(html).toMatch(/<textarea[^>]*min-w-0[^>]*>Unsaved/); expect(html).not.toContain('name="arrival"'); expect(html).not.toContain('name="departure"');
+    expect(html).toContain("Guest and contact"); expect(html).toContain("Expected stay times");
+    expect(html.indexOf('name="phone"')).toBeLessThan(html.indexOf("Expected stay times"));
+    expect(html.indexOf("Expected stay times")).toBeLessThan(html.indexOf('name="notes"'));
   });
   it("refresh retains displayed draft but disables fields/save; unresolved result offers only exact replay", () => {
     const refreshing = form({}, false); expect(refreshing).toContain("Your draft stays here"); expect(refreshing).toContain("Unsaved"); expect(refreshing).toMatch(/disabled=""[^>]*>.*?Save booking details/s);
