@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Edit3,
   Globe2,
-  History,
   Languages,
   Mail,
   MessageSquareText,
@@ -34,6 +33,7 @@ import { useTargetProperty } from "../../app/resourceFocus";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { DatePicker } from "../../components/ui/DatePicker";
+import { DetailColumns, FormGrid, FormSection, FormSpan } from "../../components/ui/FormLayout";
 import { CompositeSourceFallback, CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
@@ -425,7 +425,6 @@ export function GuestsPage() {
   }, [stayPage, stays.data, staysCurrent]);
 
   const guestItems = directoryUsable ? guests.data?.guests ?? [] : [];
-  const selectedSummary = guestItems.find((guest) => guest.guestId === selectedGuestId);
   const guestDataVisible = permissionUsable && mayRead;
   const detailOpen = Boolean(guestDataVisible && selectedGuestId && formState === undefined && !archiveTarget);
 
@@ -563,8 +562,8 @@ export function GuestsPage() {
 
       <Modal
         open={detailOpen}
-        title={detail.data?.displayName ?? selectedSummary?.displayName ?? "Guest profile"}
-        description="Durable identity, contact details and reservation-linked history"
+        title="Guest record"
+        description="Contact details and stay history."
         onClose={() => selectGuest(null)}
         size="lg"
       >
@@ -687,7 +686,7 @@ function IdentitySummary({ guest }: { guest: GuestListItem }) {
   return <div className="max-w-52 space-y-1 text-sm text-base-content/55">{details.map((detail) => <p key={detail} className="truncate" title={detail}>{detail}</p>)}</div>;
 }
 
-function GuestDetail({
+export function GuestDetail({
   guest,
   stays,
   staysSource,
@@ -734,46 +733,60 @@ function GuestDetail({
   ].filter((value): value is string => Boolean(value));
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-lg bg-base-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3"><InitialAvatar name={guest.displayName} variant="solid" /><div><div className="flex flex-wrap items-center gap-2"><p className="font-display text-lg font-semibold">{guest.displayName}</p><StatusBadge status={guestStatusLabel(guest.status)} /></div><p className="mt-1 text-xs text-base-content/45">Guest since {formatDateTime(guest.createdAtUtc)}</p></div></div>
-        {active && (canManage || canArchive) && <div className="flex gap-2">{canManage && <button type="button" className="btn btn-sm btn-outline" disabled={!manageEnabled} onClick={onEdit}><Edit3 size={15} />Edit</button>}{canArchive && <button type="button" className="btn btn-sm btn-ghost text-error" disabled={!archiveEnabled} onClick={onArchive}><Archive size={15} />Archive</button>}</div>}
+    <div className="min-w-0 space-y-6">
+      <div className="flex min-w-0 flex-col items-start gap-3 border-b border-base-300 pb-5 sm:flex-row sm:justify-between sm:gap-5">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-xl font-semibold leading-7 [overflow-wrap:anywhere]">{guest.displayName}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <StatusBadge status={guestStatusLabel(guest.status)} />
+            <p className="text-sm text-base-content/65">Guest since {formatDateTime(guest.createdAtUtc)}</p>
+          </div>
+        </div>
+        {active && (canManage || canArchive) && <div className="flex max-w-full shrink-0 flex-wrap gap-2">
+          {canManage && <button type="button" className="btn btn-sm btn-outline min-h-11" disabled={!manageEnabled} onClick={onEdit}><Edit3 size={15} />Edit</button>}
+          {canArchive && <button type="button" className="btn btn-sm btn-ghost min-h-11 text-error" disabled={!archiveEnabled} onClick={onArchive}><Archive size={15} />Archive</button>}
+        </div>}
       </div>
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <DetailColumns>
         <section className="min-w-0" aria-labelledby="guest-profile-details">
-          <h3 id="guest-profile-details" className="mb-3 text-xs font-bold uppercase text-base-content/40">Identity and contact</h3>
-          <div className="divide-y divide-base-300 overflow-hidden rounded-lg border border-base-300 bg-base-100">
+          <h3 id="guest-profile-details" className="mb-2 text-base font-semibold">Identity and contact</h3>
+          {hasRecordedProfileFacts ? <dl className="min-w-0 divide-y divide-base-300">
             {guest.legalName && <ProfileFact icon={<UserRound size={16} />} label="Legal name" value={guest.legalName} />}
             {guest.email && <ProfileFact icon={<Mail size={16} />} label="Email" value={guest.email} href={`mailto:${guest.email}`} />}
             {guest.phone && <ProfileFact icon={<Phone size={16} />} label="Phone" value={guest.phone} href={`tel:${guest.phone}`} />}
             {guest.dateOfBirth && <ProfileFact icon={<CalendarDays size={16} />} label="Date of birth" value={formatDate(guest.dateOfBirth)} />}
             {country && <ProfileFact icon={<Globe2 size={16} />} label="Nationality" value={country} />}
             {language && <ProfileFact icon={<Languages size={16} />} label="Languages" value={language} />}
-            {!hasRecordedProfileFacts && <div className="p-4 text-sm text-base-content/50">Only the display name is recorded.</div>}
-          </div>
-          {missingProfileFacts.length > 0 && <p className="mt-3 text-xs leading-5 text-base-content/45">Not recorded: {missingProfileFacts.join(", ")}.</p>}
-          {guest.notes && <div className="mt-5 border-l-2 border-primary/35 pl-4"><div className="flex items-center gap-2 text-xs font-semibold text-base-content/50"><MessageSquareText size={15} className="text-primary" />Staff notes</div><p className="mt-2 whitespace-pre-wrap text-sm leading-6">{guest.notes}</p></div>}
+          </dl> : <p className="py-3 text-sm text-base-content/65">Only the display name is recorded.</p>}
+          {missingProfileFacts.length > 0 && <p className="mt-3 text-sm leading-5 text-base-content/65">Not recorded: {missingProfileFacts.join(", ")}.</p>}
+          {guest.notes && <section aria-labelledby="guest-staff-notes" className="mt-5 min-w-0 border-t border-base-300 pt-4">
+            <h4 id="guest-staff-notes" className="flex items-center gap-2 text-sm font-semibold"><MessageSquareText size={16} aria-hidden="true" className="shrink-0 text-primary" />Staff notes</h4>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]">{guest.notes}</p>
+          </section>}
         </section>
 
         <section className="min-w-0" aria-labelledby="guest-stay-history">
-          <div className="mb-3 flex items-center justify-between gap-3"><h3 id="guest-stay-history" className="text-xs font-bold uppercase text-base-content/40">Stay history</h3>{stays.length > 0 && <span className="text-xs font-medium text-base-content/40">Page {stayPage}</span>}</div>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2"><h3 id="guest-stay-history" className="text-base font-semibold">Stay history</h3>{stays.length > 0 && <span className="text-sm text-base-content/65">Page {stayPage}</span>}</div>
           <CompositeSourceNotice className="mb-3" sources={[staysSource]} title="Stay history is delayed" />
           {staysSource.state === "loading" ? <LoadingState label="Loading stay history" /> : !compositeSourceUsable(staysSource.state) ? (
             <CompositeSourceFallback state={staysSource.state} label="stay history" />
           ) : !stays.length ? (
-            <div className="rounded-lg border border-dashed border-base-300 p-6 text-center"><History className="mx-auto text-base-content/25" size={26} /><p className="mt-3 text-sm font-semibold">No stays recorded yet</p><p className="mt-1 text-xs text-base-content/45">A linked reservation will appear here automatically.</p></div>
-          ) : <><div className="space-y-3">{stays.map((stay) => <StayHistoryCard key={`${stay.reservationId}-${stay.reservationVersion}`} stay={stay} canOpenReservation={canOpenReservations} />)}</div><PaginationBar page={stayPage} pageSize={stayPageSize} itemCount={stays.length} itemLabel="stay" hasMore={staysHasMore} disabled={!compositeSourceCurrent(staysSource)} onPageChange={onStayPageChange} /></>}
+            <div className="py-3"><p className="text-sm font-medium">No stays recorded yet</p><p className="mt-1 text-sm leading-5 text-base-content/65">A linked reservation will appear here automatically.</p></div>
+          ) : <><div className="min-w-0 divide-y divide-base-300">{stays.map((stay) => <StayHistoryCard key={`${stay.reservationId}-${stay.reservationVersion}`} stay={stay} canOpenReservation={canOpenReservations} />)}</div><PaginationBar page={stayPage} pageSize={stayPageSize} itemCount={stays.length} itemLabel="stay" hasMore={staysHasMore} disabled={!compositeSourceCurrent(staysSource)} onPageChange={onStayPageChange} /></>}
         </section>
-      </div>
+      </DetailColumns>
 
-      <p className="border-t border-base-300 pt-4 text-xs leading-5 text-base-content/40">Last updated {formatDateTime(guest.lastChangedAtUtc)} by {formatActor(guest.lastChangedBy)} · Profile version {guest.version}</p>
+      <p className="border-t border-base-300 pt-4 text-xs leading-5 text-base-content/65 [overflow-wrap:anywhere]">Last updated {formatDateTime(guest.lastChangedAtUtc)} by {formatActor(guest.lastChangedBy)} · Profile version {guest.version}</p>
     </div>
   );
 }
 
 function ProfileFact({ icon, label, value, href }: { icon: React.ReactNode; label: string; value: string; href?: string }) {
-  return <div className="flex min-w-0 gap-3 p-4"><span className="mt-0.5 shrink-0 text-primary">{icon}</span><div className="min-w-0"><p className="text-xs font-semibold text-base-content/45">{label}</p>{href ? <a className="mt-1 block break-words text-sm font-medium text-primary hover:underline" href={href}>{value}</a> : <p className="mt-1 break-words text-sm font-medium">{value}</p>}</div></div>;
+  return <div className="grid min-w-0 grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)] sm:gap-3">
+    <dt className="flex min-w-0 items-start gap-2 text-sm leading-5 text-base-content/65"><span aria-hidden="true" className="mt-0.5 shrink-0 text-primary">{icon}</span>{label}</dt>
+    <dd className="min-w-0 text-sm font-medium leading-5 [overflow-wrap:anywhere]">{href ? <a className="text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary" href={href}>{value}</a> : value}</dd>
+  </div>;
 }
 
 function StayHistoryCard({ stay, canOpenReservation }: { stay: GuestStayHistoryItem; canOpenReservation: boolean }) {
@@ -785,15 +798,17 @@ function StayHistoryCard({ stay, canOpenReservation }: { stay: GuestStayHistoryI
         ? `Checked in ${formatDate(stay.checkedInBusinessDate)}`
         : null;
   return (
-    <article className="rounded-lg border border-base-300 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><CalendarDays size={17} /></span><div><p className="font-semibold">{formatDate(stay.arrival)} → {formatDate(stay.departure)}</p><p className="mt-1 text-xs text-base-content/45">{nightsBetween(stay.arrival, stay.departure)} nights · {guestStayRoleLabel(stay.role)}</p></div></div>
+    <article className="min-w-0 py-4 first:pt-3">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <h4 className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-sm font-semibold leading-6"><time dateTime={stay.arrival}>{formatDate(stay.arrival)}</time><span>→</span><time dateTime={stay.departure}>{formatDate(stay.departure)}</time></h4>
         <StatusBadge status={guestStayStatusLabel(stay.status)} />
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-3">
-        <div className="text-xs text-base-content/45"><p>{lifecycleDate ?? "Stay not started"}</p><p className="mt-1">{stay.isCurrentParticipant ? "Current participant" : "Historical participant"} · Reservation {stay.reservationId.slice(0, 8).toUpperCase()}</p></div>
-        {canOpenReservation && <Link className="btn btn-ghost btn-sm shrink-0 text-primary" to={`/reservations?${new URLSearchParams({ property: stay.propertyId, reservation: stay.reservationId, focus: stay.reservationId })}`}><span>Open reservation</span><ArrowUpRight size={15} /></Link>}
+      <div className="mt-1 space-y-1 text-sm leading-5 text-base-content/65 [overflow-wrap:anywhere]">
+        <p>{nightsBetween(stay.arrival, stay.departure)} {nightsBetween(stay.arrival, stay.departure) === 1 ? "night" : "nights"} · {guestStayRoleLabel(stay.role)}</p>
+        <p>{lifecycleDate ?? "Stay not started"}</p>
+        <p>{stay.isCurrentParticipant ? "Current participant" : "Historical participant"} · Reservation {stay.reservationId.slice(0, 8).toUpperCase()}</p>
       </div>
+      {canOpenReservation && <Link className="mt-2 inline-flex min-h-11 max-w-full items-center gap-2 rounded py-2 text-sm font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" to={`/reservations?${new URLSearchParams({ property: stay.propertyId, reservation: stay.reservationId, focus: stay.reservationId })}`}><span>Open reservation</span><ArrowUpRight aria-hidden="true" className="shrink-0" size={15} /></Link>}
     </article>
   );
 }
@@ -819,8 +834,9 @@ function GuestForm(props: GuestFormProps) {
   </Modal>;
 }
 
-function GuestEditor({ state, submitting, error, sources, authorityCurrent, authorityMessage, recovery, recoveryAllowed, onRetry, onSubmit, onClose }: GuestFormProps) {
+export function GuestEditor({ state, submitting, error, sources, authorityCurrent, authorityMessage, recovery, recoveryAllowed, onRetry, onSubmit, onClose }: GuestFormProps) {
   const guest = state ?? null;
+  const notesId = useId();
   const [languageTags, setLanguageTags] = useState(() => guestLanguageSelection(guest ?? {}));
   const [languageError, setLanguageError] = useState<string | null>(null);
   const authorityFeedback = useRef<HTMLDivElement>(null);
@@ -875,7 +891,7 @@ function GuestEditor({ state, submitting, error, sources, authorityCurrent, auth
     });
   }
   return (
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="min-w-0 space-y-4">
         <div ref={authorityFeedback} tabIndex={-1} className="rounded outline-none focus:ring-2 focus:ring-primary">
           <CompositeSourceNotice className="mb-0" sources={sources} title="Guest command context is delayed" />
           {recovery ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm" role="alert">
@@ -892,39 +908,43 @@ function GuestEditor({ state, submitting, error, sources, authorityCurrent, auth
             {!guest && Boolean(error) && guestSaveResultUncertain(error) && <button type="submit" className="btn btn-primary mt-3 min-h-11" disabled={!authorityCurrent || submitting}>Retry create</button>}
           </>}
         </div>
-        <fieldset disabled={fieldsDisabled} className="divide-y divide-base-300">
+        <fieldset disabled={fieldsDisabled} className="min-w-0 divide-y divide-base-300">
           <FormSection icon={<UserRound size={17} />} title="Identity">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <FormGrid>
               <FormField label="Display name" name="displayName" defaultValue={guest?.displayName} placeholder="Maya Chen" maxLength={256} autoComplete="name" />
               <FormField label="Legal name (optional)" name="legalName" defaultValue={guest?.legalName} placeholder="As shown on identification" maxLength={256} required={false} autoComplete="name" />
-            </div>
+            </FormGrid>
           </FormSection>
           <FormSection icon={<Mail size={17} />} title="Contact">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <FormGrid>
               <FormField label="Email (optional)" name="email" type="email" defaultValue={guest?.email} placeholder="maya@example.com" maxLength={320} required={false} autoComplete="email" />
               <FormField label="Phone (optional)" name="phone" type="tel" defaultValue={guest?.phone} placeholder="+44 20 1234 5678" maxLength={64} required={false} autoComplete="tel" />
-            </div>
+            </FormGrid>
           </FormSection>
           <FormSection icon={<Globe2 size={17} />} title="Additional details" headingRef={detailsHeading}>
-            <div className="mb-4 grid gap-4 sm:grid-cols-2">
+            <FormGrid>
               <FormDatePicker label="Date of birth (optional)" name="dateOfBirth" defaultValue={guest?.dateOfBirth} />
               <FormNationalityPicker defaultValue={guest?.nationalityCountryCode} disabled={fieldsDisabled} />
-            </div>
-            <LanguagePicker value={languageTags} onChange={value => { setLanguageTags(value); setLanguageError(null); }} disabled={fieldsDisabled}
-              onDisabledClose={() => (!authorityCurrent ? authorityFeedback.current : detailsHeading.current)?.focus()} />
-            {languageError && <p role="alert" className="mt-2 text-sm text-error">{languageError}</p>}
+              <FormSpan>
+                <LanguagePicker value={languageTags} onChange={value => { setLanguageTags(value); setLanguageError(null); }} disabled={fieldsDisabled}
+                  onDisabledClose={() => (!authorityCurrent ? authorityFeedback.current : detailsHeading.current)?.focus()} />
+                {languageError && <p role="alert" className="mt-2 text-sm text-error">{languageError}</p>}
+              </FormSpan>
+            </FormGrid>
           </FormSection>
           <FormSection icon={<MessageSquareText size={17} />} title="Staff context">
-            <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">Staff notes (optional)</span><textarea className="textarea textarea-bordered min-h-24 w-full" name="notes" defaultValue={guest?.notes ?? ""} maxLength={4000} placeholder="Operational preferences or context" /><span className="mt-1.5 block text-xs leading-5 text-base-content/45">Visible to staff who can read Guest Records at this property.</span></label>
+            <FormSpan>
+              <div className="form-control block min-w-0">
+                <label htmlFor={notesId} className="label-text mb-1.5 block text-sm font-semibold">Staff notes (optional)</label>
+                <textarea id={notesId} aria-describedby={`${notesId}-hint`} className="textarea textarea-bordered min-h-24 w-full" name="notes" defaultValue={guest?.notes ?? ""} maxLength={4000} placeholder="Operational preferences or context" />
+                <span id={`${notesId}-hint`} className="mt-1.5 block text-xs leading-5 text-base-content/65">Visible to staff who can read Guest Records at this property.</span>
+              </div>
+            </FormSpan>
           </FormSection>
         </fieldset>
         <FormActions submitting={submitting} disabled={!authorityCurrent || Boolean(recovery)} submitLabel={guest ? "Save changes" : "Create guest record"} onCancel={onClose} />
       </form>
   );
-}
-
-function FormSection({ icon, title, children, headingRef }: { icon: React.ReactNode; title: string; children: React.ReactNode; headingRef?: React.Ref<HTMLHeadingElement> }) {
-  return <section className="py-5 first:pt-0 last:pb-0"><div className="mb-4 flex items-center gap-2"><span className="text-primary">{icon}</span><h3 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="rounded font-display text-base font-semibold outline-none focus:ring-2 focus:ring-primary">{title}</h3></div>{children}</section>;
 }
 
 function MutationAuthorityNotice({ message }: { message: string }) {
@@ -952,12 +972,12 @@ function FormField({ label, name, defaultValue, placeholder, type = "text", minL
   hint?: string;
 }) {
   const hintId = useId();
-  return <label className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} pattern={pattern} autoComplete={autoComplete} autoCapitalize={autoCapitalize} spellCheck={spellCheck} aria-describedby={hint ? hintId : undefined} />{hint && <span id={hintId} className="mt-1.5 block text-xs leading-5 text-base-content/45">{hint}</span>}</label>;
+  return <label className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} pattern={pattern} autoComplete={autoComplete} autoCapitalize={autoCapitalize} spellCheck={spellCheck} aria-describedby={hint ? hintId : undefined} />{hint && <span id={hintId} className="mt-1.5 block text-xs leading-5 text-base-content/45">{hint}</span>}</label>;
 }
 
 function FormDatePicker({ label, name, defaultValue }: { label: string; name: string; defaultValue?: string | null }) {
   const [value, setValue] = useState(defaultValue ?? "");
-  return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" name={name} value={value} onChange={setValue} ariaLabel={label} /></div>;
+  return <div className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" name={name} value={value} onChange={setValue} ariaLabel={label} /></div>;
 }
 
 function FormNationalityPicker({ defaultValue, disabled }: { defaultValue?: string | null; disabled: boolean }) {

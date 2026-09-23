@@ -13,6 +13,19 @@ import {
 const network = vi.hoisted(() => ({ isOffline: false }));
 vi.mock("../src/app/networkStatus", () => ({ useNetworkStatus: () => network }));
 beforeEach(() => { network.isOffline = false; });
+describe("recovery notice layout contract (native geometry is verified separately)", () => {
+  it.each(["stale", "unavailable"] as const)("establishes a mobile column and wide row for %s content", state => {
+    const tree = CompositeSourceNotice({ sources: [{ label: "Stay history", state, isFetching: false, refetch: vi.fn() }] })!;
+    const classes = tree.props.className.split(/\s+/);
+    expect(classes).toContain("flex");
+    expect(classes).toContain("flex-col");
+    expect(classes).toContain("items-stretch");
+    expect(classes).toContain("sm:flex-row");
+    expect(classes).toContain("sm:items-center");
+    expect(tree.props.role).toBe("status");
+    expect(tree.props["aria-live"]).toBe("polite");
+  });
+});
 describe("owner-opted focusable retry (native browser focus is verified separately)", () => {
   function retry(keepRetryFocusable: boolean, isFetching = false) {
     const refetch = vi.fn(async () => undefined);

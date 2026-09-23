@@ -28,7 +28,7 @@ export function CompositeSourceNotice({
     : "Showing last confirmed information");
   return (
     <div
-      className={`alert flex-col items-stretch gap-3 border border-warning/25 bg-warning/10 text-base-content sm:flex-row sm:items-center ${className}`}
+      className={`alert flex flex-col items-stretch gap-3 border border-warning/25 bg-warning/10 text-base-content sm:flex-row sm:items-center ${className}`}
       role="status"
       aria-live="polite"
     >

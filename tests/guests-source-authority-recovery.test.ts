@@ -145,7 +145,7 @@ describe("guests source authority recovery", () => {
     expect(page).toContain("selectedGuestId !== formState.guestId");
     expect(page).toContain("detail.data.status !== 1");
     expect(page).toContain("setGuestOutcome(\"Guest record saved.\")");
-    const editor = page.slice(page.indexOf("function GuestEditor"), page.indexOf("function FormSection"));
+    const editor = page.slice(page.indexOf("function GuestEditor"), page.indexOf("function MutationAuthorityNotice"));
     expect(editor.indexOf("<ErrorState")).toBeLessThan(editor.indexOf("<fieldset"));
     expect(editor.indexOf("Retry save")).toBeLessThan(editor.indexOf("<fieldset"));
     expect(editor).toContain("<fieldset disabled={fieldsDisabled}");
