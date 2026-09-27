@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowUpRight, BedDouble, ChevronRight, Clock3, Edit3, Hi
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ApiError } from "../../api/client";
+import { browserIsOnline } from "../../api/requestConnectivity";
 import { inventoryKindLabel, reservationDetailsOriginLabel, reservationSourceLabel, reservationStatusLabel } from "../../api/labels";
 import type { GuestListItem, GuestProfile, Reservation, ReservationDetailsHistoryItem, ReservationDetailsHistoryListResponse, ReservationMutationReceipt } from "../../api/types";
 import {
@@ -12,6 +13,7 @@ import {
   type CompositeSource,
 } from "../../app/compositeSourceState";
 import { LIVE_DETAIL_REFRESH_INTERVAL_MS, reservationNeedsLiveRefresh, reservationStatusKey } from "../../app/liveUpdates";
+import { useNetworkStatus } from "../../app/networkStatus";
 import { shiftDateKey } from "../../app/propertyDate";
 import { useSession } from "../../app/session";
 import type { RouteNavigationLease } from "../../app/routeNavigationLease";
@@ -68,6 +70,7 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
 }) {
   const { request } = useSession();
   const queryClient = useQueryClient();
+  const { isOffline } = useNetworkStatus();
   const [historyOpen, setHistoryOpen] = useState(initialTab === "history");
   const [guestOpen, setGuestOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<ReservationAction | null>(null);
@@ -80,6 +83,9 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
   const detailsArea = useRef<HTMLElement>(null);
   const restoreDetailsFocus = useRef<ReservationDetailsFocusIntent | null>(null);
   const enterDetailsFocus = useRef<ReservationDetailsFocusIntent | null>(null);
+  const recoveryArea = useRef<HTMLDivElement>(null);
+  const stayHeading = useRef<HTMLHeadingElement>(null);
+  const recoverDetailsFocus = useRef<ReservationDetailsFocusIntent | null>(null);
   const permissionsCurrent = compositeSourceCurrent(permissionSource);
 
   useEffect(() => {
@@ -122,7 +128,7 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
     isLoading: reservation.isLoading,
     error: reservation.error,
     isFetching: reservation.isFetching,
-    refetch: () => reservation.refetch(),
+    refetch: retryReservation,
   });
   const historySource = createCompositeSource({
     label: "Reservation history",
@@ -154,6 +160,7 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
   const item = reservationUsable ? reservation.data : undefined;
   const reservationDescription = item
     ? `Reservation ${item.reservationId.slice(0, 8).toUpperCase()}`
+    : reservationReadDenied ? "Reservation access is denied"
     : reservationSource.state === "unavailable"
       ? "The requested reservation is unavailable"
       : "Loading reservation details";
@@ -269,10 +276,26 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
     current: reservation.data, authorityCurrent: detailsAuthorityCurrent,
     authorityLost: !reservationId || reservationReadDenied || (permissionsCurrent && !capabilities.manage),
     navigation, onSaved: refresh });
+  async function retryReservation() {
+    // Read the live fetch state as well as the rendered control state so a
+    // repeated activation cannot cancel/restart an in-flight or paused read.
+    const fetchStatus = queryClient.getQueryState(["reservation", propertyId, reservationId])?.fetchStatus;
+    if (!browserIsOnline() || (fetchStatus && fetchStatus !== "idle")) return;
+    recoverDetailsFocus.current?.cancel();
+    recoverDetailsFocus.current = captureReservationDetailsFocus(recoveryArea.current, editorIdentity);
+    return reservation.refetch();
+  }
   useLayoutEffect(() => () => {
     enterDetailsFocus.current?.cancel(); enterDetailsFocus.current = null;
     restoreDetailsFocus.current?.cancel(); restoreDetailsFocus.current = null;
+    recoverDetailsFocus.current?.cancel(); recoverDetailsFocus.current = null;
   }, [editorIdentity]);
+  useLayoutEffect(() => {
+    if (reservation.isFetching || reservation.isPaused || !recoverDetailsFocus.current) return;
+    finishReservationDetailsFocus(recoverDetailsFocus.current,
+      details.editor ? detailsArea.current : stayHeading.current, editorIdentity, reservationCurrent);
+    recoverDetailsFocus.current = null;
+  }, [details.editor, editorIdentity, reservation.isFetching, reservation.isPaused, reservationCurrent]);
   useLayoutEffect(() => {
     if (details.editor && enterDetailsFocus.current) {
       finishReservationDetailsFocus(enterDetailsFocus.current,
@@ -319,17 +342,23 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
       <Modal open={Boolean(reservationId)} size="lg" title={item?.primaryGuestName || "Reservation"} description={reservationDescription} onClose={onClose}>
         {originLink}
         <div className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-          <CompositeSourceNotice className="mb-0" sources={[permissionSource, reservationSource]} title="Some reservation details are delayed" />
+          <CompositeSourceNotice className="mb-0" sources={[permissionSource]} title="Reservation access is delayed" />
           {notice && <div className="alert border border-warning/25 bg-warning/10 text-base-content"><AlertTriangle size={19} className="text-warning" /><span className="text-sm">{notice}</span>{onDismissNotice && <button type="button" className="btn btn-ghost btn-xs" onClick={onDismissNotice}>Dismiss</button>}</div>}
           {navigation.paused && <section aria-label="Paused booking navigation" className="rounded-lg border border-warning/30 p-3 text-sm">
             <p role="status">Navigation is paused while you edit this booking. {details.unresolved ? "Resolve the pending save before leaving." : "Your draft is kept here."}</p>
             <button type="button" className="btn btn-ghost btn-sm mt-2" onClick={navigation.review}>Review navigation</button>
           </section>}
+          <div ref={recoveryArea} className="contents">
+            {item ? <CompositeSourceNotice className="mb-0" sources={[reservationSource]} title="Reservation details are delayed" keepRetryFocusable /> : <fieldset className="min-w-0" disabled={reservation.isFetching || reservation.isPaused || isOffline} aria-busy={reservation.isFetching || reservation.isPaused}>
+              <CompositeSourceFallback error={reservation.error} retry={() => void retryReservation()} state={reservationSource.state} label="reservation details" title={reservationReadDenied ? "Reservation access denied" : "Reservation could not be opened"} />
+              {isOffline && <p role="status" className="px-4 text-sm text-base-content/65 sm:px-5">Reconnect before retrying reservation details.</p>}
+            </fieldset>}
+          </div>
           {item ? <>
             <section aria-label="Stay summary" className="min-w-0 space-y-4 border-b border-base-300 pb-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-xs font-bold uppercase text-base-content/60">Stay</h3>
+                  <h3 ref={stayHeading} tabIndex={-1} className="text-xs font-bold uppercase text-base-content/60">Stay</h3>
                   <p className="mt-2 font-display text-lg font-semibold sm:text-xl">{formatStayEndpoint(item.arrival, item.expectedArrivalTime)} → {formatStayEndpoint(item.departure, item.expectedDepartureTime)}</p>
                   <p className="mt-1 text-sm text-base-content/65">{nightsBetween(item.arrival, item.departure)} nights · {item.guestCount} {item.guestCount === 1 ? "guest" : "guests"} · property local time</p>
                 </div>
@@ -342,9 +371,9 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
                 onConfirm={() => pendingAction && !details.editor && lifecycleCommandAuthorityCurrent && actionMutation.mutate({ action: pendingAction, date: businessDate, current: item })}
                 onCancel={() => { lifecycleAttempt.current = null; setPendingAction(null); setPendingActionVersion(null); actionMutation.reset(); }} />
             </section>
-          </> : <CompositeSourceFallback error={reservation.error} retry={() => void reservation.refetch()} state={reservationSource.state} label="reservation details" title="Reservation could not be opened" />}
+          </> : null}
 
-          <section ref={detailsArea} className="min-w-0 border-b border-base-300 pb-5" aria-labelledby="booking-details-heading">
+          {(item || details.editor) && <section ref={detailsArea} tabIndex={-1} className="min-w-0 border-b border-base-300 pb-5" aria-labelledby="booking-details-heading">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0"><h3 id="booking-details-heading" className="text-base font-semibold">Booking details</h3><p className="mt-1 text-sm text-base-content/60">Booking contact and staff notes. Guest Record is separate.</p></div>
               {capabilities.manage && !details.editor && item && <button ref={editButton} type="button" className="btn btn-outline btn-sm min-h-11" disabled={!detailsAuthorityCurrent || Boolean(pendingAction)} onClick={(event) => {
@@ -354,7 +383,7 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
               }}><Edit3 size={15} />Edit booking details</button>}
             </div>
             {details.editor ? <GuestDetailsForm details={details} current={item} authorityCurrent={detailsAuthorityCurrent}
-              onRefresh={() => void reservation.refetch()} onCancel={() => {
+              onRefresh={() => void retryReservation()} onCancel={() => {
                 restoreDetailsFocus.current?.cancel(); restoreDetailsFocus.current = null;
                 if (!details.unresolved) restoreDetailsFocus.current = captureReservationDetailsFocus(detailsArea.current, editorIdentity);
                 details.cancel();
@@ -362,7 +391,7 @@ export function ReservationDetail({ propertyId, reservationId, editorIdentity, n
                 restoreDetailsFocus.current?.cancel();
                 restoreDetailsFocus.current = captureReservationDetailsFocus(detailsArea.current, editorIdentity);
               }} /> : item ? <GuestDetailsReadOnly reservation={item} /> : null}
-          </section>
+          </section>}
           {item && <ReservationActivity reservation={item} />}
 
           <section className="min-w-0 border-t border-base-300 pt-2">

@@ -13,6 +13,7 @@ const fixture = `
 import React, {useState} from "react";
 import {createRoot} from "react-dom/client";
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import {ApiError} from "/src/api/client.ts";
 import {MemoryRouter} from "react-router";
 import {CreateReservationModal} from "/src/features/reservations/CreateReservationModal.tsx";
 import {GuestDetailsForm, ReservationDetail} from "/src/features/reservations/ReservationDetail.tsx";
@@ -26,11 +27,21 @@ const groups=rooms.map(room=>({...room,availableCount:room.units.length,totalCou
 const reservation={propertyId:"property",reservationId:"reservation",primaryGuestName:"Alexandra María Nguyễn — returning guest",guestCount:2,email:params.has("missing")?null:"long.reservation.contact@example.invalid",phone:null,notes:"First line of staff instructions.\\n"+"Courtyard entrance and late arrival details. ".repeat(4),arrival:"2026-09-18",departure:"2026-09-23",expectedArrivalTime:"14:30:00",expectedDepartureTime:"10:00:00",detailsRevision:3,version:7,status:params.get("status")||"checkedIn",holdsInventory:params.get("status")!=="checkedOut",inventoryUnitIds:["unit0-0"],guests:[],sourceKind:"external",sourceSystem:"Partner booking system",sourceReference:"SOURCE-REFERENCE-"+"1234567890".repeat(6),createdAtUtc:"2026-09-07T00:00:00Z",updatedAtUtc:null,allocationRequestId:"allocation-request",allocationId:"allocation",allocationVersion:1,allocationRejection:0,pendingAllocationAmendmentId:null,lastAllocationAmendmentRejection:0,lastDetailsChangeOrigin:1,pendingStayBusinessDate:null,pendingStayActorId:null,checkedInBusinessDate:"2026-09-18",checkedInAtUtc:"2026-09-18T14:30:00Z",checkedInBy:"staff",noShowBusinessDate:null,noShowAtUtc:null,noShowBy:null,checkedOutBusinessDate:params.get("status")==="checkedOut"?"2026-09-23":null,checkedOutAtUtc:null,checkedOutBy:null};
 if(reservation.status==="confirmed") {reservation.checkedInBusinessDate=null;reservation.checkedInAtUtc=null;reservation.checkedInBy=null;}
 window.reservationFixtureRequests=[];
+window.reservationRead={status:Number(params.get("read-status")||200),pending:params.has("read-pending")};
+window.reservationHistoryStatus=200;
+window.permissionRetries=0;
 window.reservationFixtureRequest=async(path,options)=>{
  window.reservationFixtureRequests.push({path,method:options?.method||"GET"});
+ if(params.has("uncertain-save") && path.endsWith("/guest-details") && options?.method==="PUT") throw new ApiError("Request failed with HTTP 503",503);
  if(options?.method && options.method!=="GET") throw Error("No fixture writes permitted");
+ if(path.includes("/details-history?") && window.reservationHistoryStatus!==200) throw new ApiError("Request failed with HTTP "+window.reservationHistoryStatus,window.reservationHistoryStatus);
  if(path.includes("/details-history?")) return {items:[{changeId:"change",fromRevision:2,toRevision:3,changedFields:["notes","email"],before:{...reservation,notes:"Earlier instructions",email:null},after:reservation,origin:1,occurredAtUtc:"2026-09-19T14:30:00Z",actorId:"staff"}],hasMore:false,page:1,pageSize:20};
- if(path==="/api/reservations/properties/property/reservation")return reservation;
+ if(path==="/api/reservations/properties/property/reservation"){
+  const {status,pending}=window.reservationRead;
+  if(pending)await new Promise(resolve=>{window.releaseReservationRead=resolve;});
+  if(status!==200)throw new ApiError("Request failed with HTTP "+status,status,undefined,Number(params.get("retry-after"))||undefined);
+  return reservation;
+ }
  if(path.includes("/availability?")){const url=new URL(path,location.origin);return {propertyId:"property",arrival:url.searchParams.get("arrival"),departure:url.searchParams.get("departure"),units:availability};}
  if(path.includes("/rooms?"))return {rooms,hasMore:false,page:1,pageSize:100};
  if(path.includes("/guests/"))return {guests:[],hasMore:false,page:1,pageSize:8};
@@ -42,10 +53,11 @@ function Fixture(){
  const [identity,setIdentity]=useState("fixture:property:reservation"),[nested,setNested]=useState(false);
  const [selected,setSelected]=useState(params.has("preselected")?["unit0-0"]:[]);
  const [current,setCurrent]=useState(true),[visible,setVisible]=useState(true),[version,setVersion]=useState(0),[missing,setMissing]=useState(false),[unavailable,setUnavailable]=useState(false);
+ const [permissionState,setPermissionState]=useState("ready");
  const [name,setName]=useState("");
  const [draft,setDraft]=useState({primaryGuestName:"Initial guest",guestCount:"2",email:"guest@example.invalid",phone:"+44123456789",expectedArrivalTime:"16:45",expectedDepartureTime:"10:00",notes:"Existing notes"});
- const source={label:"Permissions",state:"ready",isFetching:false,refetch:async()=>{}};
- window.reservationHarness={setCurrent,setVisible,setSelected,setMissing,setUnavailable,setOpen,setIdentity,setNested,reset:()=>{setSelected([]);setVersion(n=>n+1);},rerender:()=>setVersion(n=>n),refetch:()=>client.invalidateQueries({queryKey:["availability"]})};
+ const source={label:"Permissions",state:permissionState,isFetching:false,refetch:async()=>{window.permissionRetries++;setPermissionState("ready");}};
+ window.reservationHarness={setCurrent,setVisible,setSelected,setMissing,setUnavailable,setOpen,setIdentity,setNested,setPermissionState,reset:()=>{setSelected([]);setVersion(n=>n+1);},rerender:()=>setVersion(n=>n),refetch:()=>client.invalidateQueries({queryKey:["availability"]}),refetchRead:()=>client.invalidateQueries({queryKey:["reservation","property","reservation"],exact:true}),resetRead:()=>client.resetQueries({queryKey:["reservation","property","reservation"],exact:true})};
  const modifiedGroups=groups.map(group=>{const units=group.units.filter(item=>!missing||!selected.includes(item.unit.inventoryUnitId)).map(item=>({...item,isAvailable:!unavailable||(params.has("whole-room-unavailable")?item.unit.roomId!=="room0":item.unit.inventoryUnitId!=="unit0-0")}));return {...group,units,availableCount:units.filter(item=>item.isAvailable).length,totalCount:units.length};});
  const capabilities={manage:!params.has("viewer"),manageGuests:!params.has("viewer"),readGuests:!params.has("viewer"),createGuests:!params.has("viewer"),cancel:!params.has("viewer"),checkIn:!params.has("viewer"),noShow:!params.has("viewer"),checkOut:!params.has("viewer")};
  const navigation={reportOwner:()=>{},paused:false,expanded:false};
@@ -106,7 +118,7 @@ async function open(width = 320, query = "", height = 640) {
   await page.goto(origin + "__reservation-layout" + query);
   await page.getByRole("dialog").waitFor();
   if (query.includes("create")) await page.getByText("58 available across 17 rooms").waitFor();
-  if (query.includes("detail")) await page.getByRole("region",{name:"Stay summary",exact:true}).waitFor();
+  if (query.includes("detail") && !query.includes("read-")) await page.getByRole("region",{name:"Stay summary",exact:true}).waitFor();
   return page;
 }
 const room = (page: Page, number = "01") => page.getByRole("button", { name: new RegExp("^Dorm " + number) });
@@ -155,6 +167,222 @@ async function tabToButton(page: Page,name: string) {
 async function noFixtureCommands(page: Page) {
   expect(await page.evaluate(()=>(window as unknown as {reservationFixtureRequests:{method:string}[]}).reservationFixtureRequests.filter(request=>request.method!=="GET"))).toEqual([]);
 }
+
+type RecoveryWindow = {
+  reservationRead: { status: number; pending: boolean };
+  reservationHistoryStatus: number;
+  releaseReservationRead: () => void;
+  reservationHarness: Record<string, (value?: string | boolean) => unknown>;
+  reservationFixtureRequests: { path: string; method: string }[];
+};
+async function setReservationRead(page: Page, status: number, pending = false) {
+  await page.evaluate(read => { (window as unknown as RecoveryWindow).reservationRead = read; }, { status, pending });
+}
+async function recoveryAction(page: Page, action: string, value?: string | boolean) {
+  await page.evaluate(({ action, value }) => { void (window as unknown as RecoveryWindow).reservationHarness[action](value); }, { action, value });
+}
+async function reservationReadCount(page: Page) {
+  return page.evaluate(() => (window as unknown as RecoveryWindow).reservationFixtureRequests.filter(request => request.path === "/api/reservations/properties/property/reservation" && request.method === "GET").length);
+}
+async function releaseReservationRead(page: Page) {
+  await page.evaluate(() => (window as unknown as RecoveryWindow).releaseReservationRead());
+}
+
+describe("REC003 primary reservation recovery", () => {
+  it.each([320, 1440])("%i: one cold failure recovers through its native Retry", async width => {
+    const page = await open(width, "?detail&read-status=503", width === 320 ? 640 : 800);
+    try {
+      await page.getByText("Reservation could not be opened", { exact: true }).waitFor();
+      expect(await page.getByRole("alert").count()).toBe(1);
+      expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(1);
+      expect(await page.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(0);
+      expect(await page.getByRole("region", { name: "Stay summary", exact: true }).count()).toBe(0);
+      expect(await page.getByRole("dialog").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await capture(page, `rec003-cold-503-${width}.png`);
+      await setReservationRead(page, 200, true);
+      await tabToButton(page, "Try again");
+      await page.keyboard.press("Enter");
+      await page.getByText("Loading reservation details", { exact: true }).last().waitFor();
+      expect(await page.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(0);
+      await page.keyboard.press("Enter"); await page.keyboard.press("Space");
+      expect(await reservationReadCount(page)).toBe(2);
+      await releaseReservationRead(page);
+      await page.getByRole("region", { name: "Stay summary", exact: true }).waitFor();
+      await expect.poll(() => focusedAndRevealed(page, 'section[aria-label="Stay summary"] h3[tabindex="-1"]')).toBe(true);
+      expect(await page.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(1);
+      expect(await page.getByRole("alert").count()).toBe(0);
+      expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(0);
+      await capture(page, `rec003-native-recovered-${width}.png`);
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it("keeps the cold loading state free of empty booking details", async () => {
+    const page = await open(320, "?detail&read-pending");
+    try {
+      await page.getByText("Loading reservation details", { exact: true }).last().waitFor();
+      expect(await page.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(0);
+      expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(0);
+      await releaseReservationRead(page);
+      await page.getByRole("region", { name: "Stay summary", exact: true }).waitFor();
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  });
+
+  it("blocks offline retry without queuing another read", async () => {
+    const page = await open(320, "?detail&read-status=503");
+    try {
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor();
+      await page.context().setOffline(true);
+      await page.getByText("Reconnect before retrying reservation details.", { exact: true }).waitFor();
+      expect(await retry.isDisabled()).toBe(true);
+      await retry.evaluate(button => { (button as HTMLButtonElement).click(); });
+      expect(await reservationReadCount(page)).toBe(1);
+      await setReservationRead(page, 200);
+      await page.context().setOffline(false);
+      // React Query's normal reconnect policy may recover the existing read.
+      await page.getByRole("region", { name: "Stay summary", exact: true }).waitFor();
+      expect(await reservationReadCount(page)).toBe(2);
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  });
+
+  it("distinguishes primary 403 access denial and keeps independent history and Guest state", async () => {
+    const page = await open(320, "?detail&read-status=403");
+    try {
+      await page.getByText("Reservation access denied", { exact: true }).waitFor();
+      expect(await page.getByText("Your current workspace role does not allow this action.", { exact: true }).count()).toBe(1);
+      expect(await page.getByText("Reservation could not be opened", { exact: true }).count()).toBe(0);
+      expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(1);
+      await page.getByRole("button", { name: "Booking details history", exact: true }).click();
+      await page.getByText("Earlier instructions", { exact: true }).waitFor();
+      await page.getByRole("button", { name: "Guest record", exact: true }).click();
+      await page.getByText("Refresh current reservation details before opening its Guest Record.", { exact: true }).waitFor();
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  });
+
+  it("preserves Retry-After and hides cached data after a definitive 403", async () => {
+    const throttled = await open(320, "?detail&read-status=429&retry-after=30000");
+    try {
+      const retry = throttled.getByRole("button", { name: /^Try again in \d+s$/ });
+      await retry.waitFor();
+      expect(await retry.isDisabled()).toBe(true);
+      expect(await throttled.getByText("BunkFy is receiving too many requests. Try again in about 30 seconds.", { exact: true }).count()).toBe(1);
+      await retry.evaluate(button => { (button as HTMLButtonElement).click(); });
+      expect(await reservationReadCount(throttled)).toBe(1);
+    } finally { await throttled.close(); }
+    const denied = await open(320, "?detail");
+    try {
+      await setReservationRead(denied, 403);
+      await recoveryAction(denied, "refetchRead");
+      await denied.getByText("Reservation access denied", { exact: true }).waitFor();
+      expect(await denied.getByRole("region", { name: "Stay summary", exact: true }).count()).toBe(0);
+      expect(await denied.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(0);
+      expect(await denied.getByText("Reservation details are delayed", { exact: true }).count()).toBe(0);
+      await noFixtureCommands(denied);
+    } finally { await denied.close(); }
+  });
+
+  it("retains separate permission and history failures during a primary outage", async () => {
+    const page = await open(320, "?detail&read-status=503");
+    try {
+      await page.getByText("Reservation could not be opened", { exact: true }).waitFor();
+      await page.evaluate(() => { (window as unknown as RecoveryWindow).reservationHistoryStatus = 503; });
+      await page.getByRole("button", { name: "Booking details history", exact: true }).click();
+      await page.getByText("Reservation history is delayed", { exact: true }).waitFor();
+      await recoveryAction(page, "setPermissionState", "stale");
+      await page.getByText("Reservation access is delayed", { exact: true }).waitFor();
+      expect(await page.getByText("Permissions is showing its last confirmed snapshot.", { exact: true }).count()).toBe(1);
+      expect(await page.getByText("Reservation could not be opened", { exact: true }).count()).toBe(1);
+      expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(3);
+      const permissionNotice = page.getByRole("status").filter({ hasText: "Reservation access is delayed" });
+      await permissionNotice.getByRole("button", { name: "Try again", exact: true }).click();
+      await expect.poll(() => permissionNotice.count()).toBe(0);
+      // Restoring permission re-enables the normal reservation query.
+      await expect.poll(() => reservationReadCount(page)).toBe(2);
+      expect(await page.getByText("Reservation history is delayed", { exact: true }).count()).toBe(1);
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  });
+
+  it("keeps usable stale details visible and prevents repeated pending retry", async () => {
+    const page = await open(320, "?detail");
+    try {
+      await setReservationRead(page, 503);
+      await recoveryAction(page, "refetchRead");
+      await page.getByText("Reservation details are delayed", { exact: true }).waitFor();
+      expect(await page.getByRole("region", { name: "Stay summary", exact: true }).count()).toBe(1);
+      expect(await page.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(1);
+      expect(await page.getByRole("button", { name: "Edit booking details", exact: true }).isDisabled()).toBe(true);
+      expect(await page.getByRole("button", { name: "Check out", exact: true }).isDisabled()).toBe(true);
+      await setReservationRead(page, 200, true);
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      await retry.focus(); await page.keyboard.press("Enter");
+      await expect.poll(() => retry.getAttribute("aria-disabled")).toBe("true");
+      await page.keyboard.press("Enter"); await page.keyboard.press("Space");
+      expect(await reservationReadCount(page)).toBe(3);
+      await releaseReservationRead(page);
+      await expect.poll(() => retry.count()).toBe(0);
+      expect(await page.getByRole("button", { name: "Edit booking details", exact: true }).isEnabled()).toBe(true);
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  });
+
+  it.each([false, true])("preserves an editor without a usable item (unresolved save: %s)", async unresolved => {
+    const page = await open(320, "?detail" + (unresolved ? "&uncertain-save" : ""));
+    try {
+      await page.getByRole("button", { name: "Edit booking details", exact: true }).click();
+      const notes = page.getByRole("textbox", { name: "Notes", exact: true });
+      await notes.fill("Keep this locally edited arrival note");
+      if (unresolved) {
+        await page.getByRole("button", { name: "Save booking details", exact: true }).click();
+        await page.getByRole("button", { name: "Retry same change", exact: true }).waitFor();
+      }
+      await setReservationRead(page, 503);
+      await recoveryAction(page, "resetRead");
+      await page.getByText("Reservation could not be opened", { exact: true }).waitFor();
+      expect(await page.getByRole("region", { name: "Stay summary", exact: true }).count()).toBe(0);
+      expect(await page.getByRole("heading", { name: "Booking details", exact: true }).count()).toBe(1);
+      expect(await notes.inputValue()).toBe("Keep this locally edited arrival note");
+      expect(await notes.isDisabled()).toBe(true);
+      const save = page.getByRole("button", { name: unresolved ? "Retry same change" : "Save booking details", exact: true });
+      expect(await save.isDisabled()).toBe(true);
+      expect(await page.getByRole("button", { name: "Refresh current details", exact: true }).count()).toBe(1);
+      await setReservationRead(page, 200);
+      await page.getByRole("button", { name: "Try again", exact: true }).click();
+      await page.getByRole("region", { name: "Stay summary", exact: true }).waitFor();
+      await expect.poll(() => save.isEnabled()).toBe(true);
+      expect(await notes.inputValue()).toBe("Keep this locally edited arrival note");
+      if (unresolved) {
+        expect(await page.getByRole("button", { name: "Cancel", exact: true }).isDisabled()).toBe(true);
+        expect(await notes.isDisabled()).toBe(true);
+        const writes = await page.evaluate(() => (window as unknown as RecoveryWindow).reservationFixtureRequests.filter(request => request.method !== "GET"));
+        expect(writes).toEqual([{ path: "/api/reservations/properties/property/reservation/guest-details", method: "PUT" }]);
+      } else {
+        expect(await notes.isEnabled()).toBe(true);
+        await noFixtureCommands(page);
+      }
+    } finally { await page.close(); }
+  });
+
+  it("does not move focus away from an independent control after recovery", async () => {
+    const page = await open(320, "?detail&read-status=503");
+    try {
+      await page.getByRole("button", { name: "Try again", exact: true }).waitFor();
+      await setReservationRead(page, 200, true);
+      await tabToButton(page, "Try again"); await page.keyboard.press("Enter");
+      await page.getByText("Loading reservation details", { exact: true }).last().waitFor();
+      const history = page.getByRole("button", { name: "Booking details history", exact: true });
+      await history.focus();
+      await releaseReservationRead(page);
+      await page.getByRole("region", { name: "Stay summary", exact: true }).waitFor();
+      expect(await history.evaluate(element => document.activeElement === element)).toBe(true);
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  });
+});
 
 describe("B2 R2 lifecycle keyboard return",()=>{
   const actions=[{name:"Check out",status:"checkedIn",key:"Enter"},{name:"Check in",status:"confirmed",key:"Enter"},{name:"Mark no-show",status:"confirmed",key:"Space"},{name:"Cancel",status:"confirmed",key:"Enter"}];

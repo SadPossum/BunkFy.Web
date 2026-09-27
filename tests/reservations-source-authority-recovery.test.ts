@@ -139,6 +139,10 @@ describe("reservations source authority recovery", () => {
     expect(detail).toContain("guestDirectoryCurrent: candidateCurrent");
     expect(detail).toContain("defaultReservationBusinessDate(action, current, businessDateToday)");
     expect(detail).toContain("<CompositeSourceFallback");
+    expect(detail).toContain("(item || details.editor) && <section");
+    expect(detail).not.toContain("sources={[permissionSource, reservationSource]}");
+    expect(detail).toContain('fetchStatus !== "idle"');
+    expect(detail).toContain("!browserIsOnline()");
     expect(detail).not.toContain("reservation.error ?");
     expect(detail).not.toContain("if (query.error)");
 
