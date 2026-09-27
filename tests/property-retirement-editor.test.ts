@@ -25,6 +25,7 @@ const input: PropertyRetirementInput = { ...current, property, tenantId: "tenant
 const receipt: PropertyMutationReceipt = { propertyId, status: "retired", processingStatus: "enabled", version: 4 };
 const evidence = { property, permissionsCurrent: true, propertyCurrent: true, mayManage: true };
 const source = (file: string) => readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
+const permissionSource = { label: "Property permissions", state: "ready" as const, isFetching: false, refetch: async () => {} };
 
 describe("property retirement exact operation and receipt", () => {
   it("requires current property authority/version for a new operation but permits exact replay after the property advances", () => {
@@ -150,7 +151,7 @@ describe("property retirement confirmation and readback", () => {
     client.setQueryData(["property-processing", propertyId], { propertyId, propertyVersion: 4, configuredStatus: "enabled", effectiveStatus: "suspended", reasonCode: "Properties.PropertyRetired", governancePolicy: null });
     client.setQueryData(["country-policies", propertyId], { items: [] });
     const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(PropertyProcessingPanel, {
-      property: { ...property, status, version: 4 }, embedded: true, canManage: true, permissionsCurrent: true, propertyCurrent: status === "retired", onChanged: () => {},
+      property: { ...property, status, version: 4 }, embedded: true, canManage: true, permissionSource, permissionsCurrent: true, propertyCurrent: status === "retired", onChanged: () => {},
     })));
     expect(html).toContain("Processing is suspended because this property is retired");
     expect(html).not.toContain("Configure</button>");
@@ -166,7 +167,7 @@ describe("property retirement confirmation and readback", () => {
     client.setQueryData(key, cached);
     client.setQueryData(["country-policies", propertyId], { items: [] });
     const renderProcessing = (status: Property["status"]) => renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(PropertyProcessingPanel, {
-      property: { ...property, status, version: status === "retired" ? 4 : 3 }, embedded: true, canManage: true, permissionsCurrent: true, propertyCurrent: true, onChanged: () => {},
+      property: { ...property, status, version: status === "retired" ? 4 : 3 }, embedded: true, canManage: true, permissionSource, permissionsCurrent: true, propertyCurrent: true, onChanged: () => {},
     })));
     for (const failed of [false, true]) {
       client.getQueryCache().find({ queryKey: key })!.setState({ error: failed ? new ApiError("Processing unavailable", 503) : null, status: failed ? "error" : "success", fetchStatus: "idle" });
@@ -194,19 +195,26 @@ describe("property retirement confirmation and readback", () => {
     expect(recovered).not.toContain("Data-processing context is delayed");
     client.clear();
   });
-  it.each([false, true])("gives processing recovery an explicit flex stack with usable embedded width (cached=%s)", (cached) => {
+  it.each([false, true])("gives processing recovery one responsive notice with usable embedded width (cached=%s)", (cached) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryOnMount: false, refetchOnMount: false } } });
     const queryKey = ["property-processing", propertyId];
     client.setQueryData(queryKey, { propertyId, propertyVersion: 4, configuredStatus: "unconfigured", effectiveStatus: "suspended", reasonCode: "Properties.PropertyRetired", governancePolicy: null });
     client.getQueryCache().find({ queryKey })!.setState({ ...(cached ? {} : { data: undefined }), error: new ApiError("Unavailable", 503), status: "error", fetchStatus: "idle" });
     client.setQueryData(["country-policies", propertyId], { items: [] });
     const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(PropertyProcessingPanel, {
-      property: { ...property, status: "retired", version: 4 }, embedded: true, canManage: true, permissionsCurrent: true, propertyCurrent: true, onChanged: () => {},
+      property: { ...property, status: "retired", version: 4 }, embedded: true, canManage: true, permissionSource, permissionsCurrent: true, propertyCurrent: true, onChanged: () => {},
     })));
-    const noticeClass = html.match(/class="([^"]*alert[^"]*)" role="status"/)?.[1]?.split(/\s+/) ?? [];
-    expect(noticeClass).toContain("flex");
-    expect(noticeClass).toContain("flex-col");
-    expect(noticeClass).toContain("sm:flex-row");
+    const noticeClass = html.match(cached ? /class="([^"]*alert[^"]*)" role="status"/ : /class="([^"]*)" role="alert"/)?.[1]?.split(/\s+/) ?? [];
+    if (cached) {
+      expect(noticeClass).toContain("flex");
+      expect(noticeClass).toContain("flex-col");
+      expect(noticeClass).toContain("sm:flex-row");
+    } else {
+      expect(noticeClass).toContain("grid-cols-[auto_minmax(0,1fr)]");
+      expect(noticeClass).toContain("sm:grid-cols-[auto_minmax(0,1fr)_auto]");
+      expect(html).toContain("Data processing could not be loaded");
+      expect(html).not.toContain("Data-processing context is delayed");
+    }
     expect(noticeClass).not.toContain("mx-5");
     expect(noticeClass).not.toContain("sm:mx-6");
     expect(html.match(/Try again/g)).toHaveLength(1);

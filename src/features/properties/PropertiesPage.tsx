@@ -459,6 +459,7 @@ export function PropertiesPage() {
               <PropertyProcessingPanel
                 property={selectedProperty}
                 canManage={mayManageProperty}
+                permissionSource={permissionSource}
                 permissionsCurrent={permissionsCurrent}
                 propertyCurrent={propertyCurrent}
                 actionsDisabled={propertyRetirementEngaged} onEngagementChange={setProcessingEngaged}

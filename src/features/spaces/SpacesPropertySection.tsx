@@ -13,9 +13,10 @@ import { usePropertyRetirementEditor } from "../properties/usePropertyRetirement
 import { PropertyRetirementPanel } from "../properties/PropertyRetirementPanel";
 import type { SpacesEditorNavigationState } from "./spacesSectionRoute";
 
-export function SpacesPropertySection({ property, directorySource, permissionsCurrent, mayManageIdentity, mayManageTimeZone, refreshPermissions, onNavigationStateChange, routeInput, actionsDisabled = false }: {
+export function SpacesPropertySection({ property, directorySource, permissionSource, permissionsCurrent, mayManageIdentity, mayManageTimeZone, refreshPermissions, onNavigationStateChange, routeInput, actionsDisabled = false }: {
   property: Property;
   directorySource: CompositeSource;
+  permissionSource: CompositeSource;
   permissionsCurrent: boolean;
   mayManageIdentity: boolean;
   mayManageTimeZone: boolean;
@@ -75,6 +76,7 @@ export function SpacesPropertySection({ property, directorySource, permissionsCu
     </div>
     <PropertyEditorForms editor={editor} inline kind="timezone" />
     <PropertyProcessingPanel embedded property={property} canManage={mayManageIdentity}
+      permissionSource={permissionSource}
       permissionsCurrent={permissionsCurrent} propertyCurrent={propertyCurrent}
       actionsDisabled={retirementEngaged || actionsDisabled || editor.busy || Boolean(editor.propertyForm || editor.timeZoneTarget)} onEngagementChange={setProcessingEngaged} onPendingChange={setProcessingPending}
       onChanged={editor.refreshProperty} />

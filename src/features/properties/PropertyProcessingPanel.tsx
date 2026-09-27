@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Database, Globe2, MapPin, Pause, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { ApiError } from "../../api/client";
+import { browserIsOnline } from "../../api/requestConnectivity";
 import type {
   CountryPolicy,
   CountryPolicyListResponse,
@@ -14,11 +16,14 @@ import {
   compositeSourceCurrent,
   compositeSourceUsable,
   createCompositeSource,
+  type CompositeSource,
 } from "../../app/compositeSourceState";
+import { useNetworkStatus } from "../../app/networkStatus";
 import { useSession } from "../../app/session";
 import {
   ErrorState,
   FormActions,
+  LoadingState,
   Modal,
   ModalActions,
   StatusBadge,
@@ -48,6 +53,7 @@ type PropertyProcessingPanelProps = {
   embedded?: boolean;
   property: Property;
   canManage: boolean;
+  permissionSource: CompositeSource;
   permissionsCurrent: boolean;
   propertyCurrent: boolean;
   onChanged: () => Promise<void> | void;
@@ -60,6 +66,7 @@ export function PropertyProcessingPanel({
   embedded = false,
   property,
   canManage,
+  permissionSource,
   permissionsCurrent,
   propertyCurrent,
   onChanged,
@@ -69,6 +76,11 @@ export function PropertyProcessingPanel({
 }: PropertyProcessingPanelProps) {
   const { request } = useSession();
   const queryClient = useQueryClient();
+  const { isOffline } = useNetworkStatus();
+  const permissionRetryPending = useRef(false);
+  const [retryingPermission, setRetryingPermission] = useState(false);
+  const recoverySurface = useRef<HTMLElement>(null);
+  const recoveryFocus = useRef<{ propertyId: string; source: string; button: HTMLButtonElement; cancel: () => void } | null>(null);
   const [activationOpen, setActivationOpen] = useState(false);
   const [suspensionOpen, setSuspensionOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -83,6 +95,7 @@ export function PropertyProcessingPanel({
     processing.data,
     property.propertyId,
   );
+  const processingReadDenied = processing.error instanceof ApiError && processing.error.status === 403;
   const policies = useQuery({
     queryKey: ["country-policies", property.propertyId],
     queryFn: () => request<CountryPolicyListResponse>(`/api/properties/${property.propertyId}/country-policies`),
@@ -91,21 +104,22 @@ export function PropertyProcessingPanel({
   });
   const processingSource = createCompositeSource({
     label: "Processing status",
-    hasData: processing.data !== undefined && !processingContextMismatch,
-    isLoading: processing.isLoading,
+    hasData: processing.data !== undefined && !processingContextMismatch && !processingReadDenied,
+    // Pending includes a paused or not-yet-admitted read. Neither is a failed GET.
+    isLoading: processing.isPending,
     error: processingContextMismatch
       ? new Error("The processing response did not match this property.")
       : processing.error,
     isFetching: processing.isFetching,
-    refetch: () => processing.refetch(),
+    refetch: retryProcessing,
   });
   const policySource = createCompositeSource({
     label: "Country policies",
     hasData: policies.data !== undefined,
-    isLoading: policies.isLoading,
+    isLoading: policies.isPending,
     error: policies.error,
     isFetching: policies.isFetching,
-    refetch: () => policies.refetch(),
+    refetch: retryPolicies,
   });
   const processingUsable = compositeSourceUsable(processingSource.state);
   const policiesUsable = compositeSourceUsable(policySource.state);
@@ -129,10 +143,70 @@ export function PropertyProcessingPanel({
       propertyCurrent,
       processingCurrent: compositeSourceCurrent(processingSource),
     });
-  const governanceSources = [
-    processingSource,
-    ...(canManage ? [policySource] : []),
-  ];
+  const permissionChecking = permissionSource.state === "loading" ||
+    (permissionSource.state === "ready" && permissionSource.isFetching);
+  const accessNotice = !permissionsCurrent && (
+    permissionChecking
+      ? <p role="status" className="text-sm text-base-content/65">Checking data-processing access. Changes are paused.</p>
+      : <div data-processing-recovery="permission"><CompositeSourceNotice className="flex" sources={[{ ...permissionSource, isFetching: permissionSource.isFetching || retryingPermission, refetch: retryPermissions }]} title="Data-processing access could not be confirmed" /></div>
+  );
+  const policyNotice = permissionsCurrent && canManage && (policySource.state === "stale" || policySource.state === "unavailable") && <div data-processing-recovery="policy"><CompositeSourceNotice className="flex" sources={[policySource]} title="Country policies could not be confirmed" /></div>;
+
+  function rememberRecoveryFocus(event: MouseEvent<HTMLElement>) {
+    const button = event.target instanceof Element ? event.target.closest("button") : null;
+    const source = button?.closest<HTMLElement>("[data-processing-recovery]")?.dataset.processingRecovery;
+    if (event.detail !== 0 || !source || !button || button.disabled || button.matches(":disabled") || document.activeElement !== button || isOffline) return;
+    recoveryFocus.current?.cancel();
+    const cancel = () => {
+      document.removeEventListener("focusin", moved);
+      document.removeEventListener("pointerdown", cancel);
+      document.removeEventListener("keydown", key);
+      recoveryFocus.current = null;
+    };
+    const moved = () => {
+      if (document.activeElement !== button && !(document.activeElement === document.body && (!button.isConnected || button.matches(":disabled")))) cancel();
+    };
+    const key = (event: KeyboardEvent) => { if (event.key === "Tab" || event.key === "Escape") cancel(); };
+    recoveryFocus.current = { propertyId: property.propertyId, source, button, cancel };
+    document.addEventListener("focusin", moved);
+    document.addEventListener("pointerdown", cancel);
+    document.addEventListener("keydown", key);
+  }
+  useLayoutEffect(() => {
+    const intent = recoveryFocus.current;
+    if (!intent) return;
+    if (intent.propertyId !== property.propertyId || processingReadDenied || (intent.source !== "permission" && !permissionsCurrent)) { intent.cancel(); return; }
+    // A retained notice keeps its button mounted, but native disabling may
+    // still move focus to body. Restore after settlement, not after removal.
+    if (permissionSource.isFetching || retryingPermission || processing.isFetching || processing.isPaused || policies.isFetching) return;
+    const notice = recoverySurface.current?.querySelector(`[data-processing-recovery="${intent.source}"]`);
+    const target = notice?.querySelector<HTMLElement>("button") ?? (state && permissionsCurrent ? recoverySurface.current?.querySelector<HTMLElement>("[data-processing-heading]") : null);
+    if (!target) { intent.cancel(); return; }
+    const restore = document.activeElement === document.body && target.isConnected && !target.matches(":disabled") && !target.closest('[hidden], [inert], [aria-hidden="true"]') && target.getClientRects().length > 0;
+    intent.cancel();
+    if (restore) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest", behavior: "instant" }); }
+  });
+  useLayoutEffect(() => () => recoveryFocus.current?.cancel(), []);
+
+  async function retryPermissions() {
+    if (!browserIsOnline() || permissionSource.isFetching || permissionRetryPending.current) return;
+    permissionRetryPending.current = true;
+    setRetryingPermission(true);
+    try { return await permissionSource.refetch(); }
+    finally { permissionRetryPending.current = false; setRetryingPermission(false); }
+  }
+
+  async function retryProcessing() {
+    const status = queryClient.getQueryState(["property-processing", property.propertyId])?.fetchStatus;
+    if (!permissionsCurrent || processingReadDenied || !browserIsOnline() || (status && status !== "idle")) return;
+    return processing.refetch();
+  }
+
+  async function retryPolicies() {
+    const status = queryClient.getQueryState(["country-policies", property.propertyId])?.fetchStatus;
+    if (!permissionsCurrent || !canManage || !browserIsOnline() || (status && status !== "idle")) return;
+    return policies.refetch();
+  }
 
   useEffect(() => {
     activationAttempt.current = null;
@@ -235,13 +309,21 @@ export function PropertyProcessingPanel({
 
   if (!processingUsable || !state) {
     return (
-      <section className={embedded ? "border-t border-base-300 px-4 py-3 sm:px-5" : "card border border-base-300 bg-base-100 shadow-sm"}>
-        <CompositeSourceNotice
-          className={embedded ? "mb-3 flex" : "mx-5 mt-5 flex sm:mx-6"}
-          sources={governanceSources}
-          title="Data-processing context is delayed"
-        />
-        <CompositeSourceFallback state={processingSource.state} label="data processing" />
+      <section ref={recoverySurface} onClickCapture={rememberRecoveryFocus} className={embedded ? "border-t border-base-300 px-4 py-3 sm:px-5" : "card border border-base-300 bg-base-100 shadow-sm"}>
+        {!permissionsCurrent ? (
+          permissionChecking
+            ? <LoadingState label="Checking data-processing access" />
+            : <div className={embedded ? "py-1" : "p-4 sm:p-5"}>{accessNotice}</div>
+        ) : (
+          <fieldset data-processing-recovery="processing" className="min-w-0" disabled={processing.isFetching || processing.isPaused || isOffline} aria-busy={processing.isFetching || processing.isPaused}>
+            <CompositeSourceFallback state={processingSource.state} label="data processing"
+              error={processingContextMismatch ? new Error("The processing response did not match this property.") : processing.error}
+              title={processingReadDenied ? "Data-processing access denied" : "Data processing could not be loaded"}
+              retry={processingReadDenied ? undefined : () => void retryProcessing()} />
+            {isOffline && <p role="status" className="px-4 pb-3 text-sm text-base-content/65 sm:px-5">Reconnect before loading data processing.</p>}
+          </fieldset>
+        )}
+        {policyNotice && <div className={embedded ? "py-1" : "px-4 pb-4 sm:px-5"}>{policyNotice}</div>}
       </section>
     );
   }
@@ -251,13 +333,15 @@ export function PropertyProcessingPanel({
 
   return (
     <>
-      <section className={embedded ? "border-t border-base-300" : `card border bg-base-100 shadow-sm ${needsAttention ? "border-warning/45" : "border-base-300"}`}>
+      <section ref={recoverySurface} onClickCapture={rememberRecoveryFocus} className={embedded ? "border-t border-base-300" : `card border bg-base-100 shadow-sm ${needsAttention ? "border-warning/45" : "border-base-300"}`}>
         <div className={embedded ? "space-y-3 px-4 py-3 sm:px-5" : "card-body gap-5 p-5 sm:p-6"}>
-          <CompositeSourceNotice
+          {accessNotice}
+          {permissionsCurrent && processingSource.state === "stale" && <div data-processing-recovery="processing"><CompositeSourceNotice
             className="flex"
-            sources={governanceSources}
+            sources={[processingSource]}
             title="Data-processing context is delayed"
-          />
+          /></div>}
+          {policyNotice}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 gap-3">
               {!embedded && <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${needsAttention ? "bg-warning/15 text-warning-content" : effectiveStatus === "enabled" ? "bg-success/15 text-success" : "bg-base-200 text-base-content/55"}`}>
@@ -265,8 +349,9 @@ export function PropertyProcessingPanel({
               </div>}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  {embedded ? <h3 className="text-sm font-semibold">Data processing</h3> : <h2 className="font-display text-xl font-semibold">Data processing</h2>}
+                  {embedded ? <h3 data-processing-heading tabIndex={-1} className="text-sm font-semibold outline-offset-2 focus:outline-2 focus:outline-primary">Data processing</h3> : <h2 data-processing-heading tabIndex={-1} className="font-display text-xl font-semibold outline-offset-2 focus:outline-2 focus:outline-primary">Data processing</h2>}
                   <StatusBadge status={effectiveStatus} />
+                  {(!permissionsCurrent || !compositeSourceCurrent(processingSource)) && <span className="text-xs text-base-content/60">Last confirmed configuration</span>}
                 </div>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-base-content/60">
                   {retired ? "Processing is suspended because this property is retired. Stored configuration and existing records are kept." : propertyProcessingMessage(effectiveStatus)}

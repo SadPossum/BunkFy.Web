@@ -827,7 +827,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
     </section>}
     <div id="spaces-property-settings" hidden={!propertyOpen}>
       {propertyOpen && <SpacesPropertySection key={`${sessionIdentityKey(session)}:${targetProperty.propertyId}`} property={targetProperty}
-        directorySource={propertySource} permissionsCurrent={permissionCurrent} mayManageIdentity={mayManageIdentity}
+        directorySource={propertySource} permissionSource={permissionSource} permissionsCurrent={permissionCurrent} mayManageIdentity={mayManageIdentity}
         mayManageTimeZone={mayManageTimeZone} refreshPermissions={access.refetch} onNavigationStateChange={setPropertyNavigation}
         routeInput={{ params: searchParams, setParams: setSearchParams }}
         actionsDisabled={Boolean(topologyEditor.target || salesEditor.target || retirementEditor.target || blockEditor.editor)} />}
