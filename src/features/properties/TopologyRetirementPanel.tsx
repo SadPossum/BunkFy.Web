@@ -125,8 +125,10 @@ function RetirementPanel({ editor, inline, mayReadReservations, blocksHref, mayU
           {target.kind === "room" && <div><dt className="text-xs text-base-content/60">Bed retirements</dt><dd>{impact.activeBedRetirementCount}</dd></div>}
         </dl>
         {impact.parentRoomRetirementActive && <p>The parent room is already being retired. This bed cannot start a separate retirement.</p>}
-        {reservationsHref && <Link className="link inline-flex min-h-10 items-center text-primary" to={reservationsHref}>Review affected reservations{impact.affectedReservationIdsTruncated ? " (first 25)" : ""}</Link>}
-        {blocksHref && impact.activeManualBlockCount > 0 && <Link className="link inline-flex min-h-10 items-center text-primary" to={blocksHref}>Review blocks for this space</Link>}
+        {(reservationsHref || (blocksHref && impact.activeManualBlockCount > 0)) && <div data-retirement-dependency-actions className="flex flex-wrap gap-x-6 gap-y-2">
+          {reservationsHref && <Link className="link inline-flex min-h-10 items-center text-primary" to={reservationsHref}>Review affected reservations{impact.affectedReservationIdsTruncated ? " (first 25)" : ""}</Link>}
+          {blocksHref && impact.activeManualBlockCount > 0 && <Link className="link inline-flex min-h-10 items-center text-primary" to={blocksHref}>Review blocks for this space</Link>}
+        </div>}
       </div>}
       {asking && <div className="border-l-2 border-warning pl-3 text-sm">
         <p>Use retirement to take this {target.kind} out of service. It is unavailable while retirement is in progress. Existing reservations and blocks must be moved or released; they are not deleted.</p>

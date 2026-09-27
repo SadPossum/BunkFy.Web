@@ -275,6 +275,27 @@ describe("inline retirement presentation and shared wiring", () => {
     expect(html).toContain("Review blocks for this space");
     expect(html).not.toContain("Open Blocks for this space");
   });
+  it("groups distinct dependency destinations with wrapping and explicit gaps, retaining room and bed permissions", () => {
+    const blocksHref = "/spaces?section=blocks&property=" + propertyId + "&room=" + roomId;
+    const withDependencies = { ...data, impact: { ...data.impact!, activeAllocationCount: 1, activeManualBlockCount: 1, affectedReservationIds: [bedId], affectedReservationIdsTruncated: true } };
+    for (const selected of [target, bedTarget]) {
+      const html = renderEditor({ target: selected, data: { ...withDependencies, bedId: selected.bedId ?? null } }, true, { blocksHref });
+      const group = html.match(/<div data-retirement-dependency-actions="true" class="([^"]+)">([\s\S]*?)<\/div>/);
+      expect(group).not.toBeNull();
+      expect(group![1].split(" ")).toEqual(expect.arrayContaining(["flex", "flex-wrap", "gap-x-6", "gap-y-2"]));
+      expect(group![2].match(/<a /g)).toHaveLength(2);
+      expect(group![2]).toContain("Review affected reservations (first 25)");
+      expect(group![2]).toContain("Review blocks for this space");
+      expect(group![2].indexOf("Review affected")).toBeLessThan(group![2].indexOf("Review blocks"));
+      expect(group![2].match(/min-h-10/g)).toHaveLength(2);
+      expect(group![2]).toContain("retirementReturn=");
+      const restricted = renderEditor({ target: selected, data: withDependencies }, false, { blocksHref });
+      expect(restricted).not.toContain("Review affected reservations");
+      expect(restricted).toContain("Review blocks for this space");
+    }
+    expect(renderEditor()).not.toContain("data-retirement-dependency-actions");
+    expect(renderEditor({ data: withDependencies }, false)).not.toContain("data-retirement-dependency-actions");
+  });
   it("offers exact retry for unknown outcome and deliberate review for a known rejection", () => {
     const unknown = renderEditor({ mutation: { error: new ApiError("503", 503) } as unknown as TopologyRetirementEditor["mutation"], canReplay: true });
     expect(unknown).toContain("Retry same request");
