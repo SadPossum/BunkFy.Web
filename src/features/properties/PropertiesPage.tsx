@@ -416,10 +416,10 @@ export function PropertiesPage() {
             <section className="min-w-0 space-y-5">
               <div className="card border border-base-300 bg-base-100 shadow-sm">
                 <div className="card-body gap-5 p-5 sm:p-6">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h2 data-property-retirement-heading tabIndex={-1} className="font-display text-2xl font-semibold outline-offset-2 focus:outline-2 focus:outline-primary">{selectedProperty.name}</h2>
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1 basis-64">
+                      <div className="flex min-w-0 flex-wrap items-center gap-3">
+                        <h2 data-property-retirement-heading tabIndex={-1} className="min-w-0 max-w-full break-words font-display text-2xl font-semibold outline-offset-2 focus:outline-2 focus:outline-primary">{selectedProperty.name}</h2>
                         <StatusBadge status={selectedProperty.status} />
                       </div>
                       <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-base-content/55">
@@ -429,7 +429,7 @@ export function PropertiesPage() {
                       </p>
                     </div>
                     {(canUpdateProperty || (canUpdatePropertyTimeZone && selectedProperty.status === "active") || canRetireProperty) && (
-                      <div className="flex gap-2">
+                      <div className="flex max-w-full flex-wrap gap-2">
                         {canUpdateProperty && (
                           <button className="btn btn-sm btn-ghost" disabled={editor.busy || propertyRetirementEngaged} onClick={() => setPropertyForm({ property: selectedProperty })}>
                             <Edit3 size={16} />Edit
