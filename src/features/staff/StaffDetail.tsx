@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import {
   BadgeCheck,
   BriefcaseBusiness,
@@ -19,13 +19,14 @@ import {
   UserRoundX,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type {
   Property,
   StaffMember,
   StaffMemberMutationReceipt,
 } from "../../api/types";
 import { staffStatusLabel } from "../../api/labels";
+import { ApiError } from "../../api/client";
 import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
 import {
   compositeSourceCurrent,
@@ -42,13 +43,13 @@ import {
 import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
 import {
   ErrorState,
-  InitialAvatar,
   InlineFormActions,
   LoadingState,
   Modal,
   StatusBadge,
 } from "../../components/ui/primitives";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import { focusModalRecoveryFeedback, modalControlVisible, modalIsTopmost } from "../../components/ui/modalFocus";
 import {
   resolveStaffAuthSubjectChangeAttempt,
   type StaffAuthSubjectChangeAttempt,
@@ -146,11 +147,16 @@ export function StaffDetail({
     initialTab === "account" && !canReadSensitive ? "profile" : initialTab,
   );
   const [editingTarget, setEditingTarget] = useState<StaffMember | null>(null);
+  const [clearedProfile, setClearedProfile] = useState<{ scope: string; submitted: boolean } | null>(null);
   const [lifecycleTarget, setLifecycleTarget] = useState<LifecycleTarget | null>(null);
   const profileAttempt = useRef<StaffProfileUpdateAttempt | null>(null);
   const authSubjectAttempt = useRef<StaffAuthSubjectChangeAttempt | null>(null);
   const lifecycleAttempt = useRef<StaffLifecycleAttempt | null>(null);
   const employmentMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const profileArea = useRef<HTMLElement>(null);
+  const accessFeedback = useRef<HTMLDivElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const profileFocus = useRef<StaffProfileFocusIntent | null>(null);
   const scopeKey = `${tenantId}:${memberId ?? "none"}`;
   const scopeKeyRef = useRef(scopeKey);
   scopeKeyRef.current = scopeKey;
@@ -165,9 +171,11 @@ export function StaffDetail({
     queryFn: () => request<StaffMember>(`/api/staff/members/${memberId}/profile`),
     enabled: Boolean(memberId && canReadSensitive),
   });
+  const directoryDenied = useStaffReadDenial(directory, tenantId, memberId, "directory");
+  const profileDenied = useStaffReadDenial(profile, tenantId, memberId, "profile");
   const directorySource = createCompositeSource({
     label: "Staff directory detail",
-    hasData: directory.data !== undefined,
+    hasData: !directoryDenied && directory.data !== undefined,
     isLoading: directory.isLoading,
     error: directory.error,
     isFetching: directory.isFetching,
@@ -175,17 +183,17 @@ export function StaffDetail({
   });
   const profileSource = createCompositeSource({
     label: "Sensitive Staff profile",
-    hasData: canReadSensitive && profile.data !== undefined,
+    hasData: canReadSensitive && !profileDenied && profile.data !== undefined,
     isLoading: canReadSensitive && profile.isLoading,
     error: canReadSensitive ? profile.error : null,
     isFetching: canReadSensitive && profile.isFetching,
     refetch: () => profile.refetch(),
   });
   const permissionsCurrent = compositeSourceCurrent(permissionSource);
-  const directoryCurrent = compositeSourceCurrent(directorySource);
-  const profileCurrent = canReadSensitive && compositeSourceCurrent(profileSource);
-  const directoryUsable = compositeSourceUsable(directorySource.state);
-  const profileUsable = canReadSensitive && compositeSourceUsable(profileSource.state);
+  const directoryCurrent = !directoryDenied && compositeSourceCurrent(directorySource);
+  const profileCurrent = canReadSensitive && !profileDenied && compositeSourceCurrent(profileSource);
+  const directoryUsable = !directoryDenied && compositeSourceUsable(directorySource.state);
+  const profileUsable = canReadSensitive && !profileDenied && compositeSourceUsable(profileSource.state);
   const currentRecords = [
     ...(directoryCurrent && directory.data ? [{ item: directory.data, source: directorySource }] : []),
     ...(profileCurrent && profile.data ? [{ item: profile.data, source: profileSource }] : []),
@@ -305,6 +313,8 @@ export function StaffDetail({
       }
     },
     onError: async (_error, submission) => {
+      profileFocus.current?.cancel();
+      profileFocus.current = null;
       await refresh(submission.tenantId, submission.member.staffMemberId);
     },
   });
@@ -451,17 +461,86 @@ export function StaffDetail({
 
   const authNeedsAuthentication = isInsufficientAuthenticationError(authMutation.error);
   const currentAssignmentCount = item?.assignments.filter(assignmentIsCurrent).length ?? 0;
+  const sensitiveHidden = !canReadSensitive || profileDenied;
+  const visibleEditingTarget = !sensitiveHidden && canManage ? editingTarget : null;
+  const submittedHere = Boolean(profileMutation.variables && profileMutation.variables.tenantId === tenantId
+    && profileMutation.variables.member.staffMemberId === memberId);
+  const clearedHere = clearedProfile?.scope === scopeKey ? clearedProfile : null;
+  const clearingDraft = Boolean(editingTarget && sensitiveHidden);
+  const showSubmittedNotice = (clearingDraft && submittedHere) || clearedHere?.submitted;
+
+  useLayoutEffect(() => {
+    if (directoryDenied || (canReadSensitive && profileDenied) || clearingDraft) {
+      focusModalRecoveryFeedback(accessFeedback.current);
+    }
+  }, [directoryDenied, profileDenied, canReadSensitive, clearingDraft]);
+
+  useEffect(() => {
+    if (!sensitiveHidden) return;
+    profileFocus.current?.cancel(); profileFocus.current = null;
+    if (editingTarget) {
+      setClearedProfile({ scope: scopeKey, submitted: submittedHere });
+      setEditingTarget(null);
+      // A server write is not cancelled by hiding its editor. Keep an already
+      // submitted attempt and mutation receipt lifecycle intact until settlement.
+      if (!submittedHere) profileAttempt.current = null;
+    }
+  }, [sensitiveHidden, editingTarget, scopeKey, submittedHere]);
+
+  useLayoutEffect(() => {
+    const intent = profileFocus.current;
+    if (!intent) return;
+    if (intent.identity !== scopeKey || tab !== "profile" || initialTab !== "profile" || !canManage || sensitiveHidden || !permissionsCurrent) {
+      intent.cancel(); profileFocus.current = null; return;
+    }
+    if (intent.direction === "return" && (editingTarget || profileMutation.isPending)) return;
+    const target = intent.direction === "enter"
+      ? profileArea.current?.querySelector<HTMLElement>('input[name="displayName"]') ?? null
+      : editButton.current;
+    finishStaffProfileFocus(intent, target, intent.direction === "enter" ? editingAuthorityCurrent : profileActionCurrent);
+    profileFocus.current = null;
+  }, [scopeKey, tab, initialTab, canManage, sensitiveHidden, permissionsCurrent, editingTarget, editingAuthorityCurrent, profileActionCurrent, profileMutation.isPending]);
+
+  useEffect(() => () => { profileFocus.current?.cancel(); }, []);
+
+  function rememberProfileFocus(direction: StaffProfileFocusIntent["direction"]) {
+    profileFocus.current?.cancel();
+    profileFocus.current = captureStaffProfileFocus(profileArea.current, scopeKey, direction);
+  }
 
   return (
+    <div className="[&_h2]:line-clamp-2 [&_h2]:[overflow-wrap:anywhere]">
     <Modal
       open={Boolean(memberId)}
       size="lg"
       title={item?.displayName || "Staff profile"}
       description={item
-        ? `${item.jobTitle || "Staff member"}${item.department ? ` / ${item.department}` : ""}`
-        : "Loading staff profile"}
+        ? "Employment profile"
+        : detailLoading ? "Loading staff profile"
+          : directoryDenied || profileDenied ? "Access to staff details could not be confirmed" : "Staff profile is unavailable"}
       onClose={onClose}
     >
+      {(directoryDenied || (canReadSensitive && profileDenied) || clearingDraft || clearedHere) && <div
+        ref={accessFeedback} role="status" aria-label="Staff access update" tabIndex={-1}
+        className="mb-4 scroll-my-2 space-y-3 rounded outline-none focus:ring-2 focus:ring-primary"
+      >
+      {(directoryDenied || (canReadSensitive && profileDenied)) && <p className="border-l-2 border-warning pl-3 text-sm leading-6">
+        {directoryDenied && profileDenied
+          ? "Staff details are hidden because access could not be confirmed. Try again to load fresh information."
+          : profileDenied
+            ? "Sensitive staff details are hidden because access could not be confirmed. Available directory information is shown separately."
+            : "Staff directory details could not be confirmed. Separately available profile information is shown."}
+      </p>}
+      {(clearingDraft || clearedHere) && <p className="border-l-2 border-warning pl-3 text-sm leading-6">
+        {showSubmittedNotice
+          ? profileMutation.isPending
+            ? "A profile save is still in progress. It has not been cancelled. Its result cannot be shown until access is restored."
+            : profileMutation.isSuccess
+              ? "The submitted profile save completed. Refresh access to view the current profile."
+              : "A profile save was submitted, but its result could not be confirmed. Check the current profile before submitting again."
+          : "Unsaved profile changes were cleared because access could not be confirmed. Reopen Edit after access is restored to start again."}
+      </p>}
+      </div>}
       {item && <CompositeSourceNotice
         sources={detailSources}
         title="Staff profile context is delayed"
@@ -481,22 +560,14 @@ export function StaffDetail({
         />
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-col gap-4 rounded-lg border border-base-300 bg-base-200/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <InitialAvatar name={item.displayName} variant="solid" />
-              <div className="min-w-0">
-                <p className="font-semibold">{item.displayName}</p>
-                <p className="mt-1 truncate text-xs text-base-content/50">
-                  {[item.jobTitle, item.department].filter(Boolean).join(" · ") || "Employment details not recorded"}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
               <StatusBadge status={staffStatusLabel(item.status)} />
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-base-content/55">
-                <Building2 size={14} className="text-primary" />
+                <Building2 size={14} className="shrink-0 text-primary" />
                 {currentAssignmentCount} current {currentAssignmentCount === 1 ? "property" : "properties"}
               </span>
+            </div>
               {canManageLifecycle && staffStatusKey(item.status) !== "departed" && (
                 <details ref={employmentMenuRef} className="dropdown dropdown-end">
                   <summary className="btn btn-outline btn-sm list-none [&::-webkit-details-marker]:hidden">
@@ -513,7 +584,6 @@ export function StaffDetail({
                   </ul>
                 </details>
               )}
-            </div>
           </div>
 
           {lifecycleTarget && (
@@ -557,15 +627,17 @@ export function StaffDetail({
           />
 
           {tab === "profile" && (
-            <section className="min-w-0">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-display text-lg font-semibold">Employment profile</h3>
+            <section ref={profileArea} className="min-w-0">
+              <div className="mb-4 flex min-w-0 flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 basis-48">
+                  <h3 className="font-display text-lg font-semibold">{visibleEditingTarget ? "Edit employment profile" : "Employment profile"}</h3>
                   <p className="mt-1 text-xs text-base-content/50">Employment, work contact, and internal identity details.</p>
                 </div>
                 {fullProfile && canManage && !editingTarget && staffStatusKey(fullProfile.status) !== "departed" && (
-                  <button type="button" className="btn btn-ghost btn-sm text-primary" disabled={!profileActionCurrent} onClick={() => {
+                  <button ref={editButton} type="button" className="btn btn-ghost btn-sm shrink-0 text-primary" disabled={!profileActionCurrent} onClick={() => {
                     if (!profileActionCurrent) return;
+                    rememberProfileFocus("enter");
+                    setClearedProfile(null);
                     profileAttempt.current = null;
                     profileMutation.reset();
                     setEditingTarget(fullProfile);
@@ -574,9 +646,9 @@ export function StaffDetail({
                   </button>
                 )}
               </div>
-              {editingTarget ? (
+              {visibleEditingTarget ? (
                 <StaffProfileForm
-                  member={editingTarget}
+                  member={visibleEditingTarget}
                   submitting={profileMutation.isPending}
                   error={profileMutation.error}
                   submitLabel="Save profile"
@@ -584,13 +656,15 @@ export function StaffDetail({
                   authorityCurrent={editingAuthorityCurrent}
                   authorityMessage="Current Staff profile or access evidence is refreshing or no longer matches this form. If it remains disabled, cancel and reopen the latest profile."
                   onCancel={() => {
+                    rememberProfileFocus("return");
                     profileAttempt.current = null;
                     setEditingTarget(null);
                     profileMutation.reset();
                   }}
                   onSubmit={(payload) => {
                     if (!editingAuthorityCurrent) return;
-                    profileMutation.mutate({ tenantId, member: editingTarget, payload });
+                    rememberProfileFocus("return");
+                    profileMutation.mutate({ tenantId, member: visibleEditingTarget, payload });
                   }}
                 />
               ) : (
@@ -648,7 +722,83 @@ export function StaffDetail({
         </div>
       )}
     </Modal>
+    </div>
   );
+}
+
+// A denied read is not an ordinary stale-data outage. Conceal immediately, then
+// evict only the settled denied cache entry owned by this tenant/member/source.
+// The observer can retain its old result after removal, so keep a local latch
+// until that observer receives a successful fresh result. Cache eviction also
+// prevents a later route/modal mount from reviving the rejected snapshot on503.
+function useStaffReadDenial(query: UseQueryResult<unknown, Error>, tenantId: string, memberId: string | null, kind: "directory" | "profile") {
+  const client = useQueryClient();
+  const identity = JSON.stringify([tenantId, memberId, kind]);
+  const [deniedIdentity, setDeniedIdentity] = useState<string | null>(null);
+  const observedDenial = query.error instanceof ApiError && (query.error.status === 403 || query.error.status === 401);
+  const successfulRead = query.isSuccess && !query.isFetching && query.data !== undefined;
+  const denied = observedDenial || (deniedIdentity === identity && !successfulRead);
+
+  useEffect(() => {
+    if (!memberId) return;
+    if (observedDenial) {
+      setDeniedIdentity(identity);
+      if (query.isFetching || query.data === undefined) return;
+      const key = ["staff-member", memberId, tenantId, kind];
+      const cached = client.getQueryState(key);
+      if (cached?.status === "error" && cached.fetchStatus === "idle"
+        && cached.error === query.error && cached.data === query.data
+        && cached.errorUpdatedAt === query.errorUpdatedAt && cached.dataUpdatedAt === query.dataUpdatedAt) {
+        client.removeQueries({ queryKey: key, exact: true });
+      }
+    } else if (successfulRead && deniedIdentity === identity) {
+      setDeniedIdentity(null);
+    }
+  }, [client, tenantId, memberId, kind, identity, observedDenial, successfulRead, deniedIdentity, query.isFetching, query.data, query.error, query.errorUpdatedAt, query.dataUpdatedAt]);
+  return denied;
+}
+
+type StaffProfileFocusIntent = {
+  identity: string;
+  direction: "enter" | "return";
+  source: HTMLElement;
+  modal: HTMLElement;
+  cancelled: boolean;
+  cancel: () => void;
+};
+
+// Only a deliberate transition within this profile can request focus. A save
+// may finish later; independent navigation must permanently cancel its intent.
+function captureStaffProfileFocus(area: HTMLElement | null, identity: string, direction: StaffProfileFocusIntent["direction"]): StaffProfileFocusIntent | null {
+  const activeElement = document.activeElement;
+  const modal = area?.closest<HTMLElement>("[data-bunkfy-modal-box]");
+  if (!(activeElement instanceof HTMLElement) || !area?.contains(activeElement) || !modal || !modalIsTopmost(modal)) return null;
+  const source = activeElement;
+  const intent: StaffProfileFocusIntent = { identity, direction, source, modal, cancelled: false,
+    cancel: () => { intent.cancelled = true; document.removeEventListener("focusin", moved); } };
+  function moved() {
+    const active = document.activeElement;
+    const handoff = !source.isConnected || source.matches(":disabled");
+    if (active !== source && !(handoff && (active === modal || active === document.body))) intent.cancel();
+  }
+  document.addEventListener("focusin", moved);
+  return intent;
+}
+
+function finishStaffProfileFocus(intent: StaffProfileFocusIntent, target: HTMLElement | null, authorityCurrent: boolean) {
+  const active = document.activeElement;
+  const allowed = !intent.cancelled && authorityCurrent && target && intent.modal.isConnected
+    && target.closest("[data-bunkfy-modal-box]") === intent.modal && modalIsTopmost(intent.modal) && modalControlVisible(target)
+    && (active === intent.source || ((!intent.source.isConnected || intent.source.matches(":disabled")) && (active === document.body || active === intent.modal)));
+  intent.cancel();
+  if (!allowed || !target) return;
+  target.focus({ preventScroll: true });
+  for (let port = target.parentElement; port && port !== intent.modal; port = port.parentElement) {
+    if (!/^(auto|scroll)$/.test(getComputedStyle(port).overflowY)) continue;
+    const rect = target.getBoundingClientRect(), bounds = port.getBoundingClientRect();
+    port.scrollTop += rect.top < bounds.top + 8 ? rect.top - bounds.top - 8 : rect.bottom > bounds.bottom - 8 ? rect.bottom - bounds.bottom + 8 : 0;
+    break;
+  }
 }
 
 function ProfileDetails({ member }: { member: StaffDetailMember }) {
@@ -656,6 +806,7 @@ function ProfileDetails({ member }: { member: StaffDetailMember }) {
     return (
       <div>
         <ProfileGroup title="Employment" icon={<BriefcaseBusiness size={17} />}>
+          <ProfileFact icon={<CircleUserRound size={16} />} label="Display name" value={member.displayName} />
           {member.jobTitle && <ProfileFact icon={<BriefcaseBusiness size={16} />} label="Job title" value={member.jobTitle} />}
           {member.department && <ProfileFact icon={<UsersRound size={16} />} label="Department" value={member.department} />}
           {!member.jobTitle && !member.department && <p className="p-4 text-sm text-base-content/50">No employment details are recorded.</p>}
@@ -690,6 +841,7 @@ function ProfileDetails({ member }: { member: StaffDetailMember }) {
         </div>
         <div className="min-w-0">
           <ProfileGroup title="Identity and contact" icon={<CircleUserRound size={17} />}>
+            <ProfileFact icon={<CircleUserRound size={16} />} label="Display name" value={member.displayName} />
             {member.legalName && <ProfileFact icon={<CircleUserRound size={16} />} label="Legal name" value={member.legalName} />}
             {member.workEmail && <ProfileFact icon={<Mail size={16} />} label="Work email" value={member.workEmail} href={`mailto:${member.workEmail}`} />}
             {member.workPhone && <ProfileFact icon={<Phone size={16} />} label="Work phone" value={member.workPhone} href={`tel:${member.workPhone}`} />}

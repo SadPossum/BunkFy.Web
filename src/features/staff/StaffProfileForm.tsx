@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from "react";
+import { useEffect, useRef, type FormEvent, type ReactNode } from "react";
 import { BadgeCheck, BriefcaseBusiness, CircleUserRound, ContactRound } from "lucide-react";
 import type { StaffMember } from "../../api/types";
 import type { CompositeSource } from "../../app/compositeSourceState";
@@ -10,6 +10,7 @@ import {
 } from "../../components/ui/primitives";
 import type { StaffCreatePayload } from "./staffCreateAttempt";
 import { StaffAuthorityNotice } from "./StaffAuthorityNotice";
+import { modalIsTopmost } from "../../components/ui/modalFocus";
 
 export function StaffProfileForm({
   member,
@@ -32,6 +33,50 @@ export function StaffProfileForm({
   onCancel: () => void;
   onSubmit: (payload: StaffCreatePayload) => void;
 }) {
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const editor = form.current, modal = editor?.closest<HTMLElement>("[data-bunkfy-modal-box]");
+    if (!member || !authorityCurrent || submitting || !editor || !modal) return;
+    let port = editor.parentElement;
+    while (port && port !== modal && !/^(auto|scroll)$/.test(getComputedStyle(port).overflowY)) port = port.parentElement;
+    if (!port || port === modal) return;
+    const scrollport = port;
+    let width = window.innerWidth, height = window.innerHeight;
+    let visibleField: HTMLElement | null = null;
+    let pointerDown = false;
+    const remember = () => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !editor.contains(active) || !active.matches("input") || active.matches(":disabled, [readonly]")) { visibleField = null; return; }
+      const rect = active.getBoundingClientRect(), bounds = scrollport.getBoundingClientRect();
+      visibleField = rect.top >= bounds.top && rect.bottom <= bounds.bottom ? active : null;
+    };
+    const shrink = () => {
+      const smaller = window.innerWidth < width || window.innerHeight < height;
+      width = window.innerWidth; height = window.innerHeight;
+      const target = visibleField;
+      if (smaller && !pointerDown && target?.isConnected && editor.isConnected && document.activeElement === target && modalIsTopmost(modal)) {
+        const rect = target.getBoundingClientRect(), bounds = scrollport.getBoundingClientRect();
+        const top = bounds.top + 8, bottom = bounds.bottom - 8;
+        scrollport.scrollTop += rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0;
+      }
+      remember();
+    };
+    const startPointer = () => { pointerDown = true; };
+    const endPointer = () => { pointerDown = false; remember(); };
+    const clear = () => { visibleField = null; };
+    remember();
+    editor.addEventListener("focusin", remember); editor.addEventListener("focusout", clear);
+    scrollport.addEventListener("scroll", remember, { passive: true }); scrollport.addEventListener("pointerdown", startPointer);
+    document.addEventListener("pointerup", endPointer); document.addEventListener("pointercancel", endPointer);
+    window.addEventListener("resize", shrink);
+    return () => {
+      editor.removeEventListener("focusin", remember); editor.removeEventListener("focusout", clear);
+      scrollport.removeEventListener("scroll", remember); scrollport.removeEventListener("pointerdown", startPointer);
+      document.removeEventListener("pointerup", endPointer); document.removeEventListener("pointercancel", endPointer);
+      window.removeEventListener("resize", shrink);
+    };
+  }, [member, authorityCurrent, submitting]);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authorityCurrent) return;
@@ -48,7 +93,7 @@ export function StaffProfileForm({
   }
 
   return (
-    <form className="space-y-4" onSubmit={submit}>
+    <form ref={form} className="space-y-4" onSubmit={submit}>
       <CompositeSourceNotice
         className="mb-0"
         sources={sources}
