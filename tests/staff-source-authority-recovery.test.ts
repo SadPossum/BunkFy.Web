@@ -136,9 +136,14 @@ describe("staff source authority recovery", () => {
     expect(detail).not.toContain("if (profile.error)");
 
     expect(assignments).toContain("staffPropertyTargetMatches(properties, target.property)");
-    expect(assignments).toContain("staffRecordMatches(currentMember, targetMember)");
-    expect(assignments).toContain("scopeKeyRef.current === `${targetTenantId}:${targetMember.staffMemberId}:${property.propertyId}`");
+    expect(assignments).toContain("staffRecordMatches(currentMember, target.member)");
+    expect(assignments).toContain("latest.current.owner === submission.owner");
+    expect(assignments).toContain("propertyAccessScope(tenantId, propertyId)");
+    expect(assignments).toContain("if (!authorized()) throw new Error(\"The assignment context changed before saving.");
     expect(assignments).toContain("(target?.member ?? member).assignments.some");
+    expect(detail).toContain("fullProfile?.staffMemberId === item.staffMemberId && fullProfile.version === item.version");
+    expect(detail).toContain("historyRestricted={!canReadSensitive}");
+    expect(page).not.toContain("mayAssignCurrentProperty");
   });
 });
 

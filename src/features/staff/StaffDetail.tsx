@@ -119,12 +119,10 @@ export function StaffDetail({
   selectedProperty,
   propertySource,
   permissionSource,
-  assignmentPermissionSource,
   canReadSensitive,
   canManage,
   canManageAccountLinks,
   canManageLifecycle,
-  canAssignCurrentProperty,
   onSectionChange,
   onClose,
 }: {
@@ -135,12 +133,10 @@ export function StaffDetail({
   selectedProperty: Property | null;
   propertySource: CompositeSource;
   permissionSource: CompositeSource;
-  assignmentPermissionSource: CompositeSource | null;
   canReadSensitive: boolean;
   canManage: boolean;
   canManageAccountLinks: boolean;
   canManageLifecycle: boolean;
-  canAssignCurrentProperty: boolean;
   onSectionChange: (section: StaffDetailTab) => void;
   onClose: () => void;
 }) {
@@ -744,8 +740,10 @@ export function StaffDetail({
               properties={properties}
               selectedProperty={selectedProperty}
               propertySource={propertySource}
-              assignmentPermissionSource={assignmentPermissionSource}
-              canAssign={canAssignCurrentProperty}
+              assignmentHistory={fullProfile?.staffMemberId === item.staffMemberId && fullProfile.version === item.version
+                ? fullProfile.assignments : null}
+              historyRestricted={!canReadSensitive}
+              historyStale={!profileCurrent}
               onUpdated={refresh}
             />
           )}

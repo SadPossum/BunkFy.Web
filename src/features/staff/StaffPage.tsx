@@ -114,7 +114,6 @@ export function StaffPage() {
   ] : []);
   const propertyStaffAccess = usePermissions(propertyScope ? [
     { permission: permissions.staffRead, scope: propertyScope },
-    { permission: permissions.staffAssignProperties, scope: propertyScope },
   ] : []);
   const mayRead = tenantAccess.allows(permissions.staffRead, tenantScope);
   const mayReadSensitive = tenantAccess.allows(
@@ -133,10 +132,6 @@ export function StaffPage() {
   );
   const mayReadCurrentProperty = Boolean(
     propertyScope && propertyStaffAccess.allows(permissions.staffRead, propertyScope),
-  );
-  const mayAssignCurrentProperty = Boolean(
-    propertyScope &&
-      propertyStaffAccess.allows(permissions.staffAssignProperties, propertyScope),
   );
   const permissionSource = createCompositeSource({
     label: "Staff permissions",
@@ -515,12 +510,10 @@ export function StaffPage() {
           selectedProperty={selectedProperty}
           propertySource={propertySource}
           permissionSource={permissionSource}
-          assignmentPermissionSource={propertyStaffPermissionSource}
           canReadSensitive={mayReadSensitive}
           canManage={mayManage}
           canManageAccountLinks={mayManageAccountLinks}
           canManageLifecycle={mayManageLifecycle}
-          canAssignCurrentProperty={mayAssignCurrentProperty}
           onSectionChange={setDetailSection}
           onClose={() => selectMember(null)}
         />

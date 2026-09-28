@@ -44,7 +44,11 @@ describe("workspace access authority recovery", () => {
     const workspace = readFileSync(join(repositoryRoot, "src", "app", "workspace.tsx"), "utf8");
     const settings = sourceFile("WorkspaceSettingsPage.tsx");
 
-    expect(authority).toContain("hasSnapshot: query.data !== undefined || authorityRejected");
+    expect(authority).toContain("const candidate = query.data ?? retained.current");
+    expect(authority).toContain("candidate?.identity === authorityBoundary");
+    expect(authority).toContain("candidate.evaluation >= barrier.evaluation");
+    expect(authority).toContain("hasSnapshot: snapshot !== undefined || authorityRejected");
+    expect(authority).toContain("if (!query.data || snapshot !== query.data) return;");
     expect(authority).toContain("isFetching: query.isFetching && query.data === undefined");
     expect(authority).toContain("accessAuthorityChecksMatchTenant(session.tenantId, checks)");
     expect(authority).toContain("refetchOnWindowFocus: \"always\"");
