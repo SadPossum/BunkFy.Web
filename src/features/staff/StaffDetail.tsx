@@ -19,7 +19,7 @@ import {
   UserRoundX,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type {
   Property,
   StaffMember,
@@ -27,9 +27,12 @@ import type {
 } from "../../api/types";
 import { staffStatusLabel } from "../../api/labels";
 import { ApiError } from "../../api/client";
+import { browserIsOnline } from "../../api/requestConnectivity";
+import { useNetworkStatus } from "../../app/networkStatus";
 import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
 import {
   compositeSourceCurrent,
+  compositeSourceNeedsRetry,
   compositeSourceUsable,
   createCompositeSource,
   type CompositeSource,
@@ -157,7 +160,15 @@ export function StaffDetail({
   const accessFeedback = useRef<HTMLDivElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const profileFocus = useRef<StaffProfileFocusIntent | null>(null);
+  const recoveryArea = useRef<HTMLDivElement>(null);
+  const recoveryFeedback = useRef<HTMLDivElement>(null);
+  const recoveryFocus = useRef<StaffRetryFocusIntent | null>(null);
+  const recoveryFlight = useRef<{ identity: string; promise: Promise<unknown> } | null>(null);
+  const [recoveryPending, setRecoveryPending] = useState<string | null>(null);
+  const { isOffline } = useNetworkStatus();
+  const offlineRecoveryId = useId();
   const scopeKey = `${tenantId}:${memberId ?? "none"}`;
+  const recoveryIdentity = `${scopeKey}:${tab}:${initialTab}:${canReadSensitive}`;
   const scopeKeyRef = useRef(scopeKey);
   scopeKeyRef.current = scopeKey;
 
@@ -214,6 +225,47 @@ export function StaffDetail({
     directorySource.state === "loading" ||
     (canReadSensitive && profileSource.state === "loading")
   );
+  const retryPending = recoveryPending === recoveryIdentity;
+
+  function retryDetails() {
+    // CompositeSourceNotice invokes each affected callback. Share one flight so
+    // a native activation captures focus once and refreshes each source once.
+    if (recoveryFlight.current?.identity === recoveryIdentity) return recoveryFlight.current.promise;
+    const sources = item ? detailSources.filter(source => compositeSourceNeedsRetry(source.state))
+      : [directorySource, ...(canReadSensitive ? [profileSource] : [])];
+    if (!browserIsOnline() || sources.some(source => source.isFetching)
+      || ["directory", ...(canReadSensitive ? ["profile"] : [])].some(kind => {
+        const state = queryClient.getQueryState(["staff-member", memberId, tenantId, kind]);
+        return sources.includes(kind === "directory" ? directorySource : profileSource) && state && state.fetchStatus !== "idle";
+      })) return Promise.resolve();
+    recoveryFocus.current?.cancel();
+    recoveryFocus.current = captureStaffRetryFocus(recoveryArea.current, recoveryIdentity);
+    setRecoveryPending(recoveryIdentity);
+    const flight = { identity: recoveryIdentity, promise: Promise.allSettled(sources.map(source => source.refetch())) };
+    recoveryFlight.current = flight;
+    void flight.promise.then(() => {
+      if (recoveryFlight.current !== flight) return;
+      recoveryFlight.current = null;
+      setRecoveryPending(null);
+    });
+    return flight.promise;
+  }
+
+  useLayoutEffect(() => {
+    const intent = recoveryFocus.current;
+    if (!intent) return;
+    if (intent.identity !== recoveryIdentity || !modalIsTopmost(intent.modal)) {
+      intent.cancel(); recoveryFocus.current = null; return;
+    }
+    const target = retryPending ? recoveryFeedback.current
+      : recoveryArea.current?.querySelector<HTMLElement>('button:not(:disabled)')
+        ?? (tab === "profile" ? profileArea.current?.querySelector<HTMLElement>("h3") : intent.modal.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'))
+        ?? accessFeedback.current;
+    moveStaffRetryFocus(intent, target ?? null);
+    if (!retryPending) { intent.cancel(); recoveryFocus.current = null; }
+  });
+
+  useEffect(() => () => { recoveryFocus.current?.cancel(); }, [recoveryIdentity]);
 
   const editingAuthorityCurrent = Boolean(
     editingTarget &&
@@ -541,24 +593,34 @@ export function StaffDetail({
           : "Unsaved profile changes were cleared because access could not be confirmed. Reopen Edit after access is restored to start again."}
       </p>}
       </div>}
-      {item && <CompositeSourceNotice
-        sources={detailSources}
+      <div ref={recoveryArea} className="contents">
+      {retryPending ? <div ref={recoveryFeedback} role="status" aria-label="Refreshing staff details" tabIndex={-1}
+        className="mb-4 rounded border border-base-300 p-4 text-sm outline-none focus:ring-2 focus:ring-primary">
+        {isOffline ? "Waiting for a connection to refresh staff details." : "Refreshing staff details…"}
+      </div> : item && <CompositeSourceNotice
+        sources={detailSources.map(source => ({ ...source, refetch: retryDetails }))}
         title="Staff profile context is delayed"
       />}
-      {detailLoading ? (
+      {!retryPending && (detailLoading ? (
         <LoadingState label="Loading staff profile" />
       ) : !item ? (
+        <div role="group" aria-label="Staff profile recovery" aria-disabled={isOffline || undefined}
+          aria-describedby={isOffline ? offlineRecoveryId : undefined}
+          className={isOffline ? "[&_button]:cursor-not-allowed [&_button]:text-base-content/60" : undefined}>
         <CompositeSourceFallback
           error={directory.error ?? profile.error}
-          retry={() => void Promise.all([
-            directory.refetch(),
-            ...(canReadSensitive ? [profile.refetch()] : []),
-          ])}
+          retry={() => { void retryDetails(); }}
           state="unavailable"
           label="staff profile"
           title="Staff profile could not be opened"
         />
-      ) : (
+        {isOffline && <p id={offlineRecoveryId} role="status" className="px-4 pb-4 text-sm leading-6 sm:px-5">
+          Reconnect to retry. Staff details cannot be loaded while you are offline.
+        </p>}
+        </div>
+      ) : null)}
+      </div>
+      {item && (
         <div className="space-y-5">
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-4">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -630,7 +692,7 @@ export function StaffDetail({
             <section ref={profileArea} className="min-w-0">
               <div className="mb-4 flex min-w-0 flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 basis-48">
-                  <h3 className="font-display text-lg font-semibold">{visibleEditingTarget ? "Edit employment profile" : "Employment profile"}</h3>
+                  <h3 tabIndex={-1} className="rounded font-display text-lg font-semibold outline-none focus:ring-2 focus:ring-primary">{visibleEditingTarget ? "Edit employment profile" : "Employment profile"}</h3>
                   <p className="mt-1 text-xs text-base-content/50">Employment, work contact, and internal identity details.</p>
                 </div>
                 {fullProfile && canManage && !editingTarget && staffStatusKey(fullProfile.status) !== "departed" && (
@@ -792,6 +854,56 @@ function finishStaffProfileFocus(intent: StaffProfileFocusIntent, target: HTMLEl
     && (active === intent.source || ((!intent.source.isConnected || intent.source.matches(":disabled")) && (active === document.body || active === intent.modal)));
   intent.cancel();
   if (!allowed || !target) return;
+  target.focus({ preventScroll: true });
+  for (let port = target.parentElement; port && port !== intent.modal; port = port.parentElement) {
+    if (!/^(auto|scroll)$/.test(getComputedStyle(port).overflowY)) continue;
+    const rect = target.getBoundingClientRect(), bounds = port.getBoundingClientRect();
+    port.scrollTop += rect.top < bounds.top + 8 ? rect.top - bounds.top - 8 : rect.bottom > bounds.bottom - 8 ? rect.bottom - bounds.bottom + 8 : 0;
+    break;
+  }
+}
+
+type StaffRetryFocusIntent = {
+  identity: string;
+  modal: HTMLElement;
+  owned: HTMLElement;
+  cancelled: boolean;
+  cancel: () => void;
+};
+
+// Local read recovery, not an Edit transition: failure must remain reachable
+// even when current authority cannot be confirmed. Explicit navigation wins.
+function captureStaffRetryFocus(area: HTMLElement | null, identity: string): StaffRetryFocusIntent | null {
+  const source = document.activeElement;
+  const modal = area?.closest<HTMLElement>("[data-bunkfy-modal-box]");
+  if (!(source instanceof HTMLElement) || !area?.contains(source) || !modal || !modalIsTopmost(modal)) return null;
+  const intent: StaffRetryFocusIntent = { identity, modal, owned: source, cancelled: false, cancel: () => {
+    intent.cancelled = true;
+    document.removeEventListener("focusin", moved);
+    document.removeEventListener("keydown", key, true);
+    document.removeEventListener("pointerdown", pointer, true);
+  } };
+  function moved() {
+    const active = document.activeElement;
+    const handoff = !intent.owned.isConnected || intent.owned.matches(":disabled");
+    if (active !== intent.owned && !(handoff && (active === modal || active === document.body))) intent.cancel();
+  }
+  function key(event: KeyboardEvent) { if (event.key === "Tab" || event.key === "Escape") intent.cancel(); }
+  function pointer() { intent.cancel(); }
+  document.addEventListener("focusin", moved);
+  document.addEventListener("keydown", key, true);
+  document.addEventListener("pointerdown", pointer, true);
+  return intent;
+}
+
+function moveStaffRetryFocus(intent: StaffRetryFocusIntent, target: HTMLElement | null) {
+  const active = document.activeElement;
+  const handoff = !intent.owned.isConnected || intent.owned.matches(":disabled");
+  if (intent.cancelled || !target || !modalIsTopmost(intent.modal) || !modalControlVisible(target)
+    || target.closest("[data-bunkfy-modal-box]") !== intent.modal
+    || (active !== intent.owned && !(handoff && (active === document.body || active === intent.modal)))) return;
+  if (active === target) return;
+  intent.owned = target;
   target.focus({ preventScroll: true });
   for (let port = target.parentElement; port && port !== intent.modal; port = port.parentElement) {
     if (!/^(auto|scroll)$/.test(getComputedStyle(port).overflowY)) continue;

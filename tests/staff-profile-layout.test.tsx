@@ -23,7 +23,7 @@ const params=new URLSearchParams(location.search);
 const member={staffMemberId:'member',displayName:params.has('long')?'N'.repeat(256):'Morgan Lee',legalName:null,jobTitle:'Hostel manager',department:'Operations',employeeNumber:'QA-01',workEmail:'morgan@example.invalid',workPhone:null,status:params.get('status')||'active',version:7,createdAtUtc:'2026-09-20T12:00:00Z',lastChangedAtUtc:'2026-09-27T12:00:00Z',authSubjectId:null,assignments:[]};
 if(params.has('stress'))Object.assign(member,{displayName:params.get('stress')==='unbroken'?'N'.repeat(256):'Alexandria Natalia Example '.repeat(10).slice(0,256),jobTitle:'Senior multilingual overnight reception and guest operations coordinator '.repeat(2).slice(0,128),department:'Front desk and guest relations across multiple hostel locations and seasonal operations '.repeat(2).slice(0,128)});
 const directory=()=>{const {legalName,employeeNumber,workEmail,workPhone,authSubjectId,createdAtUtc,...safe}=member;return safe;};
-window.staffRequests=[];window.staffWrites=[];window.staffReadStatus=Number(params.get('read')||200);window.staffReadStatuses={};window.staffSaveStatus=200;window.staffHoldSave=false;window.staffHoldRead=false;window.staffReadReleases=[];
+window.staffRequests=[];window.staffWrites=[];window.staffReadStatus=Number(params.get('read')||200);window.staffReadStatuses={};window.staffSaveStatus=200;window.staffHoldSave=false;window.staffHoldRead=false;window.staffReadReleases=[];window.staffPermissionReads=0;
 window.staffRequest=async(path,options)=>{
  const method=options?.method||'GET';window.staffRequests.push({path,method});
  if(method!=='GET'){
@@ -43,10 +43,10 @@ window.staffRequest=async(path,options)=>{
 };
 const client=new QueryClient({defaultOptions:{queries:{retry:false,refetchOnWindowFocus:false}}});
 function Fixture(){
- const [open,setOpen]=useState(true),[mounted,setMounted]=useState(true),[tab,setTab]=useState('profile'),[id,setId]=useState('member'),[nested,setNested]=useState(false);
+ const [open,setOpen]=useState(true),[mounted,setMounted]=useState(true),[tab,setTab]=useState('profile'),[id,setId]=useState('member'),[nested,setNested]=useState(false),[tenant,setTenant]=useState('tenant');
  const [manage,setManage]=useState(!params.has('readonly')),[sensitive,setSensitive]=useState(!params.has('directory')),[permission,setPermission]=useState('ready');
- window.staffHarness={setOpen,setMounted,setTab,setId,setNested,setManage,setSensitive,setPermission,pending:()=>client.isMutating(),retry:()=>client.refetchQueries({queryKey:['staff-member']}),refetch:()=>client.invalidateQueries({queryKey:['staff-member']}),cache:()=>client.getQueryCache().findAll({queryKey:['staff-member']}).map(q=>({key:q.queryKey,data:q.state.data,error:!!q.state.error})),bump:()=>{member.version++;return client.invalidateQueries({queryKey:['staff-member']});}};
- const source={label:'Synthetic permission',state:permission,isFetching:false,refetch:async()=>setPermission('ready')};
+ window.staffHarness={setOpen,setMounted,setTab,setId,setTenant,setNested,setManage,setSensitive,setPermission,pending:()=>client.isMutating(),retry:()=>client.refetchQueries({queryKey:['staff-member']}),refetch:()=>client.invalidateQueries({queryKey:['staff-member']}),cache:()=>client.getQueryCache().findAll({queryKey:['staff-member']}).map(q=>({key:q.queryKey,data:q.state.data,error:!!q.state.error})),bump:()=>{member.version++;return client.invalidateQueries({queryKey:['staff-member']});}};
+ const source={label:'Synthetic permission',state:permission,isFetching:false,refetch:async()=>{window.staffPermissionReads++;if(window.staffHoldRead)await new Promise(resolve=>window.staffReadReleases.push(resolve));setPermission(window.staffPermissionResult||'ready');}};
  function boundary(event){
   if(!window.staffBoundary||!['Cancel','Save profile','Edit'].includes(event.target.textContent))return;
   const action=window.staffBoundary;delete window.staffBoundary;
@@ -57,7 +57,7 @@ function Fixture(){
   if(action==='top modal')setNested(true);
   if(action==='independent')document.querySelector('[aria-label="Close dialog"]').focus({preventScroll:true});
  }
- return <QueryClientProvider client={client}><div onClick={boundary}><button onClick={()=>setOpen(true)}>Open Staff</button>{mounted&&open&&(params.has('create')?<Modal open title='Add staff member' onClose={()=>setOpen(false)}><StaffProfileForm submitting={false} error={null} submitLabel='Create staff member' sources={[source]} authorityCurrent={permission==='ready'} authorityMessage='Refresh access' onCancel={()=>setOpen(false)} onSubmit={payload=>window.staffWrites.push(payload)}/></Modal>:<StaffDetail tenantId='tenant' memberId={id} initialTab={tab} properties={[]} selectedProperty={null} propertySource={source} permissionSource={source} assignmentPermissionSource={null} canReadSensitive={sensitive} canManage={manage} canManageAccountLinks={false} canManageLifecycle={true} canAssignCurrentProperty={false} onSectionChange={setTab} onClose={()=>setOpen(false)}/>)}{nested&&<Modal open title='Independent dialog' onClose={()=>setNested(false)}><button>Independent task</button></Modal>}</div></QueryClientProvider>;
+ return <QueryClientProvider client={client}><div onClick={boundary}><button onClick={()=>setOpen(true)}>Open Staff</button>{mounted&&open&&(params.has('create')?<Modal open title='Add staff member' onClose={()=>setOpen(false)}><StaffProfileForm submitting={false} error={null} submitLabel='Create staff member' sources={[source]} authorityCurrent={permission==='ready'} authorityMessage='Refresh access' onCancel={()=>setOpen(false)} onSubmit={payload=>window.staffWrites.push(payload)}/></Modal>:<StaffDetail tenantId={tenant} memberId={id} initialTab={tab} properties={[]} selectedProperty={null} propertySource={source} permissionSource={source} assignmentPermissionSource={null} canReadSensitive={sensitive} canManage={manage} canManageAccountLinks={false} canManageLifecycle={true} canAssignCurrentProperty={false} onSectionChange={setTab} onClose={()=>setOpen(false)}/>)}{nested&&<Modal open title='Independent dialog' onClose={()=>setNested(false)}><button>Independent task</button></Modal>}</div></QueryClientProvider>;
 }
 createRoot(document.getElementById('root')).render(<MemoryRouter><Fixture/></MemoryRouter>);
 `;
@@ -124,7 +124,138 @@ async function sensitiveAbsent(page: Page) {
   expect(await page.locator('input[name="workEmail"]').count()).toBe(0);
   expect(await page.getByRole("button", { name: "Edit", exact: true }).count()).toBe(0);
 }
+async function holdReads(page: Page) {
+  await page.evaluate(() => Object.assign(window, { staffHoldRead: true, staffReadReleases: [], staffRequests: [] }));
+}
+async function releaseReads(page: Page) {
+  await page.evaluate(() => { Object.assign(window, { staffHoldRead: false }); for (const resolve of (window as unknown as { staffReadReleases: (() => void)[] }).staffReadReleases) resolve(); });
+  await settle(page);
+}
 describe("Staff D01 native layout and task continuity", () => {
+  it.each([320, 1024])("%i: cold offline Retry explains reconnection, stays focused and resumes without extra reads", async width => {
+    const page = await open(width, "?read=503"); try {
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor(); await tabTo(page, retry);
+      const requests = () => page.evaluate(() => (window as unknown as { staffRequests: unknown[] }).staffRequests.length);
+      const before = await requests();
+      await page.context().setOffline(true); await settle(page);
+      expect(await page.getByRole("status").filter({ hasText: "Reconnect to retry. Staff details cannot be loaded while you are offline." }).count()).toBe(1);
+      expect(await retry.isDisabled()).toBe(true);
+      expect(await retry.ariaSnapshot()).toContain('[disabled]');
+      expect(await painted(retry)).toBe(true);
+      await page.keyboard.press("Enter"); await page.keyboard.press("Space"); await settle(page);
+      expect(await requests()).toBe(before);
+      expect(await page.getByRole("status", { name: "Refreshing staff details", exact: true }).count()).toBe(0);
+      await page.context().setOffline(false); await settle(page);
+      await expect.poll(() => retry.isEnabled()).toBe(true);
+      expect(await painted(retry)).toBe(true);
+      await readStatus(page, 200, 200); await page.keyboard.press("Enter");
+      await page.getByText("morgan@example.invalid", { exact: true }).waitFor(); await settle(page);
+      expect(await painted(page.getByRole("heading", { name: "Employment profile", exact: true }))).toBe(true);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  });
+
+  it.each(["both denied", "profile denied", "directory denied", "initial503"])("notice Retry: %s preserves source boundaries and focus through failure and fresh success", async variant => {
+    const page = await open(320, variant === "initial503" ? "?read=503" : ""); try {
+      if (variant !== "initial503") {
+        await readStatus(page, variant === "profile denied" ? 200 : 403, variant === "directory denied" ? 200 : 403);
+        await change(page, "refetch");
+      }
+      const retry = page.getByRole("button", { name: "Try again", exact: true }); await retry.waitFor();
+      await readStatus(page, variant === "profile denied" ? 200 : 503, variant === "directory denied" ? 200 : 503);
+      await holdReads(page); await tabTo(page, retry); await page.keyboard.press("Enter"); await settle(page);
+      expect(await painted(page.getByRole("status", { name: "Refreshing staff details", exact: true }))).toBe(true);
+      if (variant !== "directory denied") await sensitiveAbsent(page);
+      await releaseReads(page); await retry.waitFor(); await settle(page); expect(await painted(retry)).toBe(true);
+      if (variant !== "directory denied") await sensitiveAbsent(page);
+      const count = variant === "profile denied" || variant === "directory denied" ? 1 : 2;
+      expect(await page.evaluate(() => (window as unknown as { staffRequests: unknown[] }).staffRequests.length)).toBe(count);
+      await readStatus(page, 200, 200); await page.keyboard.press("Enter");
+      await page.getByText("morgan@example.invalid", { exact: true }).waitFor();
+      await expect.poll(() => retry.count()).toBe(0); await settle(page);
+      expect(await painted(page.getByRole("heading", { name: "Employment profile", exact: true }))).toBe(true);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  });
+
+  it.each(["permission only", "all sources"])("notice Retry: %s is one operation, failed permission does not require Edit authority", async variant => {
+    const page = await open(1024, "?readonly"); try {
+      if (variant === "all sources") { await readStatus(page, 503, 503); await change(page, "refetch"); }
+      await change(page, "setPermission", "stale"); await holdReads(page);
+      await page.evaluate(() => Object.assign(window, { staffPermissionResult: "stale" }));
+      const retry = page.getByRole("button", { name: "Try again", exact: true }); await retry.click(); await settle(page);
+      expect(await painted(page.getByRole("status", { name: "Refreshing staff details", exact: true }))).toBe(true);
+      await expect.poll(() => page.evaluate(() => (window as unknown as { staffReadReleases: unknown[] }).staffReadReleases.length)).toBe(variant === "all sources" ? 3 : 1);
+      await page.keyboard.press("Enter"); // Pending status is not a second Retry control.
+      await releaseReads(page); await retry.waitFor(); await settle(page); expect(await painted(retry)).toBe(true);
+      expect(await page.evaluate(() => (window as unknown as { staffPermissionReads: number }).staffPermissionReads)).toBe(1);
+      expect(await page.evaluate(() => (window as unknown as { staffRequests: unknown[] }).staffRequests.length)).toBe(variant === "all sources" ? 2 : 0);
+      await readStatus(page, 200, 200); await page.evaluate(() => Object.assign(window, { staffPermissionResult: "ready" }));
+      await retry.click(); await expect.poll(() => retry.count()).toBe(0); await settle(page);
+      expect(await painted(page.getByRole("heading", { name: "Employment profile", exact: true }))).toBe(true);
+      expect(await page.getByRole("button", { name: "Edit", exact: true }).count()).toBe(0);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  });
+
+  it.each(["Tab", "Shift+Tab", "pointer", "independent focus", "Escape", "close", "member", "tenant", "tab", "permission", "unmount", "top modal"])("notice Retry never steals late focus across %s", async boundary => {
+    const page = await open(); try {
+      await page.getByRole("button", { name: "Close dialog", exact: true }).click(); await page.getByRole("button", { name: "Open Staff", exact: true }).click();
+      await readStatus(page, 503, 503); await change(page, "refetch"); await holdReads(page);
+      const retry = page.getByRole("button", { name: "Try again", exact: true }); await tabTo(page, retry); await page.keyboard.press("Enter");
+      await page.getByRole("status", { name: "Refreshing staff details", exact: true }).waitFor();
+      if (["Tab", "Shift+Tab", "Escape"].includes(boundary)) await page.keyboard.press(boundary);
+      else if (boundary === "pointer") await page.getByRole("heading", { name: "Morgan Lee", exact: true }).click();
+      else if (boundary === "independent focus") await page.getByRole("button", { name: "Close dialog", exact: true }).focus();
+      else if (boundary === "close") await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+      else { const [action, value] = ({ member: ["setId", "other-member"], tenant: ["setTenant", "other-tenant"], tab: ["setTab", "account"], permission: ["setSensitive", false], unmount: ["setMounted", false], "top modal": ["setNested", true] } as Record<string, [string, unknown]>)[boundary]; await change(page, action, value); }
+      await readStatus(page, 200, 200); await releaseReads(page);
+      await expect.poll(() => page.getByRole("status", { name: "Refreshing staff details", exact: true }).count()).toBe(0); await settle(page);
+      expect(await page.evaluate(() => document.activeElement?.textContent === "Employment profile")).toBe(false);
+      if (boundary === "close" || boundary === "Escape") expect(await page.getByRole("button", { name: "Open Staff", exact: true }).evaluate(e => e === document.activeElement)).toBe(true);
+      if (boundary === "independent focus") expect(await page.getByRole("button", { name: "Close dialog", exact: true }).evaluate(e => e === document.activeElement)).toBe(true);
+      if (boundary === "top modal") expect(await page.getByRole("dialog", { name: "Independent dialog" }).evaluate(e => e.contains(document.activeElement))).toBe(true);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  });
+
+  it("notice Retry does not start an offline read or duplicate background in-flight reads", async () => {
+    const page = await open(); try {
+      await readStatus(page, 503, 503); await change(page, "refetch");
+      await page.context().setOffline(true); await settle(page);
+      expect(await page.getByRole("button", { name: "Reconnect to retry", exact: true }).isDisabled()).toBe(true);
+      await page.context().setOffline(false); await holdReads(page);
+      await page.evaluate(() => { void (window as unknown as { staffHarness: { refetch: () => Promise<unknown> } }).staffHarness.refetch(); });
+      await settle(page); expect(await page.getByRole("button", { name: "Try again", exact: true }).isDisabled()).toBe(true);
+      expect(await page.getByRole("status", { name: "Refreshing staff details", exact: true }).count()).toBe(0);
+      await releaseReads(page); expect(await page.evaluate(() => (window as unknown as { staffRequests: unknown[] }).staffRequests.length)).toBe(2);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  });
+
+  it.each([320, 1024, 1440])("%i: native notice Retry owns visible pending, failed and recovered focus without duplicate reads", async width => {
+    const page = await open(width); try {
+      await readStatus(page, 503, 503); await change(page, "refetch");
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor(); await tabTo(page, retry);
+      await page.evaluate(() => Object.assign(window, { staffHoldRead: true, staffReadReleases: [], staffRequests: [] }));
+      await page.keyboard.press("Enter"); await settle(page);
+      const pending = page.getByRole("status", { name: "Refreshing staff details", exact: true });
+      expect(await pending.count()).toBe(1); expect(await painted(pending)).toBe(true);
+      expect(await page.getByText("morgan@example.invalid", { exact: true }).count()).toBe(1);
+      await expect.poll(() => page.evaluate(() => (window as unknown as { staffReadReleases: unknown[] }).staffReadReleases.length)).toBe(2);
+      await page.evaluate(() => { Object.assign(window, { staffHoldRead: false }); for (const resolve of (window as unknown as { staffReadReleases: (() => void)[] }).staffReadReleases) resolve(); });
+      await retry.waitFor(); await settle(page); expect(await painted(retry)).toBe(true);
+      expect(await page.evaluate(() => (window as unknown as { staffRequests: unknown[] }).staffRequests.length)).toBe(2);
+      await readStatus(page, 200, 200); await page.keyboard.press("Enter");
+      await expect.poll(() => retry.count()).toBe(0); await settle(page);
+      expect(await painted(page.getByRole("heading", { name: "Employment profile", exact: true }))).toBe(true);
+      expect(await page.evaluate(() => (window as unknown as { staffRequests: unknown[] }).staffRequests.length)).toBe(4);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  });
+
   it("native Edit starts at the first profile field", async () => {
     const page = await open(); try { await edit(page); expect(await painted(page.locator('input[name="displayName"]'))).toBe(true); } finally { await page.close(); }
   });
