@@ -5,7 +5,7 @@ import { chromium, type Browser, type Page } from "@playwright/test";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 // Mounted real workspace, DatePickers and local CSS in Chromium. Only the
 // parent data/selection callbacks are synthetic; this is not live API or UX
@@ -32,11 +32,13 @@ function Fixture() {
   const [denied, setDenied] = useState(false);
   const [requests, setRequests] = useState(0);
   const [mounted, setMounted] = useState(true);
+  const [current, setCurrent] = useState(true);
+  const [eligible, setEligible] = useState(true);
   const [notice, setNotice] = useState("layout");
   const noticeState = {active:true, pending:mode.startsWith("pending"), retryable:mode === "stale"};
-  const retryFocus = useSpacesRetryFocus({owner:JSON.stringify([context, selection]), enabled:!editing && mounted, ready:mode === "ready", denied,
+  const retryFocus = useSpacesRetryFocus({owner:JSON.stringify([context, selection]), enabled:eligible && !editing && mounted, current, ready:mode === "ready", denied,
     notices:{layout:{...noticeState,active:notice === "layout"},availability:{...noticeState,active:notice === "availability"}}});
-  window.spacesHarness = {settle:setMode, changeContext:setContext, deny:() => setDenied(true), unmount:() => setMounted(false), changeNotice:setNotice, resetWorkspace:()=>setWorkspaceKey(n=>n+1)};
+  window.spacesHarness = {settle:setMode, setCurrent, setEligible, setEditing, setSelection, setMounted, setDenied, changeContext:setContext, deny:() => setDenied(true), unmount:() => setMounted(false), changeNotice:setNotice, resetWorkspace:()=>setWorkspaceKey(n=>n+1)};
   const source = {label:"Synthetic inventory", state:mode === "ready" ? "ready" : mode === "pending" && location.search.includes("replaceRetry") ? "loading" : "stale", isFetching:mode.startsWith("pending"),
     refetch:async () => {setRequests(n => n + 1); setMode("pending");}};
   const selected = rooms.find(room => room.roomId === selection) ?? null;
@@ -58,6 +60,68 @@ function Fixture() {
 }
 createRoot(document.getElementById("root")).render(<Fixture/>);
 `;
+// The page fixture retains real React Query, SpacesPage, source fallbacks and
+// navigation ownership. Only identity/authority and transport are synthetic.
+const pageData = `
+import {useSyncExternalStore} from "react";
+export const propertyId="00000000-0000-4000-8000-000000000001", roomId="00000000-0000-4000-8000-000000000002";
+const bedId="00000000-0000-4000-8000-000000000003";
+export const property={propertyId,name:"Synthetic focus property",code:"FOCUS",timeZoneId:"Europe/London",canonicalTimeZoneId:"Europe/London",timeZoneStatus:"valid",status:"active",processingStatus:"enabled",version:1};
+const room={propertyId,roomId,name:"Dorm 101",buildingLabel:"Demo House",floorLabel:"First floor",status:"active",version:1};
+const bed={...room,bedId,label:"101-A"};
+const unit={propertyId,roomId,bedId,inventoryUnitId:"00000000-0000-4000-8000-000000000004",kind:"bed",label:bed.label,isSellable:true,isTopologyActive:true};
+export const listeners=new Set();
+let state={current:true,denied:false,actor:"one",mounted:true};
+export const useFixture=()=>useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn)},()=>state);
+export const update=value=>{state={...state,...value};listeners.forEach(fn=>fn())};
+const options=new URLSearchParams(location.search);
+const availability=options.has("availability");
+const modes={rooms:options.has("heldLayout")?"held":availability?"ready":"failed",inventory:availability&&!options.has("heldLayout")?"ready":"held",availability:availability?"failed":"ready",beds:"ready",blocks:"ready"};
+const pending=new Map();
+const calls=[];
+function response(kind,path){
+ const query=new URL(path,location.origin).searchParams;
+ if(kind==="rooms") return {rooms:[room],hasMore:false};
+ if(kind==="inventory") return {rooms:[{...room,roomName:room.name,salesMode:"bedLevel",units:[unit]}],hasMore:false};
+ if(kind==="beds") return {beds:[bed],hasMore:false};
+ if(kind==="availability") return {propertyId,arrival:query.get("arrival"),departure:query.get("departure"),units:[{unit,isAvailable:true,activeBlockIds:[],activeAllocationIds:[]}]};
+ if(kind==="blocks") return {blocks:[],hasMore:false};
+ throw new Error("Unmapped fixture request: "+path);
+}
+export async function request(path,options={}){
+ if(options.method && options.method!=="GET") throw new Error("Fixture forbids writes");
+ const kind=path.includes("/availability?")?"availability":path.includes("/beds?")?"beds":path.includes("/blocks?")?"blocks":path.includes("/inventory/")?"inventory":"rooms";
+ calls.push({kind,path,at:performance.now()});
+ if(modes[kind]==="held") await new Promise((resolve,reject)=>{const queue=pending.get(kind)||[];queue.push({resolve,reject});pending.set(kind,queue);});
+ if(modes[kind]==="failed") throw new Error("Controlled "+kind+" read failure");
+ return response(kind,path);
+}
+window.pageHarness={update,calls,modes,pendingCount:kind=>(pending.get(kind)||[]).length,
+ mode:(kind,mode)=>{modes[kind]=mode},
+ settle:(kind,mode="ready")=>{modes[kind]=mode;const queue=pending.get(kind)||[];pending.delete(kind);queue.forEach(item=>item.resolve())},
+ abort:kind=>{const queue=pending.get(kind)||[];pending.delete(kind);queue.forEach(item=>item.reject(new Error("Controlled offline interruption")))}
+};
+`;
+const pageFixture = `
+import React,{useEffect} from "react";
+import {createRoot} from "react-dom/client";
+import {MemoryRouter,Routes,Route,useLocation,useNavigate,useNavigationType} from "react-router";
+import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
+import {RouteNavigationLeaseProvider,useCurrentRouteNavigationLease} from "/src/app/routeNavigationLease.tsx";
+import {SpacesPage} from "/src/features/spaces/SpacesPage.tsx";
+import {propertyId,roomId,useFixture} from "/__spaces_page_data.ts";
+import "/src/styles.css";
+const options=new URLSearchParams(location.search);
+const url="/spaces?property="+propertyId+"&section=layout&arrival=2026-09-29&departure=2026-10-01"+(options.has("noRoom")?"":"&room="+roomId);
+const client=new QueryClient({defaultOptions:{queries:{staleTime:20000,retry:1,refetchOnWindowFocus:false},mutations:{networkMode:"always",retry:0}}});
+function Fixture(){const value=useFixture(),route=useLocation(),navigate=useNavigate(),action=useNavigationType();
+ const {effectiveLocation}=useCurrentRouteNavigationLease();
+ useEffect(()=>{window.pageHarness.locations??=[];window.pageHarness.locations.push({...route,action});},[route,action]);
+ window.pageHarness.navigate=navigate;
+ return <main style={{padding:16}}><button>Unrelated destination</button>{value.mounted&&<Routes location={effectiveLocation}><Route path="/spaces" element={<SpacesPage/>}/></Routes>}</main>;
+}
+createRoot(document.getElementById("root")).render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[url,url]}><RouteNavigationLeaseProvider><Fixture/></RouteNavigationLeaseProvider></MemoryRouter></QueryClientProvider>);
+`;
 let server: ViteDevServer;
 let browser: Browser;
 let origin: string;
@@ -67,15 +131,34 @@ beforeAll(async () => {
   // This virtual entry must not share the app's optimizer generation or scan
   // its unrelated index.html while mounted tests are navigating.
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-spaces-disclosure-vite-")), logLevel: "error",
-    optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "lucide-react", "@radix-ui/react-popover", "@daypicker/react"] },
+    optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-router", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), {
       name: "spaces-disclosure-test-fixture",
-      resolveId: id => id === "/__spaces_disclosure_fixture.tsx" || id === fixturePath ? fixturePath : undefined,
-      load: id => id === fixturePath ? fixture : undefined,
+      enforce: "pre",
+      resolveId(id, importer) {
+        if (id === "/__spaces_disclosure_fixture.tsx" || id === fixturePath) return fixturePath;
+        for (const entry of ["/__spaces_page_fixture.tsx", "/__spaces_page_data.ts"]) {
+          if (id === entry || id === process.cwd() + entry) return process.cwd() + entry;
+        }
+        const path = id.startsWith("/src/") ? process.cwd() + id : resolve(importer ? dirname(importer) : process.cwd(), id);
+        for (const name of ["session", "workspace", "permissions"]) {
+          if (path === process.cwd() + "/src/app/" + name || path === process.cwd() + "/src/app/" + name + (name === "permissions" ? ".ts" : ".tsx")) return "\0spaces-page-" + name;
+        }
+      },
+      load(id) {
+        if (id === fixturePath) return fixture;
+        if (id === process.cwd() + "/__spaces_page_fixture.tsx") return pageFixture;
+        if (id === process.cwd() + "/__spaces_page_data.ts") return pageData;
+        if (id === "\0spaces-page-session") return `import {useFixture,request} from "/__spaces_page_data.ts";export function useSession(){const s=useFixture();return {request,session:{tenantId:"synthetic",username:"synthetic",subjectId:s.actor,sessionId:"session-"+s.actor}}}`;
+        if (id === "\0spaces-page-workspace") return `import {useFixture,property,propertyId} from "/__spaces_page_data.ts";const properties=[property];const noop=()=>{};export function useWorkspace(){const s=useFixture();return {properties,selectedProperty:property,selectedPropertyId:propertyId,propertiesLoaded:true,propertiesLoading:false,propertiesFetching:!s.current,propertiesError:null,setSelectedPropertyId:noop,refetchProperties:async()=>{}}}`;
+        if (id === "\0spaces-page-permissions") return `export * from "/src/app/permissions.ts?actual";import {useFixture} from "/__spaces_page_data.ts";export function usePermissions(){const s=useFixture();return {allows:()=>!s.denied,hasData:true,isLoading:false,isFetching:false,error:null,refetch:async()=>{}}}`;
+      },
       configureServer(vite) {
         vite.middlewares.use((req, res, next) => {
-          if (!req.url?.startsWith("/__spaces-disclosure")) return next();
-          void vite.transformIndexHtml(req.url, '<!doctype html><html><body><div id="root"></div><script type="module" src="/__spaces_disclosure_fixture.tsx"></script></body></html>')
+          const mountedPage = req.url?.startsWith("/__spaces-page");
+          if (!mountedPage && !req.url?.startsWith("/__spaces-disclosure")) return next();
+          const entry = mountedPage ? "/__spaces_page_fixture.tsx" : "/__spaces_disclosure_fixture.tsx";
+          void vite.transformIndexHtml(req.url!, '<!doctype html><html><body><div id="root"></div><script type="module" src="' + entry + '"></script></body></html>')
             .then(html => { res.setHeader("Content-Type", "text/html"); res.end(html); });
         });
       },
@@ -106,8 +189,238 @@ async function settledResize(page: Page, width: number) {
   await page.setViewportSize({ width, height: 800 });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
+async function updateRetryHarness(page: Page, method: string, value?: string | boolean) {
+  await page.evaluate(({ method, value }) => (window as unknown as { spacesHarness: Record<string, (value?: unknown) => void> }).spacesHarness[method](value), { method, value });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function pageControl(page: Page, method: string, ...args: unknown[]) {
+  await page.evaluate(({ method, args }) => (window as unknown as { pageHarness: Record<string, (...args: unknown[]) => void> }).pageHarness[method](...args), { method, args });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+async function openSpacesPage(width: number, query = "") {
+  const page = await browser.newPage({ viewport: { width, height: 800 } });
+  page.setDefaultTimeout(5000);
+  page.on("pageerror", error => runtimeErrors.push(error.message));
+  await page.goto(origin + "__spaces-page" + query);
+  return page;
+}
+
+describe("actual SpacesPage cold recovery", () => {
+  it("cold availability retains ownership through its independently loaded default room", async () => {
+    const page = await openSpacesPage(320, "?availability&noRoom&heldLayout");
+    try {
+      const retry = page.getByRole("alert").filter({ hasText: "Availability could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor(); const original = await retry.elementHandle();
+      await pageControl(page, "mode", "availability", "held"); await retry.focus(); await retry.press("Enter");
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      await pageControl(page, "update", { current: false });
+      await pageControl(page, "settle", "rooms"); await pageControl(page, "settle", "inventory");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor(); expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+      const locations = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { action: string }[] } }).pageHarness.locations);
+      expect(locations).toHaveLength(2); expect(locations[1].action).toBe("REPLACE");
+      await pageControl(page, "settle", "availability"); await pageControl(page, "update", { current: true });
+      await expect.poll(() => heading.evaluate(el => el === document.activeElement)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each([{ width: 320, key: "Enter", noRoom: false }, { width: 1024, key: "Space", noRoom: true }])("$width $key noRoom=$noRoom preserves its cold Retry through reconnect", async ({ width, key, noRoom }) => {
+    const page = await openSpacesPage(width, noRoom ? "?noRoom" : "");
+    try {
+      const retry = page.getByRole("alert").filter({ hasText: "Room layout could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor();
+      const original = await retry.elementHandle();
+      expect(await page.evaluate(() => (window as unknown as { pageHarness: { calls: { kind: string }[] } }).pageHarness.calls.filter(call => call.kind === "rooms").length)).toBe(2);
+      await pageControl(page, "mode", "rooms", "held");
+      const activatedAt = await page.evaluate(() => performance.now());
+      await retry.focus(); await retry.press(key);
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      expect(await page.evaluate(() => (window as unknown as { pageHarness: { pendingCount: (kind: string) => number } }).pageHarness.pendingCount("rooms"))).toBe(1);
+      await page.context().setOffline(true);
+      await pageControl(page, "update", { current: false });
+      await pageControl(page, "abort", "rooms");
+      await pageControl(page, "mode", "rooms", "ready");
+      await page.context().setOffline(false);
+      await pageControl(page, "settle", "inventory");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor();
+      expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+      await pageControl(page, "update", { current: true });
+      await expect.poll(() => heading.evaluate(el => el === document.activeElement), { timeout: 2000 }).toBe(true);
+      const box = await heading.boundingBox();
+      expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+      expect(await heading.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe("none");
+      const calls = await page.evaluate(() => (window as unknown as { pageHarness: { calls: { kind: string; at: number }[] } }).pageHarness.calls.filter(call => call.kind === "rooms"));
+      expect(calls[2].at).toBeGreaterThan(activatedAt); expect(calls.length).toBeGreaterThanOrEqual(4);
+      const locations = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { action: string; search: string }[] } }).pageHarness.locations);
+      expect(locations).toHaveLength(noRoom ? 2 : 1);
+      if (noRoom) { expect(locations[1].action).toBe("REPLACE"); expect(locations[1].search).toContain("room=00000000-0000-4000-8000-000000000002"); }
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each(["layout", "availability"])("cold %s cannot dispatch or acquire keyboard intent while already offline", async kind => {
+    const page = await openSpacesPage(320, kind === "availability" ? "?availability" : "");
+    try {
+      const retry = page.getByRole("alert").filter({ hasText: kind === "layout" ? "Room layout could not be loaded" : "Availability could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor(); await retry.focus();
+      await page.context().setOffline(true);
+      await expect.poll(() => retry.getAttribute("aria-disabled")).toBe("true");
+      const count = await page.evaluate(() => (window as unknown as { pageHarness: { calls: unknown[] } }).pageHarness.calls.length);
+      await page.keyboard.press("Enter"); await page.keyboard.press("Space");
+      expect(await retry.evaluate(el => el === document.activeElement)).toBe(true);
+      expect(await page.evaluate(() => (window as unknown as { pageHarness: { calls: unknown[] } }).pageHarness.calls.length)).toBe(count);
+      await pageControl(page, "mode", kind === "layout" ? "rooms" : "availability", "ready");
+      await page.context().setOffline(false);
+      await pageControl(page, "settle", "inventory");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor();
+      expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each(["layout", "availability"])("cold %s repeated failure restores only its replacement Retry, then fresh success", async kind => {
+    const page = await openSpacesPage(320, kind === "availability" ? "?availability" : "");
+    try {
+      const source = kind === "layout" ? "rooms" : "availability";
+      const retry = page.getByRole("alert").filter({ hasText: kind === "layout" ? "Room layout could not be loaded" : "Availability could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor();
+      const original = await retry.elementHandle();
+      await pageControl(page, "mode", source, "held"); await retry.focus(); await retry.press("Space");
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      await pageControl(page, "settle", source, "failed");
+      await retry.waitFor(); await expect.poll(() => retry.evaluate(el => el === document.activeElement)).toBe(true);
+      expect(await retry.evaluate((el, old) => el === old, original)).toBe(false);
+      await pageControl(page, "mode", source, "held"); await retry.press("Enter");
+      await pageControl(page, "settle", source); await pageControl(page, "settle", "inventory");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor(); await expect.poll(() => heading.evaluate(el => el === document.activeElement)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each(["focus", "Tab", "Escape", "pointer", "denied", "unmount", "session", "room PUSH", "unmatched REPLACE", "same-url PUSH", "POP", "second REPLACE"])("cold canonical recovery cannot steal focus after %s", async boundary => {
+    const page = await openSpacesPage(320, "?noRoom");
+    try {
+      const retry = page.getByRole("alert").filter({ hasText: "Room layout could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor(); const original = await retry.elementHandle();
+      await pageControl(page, "mode", "rooms", "held"); await retry.focus(); await retry.press("Enter");
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      await pageControl(page, "update", { current: false });
+      const unrelated = page.getByRole("button", { name: "Unrelated destination", exact: true });
+      if (boundary === "focus") await unrelated.focus();
+      else if (["Tab", "Escape"].includes(boundary)) await page.keyboard.press(boundary);
+      else if (boundary === "pointer") await page.mouse.click(5, 5);
+      else if (boundary === "denied") { await pageControl(page, "update", { denied: true }); await pageControl(page, "update", { denied: false }); }
+      else if (boundary === "unmount") { await pageControl(page, "update", { mounted: false }); await pageControl(page, "update", { mounted: true }); }
+      else if (boundary === "session") { await pageControl(page, "update", { actor: "two" }); await pageControl(page, "update", { actor: "one" }); }
+      else if (boundary === "POP") await pageControl(page, "navigate", -1);
+      else if (boundary !== "second REPLACE") {
+        const route = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { search: string }[] } }).pageHarness.locations.at(-1)!.search);
+        await pageControl(page, "navigate", "/spaces" + route + (boundary === "same-url PUSH" ? "" : "&room=00000000-0000-4000-8000-000000000002"), { replace: boundary === "unmatched REPLACE" });
+      }
+      await pageControl(page, "settle", "rooms"); await pageControl(page, "settle", "inventory");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor();
+      if (boundary === "second REPLACE") {
+        const route = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { search: string; action: string }[] } }).pageHarness.locations.at(-1)!);
+        expect(route.action).toBe("REPLACE"); expect(route.search).toContain("&room=");
+        await pageControl(page, "navigate", "/spaces" + route.search, { replace: true });
+      }
+      await pageControl(page, "update", { current: true });
+      expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+      if (boundary === "focus") expect(await unrelated.evaluate(el => el === document.activeElement)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+});
 
 describe("Spaces single mounted selected-context disclosure", () => {
+  it.each(["independent focus", "Tab", "Shift+Tab", "pointer", "Escape", "editor", "paused navigation", "missing property", "selection", "route", "dates", "property", "session", "permission", "confirmed denial", "notice", "unmount"])("suspended retry is permanently cancelled by %s", async boundary => {
+      const page = await open(320, "?retry");
+      try {
+        const retry = page.getByRole("button", { name: "Try again", exact: true });
+        const original = await retry.elementHandle();
+        await retry.focus(); await retry.press("Enter");
+        await updateRetryHarness(page, "setCurrent", false);
+        await updateRetryHarness(page, "settle", "ready");
+        await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+        const unrelated = page.getByRole("button", { name: "Unrelated destination", exact: true });
+        if (boundary === "independent focus") await unrelated.focus();
+        else if (["Tab", "Shift+Tab", "Escape"].includes(boundary)) await page.keyboard.press(boundary);
+        else if (boundary === "pointer") await page.mouse.click(5, 5);
+        else if (boundary === "editor") { await updateRetryHarness(page, "setEditing", true); await updateRetryHarness(page, "setEditing", false); }
+        else if (["paused navigation", "missing property"].includes(boundary)) { await updateRetryHarness(page, "setEligible", false); await updateRetryHarness(page, "setEligible", true); }
+        else if (boundary === "selection") { await updateRetryHarness(page, "setSelection", "102"); await updateRetryHarness(page, "setSelection", "101"); }
+        else if (boundary === "confirmed denial") { await updateRetryHarness(page, "setDenied", true); await updateRetryHarness(page, "setDenied", false); }
+        else if (boundary === "notice") { await updateRetryHarness(page, "changeNotice", "availability"); await updateRetryHarness(page, "changeNotice", "layout"); }
+        else if (boundary === "unmount") { await updateRetryHarness(page, "setMounted", false); await updateRetryHarness(page, "setMounted", true); }
+        else { await updateRetryHarness(page, "changeContext", "changed " + boundary); await updateRetryHarness(page, "changeContext", "original actor / property / route"); }
+        await updateRetryHarness(page, "setCurrent", true);
+        expect(await page.getByRole("heading", { name: "Dorm 101", exact: true }).evaluate(el => el === document.activeElement)).toBe(false);
+        if (boundary === "independent focus") expect(await unrelated.evaluate(el => el === document.activeElement)).toBe(true);
+      } finally { await page.close(); }
+    }, 30000);
+
+  it.each([320, 1024])("%i: unconfirmed currentness cannot create a new focus intent", async width => {
+    const page = await open(width, "?retry");
+    try {
+      await updateRetryHarness(page, "setCurrent", false);
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      await retry.focus(); await retry.press("Enter");
+      await updateRetryHarness(page, "settle", "ready");
+      await updateRetryHarness(page, "setCurrent", true);
+      expect(await page.getByRole("heading", { name: "Dorm 101", exact: true }).evaluate(el => el === document.activeElement)).toBe(false);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each([320, 1024])("%i: failed replacement Retry waits for currentness before receiving focus", async width => {
+    const page = await open(width, "?retry&replaceRetry");
+    try {
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      const original = await retry.elementHandle();
+      await retry.focus(); await retry.press("Space");
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      await updateRetryHarness(page, "setCurrent", false);
+      await updateRetryHarness(page, "settle", "stale");
+      await retry.waitFor(); expect(await retry.evaluate(el => el === document.activeElement)).toBe(false);
+      await updateRetryHarness(page, "setCurrent", true);
+      await expect.poll(() => retry.evaluate(el => el === document.activeElement)).toBe(true);
+      await retry.press("Enter"); await updateRetryHarness(page, "settle", "ready");
+      await expect.poll(() => page.getByRole("heading", { name: "Dorm 101", exact: true }).evaluate(el => el === document.activeElement)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
+  it.each([320, 1024].flatMap(width => ["Enter", "Space"].flatMap(key => ["content first", "current first"].map(order => ({ width, key, order })))))("suspended property currentness: $width $key $order restores only after both sources settle", async ({ width, key, order }) => {
+      const page = await open(width, "?retry");
+      try {
+        const retry = page.getByRole("button", { name: "Try again", exact: true });
+        const heading = page.getByRole("heading", { name: "Dorm 101", exact: true });
+        const original = await retry.elementHandle();
+        await retry.focus(); await retry.press(key);
+        await page.evaluate(() => (window as unknown as { spacesHarness: { setCurrent: (value: boolean) => void } }).spacesHarness.setCurrent(false));
+        await settledResize(page, width);
+        // A reconnect may start more than one directory refresh. No new user intent.
+        await page.evaluate(() => (window as unknown as { spacesHarness: { setCurrent: (value: boolean) => void } }).spacesHarness.setCurrent(true));
+        await settledResize(page, width);
+        await page.evaluate(() => (window as unknown as { spacesHarness: { setCurrent: (value: boolean) => void } }).spacesHarness.setCurrent(false));
+        await settledResize(page, width);
+        if (order === "content first") {
+          await page.evaluate(() => (window as unknown as { spacesHarness: { settle: (value: string) => void } }).spacesHarness.settle("ready"));
+          await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+          expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+          await page.evaluate(() => (window as unknown as { spacesHarness: { setCurrent: (value: boolean) => void } }).spacesHarness.setCurrent(true));
+        } else {
+          await page.evaluate(() => (window as unknown as { spacesHarness: { setCurrent: (value: boolean) => void } }).spacesHarness.setCurrent(true));
+          await settledResize(page, width);
+          expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+          await page.evaluate(() => (window as unknown as { spacesHarness: { settle: (value: string) => void } }).spacesHarness.settle("ready"));
+        }
+        await expect.poll(() => heading.evaluate(el => el === document.activeElement), { timeout: 2000 }).toBe(true);
+        const box = await heading.boundingBox();
+        expect(box).not.toBeNull(); expect(box!.y).toBeGreaterThanOrEqual(0); expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+        expect(await page.getByRole("status", { name: "Retry requests" }).textContent()).toBe("1");
+      } finally { await page.close(); }
+    }, 30000);
+
   it.each(["explicit", "implicit"])("R2: %s room edit after browsing stays visible through narrow resize and cancel", async target => {
     const page = await open(1440, '?roomControls' + (target === 'implicit' ? '&implicitTarget' : ''));
     try {
@@ -398,6 +711,7 @@ describe("Spaces single mounted selected-context disclosure", () => {
     const page = await open(320, "?retry");
     try {
       const retry = page.getByRole("button", { name: "Try again", exact: true });
+      const original = await retry.elementHandle();
       await retry.focus(); await retry.press(key);
       expect(await retry.getAttribute("aria-disabled")).toBe("true");
       expect(await retry.evaluate(el => (el as HTMLButtonElement).disabled)).toBe(false);
@@ -417,8 +731,9 @@ describe("Spaces single mounted selected-context disclosure", () => {
       expect(await page.getByRole("status", { name: "Retry requests" }).textContent()).toBe("2");
       await page.context().setOffline(false);
       await page.evaluate(() => (window as unknown as {spacesHarness:{settle:(mode:string)=>void}}).spacesHarness.settle("ready"));
-      await retry.waitFor({state:"detached"});
-      expect(await page.getByRole("heading", { name: "Dorm 101", exact: true }).evaluate(el => el === document.activeElement)).toBe(true);
+      // Offline renames this SAME node; name disappearance is not detachment.
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      await expect.poll(() => page.getByRole("heading", { name: "Dorm 101", exact: true }).evaluate(el => el === document.activeElement)).toBe(true);
       expect(await toggle(page).getAttribute("aria-expanded")).toBe("false");
     } finally { await page.close(); }
   }, 30000);

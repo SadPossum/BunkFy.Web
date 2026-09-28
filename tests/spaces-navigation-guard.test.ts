@@ -7,6 +7,7 @@ import type { SpacesEditorNavigationState } from "../src/features/spaces/spacesS
 // DOM events are deterministic doubles, not native browser history/focus proof.
 const hooks = vi.hoisted(() => ({ cursor: 0, slots: [] as unknown[], effects: [] as (() => void)[],
   cleanups: new Map<number, () => void>(), params: new URLSearchParams(), locationKey: "entry-d", pathname: "/spaces", setParams: vi.fn(),
+  action: "POP" as "POP" | "PUSH" | "REPLACE",
 }));
 vi.mock("react", async (load) => ({ ...await load<typeof import("react")>(),
   useRef: (initial: unknown) => { const i = hooks.cursor++; return hooks.slots[i] ?? (hooks.slots[i] = { current: initial }); },
@@ -32,6 +33,7 @@ vi.mock("react", async (load) => ({ ...await load<typeof import("react")>(),
 vi.mock("react-router", async (load) => ({ ...await load<typeof import("react-router")>(),
   useLocation: () => ({ pathname: hooks.pathname, key: hooks.locationKey, search: "?" + hooks.params, hash: "", state: null }),
   useNavigate: () => hooks.setParams,
+  useNavigationType: () => hooks.action,
 }));
 const owner: SpacesEditorNavigationState = { engaged: true, pending: false, label: "104-D", authorityLost: false };
 const idle = { ...owner, engaged: false };
@@ -49,6 +51,7 @@ beforeEach(() => {
   hooks.cursor = 0; hooks.slots = []; hooks.effects = []; hooks.cleanups.clear(); listeners.clear();
   raw(original, "entry-d"); hooks.setParams.mockReset();
   hooks.pathname = "/spaces";
+  hooks.action = "POP";
   vi.stubGlobal("window", {
     addEventListener: (_name: string, listener: (event: BeforeUnloadEvent) => void) => listeners.add(listener),
     removeEventListener: (_name: string, listener: (event: BeforeUnloadEvent) => void) => listeners.delete(listener),
@@ -89,6 +92,16 @@ describe("selected reservation uses the same route lease", () => {
 });
 
 describe("Spaces route hold — deterministic ownership, not rendered aftergate", () => {
+  it.each(["POP", "PUSH", "REPLACE"] as const)("pairs raw %s metadata with the requested location while the editor keeps its effective location", action => {
+    engage(); raw(requested, "new-request"); hooks.action = action;
+    const value = render();
+    expect(value.rawNavigationType).toBe(action);
+    expect(value.rawLocation.key).toBe("new-request");
+    expect(value.rawLocation.search).toBe("?" + requested);
+    expect(value.effectiveLocation.search).toBe("?" + original);
+    expect(value.paused).toBe(true);
+    expect(hooks.setParams).not.toHaveBeenCalled();
+  });
   it("leaves normal unopened/completed navigation alone", () => {
     const before = render(); before.reportOwner(idle); raw(requested);
     const after = render(); expect(after.params.toString()).toBe(requested); expect(after.paused).toBe(false);

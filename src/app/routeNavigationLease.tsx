@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { createSearchParams, useLocation, useNavigate, type Location, type SetURLSearchParams } from "react-router";
+import { createSearchParams, useLocation, useNavigate, useNavigationType, type Location, type SetURLSearchParams } from "react-router";
 import { spacesNavigationAuthorityKey, spacesRouteIsPaused, type SpacesEditorNavigationState } from "../features/spaces/spacesSectionRoute";
 import { useSession } from "./session";
 import { sessionIdentityKey } from "./singleFlightRefresh";
@@ -22,6 +22,9 @@ export function reservationLeaseAdmissionAllowed(actor: string, params: URLSearc
 // grants or request payloads. Existing controllers own those and evaluate live access.
 export function useRouteNavigationLease(actor: string, selectedPropertyId: string) {
   const rawLocation = useLocation(), navigate = useNavigate();
+  // Capture alongside rawLocation, above controlled Routes: its location
+  // override reports POP to descendants even for an actual REPLACE.
+  const rawNavigationType = useNavigationType();
   const rawParams = new URLSearchParams(rawLocation.search);
   const authority = JSON.stringify([actor, selectedPropertyId]);
   const admissionAllowed = rawLocation.pathname === "/reservations"
@@ -116,7 +119,7 @@ export function useRouteNavigationLease(actor: string, selectedPropertyId: strin
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [held?.engaged]);
 
-  return { rawLocation, effectiveLocation, params: new URLSearchParams(effectiveLocation.search), rawParams,
+  return { rawLocation, rawNavigationType, effectiveLocation, params: new URLSearchParams(effectiveLocation.search), rawParams,
     setParams, reportOwner, editorKey, engaged: Boolean(held?.engaged), pending: Boolean(held?.pending), ownerLabel: held?.label ?? "this task",
     paused: Boolean(held?.engaged && !sameLeasedLocation(held.location, rawLocation)), expanded: state.collapsedRequest !== requestKey,
     stay, review, discard };

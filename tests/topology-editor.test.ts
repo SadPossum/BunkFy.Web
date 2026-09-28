@@ -109,7 +109,8 @@ describe("shared room/bed editor authority and exact receipts", () => {
     expect(spaces).toContain("<TopologyRetirementPanel");
     expect(spaces).toContain('sources={detailSources} title="Physical bed details are not current"');
     expect(spaces).toContain("requestedBedId ?? \"\", requestedUnitId ?? \"\"");
-    expect(spaces).toContain('if (topologyEditor.target?.kind === "room" && !topologyEditor.target.room) return;');
+    expect(spaces).toContain('&& !(topologyEditor.target?.kind === "room" && !topologyEditor.target.room)');
+    expect(spaces).toContain('if (!awaitingDefaultRoom || !canonicalRoomId) return;');
     const legacy = read("properties/PropertiesPage.tsx");
     expect(legacy.indexOf("const topologyEditor = useTopologyEditor")).toBeLessThan(legacy.indexOf('if (targetEdit !== "room"'));
     expect(legacy).toContain('`${topologyEditor.context}:${targetEdit}:${targetId}`');

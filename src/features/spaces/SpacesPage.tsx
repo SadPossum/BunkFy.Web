@@ -479,28 +479,6 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
 
   useEffect(() => {
     if (routeIssue) return;
-    if (!layoutOpen || hasRequestedRoom || hasRequestedBed || hasRequestedUnit || searchParams.has("blockGroup") || !canonicalRoomId) return;
-    if (topologyEditor.target?.kind === "room" && !topologyEditor.target.room) return;
-    const next = new URLSearchParams(searchParams);
-    next.set("property", targetPropertyId);
-    next.set("section", section);
-    next.set("room", canonicalRoomId);
-    setSearchParams(next, { replace: true });
-  }, [
-    canonicalRoomId,
-    routeIssue,
-    hasRequestedBed,
-    hasRequestedRoom,
-    hasRequestedUnit,
-    layoutOpen,
-    searchParams,
-    setSearchParams,
-    targetPropertyId,
-    topologyEditor.target,
-  ]);
-
-  useEffect(() => {
-    if (routeIssue) return;
     if (!availabilityOpen || hasRequestedRange || !propertyDefaultRange) return;
     const next = new URLSearchParams(searchParams);
     next.set("property", targetPropertyId);
@@ -626,24 +604,40 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
   const hasUsableLayoutSource = compositeSourceUsable(roomSource.state)
     || (mayReadInventory && compositeSourceUsable(inventorySource.state));
   const layoutNoticeSources = primarySources.filter((source) => hasUsableLayoutSource || source !== roomSource);
+  const awaitingDefaultRoom = !routeIssue && layoutOpen && !hasRequestedRoom && !hasRequestedBed && !hasRequestedUnit
+    && !searchParams.has("blockGroup") && Boolean(canonicalRoomId)
+    && !(topologyEditor.target?.kind === "room" && !topologyEditor.target.room);
   const retryFocus = useSpacesRetryFocus({
-    owner: JSON.stringify([sessionIdentityKey(session), targetPropertyId, searchParams.toString(),
-      navigation.rawLocation.key, navigation.rawLocation.pathname, navigation.rawLocation.search,
+    owner: JSON.stringify([sessionIdentityKey(session), targetPropertyId,
       availabilityRange.arrival, availabilityRange.departure, mayReadProperties, mayReadInventory,
       mayManageRooms, mayManageBeds, mayConfigureInventory, mayManageBlocks, mayRetireInventory]),
+    location: { ...navigation.rawLocation, effectiveSearch: searchParams.toString(), action: navigation.rawNavigationType },
+    awaitingDefaultRoom,
     enabled: !routeIssue && !focusedSurfaceOpen && !workspaceLocked && !navigation.paused
-      && permissionCurrent && propertyDirectoryCurrent && mayReadProperties && Boolean(targetProperty),
+      && mayReadProperties && Boolean(targetProperty),
+    current: permissionCurrent && propertyDirectoryCurrent,
     ready: [roomSource, ...(mayReadInventory ? [inventorySource, ...(availabilityRangeValid ? [availabilitySource] : [])] : [])]
       .every(compositeSourceCurrent),
     denied: authorityLost || [access.error, workspace.propertiesError, roomsQuery.error, inventoryQuery.error, availabilityQuery.error]
       .some(error => error instanceof ApiError && (error.status === 401 || error.status === 403)),
     notices: {
       layout: { active: !focusedSurfaceOpen, pending: layoutNoticeSources.some(source => source.isFetching),
-        retryable: layoutNoticeSources.some(source => compositeSourceNeedsRetry(source.state)) },
+        retryable: layoutNoticeSources.some(source => compositeSourceNeedsRetry(source.state)),
+        cold: { pending: roomSource.isFetching, retryable: compositeSourceNeedsRetry(roomSource.state) } },
       availability: { active: !focusedSurfaceOpen && mayReadInventory && availabilityRangeValid,
-        pending: availabilitySource.isFetching, retryable: compositeSourceNeedsRetry(availabilitySource.state) },
+        pending: availabilitySource.isFetching, retryable: compositeSourceNeedsRetry(availabilitySource.state),
+        cold: { pending: availabilitySource.isFetching, retryable: compositeSourceNeedsRetry(availabilitySource.state) } },
     },
   });
+  useEffect(() => {
+    if (!awaitingDefaultRoom || !canonicalRoomId) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("property", targetPropertyId);
+    next.set("section", section);
+    next.set("room", canonicalRoomId);
+    retryFocus.prepareDefaultRoom(canonicalRoomId, next);
+    setSearchParams(next, { replace: true });
+  }, [awaitingDefaultRoom, canonicalRoomId, searchParams, section, targetPropertyId, retryFocus, setSearchParams]);
 
   if (routeIssue) return <TargetUnavailable title="Spaces link needs one exact context" description={routeIssue} />;
 
@@ -766,7 +760,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
   const availabilityNotice = mayReadInventory ? <>
     {!availabilityRangeValid ? <p role="status" className="px-4 py-3 text-sm">Choose valid dates to check availability.</p> : compositeSourceUsable(availabilitySource.state)
       ? <div ref={retryFocus.availabilityNotice} className="contents" onClickCapture={retryFocus.remember}><CompositeSourceNotice className="mx-4 my-3 flex sm:mx-5" sources={[availabilitySource]} title="Availability is not current" keepRetryFocusable /></div>
-      : <CompositeSourceFallback error={availabilityMismatch ? new Error("The availability did not match these dates.") : permissionCurrent ? availabilityQuery.error : access.error} state={availabilitySource.state} label="availability" retry={() => void availabilitySource.refetch()} title="Availability could not be loaded" />}
+      : <div ref={retryFocus.availabilityFallback} className="contents" onClickCapture={retryFocus.remember}><CompositeSourceFallback error={availabilityMismatch ? new Error("The availability did not match these dates.") : permissionCurrent ? availabilityQuery.error : access.error} state={availabilitySource.state} label="availability" retry={() => void availabilitySource.refetch()} title="Availability could not be loaded" /></div>}
     {availabilityModel.contextMismatch && <p role="alert" className="px-4 py-3 text-sm text-warning-content">Availability could not be matched to the current selling setup. Dates and selection are kept; no availability is assumed.</p>}
   </> : null;
   const inspector = <>
@@ -801,7 +795,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
     {!holdsOpen && !selectedRoom && holds}
     {retirementEditor.target && <TopologyRetirementPanel editor={retirementEditor} inline mayReadReservations={mayReadReservations} blocksHref={retirementBlocksHref} mayUseTemporaryBlock={Boolean(retirementUnit?.isTopologyActive && retirementUnit.isSellable)} />}
   </>;
-  const layoutFeedback = !hasUsableLayoutSource ? <CompositeSourceFallback error={roomsMismatch ? new Error("The rooms did not match this property.") : roomsQuery.error} state={roomSource.state} label="room layout" retry={() => void roomSource.refetch()} title="Room layout could not be loaded" />
+  const layoutFeedback = !hasUsableLayoutSource ? <div ref={retryFocus.layoutFallback} className="contents" onClickCapture={retryFocus.remember}><CompositeSourceFallback error={roomsMismatch ? new Error("The rooms did not match this property.") : roomsQuery.error} state={roomSource.state} label="room layout" retry={() => void roomSource.refetch()} title="Room layout could not be loaded" /></div>
     : layout.rooms.length === 0 && !layoutConfirmedEmpty ? <TargetUnconfirmedPanel title="Confirming room layout" description="The required sources are not current. This property is not confirmed empty." />
       : layout.rooms.length === 0 ? <EmptyState icon={<Layers3 />} title="No rooms configured" description={mayManageRooms ? "Add the first room above, then give its beds recognizable labels." : "A property manager can add the first room."} /> : null;
   return <>
