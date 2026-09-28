@@ -13,6 +13,7 @@ describe("runtime product capabilities", () => {
 
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: true,
+      staffPinEnabled: false,
     });
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/product-capabilities");
   });
@@ -22,6 +23,7 @@ describe("runtime product capabilities", () => {
 
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: false,
+      staffPinEnabled: false,
     });
   });
 
@@ -33,6 +35,29 @@ describe("runtime product capabilities", () => {
 
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: false,
+      staffPinEnabled: false,
+    });
+  });
+
+  it("enables staff PIN only from the composed API boolean", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ emailVerificationEnabled: false, staffPinEnabled: true }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+    await expect(loadProductCapabilities()).resolves.toEqual({
+      emailVerificationEnabled: false,
+      staffPinEnabled: true,
+    });
+  });
+
+  it.each(["true", 1, null, false])("does not enable staff PIN for %j", async (staffPinEnabled) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ emailVerificationEnabled: true, staffPinEnabled }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+    await expect(loadProductCapabilities()).resolves.toEqual({
+      emailVerificationEnabled: true,
+      staffPinEnabled: false,
     });
   });
 });

@@ -41,6 +41,7 @@ import {
 } from "./AccountSecurityPanels";
 import { AccountSessionsPanel } from "./AccountSessionsPanel";
 import { AccountStaffProfilePanel } from "./AccountStaffProfilePanel";
+import { StaffPinPanel } from "./StaffPinPanel";
 import {
   accountSection,
   accountSectionSearchParams,
@@ -319,6 +320,7 @@ export function AccountPage() {
                 <div className="divide-y divide-base-300">
                   {authentication ? <PasswordPanel methods={authentication} action={passwordAction} mutation={security} canMutate={methodsCurrent} onAction={openPasswordAction} /> : <AccountSourcePanel title="Password" description="Password sign-in status and changes." state={methodsSource.state} label="sign-in methods" />}
                   <MultiFactorPanel status={mfaUsable ? mfaStatus.data : undefined} sourceState={mfaSource.state} canMutate={mfaCurrent} />
+                  <StaffPinPanel />
                   {authentication && <EmailPanel methods={authentication} mutation={security} canMutate={methodsCurrent} />}
                   {authentication && <ProviderPanel methods={authentication} availableProviders={availableProviders} catalogueState={providerSource.state} linkingProvider={linkingProvider} unlinkIdentity={unlinkIdentity} mutation={security} canLink={methodsCurrent && providersCurrent} canUnlink={methodsCurrent} linkError={providerLinkError} onLink={linkProvider} onUnlink={openUnlink} />}
                 </div>

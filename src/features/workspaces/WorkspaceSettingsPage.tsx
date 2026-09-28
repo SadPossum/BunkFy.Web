@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { DatabaseZap, Settings2, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
+import { DatabaseZap, Monitor, Settings2, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import type {
@@ -31,6 +31,8 @@ import { WorkspaceMembersSettings } from "./WorkspaceMembersSettings";
 import { useWorkspaceCatalogueSource } from "./WorkspaceCatalogueNotice";
 import { RetentionHealthSettings } from "./RetentionHealthSettings";
 import { WorkspaceRolesSettings } from "./WorkspaceRolesSettings";
+import { WorkspaceStationsSettings } from "./WorkspaceStationsSettings";
+import { useProductCapabilities } from "../../app/productCapabilities";
 import {
   resolveWorkspaceSettingsCapabilities,
   shouldRedirectWorkspaceSettingsTab,
@@ -46,6 +48,7 @@ import {
 const MEMBERS_PAGE_SIZE = 25;
 
 export function WorkspaceSettingsPage() {
+  const { staffPinEnabled } = useProductCapabilities();
   const { request, session } = useSession();
   const {
     selectedWorkspace,
@@ -200,6 +203,7 @@ export function WorkspaceSettingsPage() {
   }
 
   const navigation = [
+    { value: "stations" as const, label: "Shared stations", description: "Staff PIN and shared browsers", icon: Monitor, visible: staffPinEnabled },
     {
       value: "general" as const,
       label: "Workspace",
@@ -319,6 +323,7 @@ export function WorkspaceSettingsPage() {
               onSaved={refetchWorkspaces}
             />
           )}
+          {tab === "stations" && (staffPinEnabled ? <WorkspaceStationsSettings /> : <p className="text-sm">Shared stations are not enabled for this environment.</p>)}
           {tab === "members" && capabilities.canReadMembers && (
             <WorkspaceMembersSettings
               workspace={workspace}

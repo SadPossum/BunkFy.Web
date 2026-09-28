@@ -12,6 +12,9 @@ import {
   ProductCapabilitiesProvider,
 } from "./app/productCapabilities";
 import { SessionProvider } from "./app/session";
+import { StationPage } from "./features/stations/StationPage";
+import { isStationPath } from "./features/stations/stationTypes";
+import { installStationHandoff } from "./features/stations/stationHandoff";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -26,7 +29,25 @@ async function bootstrap() {
   if (!root) throw new Error("BunkFy app root was not found.");
 
   const capabilities = await loadProductCapabilities();
-  createRoot(root).render(
+  const appRoot = createRoot(root);
+  installStationHandoff(async setupGrantId => {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    window.history.replaceState(null, "", "/station");
+    appRoot.render(<StrictMode><RenderErrorBoundary fallback={<ApplicationRenderFailure />}>
+      <StationPage setupGrantId={setupGrantId} />
+    </RenderErrorBoundary></StrictMode>);
+  });
+  if (isStationPath(window.location.pathname)) {
+    appRoot.render(<StrictMode><RenderErrorBoundary fallback={<ApplicationRenderFailure />}>
+      {capabilities.staffPinEnabled ? <StationPage /> : <main className="mx-auto max-w-xl p-6">
+        <h1 className="text-xl font-semibold">Shared stations are not enabled</h1>
+        <p className="my-4">Ask your manager to check the station setup.</p><a className="btn btn-outline" href="/">Back to BunkFy</a>
+      </main>}
+    </RenderErrorBoundary></StrictMode>);
+    return;
+  }
+  appRoot.render(
     <StrictMode>
       <RenderErrorBoundary fallback={<ApplicationRenderFailure />}>
         <ProductCapabilitiesProvider capabilities={capabilities}>

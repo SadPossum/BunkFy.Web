@@ -1,5 +1,6 @@
 export type WorkspaceSettingsTab =
   | "general"
+  | "stations"
   | "members"
   | "roles"
   | "invites"
@@ -47,6 +48,7 @@ export function canOpenWorkspaceSettingsTab(
 ): boolean {
   switch (tab) {
     case "general":
+    case "stations":
       return true;
     case "members":
       return capabilities.canReadMembers;
@@ -68,7 +70,7 @@ export function shouldRedirectWorkspaceSettingsTab(
 }
 
 export function workspaceSettingsTab(value: string | null): WorkspaceSettingsTab {
-  return value === "members" || value === "roles" || value === "invites" || value === "retention"
+  return value === "members" || value === "roles" || value === "invites" || value === "retention" || value === "stations"
     ? value
     : "general";
 }
