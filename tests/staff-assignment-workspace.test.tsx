@@ -19,6 +19,8 @@ import {StaffPage} from '/src/features/staff/StaffPage.tsx';
 import '/src/styles.css';
 const assignment={assignmentId:'assignment-a',propertyId:'property-a',propertyJobTitle:'Night reception',isPrimary:true,effectiveFrom:'2026-09-01'};
 const member={staffMemberId:'member',displayName:'Morgan Lee',jobTitle:'Hostel manager',status:'active',version:7,assignments:[assignment]};
+const sequence=new URLSearchParams(location.search).has('sequence');
+if(sequence)member.assignments.push({assignmentId:'assignment-c',propertyId:'property-c',propertyJobTitle:'Relief reception',isPrimary:false,effectiveFrom:'2026-09-02'});
 window.integrationProperties=[{propertyId:'property-a',name:'Harbour House',code:'HAR',status:'active',version:3},{propertyId:'property-b',name:'Canal Annex',code:'CAN',status:'active',version:5},{propertyId:'property-c',name:'Garden Lodge',code:'GAR',status:'active',version:2}];
 window.integrationProperties.push(...Array.from({length:35},(_,i)=>({propertyId:'other-'+i,name:'Other hostel '+i,code:'QA'+i,status:'active',version:1})));
 window.integrationRequests=[];window.integrationHoldB=false;window.integrationPending=[];
@@ -28,10 +30,10 @@ window.integrationRequest=async(path,options)=>{
   const {checks}=JSON.parse(options.body);
   if(checks.length>32)throw Error('API32-check limit exceeded');
   if(window.integrationHoldB&&checks.some(c=>c.scope.endsWith('/property:property-b')))await new Promise(resolve=>window.integrationPending.push(resolve));
-  return {permissions:checks.map(c=>({...c,allowed:!c.scope.endsWith('/property:property-c')}))};
+  return {permissions:checks.map(c=>({...c,allowed:sequence||!c.scope.endsWith('/property:property-c')}))};
  }
  if(method!=='GET')throw Error('Unexpected integrated mutation');
- if(path.endsWith('/profile'))return {...member,authSubjectId:null,createdAtUtc:'2026-09-01T00:00:00Z',lastChangedAtUtc:'2026-09-01T00:00:00Z'};
+ if(path.endsWith('/profile'))return {...member,authSubjectId:null,createdAtUtc:'2026-09-01T00:00:00Z',lastChangedAtUtc:'2026-09-01T00:00:00Z',assignments:sequence?[...member.assignments.map(a=>({...a,assignedAtUtc:'2026-09-01T00:00:00Z',isCurrent:true})),{assignmentId:'ended-b',propertyId:'property-b',propertyJobTitle:'Previous cover',isPrimary:false,effectiveFrom:'2026-08-01',effectiveTo:'2026-08-30',assignedAtUtc:'2026-08-01T00:00:00Z',isCurrent:false}]:member.assignments};
  if(path==='/api/staff/members/member')return member;
  if(path.startsWith('/api/staff/members?'))return {items:[member],page:1,pageSize:30,hasMore:false};
  throw Error('Unexpected integrated read '+path);
@@ -41,7 +43,7 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
 `;
 
 describe("Staff page with the actual permission registry", () => {
-  it("keeps the deep link and local draft mounted as assignment permissions settle", async () => {
+  it.each([false, 640, 800])("keeps the real page mounted and its owned editor visible (composed sequence=%s)", async sequence => {
     const entry = process.cwd() + "/__staff_integrated_fixture.tsx";
     const runtimeErrors: string[] = [];
     const integrated = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-staff-integrated-")), logLevel: "error",
@@ -61,12 +63,52 @@ describe("Staff page with the actual permission registry", () => {
       }], server: { host: "127.0.0.1", port: 0 },
     });
     await integrated.listen();
-    const page = await browser.newPage({ viewport: { width: 320, height: 800 } });
+    const page = await browser.newPage({ viewport: { width: sequence ? 1024 : 320, height: 800 } });
+    page.setDefaultTimeout(6000);
     page.on("pageerror", error => runtimeErrors.push(error.message));
     page.on("console", message => { if (message.type() === "error") runtimeErrors.push(message.text()); });
     try {
-      await page.goto(integrated.resolvedUrls!.local[0] + "__staff-integrated");
+      await page.goto(integrated.resolvedUrls!.local[0] + "__staff-integrated" + (sequence ? "?sequence=1" : ""));
       await page.getByRole("heading", { name: /^Current work locations/ }).waitFor({ timeout: 6000 });
+      if (sequence) {
+        const history = page.locator("summary").filter({ hasText: "Assignment history" });
+        await activate(page, history);
+        await addAtCanal(page);
+        const job = page.locator('input[name="propertyJobTitle"]');
+        await tabTo(page, job); await page.keyboard.type("Retained draft");
+        await page.setViewportSize({ width: 320, height: Number(sequence) }); await settle(page);
+        expect(await fieldPaintContained(job)).toBe(true);
+        await activate(page, page.getByRole("button", { name: "Cancel", exact: true }));
+        await page.setViewportSize({ width: 1024, height: 800 });
+        const end = page.getByRole("button", { name: "End assignment at Garden Lodge", exact: true });
+        await activate(page, end);
+        const reason = page.locator('textarea[name="reason"]');
+        // Entry owns this focus. Do not use fill(), locator.focus(), or Tab
+        // away/back: those would hide the initial-focus listener gap.
+        expect(await reason.evaluate(e => e === document.activeElement)).toBe(true);
+        await page.keyboard.type("Read-only sequence draft");
+        const entryContained = await fieldPaintContained(reason);
+        if (process.env.BUNKFY_QA_CAPTURE_DIR) await page.screenshot({ path: join(process.env.BUNKFY_QA_CAPTURE_DIR, `composed-end-entry-${sequence}.png`) });
+        const draft = await reason.evaluate(e => ({ value: (e as HTMLTextAreaElement).value, caret: (e as HTMLTextAreaElement).selectionStart }));
+        await page.setViewportSize({ width: 320, height: Number(sequence) }); await settle(page);
+        if (process.env.BUNKFY_QA_CAPTURE_DIR) await page.screenshot({ path: join(process.env.BUNKFY_QA_CAPTURE_DIR, `composed-end-reflow-320x${sequence}.png`) });
+        expect(await reason.evaluate(e => e === document.activeElement)).toBe(true);
+        expect(await reason.evaluate(e => ({ value: (e as HTMLTextAreaElement).value, caret: (e as HTMLTextAreaElement).selectionStart }))).toEqual(draft);
+        expect(entryContained).toBe(true);
+        expect(await fieldPaintContained(reason)).toBe(true);
+        await activate(page, page.getByRole("button", { name: "Cancel", exact: true }));
+        expect(await end.evaluate(e => e === document.activeElement)).toBe(true);
+        await page.setViewportSize({ width: 1024, height: 800 });
+        await addAtCanal(page); await tabTo(page, job); await page.keyboard.type("Second editor draft");
+        await page.setViewportSize({ width: 320, height: Number(sequence) }); await settle(page);
+        expect(await fieldPaintContained(job)).toBe(true);
+        expect(await job.inputValue()).toContain("Second editor draft");
+        await activate(page, page.getByRole("button", { name: "Cancel", exact: true }));
+        expect(await page.getByRole("button", { name: "Add work location", exact: true }).evaluate(e => e === document.activeElement)).toBe(true);
+        expect(await page.evaluate(() => (window as unknown as { integrationRequests: { path: string; method: string }[] }).integrationRequests.filter(r => r.method !== "GET" && r.path !== "/api/access/permissions/evaluate"))).toEqual([]);
+        expect(runtimeErrors).toEqual([]);
+        return;
+      }
       await page.evaluate(() => { (window as unknown as { integrationHoldB: boolean }).integrationHoldB = true; });
       await addAtCanal(page);
       await expect.poll(() => page.evaluate(() => (window as unknown as { integrationPending: unknown[] }).integrationPending.length)).toBe(1);
@@ -86,6 +128,9 @@ describe("Staff page with the actual permission registry", () => {
       expect(await page.evaluate(() => (window as unknown as { integrationRequests: unknown[] }).integrationRequests.length)).toBeLessThan(30);
       expect(await page.evaluate(() => (window as unknown as { integrationRequests: { path: string; method: string }[] }).integrationRequests.filter(r => r.method !== "GET" && r.path !== "/api/access/permissions/evaluate"))).toEqual([]);
       expect(runtimeErrors).toEqual([]);
+    } catch (error) {
+      if (sequence && process.env.BUNKFY_QA_CAPTURE_DIR) await page.screenshot({ path: join(process.env.BUNKFY_QA_CAPTURE_DIR, `composed-failure-${sequence}.png`) });
+      throw error;
     } finally { await page.close(); await integrated.close(); }
   }, 30000);
 });
@@ -279,6 +324,35 @@ describe("assignment focused field reflow", () => {
       await page.mouse.up();
       expect(await writes(page)).toEqual([]);
     } finally { await page.mouse.up(); await page.close(); }
+  }, 15000);
+
+  it("does not replay consumed entry after manual scroll and authority recovery", async () => {
+    const page = await open(1024);
+    try {
+      await twoLocations(page); await endAtHarbour(page);
+      const field = page.locator('textarea[name="reason"]');
+      await page.setViewportSize({ width: 320, height: 640 }); await settle(page);
+      expect(await fieldPaintContained(field)).toBe(true);
+      await page.mouse.move(150, 250); await page.mouse.wheel(0, -2000);
+      await expect.poll(() => field.evaluate(e => e.closest("[data-bunkfy-modal-box]")!.children[1].scrollTop)).toBe(0);
+      expect(await fieldPaintContained(field)).toBe(false);
+      await field.evaluate(e => {
+        const port = e.closest("[data-bunkfy-modal-box]")!.children[1];
+        const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop")!;
+        const calls: number[] = []; Object.assign(window, { entryScrollWrites: calls });
+        Object.defineProperty(port, "scrollTop", { configurable: true, get: () => descriptor.get!.call(port), set: value => { calls.push(value); descriptor.set!.call(port, value); } });
+      });
+      await change(page, { permissionState: "refreshing" });
+      await change(page, { permissionState: "unavailable" });
+      await change(page, { permissionState: "ready" });
+      // React may preserve the same scroll position when disabling a focused
+      // field. Reject any pullback, not a no-op write of the manual position.
+      expect(await page.evaluate(() => (window as unknown as { entryScrollWrites: number[] }).entryScrollWrites.every(value => value === 0))).toBe(true);
+      expect(await field.evaluate(e => e.closest("[data-bunkfy-modal-box]")!.children[1].scrollTop)).toBe(0);
+      expect(await fieldPaintContained(field)).toBe(false);
+      expect(await field.inputValue()).toBe("Rotation to the other hostel");
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
   }, 15000);
 
   it.each(["independent Close", "nested modal", "authority lost"])("does not reveal the old editor after %s", async boundary => {

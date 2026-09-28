@@ -52,6 +52,7 @@ export function StaffAssignmentsPanel({
   const form = useRef<HTMLFormElement>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
   const restore = useRef<{ owner: string; button: HTMLButtonElement | null; previous: Element | null } | null>(null);
+  const revealedEntry = useRef<{ owner: string; id: number } | null>(null);
   const headingId = useId();
   const owner = `${tenantId}:${member.staffMemberId}:${session?.subjectId ?? session?.username ?? ""}:${session?.sessionId ?? session?.generation ?? ""}`;
   const currentAssignments = [...member.assignments].filter(assignmentIsCurrent)
@@ -152,6 +153,10 @@ export function StaffAssignmentsPanel({
     // must not take focus away from the picker, fields or an independent task.
   }, [target?.id, owner]);
   useEffect(() => {
+    const initialEntry = Boolean(target && (revealedEntry.current?.owner !== owner || revealedEntry.current.id !== target.id));
+    // Consume this explicit entry even when authority or focus disqualifies it.
+    // Recovery must not replay a reveal over the operator's later scroll.
+    revealedEntry.current = target ? { owner, id: target.id } : null;
     const editor = form.current, modal = editor?.closest<HTMLElement>("[data-bunkfy-modal-box]");
     if (!targetAuthorityCurrent || mutation.isPending || !editor || !modal) return;
     let port = editor.parentElement;
@@ -195,7 +200,9 @@ export function StaffAssignmentsPanel({
     };
     const startPointer = () => { pointerDown = true; clear(); };
     const endPointer = () => { pointerDown = false; remember(); };
-    remember();
+    // Layout-effect entry focus happened before this listener was installed.
+    // Expose that already focused field once, including its label and ring.
+    if (initialEntry) entered(); else remember();
     editor.addEventListener("focusin", entered); editor.addEventListener("focusout", clear);
     scrollport.addEventListener("scroll", remember, { passive: true });
     scrollport.addEventListener("wheel", clear, { passive: true }); scrollport.addEventListener("pointerdown", startPointer);
