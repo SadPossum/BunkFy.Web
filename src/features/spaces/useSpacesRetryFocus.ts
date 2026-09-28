@@ -57,11 +57,13 @@ export function useSpacesRetryFocus({ owner, location, awaitingDefaultRoom = fal
   }
   function prepareDefaultRoom(roomId: string, next: URLSearchParams) {
     const intent = retry.current;
-    if (!intent || !intent.cold || intent.canonicalUsed || !location
+    if (!intent || intent.canonicalUsed || !location
       || intent.owner !== owner || intent.location !== locationKey(location) || !enabled || denied) return;
     const previous = new URLSearchParams(location.search);
     if (["room", "bed", "unit", "blockGroup"].some(key => previous.has(key))) return;
     previous.set("room", roomId);
+    // The global source notice can recover the same no-room task as a cold
+    // fallback. Its DOM slot does not change this exact one-use receipt.
     // No other canonicalization, filter, date or authority change can hitch a
     // ride. Only the caller's immediate automatic default-room REPLACE counts.
     if (previous.toString() !== next.toString() || location.effectiveSearch !== new URLSearchParams(location.search).toString()) return;

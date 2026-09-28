@@ -76,7 +76,7 @@ export const useFixture=()=>useSyncExternalStore(fn=>{listeners.add(fn);return()
 export const update=value=>{state={...state,...value};listeners.forEach(fn=>fn())};
 const options=new URLSearchParams(location.search);
 const availability=options.has("availability");
-const modes={rooms:options.has("heldLayout")?"held":availability?"ready":"failed",inventory:availability&&!options.has("heldLayout")?"ready":"held",availability:availability?"failed":"ready",beds:"ready",blocks:"ready"};
+const modes={rooms:options.has("heldLayout")?"held":availability?"ready":"failed",inventory:options.has("globalRetry")?"failed":availability&&!options.has("heldLayout")?"ready":"held",availability:availability?"failed":"ready",beds:"ready",blocks:"ready"};
 const pending=new Map();
 const calls=[];
 function response(kind,path){
@@ -207,6 +207,28 @@ async function openSpacesPage(width: number, query = "") {
 }
 
 describe("actual SpacesPage cold recovery", () => {
+  it.each([{width:320,key:"Enter"},{width:1024,key:"Space"}])("$width global Sellability Retry owns its exact default-room recovery via $key", async ({width,key}) => {
+    const page = await openSpacesPage(width, "?noRoom&globalRetry");
+    try {
+      const retry = page.getByRole("status").filter({hasText:"Some Spaces information is delayed"}).getByRole("button", {name:"Try again",exact:true});
+      await retry.waitFor(); const original = await retry.elementHandle();
+      await pageControl(page,"mode","inventory","held");
+      await retry.focus(); await retry.press(key);
+      await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
+      await pageControl(page,"update",{current:false});
+      await pageControl(page,"settle","inventory");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor(); expect(await heading.evaluate(el=>el===document.activeElement)).toBe(false);
+      const locations = await page.evaluate(()=>(window as unknown as {pageHarness:{locations:{action:string}[]}}).pageHarness.locations);
+      expect(locations).toHaveLength(2); expect(locations[1].action).toBe("REPLACE");
+      await page.context().setOffline(true); await pageControl(page,"mode","rooms","ready"); await page.context().setOffline(false);
+      await pageControl(page,"update",{current:true});
+      await expect.poll(()=>heading.evaluate(el=>el===document.activeElement)).toBe(true);
+      const box=await heading.boundingBox();expect(box!.y).toBeGreaterThanOrEqual(0);expect(box!.y+box!.height).toBeLessThanOrEqual(800);
+      expect(await heading.evaluate(el=>getComputedStyle(el).outlineStyle)).not.toBe("none");
+    } finally {await page.close();}
+  },30000);
+
   it("cold availability retains ownership through its independently loaded default room", async () => {
     const page = await openSpacesPage(320, "?availability&noRoom&heldLayout");
     try {
@@ -298,12 +320,13 @@ describe("actual SpacesPage cold recovery", () => {
     } finally { await page.close(); }
   }, 30000);
 
-  it.each(["focus", "Tab", "Escape", "pointer", "denied", "unmount", "session", "room PUSH", "unmatched REPLACE", "same-url PUSH", "POP", "second REPLACE"])("cold canonical recovery cannot steal focus after %s", async boundary => {
-    const page = await openSpacesPage(320, "?noRoom");
+  it.each(["focus", "Tab", "Escape", "pointer", "denied", "unmount", "session", "room PUSH", "unmatched REPLACE", "same-url PUSH", "POP", "second REPLACE"].flatMap(boundary => [{boundary,global:false},{boundary,global:true}]))("canonical recovery global=$global cannot steal focus after $boundary", async ({boundary,global}) => {
+    const page = await openSpacesPage(320, global ? "?noRoom&globalRetry" : "?noRoom");
     try {
-      const retry = page.getByRole("alert").filter({ hasText: "Room layout could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
+      const retry = global ? page.getByRole("status").filter({hasText:"Some Spaces information is delayed"}).getByRole("button",{name:"Try again",exact:true})
+        : page.getByRole("alert").filter({ hasText: "Room layout could not be loaded" }).getByRole("button", { name: "Try again", exact: true });
       await retry.waitFor(); const original = await retry.elementHandle();
-      await pageControl(page, "mode", "rooms", "held"); await retry.focus(); await retry.press("Enter");
+      await pageControl(page, "mode", global ? "inventory" : "rooms", "held"); await retry.focus(); await retry.press("Enter");
       await expect.poll(() => original!.evaluate(el => el.isConnected)).toBe(false);
       await pageControl(page, "update", { current: false });
       const unrelated = page.getByRole("button", { name: "Unrelated destination", exact: true });
@@ -319,6 +342,7 @@ describe("actual SpacesPage cold recovery", () => {
         await pageControl(page, "navigate", "/spaces" + route + (boundary === "same-url PUSH" ? "" : "&room=00000000-0000-4000-8000-000000000002"), { replace: boundary === "unmatched REPLACE" });
       }
       await pageControl(page, "settle", "rooms"); await pageControl(page, "settle", "inventory");
+      if (global) { await page.context().setOffline(true); await page.context().setOffline(false); }
       const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
       await heading.waitFor();
       if (boundary === "second REPLACE") {
@@ -327,6 +351,7 @@ describe("actual SpacesPage cold recovery", () => {
         await pageControl(page, "navigate", "/spaces" + route.search, { replace: true });
       }
       await pageControl(page, "update", { current: true });
+      await expect.poll(() => page.getByRole("button", {name:"Edit room",exact:true}).isEnabled()).toBe(true);
       expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
       if (boundary === "focus") expect(await unrelated.evaluate(el => el === document.activeElement)).toBe(true);
     } finally { await page.close(); }
