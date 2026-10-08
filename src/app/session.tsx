@@ -96,6 +96,7 @@ type SessionContextValue = {
   ) => Promise<ExternalAuthenticationCompletion>;
   cancelExternalAuthentication: () => void;
   logout: () => Promise<void>;
+  completeConfirmedBrowserSignOut: (expectedSessionId: string) => void;
   logoutAll: () => Promise<void>;
   stepUpWithPassword: (password: string) => Promise<void>;
   selectWorkspace: (workspaceId: string) => void;
@@ -678,6 +679,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [setSession],
   );
 
+  // Only for callers that already awaited exact browser revocation. A concurrent
+  // replacement session must not be cleared by an acknowledgement for the old one.
+  const completeConfirmedBrowserSignOut = useCallback((expectedSessionId: string) => {
+    if (!expectedSessionId || sessionRef.current?.sessionId !== expectedSessionId) {
+      throw new SessionIdentityMismatchError();
+    }
+    acceptsRefreshRef.current = false;
+    setSession(null);
+  }, [setSession]);
+
   const logout = useCallback(async () => {
     const active = sessionRef.current;
     acceptsRefreshRef.current = false;
@@ -750,6 +761,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       completeExternalAuthentication,
       cancelExternalAuthentication,
       logout,
+      completeConfirmedBrowserSignOut,
       logoutAll,
       stepUpWithPassword,
       selectWorkspace,
@@ -770,6 +782,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       download,
       isRestoring,
       logout,
+      completeConfirmedBrowserSignOut,
       logoutAll,
       request,
       restorationError,

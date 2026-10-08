@@ -86,6 +86,8 @@ describe("cookie-only station transport", () => {
     { path: "/setup/redeem", body: redeem, send: () => stationApi.redeem(redeem, csrf) },
     { path: "/check-in", body: checkIn, send: () => stationApi.checkIn(checkIn, csrf) },
     { path: "/check-in/outcome", body: outcome, send: () => stationApi.checkInOutcome(outcome, csrf) },
+    { path: "/check-out", body: checkIn, send: () => stationApi.checkOut(checkIn, csrf) },
+    { path: "/check-out/outcome", body: outcome, send: () => stationApi.checkOutOutcome(outcome, csrf) },
   ])("sends $path with CSRF in a header and only its operation body", async ({ path, body, send }) => {
     await send();
 
@@ -128,6 +130,18 @@ describe("cookie-only station transport", () => {
     expect(headers.has("X-BunkFy-Station-CSRF")).toBe(false);
   });
 
+  it("loads departures with the same cookie-only actor guard and opaque paging, never client property or date authority", async () => {
+    const controller = new AbortController();
+    await stationApi.departures({ actorSessionId, generation: 9 }, "opaque/+?cursor", controller.signal);
+    const { url, init, headers } = lastRequest();
+    expect(url.pathname).toBe("/api/station-runtime/departures");
+    expect([...url.searchParams.entries()]).toEqual([["cursor", "opaque/+?cursor"]]);
+    expect(headers.get("X-BunkFy-Station-Actor")).toBe(actorSessionId);
+    expect(headers.get("X-BunkFy-Station-Generation")).toBe("9");
+    expect(init.signal).toBe(controller.signal); expect(init.body).toBeUndefined();
+    expect(headers.has("Authorization")).toBe(false); expect(headers.has("X-Tenant-Id")).toBe(false);
+  });
+
   it("encodes roster search as data with the fixed page bound and no tenant/property authority", async () => {
     await stationApi.roster("A&B / ?", 2);
     const { url, headers } = lastRequest();
@@ -138,6 +152,13 @@ describe("cookie-only station transport", () => {
 });
 
 describe("station HTTP failure semantics", () => {
+  it("recovers only a complete guest-free incomplete-departures contract, not an actor conflict", async () => {
+    const incomplete = { state: 4, items: [], continuation: null, propertyId: null, propertyLocalDate: null };
+    fetchMock.mockResolvedValueOnce(json(incomplete, 409));
+    await expect(stationApi.departures({ actorSessionId, generation: 7 })).resolves.toEqual(incomplete);
+    fetchMock.mockResolvedValueOnce(json({ ...incomplete, code: "Station.StateChanged" }, 409));
+    await expect(stationApi.departures({ actorSessionId, generation: 7 })).rejects.toBeInstanceOf(StationRequestError);
+  });
   it("keeps an empty, typed incomplete-arrivals response separate from a station authority conflict", async () => {
     const incomplete = { state: 4, items: [], continuation: null, propertyId: null, propertyLocalDate: null };
     fetchMock.mockResolvedValueOnce(json(incomplete, 409));

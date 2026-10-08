@@ -21,6 +21,8 @@ const commands: { name: string; recovery: ManagementRecovery }[] = [
   { name: "GrantCheckIn", recovery: { id: id(17), command: { kind: 12, expectedVersion: 0, staffMemberId: id(7) } } },
   { name: "IssueSetup", recovery: { id: id(18), command: { kind: 13, expectedVersion: 0, stationId: id(4), browserSessionId: id(5), staffMemberId: id(7) } } },
   { name: "CancelSetup", recovery: { id: id(19), command: { kind: 14, expectedVersion: 0 } } },
+  { name: "GrantCheckOut", recovery: { id: id(20), command: { kind: 16, expectedVersion: 0, staffMemberId: id(7) } } },
+  { name: "RevokeCheckOutGrant", recovery: { id: id(21), command: { kind: 17, expectedVersion: 2, staffMemberId: id(7) } } },
 ];
 const values = new Map<string, string>();
 const storage = {

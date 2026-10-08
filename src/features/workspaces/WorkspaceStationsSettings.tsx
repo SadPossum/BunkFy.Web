@@ -23,7 +23,7 @@ export function WorkspaceStationsSettings() {
 }
 
 function StationsManager({ propertyId, propertyName }: { propertyId: string; propertyName: string }) {
-  const { request, session, logout } = useSession();
+  const { request, session, completeConfirmedBrowserSignOut } = useSession();
   const scope = tenantAccessScope(session!.tenantId);
   const access = usePermissions([{ permission: permissions.stationsManage, scope }]);
   const rootManager = access.hasData && !access.error && access.allows(permissions.stationsManage, scope);
@@ -51,6 +51,9 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
   const status = useQuery({ queryKey: ["stations", "staff-status", session?.generation, propertyId, chosen?.id],
     queryFn: ({ signal }) => request<StationStaffStatus>(`${endpoint}/staff/${chosen!.id}`, { signal }), enabled: Boolean(chosen), retry: false });
   const currentStaff = !status.error && !status.isFetching && status.data?.state === 0 ? status.data.item : null;
+  const hasStationOnlyTask = Boolean(currentStaff && (
+    currentStaff.localGrantPresent && !currentStaff.localGrantRevoked ||
+    currentStaff.checkOutGrantPresent && !currentStaff.checkOutGrantRevoked));
   const usable = stations.data?.state === 0 && !stations.error && !stations.isFetching;
 
   function applied(result: StationManagementResult, command: Command, recovered = false) {
@@ -80,6 +83,7 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
 
   async function execute(command: Command) {
     if (inFlight.current || operation || !usable) return;
+    if (command.kind === 13 && !hasStationOnlyTask) return;
     inFlight.current = true; setPending(true); setMessage("");
     const id = crypto.randomUUID(); let sent = false;
     try {
@@ -134,6 +138,8 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
 
   async function finish() {
     if (!paired || operation || inFlight.current) return;
+    const currentSessionId = session?.sessionId;
+    if (!currentSessionId) { setMessage("Your sign-in could not be identified. Refresh and finish manager setup before handing over this device."); return; }
     inFlight.current = true; setPending(true); setMessage("Signing out your account and securing the station…");
     try {
       savePairingContext(recoveryKey, paired);
@@ -149,7 +155,7 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
       // A local logout is insufficient. Require an acknowledged server sign-out first.
       await request<void>("/api/auth/browser/sign-out", { method: "POST" });
       try { savePairingContext(recoveryKey, null); } catch { /* Server acknowledgement remains definitive. */ }
-      await logout();
+      completeConfirmedBrowserSignOut(currentSessionId);
       await enterStation(setupGrant);
     } catch { setMessage("Sign-out is not confirmed. Do not hand over this device. Retry here; if you are asked to sign in, use the same manager account and reopen Shared stations to finish the exact original session. PIN setup must be prepared again if this page was reloaded."); }
     finally { inFlight.current = false; setPending(false); }
@@ -176,7 +182,7 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
           if (confirmation) { const command = confirmation.command; setConfirmation(null); void execute(command); }
         }}>Confirm change</button></ModalActions>
     </Modal>
-    <FormSection title="Shared stations" icon={<Monitor size={18} />} description={`Set up a shared browser at ${propertyName}. Staff sign in with their own PIN; guest check-ins retain their identity.`}>
+    <FormSection title="Shared stations" icon={<Monitor size={18} />} description={`Set up a shared browser at ${propertyName}. Staff use their own PIN; each guest action is recorded under their identity.`}>
       <p className="text-sm leading-6">Do this on the physical device staff will use. A manager’s recent multi-factor sign-in is required. Pairing does not grant staff permission.</p>
       {message && <p role="status" className="mt-4 rounded-lg border border-base-300 bg-base-200/40 p-3 text-sm leading-6">{message}</p>}
       {operation && <button className="btn btn-outline mt-3" disabled={pending} onClick={() => void recover()}>Check original result</button>}
@@ -192,14 +198,16 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
     {paired ? <FormSection title="Finish preparing this browser" icon={<ShieldCheck size={18} />}>
       <p className="text-sm leading-6">Your account is still signed in. Staff cannot unlock the station until your server session ends.</p>
       {chosen && currentStaff?.canIssueStationOnlySetup && rootManager && !setupGrant && <div className="mt-4 space-y-3">
-        <p className="text-sm leading-6">For <strong>{chosen.name}</strong> without a linked account, prepare a private PIN-creation step. Linked staff set their own PIN in Account → Security.</p>
-        <button className="btn btn-outline" disabled={pending || Boolean(operation)} onClick={() => void execute({ kind: 13, expectedVersion: currentStaff.pinRevision,
-          stationId: paired.stationId, browserSessionId: paired.browserSessionId, staffMemberId: chosen.id })}>Prepare staff PIN creation</button>
+        {hasStationOnlyTask ? <>
+          <p className="text-sm leading-6">For <strong>{chosen.name}</strong> without a linked account, prepare a private PIN-creation step. Linked staff set their own PIN in Account → Security.</p>
+          <button className="btn btn-outline" disabled={pending || Boolean(operation)} onClick={() => void execute({ kind: 13, expectedVersion: currentStaff.pinRevision,
+            stationId: paired.stationId, browserSessionId: paired.browserSessionId, staffMemberId: chosen.id })}>Prepare staff PIN creation</button>
+        </> : <p className="text-sm leading-6">Allow check-in or checkout for this staff member before preparing PIN creation. Pairing this browser does not grant task access.</p>}
       </div>}
       {!rootManager && chosen && <p className="mt-3 text-sm">PIN creation for staff without accounts needs a workspace-level station manager.</p>}
       <button className="btn btn-primary mt-5" disabled={pending || Boolean(operation)} onClick={() => void finish()}>{pending ? "Securing…" : "Sign out and open station"}</button>
     </FormSection> : <>
-      <FormSection title="1. Staff access" description="Register staff assigned to this property. Registration alone does not grant check-in permission.">
+      <FormSection title="1. Staff access" description="Register staff assigned to this property, then allow the station tasks they need. Registration alone grants no guest access.">
         <label className="block text-sm font-medium">Find staff<input className="input input-bordered mt-2 w-full" type="search" maxLength={100} value={search}
           onChange={event => { setSearch(event.target.value); setStaffPage(1); setChosen(null); }} /></label>
         {staff.error ? <p className="mt-3 text-sm">The staff directory is unavailable. You also need permission to read staff for this property.</p>
@@ -227,12 +235,20 @@ function StationsManager({ propertyId, propertyName }: { propertyId: string; pro
                   : void execute({ kind: 10, expectedVersion: currentStaff.registrationVersion, staffMemberId: chosen.id })}>
                   {currentStaff.registered ? "Remove station access" : "Register for stations"}</button>
                 {currentStaff.canIssueStationOnlySetup && <button className="btn btn-outline btn-sm" disabled={pending || Boolean(operation)} onClick={() => currentStaff.localGrantPresent && !currentStaff.localGrantRevoked
-                  ? ask({ kind: 6, expectedVersion: currentStaff.localGrantRevision ?? 0, staffMemberId: chosen.id }, `Remove check-in access for ${chosen.name}?`, "Their station-only check-in access at this property will end and affected sessions will lock.")
+                  ? ask({ kind: 6, expectedVersion: currentStaff.localGrantRevision ?? 0, staffMemberId: chosen.id }, `Remove check-in access for ${chosen.name}?`, currentStaff.checkOutGrantPresent && !currentStaff.checkOutGrantRevoked
+                    ? "They will no longer be able to check in guests at this property. Checkout access and pending PIN setup are unchanged."
+                    : "This removes their last station task at this property. Any pending PIN setup will be cancelled. Their existing PIN and staff record are unchanged.")
                   : void execute({ kind: 12, expectedVersion: currentStaff.localGrantRevision ?? 0, staffMemberId: chosen.id })}>
                   {currentStaff.localGrantPresent && !currentStaff.localGrantRevoked ? "Remove station-only check-in" : "Allow check-in without an account"}</button>}
+                {currentStaff.canIssueStationOnlySetup && <button className="btn btn-outline btn-sm" disabled={pending || Boolean(operation)} onClick={() => currentStaff.checkOutGrantPresent && !currentStaff.checkOutGrantRevoked
+                  ? ask({ kind: 17, expectedVersion: currentStaff.checkOutGrantRevision ?? 0, staffMemberId: chosen.id }, `Remove checkout access for ${chosen.name}?`, currentStaff.localGrantPresent && !currentStaff.localGrantRevoked
+                    ? "They will no longer be able to check out guests at this property. Check-in access and pending PIN setup are unchanged."
+                    : "This removes their last station task at this property. Any pending PIN setup will be cancelled. Their existing PIN and staff record are unchanged.")
+                  : void execute({ kind: 16, expectedVersion: currentStaff.checkOutGrantRevision ?? 0, staffMemberId: chosen.id })}>
+                  {currentStaff.checkOutGrantPresent && !currentStaff.checkOutGrantRevoked ? "Remove station-only checkout" : "Allow checkout without an account"}</button>}
                 {rootManager && currentStaff.pinRevision > 0 && <button className="btn btn-outline btn-sm" disabled={pending || Boolean(operation)} onClick={() => ask({ kind: 5, expectedVersion: currentStaff.pinRevision, staffMemberId: chosen.id }, `Reset ${chosen.name}’s PIN?`, "Their old PIN will stop working and their station sessions across this workspace will lock. They will need to create a new PIN before working at a station again.")}>Reset PIN and lock sessions</button>}
               </div>
-              <p className="text-sm leading-6 text-base-content/65">Linked staff use their existing check-in permission. The additional check-in grant applies only to staff without accounts. Removing access or resetting a PIN locks affected sessions.</p>
+              <p className="text-sm leading-6 text-base-content/65">Linked staff use their existing check-in and checkout permissions separately. These extra grants apply only to staff without accounts. Removing station registration or resetting a PIN locks affected sessions; removing one task does not grant or remove another.</p>
             </div>)}
       </FormSection>
       <FormSection title="2. Prepare this browser" description="This browser will be tied to the selected property. Finish by signing out your personal account.">

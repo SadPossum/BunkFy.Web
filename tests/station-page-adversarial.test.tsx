@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StationPage } from "../src/features/stations/StationPage";
 import {
   readQuarantinedCheckIn,
+  readQuarantinedCheckOut,
   readStationAttempt,
   saveStationAttempt,
   STATION_LOCK_KEY,
@@ -28,6 +29,7 @@ const deferred = <T,>(): Deferred<T> => {
 const io = vi.hoisted(() => ({
   current: vi.fn(), roster: vi.fn(), unlock: vi.fn(), lock: vi.fn(),
   activity: vi.fn(), redeem: vi.fn(), arrivals: vi.fn(), checkIn: vi.fn(), checkInOutcome: vi.fn(),
+  departures: vi.fn(), checkOut: vi.fn(), checkOutOutcome: vi.fn(),
 }));
 vi.mock("../src/features/stations/stationClient", async load => {
   const actual = await load<typeof import("../src/features/stations/stationClient")>();
@@ -58,6 +60,7 @@ const active = (actorId = ids.actorA, generation = 7) => ({
   runtime: { state: stationState.active, session: session(actorId, generation) },
   csrfToken: csrf, propertyName: "Synthetic property",
   staffDisplayName: actorId === ids.actorA ? "Alex" : "Blair",
+  jobs: { checkIn: 0, checkOut: 1 },
 });
 const locked = (generation = 7) => ({
   runtime: { state: stationState.locked, session: { ...session(ids.actorA, generation), actor: null } },
@@ -89,7 +92,7 @@ async function render(setupGrantId?: string) {
   await act(async () => root.render(<StationPage setupGrantId={setupGrantId} />)); await flush();
 }
 async function click(label: RegExp) {
-  const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(node => label.test(node.textContent ?? ""));
+  const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(node => label.test(node.textContent?.trim() ?? ""));
   expect(button, `button ${label}`).toBeDefined();
   await act(async () => button!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
   await flush(); return button!;
@@ -129,6 +132,167 @@ beforeEach(() => {
   for (const fn of Object.values(io)) fn.mockReset();
   io.roster.mockResolvedValue(roster); io.arrivals.mockResolvedValue(arrivals(arrival(ids.reservationA, "Guest A"), arrival(ids.reservationB, "Guest B")));
   io.activity.mockResolvedValue({});
+  io.departures.mockResolvedValue({ state: 0, propertyLocalDate: "2026-09-28", items: [], continuation: null });
+});
+
+describe("station shift tasks and checkout recovery", () => {
+  const departures = (...states: number[]) => ({ state: 0, propertyLocalDate: "2026-09-28", continuation: null,
+    items: states.map((state, index) => ({ ...arrival(index ? ids.reservationB : ids.reservationA, index ? "Departing B" : "Departing A"),
+      reservation: { ...arrival(index ? ids.reservationB : ids.reservationA, index ? "Departing B" : "Departing A").reservation,
+        checkedInBusinessDate: "2026-09-27", departure: "2026-09-28", state } })) });
+  const checkoutAttempt = (): StationAttempt => ({ ...checkInAttempt(ids.operationA), kind: "check-out" });
+  const checkoutOnly = () => ({ ...active(), jobs: { checkIn: 1, checkOut: 0 } });
+
+  it("offers only departures to a checkout-only actor without reading arrivals", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0));
+    await render();
+    expect(text()).toContain("Departing A"); expect(text()).toContain("Due departures");
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Departures");
+    expect(io.arrivals).not.toHaveBeenCalled(); expect(io.checkIn).not.toHaveBeenCalled();
+  });
+
+  it("keeps checkout absent for a check-in-only actor", async () => {
+    io.current.mockResolvedValue(active()); await render();
+    expect(text()).toContain("Guest A"); expect(text()).not.toContain("Departures");
+    expect(io.departures).not.toHaveBeenCalled();
+  });
+
+  it("shows a guest-free no-tasks state without inferring permission from unlock", async () => {
+    io.current.mockResolvedValue({ ...active(), jobs: { checkIn: 1, checkOut: 1 } }); await render();
+    expect(text()).toContain("No station tasks are assigned"); expect(text()).toContain("Lock / switch staff");
+    expect(io.arrivals).not.toHaveBeenCalled(); expect(io.departures).not.toHaveBeenCalled();
+    expect(text()).not.toContain("Guest A");
+  });
+
+  it("supports arrow/Home/End task selection with managed focus and corresponding panels", async () => {
+    io.current.mockResolvedValue({ ...active(), jobs: { checkIn: 0, checkOut: 0 } }); await render();
+    const tabs = [...container.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    tabs[0].focus();
+    await act(async () => tabs[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))); await flush();
+    expect(document.activeElement).toBe(tabs[1]); expect(tabs[1].getAttribute("aria-selected")).toBe("true");
+    expect(container.querySelector('[role="tabpanel"]')?.getAttribute("id")).toBe("station-panel-check-out");
+    await act(async () => tabs[1].dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }))); await flush();
+    expect(document.activeElement).toBe(tabs[0]); expect(tabs[0].tabIndex).toBe(0);
+  });
+
+  it("does not call an accepted checkout complete until inventory release is confirmed; retry keeps its operation", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0));
+    io.checkOut.mockResolvedValueOnce({ state: 6, receipt: {}, checkout: 1 })
+      .mockResolvedValueOnce({ state: 6, receipt: {}, checkout: 2 });
+    await render(); await click(/^Check out$/); await click(/^Confirm checkout$/);
+    expect(text()).toContain("Checkout is processing"); expect(text()).not.toContain("Checkout completed.");
+    const original = io.checkOut.mock.calls[0][0];
+    expect(readQuarantinedCheckOut()?.operationId).toBe(original.operationId);
+    await click(/^Check original checkout$/);
+    expect(io.checkOut.mock.calls[1][0]).toEqual(original); expect(io.checkOutOutcome).not.toHaveBeenCalled();
+    expect(readStationAttempt("check-out")).toBeNull();
+    expect(readQuarantinedCheckOut()).toBeNull();
+  });
+
+  it("resolves an old actor checkout outcome without replay, even when the new actor has no station jobs", async () => {
+    saveStationAttempt("check-out", checkoutAttempt());
+    io.current.mockResolvedValue({ ...active(ids.actorB, 8), jobs: { checkIn: 1, checkOut: 1 } });
+    io.checkOutOutcome.mockResolvedValue({ state: 2 });
+    await render(); await click(/^Check original checkout$/);
+    expect(io.checkOut).not.toHaveBeenCalled(); expect(io.checkOutOutcome).toHaveBeenCalledOnce();
+    expect(io.checkOutOutcome.mock.calls[0][0]).toMatchObject({ actorSessionId: ids.actorA, expectedGeneration: 7, operationId: ids.operationA });
+    expect(io.arrivals).not.toHaveBeenCalled(); expect(io.departures).not.toHaveBeenCalled();
+    expect(text()).not.toContain("A checkout needs its result confirmed");
+  });
+
+  it("uses outcome-only recovery when the same actor's checkout permission was removed", async () => {
+    saveStationAttempt("check-out", checkoutAttempt());
+    io.current.mockResolvedValue({ ...active(), jobs: { checkIn: 1, checkOut: 1 } });
+    io.checkOutOutcome.mockResolvedValue({ state: 1 });
+    await render(); await click(/^Check original checkout$/);
+    expect(io.checkOut).not.toHaveBeenCalled(); expect(io.checkOutOutcome).toHaveBeenCalledOnce();
+    expect(text()).toContain("Inventory release is not confirmed");
+    expect(readQuarantinedCheckOut()?.operationId).toBe(ids.operationA);
+  });
+
+  it("hides departures immediately offline while retaining non-secret checkout recovery", async () => {
+    saveStationAttempt("check-out", checkoutAttempt());
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0));
+    await render(); expect(text()).toContain("Departing A");
+    await act(async () => window.dispatchEvent(new Event("offline"))); await flush();
+    expect(text()).not.toContain("Departing A"); expect(text()).toContain("You’re offline");
+    expect(readQuarantinedCheckOut()?.operationId).toBe(ids.operationA);
+    expect(sessionStorage.getItem("bunkfy.station.check-out-review.v1")).not.toContain("Departing");
+  });
+
+  it("shows pending departures as read-only and rejected release as still in house", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(1, 2));
+    await render();
+    expect(text()).toContain("inventory release is pending"); expect(text()).toContain("Guest remains in house");
+    const rows = [...container.querySelectorAll("li")];
+    expect(rows[0].querySelector("button")).toBeNull(); expect(rows[1].querySelector("button")?.textContent?.trim()).toBe("Check out");
+  });
+
+  it("keeps departure refresh focus stable, blocks duplicate refresh, and clears a recovered load error", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0)); await render();
+    const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(node => /Refresh departures/.test(node.textContent ?? ""))!;
+    button.focus(); const response = deferred<ReturnType<typeof departures>>(); io.departures.mockReturnValueOnce(response.promise);
+    await click(/Refresh departures/); await click(/Refresh departures/);
+    expect(io.departures).toHaveBeenCalledTimes(2); expect(button.disabled).toBe(false);
+    expect(button.getAttribute("aria-disabled")).toBe("true"); expect(document.activeElement).toBe(button);
+    expect(text()).toContain("Departing A");
+    expect([...container.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent?.trim() === "Check out")?.disabled).toBe(true);
+    response.reject(new Error("Synthetic owner unavailable")); await flush();
+    expect(text()).toContain("Synthetic owner unavailable"); expect(text()).not.toContain("Departing A");
+    await click(/Refresh departures/);
+    expect(text()).not.toContain("Synthetic owner unavailable"); expect(text()).toContain("Departing A");
+    expect(document.activeElement).toBe(button); expect(button.getAttribute("aria-disabled")).toBe("false");
+  });
+
+  it("keeps an unrelated departure available without overwriting a pending checkout", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0, 0));
+    io.checkOut.mockResolvedValue({ state: 6, receipt: {}, checkout: 1 });
+    await render(); await click(/^Check out$/); await click(/^Confirm checkout$/);
+    const first = readQuarantinedCheckOut(); expect(first?.reservationId).toBe(ids.reservationA);
+    const rows = [...container.querySelectorAll("li")];
+    expect(rows[0].querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+    expect(rows[1].querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
+    await act(async () => rows[1].querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true }))); await flush();
+    await click(/^Confirm checkout$/);
+    expect(readQuarantinedCheckOut()).toEqual(first);
+    expect(readStationAttempt("check-out")?.reservationId).toBe(ids.reservationB);
+    expect(io.checkOut).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds a Recorded outcome for manager review without clearing or repeating it", async () => {
+    saveStationAttempt("check-out", checkoutAttempt()); io.current.mockResolvedValue(active(ids.actorB, 8));
+    io.checkOutOutcome.mockResolvedValue({ state: 6 }); await render(); await click(/^Check original checkout$/);
+    expect(text()).toContain("needs a manager’s review"); expect(io.checkOut).not.toHaveBeenCalled();
+    expect(readQuarantinedCheckOut()?.operationId).toBe(ids.operationA);
+    expect([...container.querySelectorAll("button")].some(node => node.textContent?.trim() === "Check original checkout")).toBe(false);
+  });
+
+  it("does not overwrite the notice when a confirmed checkout cannot clear browser recovery", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0));
+    io.checkOut.mockResolvedValue({ state: 6, receipt: {}, checkout: 2 }); await render();
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("Synthetic storage failure"); });
+    await click(/^Check out$/); await click(/^Confirm checkout$/);
+    expect(text()).toContain("could not clear its recovery reference"); expect(text()).not.toContain("Checkout completed.");
+    expect(readQuarantinedCheckOut() ?? readStationAttempt("check-out")).not.toBeNull();
+  });
+
+  it("refreshes the authoritative departures once after a terminal checkout result", async () => {
+    io.current.mockResolvedValue(checkoutOnly()); io.departures.mockResolvedValue(departures(0));
+    const result = deferred<{ state: number; receipt: object; checkout: number }>(); io.checkOut.mockReturnValueOnce(result.promise);
+    await render(); await click(/^Check out$/); await click(/^Confirm checkout$/);
+    const readsBeforeResult = io.departures.mock.calls.length;
+    expect(text()).toContain("A checkout request is in progress");
+    expect([...container.querySelectorAll("button")].some(node => node.textContent?.trim() === "Check original checkout")).toBe(false);
+    result.resolve({ state: 6, receipt: {}, checkout: 2 }); await flush();
+    expect(io.departures).toHaveBeenCalledTimes(readsBeforeResult + 1);
+    expect(text()).toContain("Checkout completed.");
+  });
+
+  it("returns lock focus to staff search without requiring the operator to restart from BODY", async () => {
+    io.current.mockResolvedValueOnce(active()).mockResolvedValue(locked(8)); io.lock.mockResolvedValue({ state: stationState.locked });
+    await render(); await click(/Lock \/ switch staff/);
+    expect(document.activeElement).toBe(container.querySelector('input[type="search"]'));
+  });
 });
 afterEach(async () => {
   if (root) await act(async () => root.unmount());

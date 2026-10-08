@@ -11839,6 +11839,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/station-runtime/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StationsRuntimeCheckOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/station-runtime/check-out/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StationsRuntimeCheckOutOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/station-runtime/departures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StationsRuntimeDepartures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -15863,6 +15911,7 @@ export interface components {
             csrfExpiresAtUtc: string | null;
             propertyName: string | null;
             staffDisplayName: string | null;
+            jobs: components["schemas"]["StationJobAvailability"];
         };
         StationDueArrival: {
             /** Format: uuid */
@@ -15978,7 +16027,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        StationOperationKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+        StationOperationKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17;
         StationOwnPinRequest: {
             /** Format: uuid */
             operationId: string;
@@ -16084,6 +16133,10 @@ export interface components {
             /** Format: int64 */
             pinRevision: number;
             canIssueStationOnlySetup: boolean;
+            checkOutGrantPresent: boolean;
+            checkOutGrantRevoked: boolean;
+            /** Format: int64 */
+            checkOutGrantRevision: number | null;
         };
         StationStaffStatusResponse: {
             state: components["schemas"]["StationManagementState"];
@@ -16486,6 +16539,86 @@ export interface components {
          * @enum {integer}
          */
         WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        StationCheckOutRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            actorSessionId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+        };
+        StationCheckOutResult: {
+            state: components["schemas"]["StationReservationState"];
+            receipt: components["schemas"]["ReservationMutationReceiptDto"];
+            checkout: components["schemas"]["StationCheckOutOutcomeState"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        StationCheckOutOutcomeState: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        StationCheckOutOutcomeRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            browserSessionId: string;
+            /** Format: uuid */
+            actorSessionId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+        };
+        StationCheckOutOutcome: {
+            state: components["schemas"]["StationCheckOutOutcomeState"];
+        };
+        StationJobAvailability: {
+            checkIn: components["schemas"]["StationReservationState"];
+            checkOut: components["schemas"]["StationReservationState"];
+        };
+        StationDeparturesResponse: {
+            state: components["schemas"]["StationReservationState"];
+            items: components["schemas"]["StationFirstJobDeparture"][] | null;
+            continuation: string | null;
+            /** Format: uuid */
+            propertyId: string | null;
+            /** Format: date */
+            propertyLocalDate: string | null;
+        };
+        StationFirstJobDeparture: {
+            reservation: components["schemas"]["StationDueDeparture"];
+            places: components["schemas"]["StationInventoryLabel"][] | null;
+        };
+        StationDueDeparture: {
+            /** Format: uuid */
+            reservationId: string;
+            primaryGuestName: string | null;
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            /** Format: date */
+            checkedInBusinessDate: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            allocationId: string;
+            /** Format: int64 */
+            allocationVersion: number;
+            units: components["schemas"]["StationAllocationUnit"][] | null;
+            state: components["schemas"]["StationDepartureState"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        StationDepartureState: 0 | 1 | 2;
     };
     responses: never;
     parameters: never;
@@ -17721,6 +17854,242 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StationCheckInOutcome"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    StationsRuntimeCheckOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationCheckOutRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationCheckOutResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    StationsRuntimeCheckOutOutcome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationCheckOutOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationCheckOutOutcome"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    StationsRuntimeDepartures: {
+        parameters: {
+            query?: {
+                pageSize?: string;
+                cursor?: string;
+            };
+            header?: {
+                "X-BunkFy-Station-Actor"?: string;
+                "X-BunkFy-Station-Generation"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationDeparturesResponse"];
                 };
             };
             /** @description Bad Request */

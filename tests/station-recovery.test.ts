@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  clearConfirmedCheckIn, hasStationLockBarrier, parseStationAttempt, quarantineCheckIn, readQuarantinedCheckIn, readStationAttempt, saveStationAttempt, STATION_LOCK_KEY, type StationAttempt,
+  clearConfirmedCheckIn, clearConfirmedCheckOut, hasStationLockBarrier, parseStationAttempt, quarantineCheckIn, quarantineCheckOut, readQuarantinedCheckIn, readQuarantinedCheckOut, readStationAttempt, saveStationAttempt, STATION_LOCK_KEY, type StationAttempt,
 } from "../src/features/stations/stationRecovery";
 
 const id = (value: number) => `00000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
@@ -9,9 +9,10 @@ const attempts: StationAttempt[] = [
   { ...base, kind: "lock" },
   { ...base, kind: "unlock", staffMemberId: id(3) },
   { ...base, kind: "check-in", actorSessionId: id(4), reservationId: id(5), expectedVersion: 2 },
+  { ...base, kind: "check-out", operationId: id(6), actorSessionId: id(4), reservationId: id(7), expectedVersion: 3 },
 ];
 const keyFor = (kind: StationAttempt["kind"]) => kind === "lock" ? STATION_LOCK_KEY
-  : kind === "unlock" ? "bunkfy.station.attempt.v1" : "bunkfy.station.check-in.v1";
+  : kind === "unlock" ? "bunkfy.station.attempt.v1" : `bunkfy.station.${kind}.v1`;
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -33,6 +34,43 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("station concurrency-only recovery records", () => {
+  it("keeps checkout and arrival recovery isolated, including exact late outcome clearing", () => {
+    const arrival = attempts[2];
+    const departure = attempts[3];
+    saveStationAttempt("check-in", arrival);
+    saveStationAttempt("check-out", departure);
+    quarantineCheckOut(departure);
+    expect(readStationAttempt("check-out")).toBeNull();
+    expect(readQuarantinedCheckOut()).toEqual(departure);
+    expect(readStationAttempt("check-in")).toEqual(arrival);
+    const nextDeparture = { ...departure, operationId: id(80), reservationId: id(81) };
+    saveStationAttempt("check-out", nextDeparture);
+    expect(() => quarantineCheckOut(nextDeparture)).toThrow("An earlier check-out still needs review.");
+    clearConfirmedCheckOut(departure.operationId);
+    expect(readQuarantinedCheckOut()).toBeNull();
+    expect(readStationAttempt("check-out")).toEqual(nextDeparture);
+    expect(readStationAttempt("check-in")).toEqual(arrival);
+    clearConfirmedCheckIn(arrival.operationId);
+    expect(readStationAttempt("check-out")).toEqual(nextDeparture);
+  });
+
+  it("never loses a pending checkout when quarantine persistence fails", () => {
+    saveStationAttempt("check-out", attempts[3]);
+    tab.setItem.mockImplementationOnce(() => { throw new Error("Storage denied"); });
+    expect(() => quarantineCheckOut(attempts[3])).toThrow("Storage denied");
+    expect(readStationAttempt("check-out")).toEqual(attempts[3]);
+    expect(readQuarantinedCheckOut()).toBeNull();
+  });
+
+  it("rejects another job kind in the checkout review slot without erasing it", () => {
+    const reviewKey = "bunkfy.station.check-out-review.v1";
+    tab.values.set(reviewKey, JSON.stringify(attempts[2]));
+    expect(readQuarantinedCheckOut()).toBeNull();
+    expect(() => quarantineCheckOut(attempts[3])).toThrow("An earlier check-out still needs review.");
+    expect(tab.values.get(reviewKey)).toBe(JSON.stringify(attempts[2]));
+    expect(() => quarantineCheckOut(attempts[2])).toThrow("Invalid check-out recovery reference.");
+  });
+
   it("quarantines an old actor's action without blocking or overwriting an unrelated current operation", () => {
     const old = attempts[2];
     const current = { ...old, operationId: id(70), reservationId: id(71), actorSessionId: id(72), generation: 6 };
@@ -135,7 +173,7 @@ describe("station concurrency-only recovery records", () => {
   it("shares only the local lock barrier between tabs while isolating unlock and job coordinates", () => {
     for (const attempt of attempts) saveStationAttempt(attempt.kind, attempt);
     expect([...local.values.keys()]).toEqual([STATION_LOCK_KEY]);
-    expect([...tab.values.keys()].sort()).toEqual([keyFor("unlock"), keyFor("check-in")].sort());
+    expect([...tab.values.keys()].sort()).toEqual([keyFor("unlock"), keyFor("check-in"), keyFor("check-out")].sort());
     const firstTab = tab;
     const secondTab = memoryStorage();
     vi.stubGlobal("sessionStorage", secondTab);
@@ -143,6 +181,7 @@ describe("station concurrency-only recovery records", () => {
     expect(readStationAttempt("lock")).toEqual(attempts[0]);
     expect(readStationAttempt("unlock")).toBeNull();
     expect(readStationAttempt("check-in")).toBeNull();
+    expect(readStationAttempt("check-out")).toBeNull();
     const otherUnlock = { ...attempts[1], operationId: id(11) };
     saveStationAttempt("unlock", otherUnlock);
     expect(readStationAttempt("unlock")).toEqual(otherUnlock);
@@ -150,6 +189,7 @@ describe("station concurrency-only recovery records", () => {
     vi.stubGlobal("sessionStorage", firstTab);
     expect(readStationAttempt("unlock")).toEqual(attempts[1]);
     expect(readStationAttempt("check-in")).toEqual(attempts[2]);
+    expect(readStationAttempt("check-out")).toEqual(attempts[3]);
     expect(readStationAttempt("lock")).toEqual(attempts[0]);
   });
 
@@ -191,6 +231,9 @@ describe("station concurrency-only recovery records", () => {
     { name: "check-in missing version", raw: JSON.stringify({ ...attempts[2], expectedVersion: undefined }) },
     { name: "check-in zero version", raw: JSON.stringify({ ...attempts[2], expectedVersion: 0 }) },
     { name: "check-in unsafe version", raw: JSON.stringify({ ...attempts[2], expectedVersion: Number.MAX_SAFE_INTEGER + 1 }) },
+    { name: "check-out missing actor", raw: JSON.stringify({ ...attempts[3], actorSessionId: undefined }) },
+    { name: "check-out invalid reservation", raw: JSON.stringify({ ...attempts[3], reservationId: "bad" }) },
+    { name: "check-out unsafe version", raw: JSON.stringify({ ...attempts[3], expectedVersion: Number.MAX_SAFE_INTEGER + 1 }) },
   ])("does not recover malformed $name coordinates", ({ raw }) => {
     expect(parseStationAttempt(raw)).toBeNull();
     expect(local.setItem).not.toHaveBeenCalled();

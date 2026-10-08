@@ -1,9 +1,12 @@
 import { ArrowLeft, Check, KeyRound, LockKeyhole, RefreshCw, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { PinFields } from "./PinFields";
+import { StationDepartures } from "./StationDepartures";
+import { StationCheckOutRecovery } from "./StationCheckOutRecovery";
+import { StationTaskTabs, type StationTask } from "./StationTaskTabs";
 import { stationApi, StationRequestError } from "./stationClient";
 import { stationState, type StationArrival, type StationArrivals, type StationCurrent, type StationRoster } from "./stationTypes";
-import { clearConfirmedCheckIn, hasStationLockBarrier, quarantineCheckIn, readQuarantinedCheckIn, readStationAttempt, saveStationAttempt, STATION_LOCK_KEY, type StationAttempt } from "./stationRecovery";
+import { clearConfirmedCheckIn, hasStationLockBarrier, quarantineCheckIn, quarantineCheckOut, readQuarantinedCheckIn, readQuarantinedCheckOut, readStationAttempt, saveStationAttempt, STATION_LOCK_KEY, type StationAttempt } from "./stationRecovery";
 
 const boundary = (view: StationCurrent) => {
   const session = view.runtime.session;
@@ -14,7 +17,7 @@ const day = (value: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "
 const pageVisible = () => document.visibilityState === "visible";
 const offlineNotice = "You’re offline. Guest details are hidden. Reconnect, then refresh the station.";
 type StationJob = { view: StationCurrent; release: () => void };
-type BeginStationJob = () => Promise<StationJob | null>;
+export type BeginStationJob = () => Promise<StationJob | null>;
 
 /** A separate application root: no primary SessionProvider, workspace queries or bearer token. */
 export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
@@ -47,6 +50,18 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
   const [jobBusy, setJobBusy] = useState(false);
   const [jobAttempt, setJobAttempt] = useState(() => readStationAttempt("check-in"));
   const [quarantined, setQuarantined] = useState(readQuarantinedCheckIn);
+  const [task, setTask] = useState<StationTask>("check-in");
+  const [checkOutAttempt, setCheckOutAttempt] = useState(() => readStationAttempt("check-out"));
+  const [checkOutReview, setCheckOutReview] = useState(readQuarantinedCheckOut);
+  const [checkOutFlights, setCheckOutFlights] = useState<ReadonlySet<string>>(() => new Set());
+  const checkOutFlightChanged = useCallback((operationId: string, pending: boolean) => {
+    setCheckOutFlights(previous => { const next = new Set(previous); if (pending) next.add(operationId); else next.delete(operationId); return next; });
+  }, []);
+  const [recoveryVersion, setRecoveryVersion] = useState(0);
+  const refreshCheckOutRecovery = useCallback(() => {
+    setCheckOutAttempt(readStationAttempt("check-out")); setCheckOutReview(readQuarantinedCheckOut());
+    setRecoveryVersion(value => value + 1);
+  }, []);
   const lastActivity = useRef(0);
 
   const hide = useCallback(() => {
@@ -131,6 +146,13 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
   const locked = view?.runtime.state === stationState.locked;
   const generation = session?.generation;
   const actorId = actor?.actorSessionId;
+  const canCheckIn = active && view?.jobs?.checkIn === 0;
+  const canCheckOut = active && view?.jobs?.checkOut === 0;
+  const selectedTask: StationTask = canCheckOut && (task === "check-out" || !canCheckIn) ? "check-out" : "check-in";
+  const refreshAuthority = useCallback(() => { void refresh(); }, [refresh]);
+  useLayoutEffect(() => {
+    if (!canCheckIn) { setArrivals(null); setConfirming(null); }
+  }, [canCheckIn]);
   useEffect(() => {
     if (!active || !jobAttempt || jobAttempt.actorSessionId === actorId && jobAttempt.generation === generation || quarantined) return;
     try {
@@ -138,8 +160,16 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
       setQuarantined(readQuarantinedCheckIn()); setJobAttempt(readStationAttempt("check-in"));
     } catch { setMessage("Two check-in results need review. No further check-ins will be sent until a result is confirmed."); }
   }, [active, actorId, generation, jobAttempt, quarantined]);
+  useEffect(() => {
+    // Keep an uncertain checkout local to its reservation. Two bounded slots
+    // prevent overwriting an older action while allowing unrelated departures.
+    if (!active || !checkOutAttempt || checkOutReview) return;
+    try { quarantineCheckOut(checkOutAttempt); refreshCheckOutRecovery(); }
+    catch { setMessage("Two checkout results need review. Resolve an original result before another checkout."); }
+  }, [active, checkOutAttempt, checkOutReview, refreshCheckOutRecovery]);
   useLayoutEffect(() => {
-    if (!focusIntent.current || document.activeElement !== document.body) return;
+    if (!focusIntent.current || pending) return;
+    if (document.activeElement !== document.body) { focusIntent.current = null; return; }
     const target = focusIntent.current === "pin" ? pinInput.current : focusIntent.current === "search" ? searchInput.current : recoveryButton.current;
     if (target) { target.focus(); focusIntent.current = null; }
   }, [staff, view, pending]);
@@ -185,7 +215,7 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
     if (!job) { if (ticket === epoch.current) setJobBusy(false); return; }
     try {
       const result = await stationApi.arrivals(job.view.runtime.session!.actor!, cursor);
-      if (ticket === epoch.current) {
+      if (ticket === epoch.current && viewRef.current?.jobs?.checkIn === 0) {
         setArrivals(result);
         setMessage(previous => previous === "The station changed. Refresh before continuing." ? "" : previous);
       }
@@ -193,7 +223,7 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
     finally { job.release(); if (ticket === epoch.current) setJobBusy(false); }
   }, [beginJob, hide]);
 
-  useEffect(() => { if (actorId) void loadArrivals(); }, [actorId, generation, loadArrivals]);
+  useEffect(() => { if (actorId && canCheckIn) void loadArrivals(); }, [actorId, generation, canCheckIn, loadArrivals]);
 
   async function unlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -247,7 +277,10 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
       setMessage(localLock.current ? "Lock could not be confirmed. Keep this device with you and retry." : "Station locked. Choose the next staff member.");
     } catch (error) { setMessage(`Guest details are hidden. Lock not confirmed: ${errorMessage(error)}`); }
     // A confirmed lock must not wait behind the superseded actor's activity.
-    finally { busy.current = false; setPending(false); channel.current?.postMessage("changed"); void refresh(false, true); }
+    finally {
+      focusIntent.current = localLock.current ? "recovery" : "search";
+      busy.current = false; setPending(false); channel.current?.postMessage("changed"); void refresh(false, true);
+    }
   }
 
   function foregroundActivity() {
@@ -297,7 +330,7 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
         <h1 className="text-2xl font-semibold [overflow-wrap:anywhere]">{session?.stationLabel ?? "Staff sign-in"}</h1>
         {view?.propertyName && <p className="mt-1 text-sm text-base-content/70 [overflow-wrap:anywhere]">{view.propertyName}</p>}
       </div>
-      {active && <button data-station-boundary className="btn btn-outline" onClick={() => { focusIntent.current = "recovery"; void lock(); }} disabled={pending}><LockKeyhole size={18} /> Lock / switch staff</button>}
+      {active && <button data-station-boundary className="btn btn-outline" onClick={() => { focusIntent.current = "search"; void lock(); }} disabled={pending}><LockKeyhole size={18} /> Lock / switch staff</button>}
     </header>
     {message && <p className="mb-5 rounded-lg border border-base-300 bg-base-100 px-4 py-3 text-sm leading-6" role="status">{message}</p>}
     {!view && <section className="max-w-xl space-y-4">
@@ -351,19 +384,33 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
       </form>}
     </section>}
     {active && <section>
+      <p className="mb-4 text-sm text-base-content/70">Working as <strong className="font-semibold text-base-content">{view.staffDisplayName}</strong></p>
+      {quarantined && <StationCheckInRecovery key={quarantined.operationId} attempt={quarantined} view={view} beginJob={beginJob} canRetry={Boolean(canCheckIn)} quarantined onResolved={() => {
+        setQuarantined(readQuarantinedCheckIn()); if (canCheckIn) void loadArrivals();
+      }} onUnavailable={error => { hide(); setMessage(error); }} />}
+      {jobAttempt && !confirming && <StationCheckInRecovery key={jobAttempt.operationId} attempt={jobAttempt} view={view} beginJob={beginJob} canRetry={Boolean(canCheckIn)} onResolved={() => {
+        setJobAttempt(readStationAttempt("check-in")); if (canCheckIn) void loadArrivals();
+      }} onUnavailable={error => { hide(); setMessage(error); }} />}
+      {checkOutFlights.size > 0 && <p role="status" className="mb-4 text-sm leading-6">A checkout request is in progress. Wait for its original result before retrying it.</p>}
+      {[checkOutReview, checkOutAttempt].filter((item): item is StationAttempt => item !== null && !checkOutFlights.has(item.operationId)).map(operation =>
+        <StationCheckOutRecovery key={operation.operationId} attempt={operation} view={view} canRetry={Boolean(canCheckOut)} beginJob={beginJob}
+          onResolved={refreshCheckOutRecovery} onAuthorityChanged={refreshAuthority} />)}
+      {(canCheckIn || canCheckOut) && <StationTaskTabs value={selectedTask} checkIn={Boolean(canCheckIn)} checkOut={Boolean(canCheckOut)}
+        onChange={next => { setConfirming(null); setTask(next); }} />}
+      {!canCheckIn && !canCheckOut && <div className="rounded-lg border border-base-300 bg-base-100 p-5">
+        <h2 className="font-semibold">{view.jobs?.checkIn === 1 && view.jobs?.checkOut === 1 ? "No station tasks are assigned" : "Station tasks are unavailable"}</h2>
+        <p className="mt-2 text-sm leading-6">{view.jobs?.checkIn === 1 && view.jobs?.checkOut === 1
+          ? "Ask a manager to review your access at this property, or lock the station and choose another staff member."
+          : "Refresh to check your current access and property configuration. Guest details remain hidden."}</p>
+        <button className="btn btn-outline mt-4" onClick={refreshAuthority}><RefreshCw size={16} /> Refresh tasks</button>
+      </div>}
+      {canCheckIn && selectedTask === "check-in" && <section id="station-panel-check-in" role="tabpanel" aria-labelledby="station-tab-check-in" tabIndex={0}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div><h2 className="text-lg font-semibold">Due arrivals</h2>
-          <p className="mt-1 text-sm text-base-content/70">Working as <strong className="font-semibold text-base-content">{view.staffDisplayName}</strong>{arrivals?.propertyLocalDate ? ` · ${day(arrivals.propertyLocalDate)}` : ""}</p></div>
+          {arrivals?.propertyLocalDate && <p className="mt-1 text-sm text-base-content/70">{day(arrivals.propertyLocalDate)}</p>}</div>
         <button className="btn btn-outline btn-sm aria-disabled:opacity-50" aria-disabled={jobBusy} aria-busy={jobBusy}
           onClick={() => { if (!jobBusy) void loadArrivals(); }}><RefreshCw size={16} /> Refresh arrivals</button>
       </div>
-      <p className="mb-4 text-sm text-base-content/65">This station supports arrival check-in. Other reservation work is available through your personal account.</p>
-      {quarantined && <StationCheckInRecovery key={quarantined.operationId} attempt={quarantined} view={view} beginJob={beginJob} quarantined onResolved={() => {
-        setQuarantined(readQuarantinedCheckIn()); void loadArrivals();
-      }} onUnavailable={error => { hide(); setMessage(error); }} />}
-      {jobAttempt && !confirming && <StationCheckInRecovery key={jobAttempt.operationId} attempt={jobAttempt} view={view} beginJob={beginJob} onResolved={() => {
-        setJobAttempt(readStationAttempt("check-in")); void loadArrivals();
-      }} onUnavailable={error => { hide(); setMessage(error); }} />}
       {jobBusy || !arrivals ? <p role="status" className="py-8 text-sm">Checking current arrivals…</p>
         : arrivals.state === 4 ? <div role="status" className="rounded-lg border border-base-300 bg-base-100 p-5">
           <h3 className="font-semibold">Arrival information is not ready</h3>
@@ -389,6 +436,10 @@ export function StationPage({ setupGrantId }: { setupGrantId?: string }) {
               </li>)}
             </ul>}
       {arrivals?.continuation && <button className="btn btn-outline mt-4" onClick={() => void loadArrivals(arrivals.continuation!)}>Next arrivals</button>}
+      </section>}
+      {canCheckOut && selectedTask === "check-out" && <StationDepartures key={`${actorId}:${generation}`}
+        view={view} beginJob={beginJob} onAuthorityChanged={refreshAuthority} attempt={checkOutAttempt} review={checkOutReview}
+        recoveryVersion={recoveryVersion} onRecoveryChanged={refreshCheckOutRecovery} onFlightChanged={checkOutFlightChanged} />}
     </section>}
     <footer className="mt-8 border-t border-base-300 pt-4 text-sm leading-6 text-base-content/65">Lock this station whenever you step away. It also locks automatically after inactivity.</footer>
   </main>;
@@ -438,9 +489,9 @@ function StationCheckIn({ item, view, beginJob, onCancel, onChanged, onUnavailab
   </div>;
 }
 
-function StationCheckInRecovery({ attempt, view, beginJob, onResolved, onUnavailable, quarantined = false }: {
+function StationCheckInRecovery({ attempt, view, beginJob, onResolved, onUnavailable, quarantined = false, canRetry = true }: {
   attempt: StationAttempt; view: StationCurrent; onResolved: () => void; onUnavailable: (message: string) => void;
-  quarantined?: boolean; beginJob: BeginStationJob;
+  quarantined?: boolean; canRetry?: boolean; beginJob: BeginStationJob;
 }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -448,7 +499,7 @@ function StationCheckInRecovery({ attempt, view, beginJob, onResolved, onUnavail
   const inFlight = useRef(false);
   const actor = view.runtime.session?.actor;
   const sameBrowser = view.runtime.session?.browserSessionId === attempt.browserSessionId;
-  const matches = actor?.actorSessionId === attempt.actorSessionId && actor?.generation === attempt.generation &&
+  const matches = canRetry && actor?.actorSessionId === attempt.actorSessionId && actor?.generation === attempt.generation &&
     sameBrowser;
   async function resolve() {
     if (!sameBrowser || needsReview || !view.csrfToken || !attempt.reservationId || !attempt.expectedVersion || !attempt.actorSessionId || inFlight.current) return;

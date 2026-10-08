@@ -4,7 +4,7 @@ export type ManagementCommand = Pick<StationManagementRequest, "kind" | "expecte
 export type ManagementRecovery = { id: string; command: ManagementCommand };
 export type PairingContext = { stationId: string; browserSessionId: string; originalIssuerSessionId: string };
 const id = (value: unknown): value is string => typeof value === "string" && value !== "00000000-0000-0000-0000-000000000000" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-const commandKinds = new Set([1, 5, 6, 7, 9, 10, 11, 12, 13, 14]);
+const commandKinds = new Set([1, 5, 6, 7, 9, 10, 11, 12, 13, 14, 16, 17]);
 const labelLifetimeMs = 2 * 60 * 60 * 1000;
 const stationLabel = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 100 &&
   value.trim() === value && !/\p{Cc}/u.test(value);

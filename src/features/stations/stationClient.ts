@@ -1,7 +1,7 @@
 import { resolveApiBaseUrl } from "../../api/client";
 import { assertRequestCanStart, networkRequestFailure } from "../../api/requestConnectivity";
 import type { components } from "../../api/contracts.generated";
-import type { StationArrivals, StationCurrent, StationRoster, StationRuntime } from "./stationTypes";
+import type { StationArrivals, StationCurrent, StationDeparturesPage, StationRoster, StationRuntime } from "./stationTypes";
 
 export class StationRequestError extends Error {
   constructor(public readonly status: number, public readonly state?: number,
@@ -17,7 +17,7 @@ export class StationRequestError extends Error {
 
 // Runtime StateChanged and job Incomplete both use 409/state 4. Recover only
 // the complete, empty arrivals contract, never an authority or partial response.
-function isIncompleteArrivals(status: number, payload: unknown): payload is StationArrivals {
+function isIncompleteJobPage(status: number, payload: unknown): payload is StationArrivals & StationDeparturesPage {
   if (status !== 409 || !payload || typeof payload !== "object") return false;
   const body = payload as Record<string, unknown>;
   return body.state === 4 && Array.isArray(body.items) && body.items.length === 0 &&
@@ -80,7 +80,11 @@ export const stationApi = {
   activity: (body: Schema["StationActivityRequest"], csrf: string) => stationRequest<StationRuntime>("/activity", { method: "POST", body, csrf }),
   redeem: (body: Schema["StationRedeemSetupRequest"], csrf: string) => stationRequest<StationRuntime>("/setup/redeem", { method: "POST", body, csrf }),
   arrivals: (actor: { actorSessionId: string; generation: number }, cursor?: string, signal?: AbortSignal) =>
-    stationRequest<StationArrivals>(`/arrivals?${new URLSearchParams(cursor ? { cursor } : {})}`, { actor, signal, recover: isIncompleteArrivals }),
+    stationRequest<StationArrivals>(`/arrivals?${new URLSearchParams(cursor ? { cursor } : {})}`, { actor, signal, recover: isIncompleteJobPage }),
   checkIn: (body: Schema["StationCheckInRequest"], csrf: string) => stationRequest<Schema["StationCheckInResult"]>("/check-in", { method: "POST", body, csrf }),
   checkInOutcome: (body: Schema["StationCheckInOutcomeRequest"], csrf: string) => stationRequest<Schema["StationCheckInOutcome"]>("/check-in/outcome", { method: "POST", body, csrf }),
+  departures: (actor: { actorSessionId: string; generation: number }, cursor?: string, signal?: AbortSignal) =>
+    stationRequest<StationDeparturesPage>(`/departures?${new URLSearchParams(cursor ? { cursor } : {})}`, { actor, signal, recover: isIncompleteJobPage }),
+  checkOut: (body: Schema["StationCheckOutRequest"], csrf: string) => stationRequest<Schema["StationCheckOutResult"]>("/check-out", { method: "POST", body, csrf }),
+  checkOutOutcome: (body: Schema["StationCheckOutOutcomeRequest"], csrf: string) => stationRequest<Schema["StationCheckOutOutcome"]>("/check-out/outcome", { method: "POST", body, csrf }),
 };
