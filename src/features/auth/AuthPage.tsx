@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowLeft,
   Building2,
   CalendarCheck2,
   Eye,
@@ -10,7 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { apiRequest } from "../../api/client";
 import type {
   AuthSelfRegistration,
@@ -39,8 +40,11 @@ import {
   publicAuthenticationErrorMessage,
 } from "./authenticationFlow";
 import { authPasswordLengthHelp, authPasswordPolicy } from "./authPasswordPolicy";
+import { useSharedAccounts } from "../account-switch/SharedAccountsProvider";
 
 export function AuthPage({ invitation = false }: { invitation?: boolean }) {
+  const sharedAccounts = useSharedAccounts();
+  const emailInput = useRef<HTMLInputElement>(null);
   const {
     beginExternalSignIn,
     completeMultiFactorSignIn,
@@ -59,6 +63,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     challenge: MultiFactorChallenge;
     username: string;
   } | null>(null);
+  useLayoutEffect(() => { if (!multiFactor) emailInput.current?.focus(); }, [mode, multiFactor]);
   const providers = useQuery({
     queryKey: ["auth", "external-providers"],
     queryFn: () =>
@@ -265,6 +270,9 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
 
       <section className="flex min-h-[calc(100vh-1.5rem)] items-center justify-center px-4 py-10 sm:min-h-[calc(100vh-2.5rem)] sm:px-10">
         <div className="w-full max-w-md">
+          {sharedAccounts?.current?.state === 3 && <button type="button" className="btn btn-ghost mb-5 -ml-3 gap-2 text-sm"
+            disabled={sharedAccounts.busy} onClick={() => void sharedAccounts.returnToAccounts()}>
+            <ArrowLeft size={17} aria-hidden="true" />Back to accounts</button>}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <BrandMark variant="simple-white-bold" height={48} framed />
             <span className="font-display text-2xl font-semibold">BunkFy</span>
@@ -308,6 +316,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                     Email
                   </span>
                   <input
+                    ref={emailInput}
                     name="username"
                     type="email"
                     className="input input-bordered h-12 w-full bg-base-100"
@@ -379,7 +388,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                       refreshing={providerSource.isFetching}
                       loadingLabel="Checking external sign-in options"
                       title="External sign-in options are delayed"
-                      description="Password sign-in remains available. Refresh before choosing a provider."
+                      description="Retry to load sign-in options. You can also try your email and password."
                       onRetry={() => void providers.refetch()}
                     />
                   )}
@@ -426,7 +435,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                         refreshing={registrationSource.isFetching}
                         loadingLabel="Checking account registration"
                         title="Registration availability is delayed"
-                        description="Sign in remains available. Refresh before creating a new account."
+                        description="Retry to check whether account creation is available."
                         onRetry={() => void selfRegistration.refetch()}
                       />
                     </div>
@@ -452,7 +461,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                     refreshing={registrationSource.isFetching}
                     loadingLabel="Checking account registration"
                     title="Registration availability is delayed"
-                    description="Password sign-in remains available. Refresh before creating an account."
+                    description="Retry to check whether account creation is available."
                     onRetry={() => void selfRegistration.refetch()}
                   />
                 </div>

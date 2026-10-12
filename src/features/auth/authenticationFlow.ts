@@ -1,4 +1,5 @@
 import { ApiError } from "../../api/client";
+import { NetworkRequestError, OfflineRequestError } from "../../api/requestConnectivity";
 import type {
   AuthSelfRegistration,
   BrowserAuthResponse,
@@ -66,9 +67,18 @@ export function publicAuthenticationErrorMessage(
   error: unknown,
   fallback: string,
 ): string {
+  if (error instanceof OfflineRequestError) {
+    return "You are offline. Reconnect, then try signing in again.";
+  }
+  if (error instanceof NetworkRequestError) {
+    return "BunkFy could not reach the sign-in service. Check your connection and try again.";
+  }
   if (error instanceof ApiError) {
     if (error.status === 429 || (error.retryAfterMs ?? 0) > 0) {
       return "Too many attempts were made. Wait a moment before trying again.";
+    }
+    if (error.status >= 500 || error.status === 408) {
+      return "The sign-in service is unavailable. Try again shortly.";
     }
     if (error.code === "Auth.SelfRegistrationDisabled") {
       return "Account registration is no longer available. Sign in or ask your workspace administrator.";

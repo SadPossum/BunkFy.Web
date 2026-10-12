@@ -10,6 +10,10 @@ const propertySwitchRoute = readFileSync(
   join(process.cwd(), "src", "components", "layout", "propertySwitchRoute.ts"),
   "utf8",
 ).replaceAll("\r\n", "\n");
+const rememberAccountPanel = readFileSync(
+  join(process.cwd(), "src", "features", "account-switch", "RememberAccountPanel.tsx"),
+  "utf8",
+).replaceAll("\r\n", "\n");
 
 describe("application shell accessibility", () => {
   it("treats the compact navigation as a keyboard-contained drawer", () => {
@@ -36,5 +40,11 @@ describe("application shell accessibility", () => {
     expect(propertySwitchRoute).toContain("withoutOperationalReturnRoute(next)");
     expect(propertySwitchRoute).toContain("withoutSpacesReturnRoute(next)");
     expect(propertySwitchRoute).toContain('next.set("property", propertyId)');
+  });
+
+  it("keeps PIN account switching desktop-only through responsive visibility", () => {
+    expect(shell).toContain("hidden gap-2 px-3 lg:inline-flex");
+    expect(shell).toContain(">Fast switching");
+    expect(rememberAccountPanel).toContain('className="hidden lg:block"');
   });
 });

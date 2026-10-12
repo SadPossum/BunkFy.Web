@@ -1,6 +1,6 @@
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
 import { BrandMark } from "../../components/ui/BrandMark";
@@ -45,6 +45,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
             <span className="font-display text-xl font-semibold">BunkFy</span>
           </div>
           <LoadingState label="Loading your workspaces" />
+          <Link to="/account?section=security" className="btn btn-ghost mt-4">Account & security</Link>
         </section>
       </main>
     );
@@ -66,6 +67,7 @@ export function WorkspaceGate({ children }: { children: ReactNode }) {
             />
           </div>
           <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Link to="/account?section=security" className="btn btn-ghost">Account & security</Link>
             <button className="btn btn-ghost" onClick={() => void logout()}>
               <LogOut size={16} />
               Sign out

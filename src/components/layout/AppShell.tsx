@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   UserRoundCog,
   UsersRound,
+  UsersRound as SwitchAccountsIcon,
   WifiOff,
   X,
 } from "lucide-react";
@@ -42,6 +43,7 @@ import { useSession } from "../../app/session";
 import { useNetworkStatus } from "../../app/networkStatus";
 import { useWorkspace } from "../../app/workspace";
 import { useNotifications } from "../../features/notifications/notifications";
+import { useSharedAccounts } from "../../features/account-switch/SharedAccountsProvider";
 import { useWorkspaceCatalogueSource } from "../../features/workspaces/WorkspaceCatalogueNotice";
 import { BrandMark } from "../ui/BrandMark";
 import { CompositeSourceNotice } from "../ui/CompositeSourceNotice";
@@ -125,6 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { session, logout } = useSession();
+  const sharedAccounts = useSharedAccounts();
   const { isOffline } = useNetworkStatus();
   const {
     properties,
@@ -141,23 +144,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     setSelectedWorkspaceId,
     workspaces,
   } = useWorkspace();
+  const scopeReady = Boolean(selectedWorkspace && selectedWorkspaceId && session?.tenantId === selectedWorkspaceId);
   const tenantScope = selectedWorkspaceId ? tenantAccessScope(selectedWorkspaceId) : "";
   const propertyScope = selectedWorkspaceId && selectedPropertyId
     ? propertyAccessScope(selectedWorkspaceId, selectedPropertyId)
     : "";
   const scopesForNavigationItem = (item: NavigationItem) =>
     navigationScopes(item.scope, tenantScope, propertyScope);
-  const navigationChecks = [...new Map(
+  const navigationChecks = scopeReady ? [...new Map(
     navigation.flatMap((item) => scopesForNavigationItem(item)
       .filter(Boolean)
       .flatMap((scope) => item.required.map((permission) => [
         `${permission}@${scope}`,
         { permission, scope },
       ] as const))),
-  ).values()];
+  ).values()] : [];
   const navigationAccess = usePermissions(navigationChecks);
   const workspaceSource = useWorkspaceCatalogueSource();
-  const scopeReady = Boolean(selectedWorkspaceId && session?.tenantId === selectedWorkspaceId);
   const propertySource = createCompositeSource({
     label: "Property list",
     hasData: propertiesLoaded,
@@ -174,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     isFetching: navigationAccess.isFetching,
     refetch: navigationAccess.refetch,
   });
-  const canReadPropertyDirectory = navigationAccess.hasData
+  const canReadPropertyDirectory = scopeReady && navigationAccess.hasData
     && navigationScopes("tenant-or-property", tenantScope, propertyScope).some(
       (scope) => navigationAccess.allows(permissions.propertiesRead, scope),
     );
@@ -191,11 +194,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       ? "Workspace updates delayed"
       : shellRefreshing
         ? "Refreshing workspace"
-        : "Workspace current";
+        : scopeReady ? "Workspace current" : "Personal account";
   const visibleNavigationSections = navigationSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => navigationItemAllowed(
+      items: section.items.filter((item) => scopeReady && navigationItemAllowed(
         item.required,
         scopesForNavigationItem(item),
         navigationAccess.allows,
@@ -461,14 +464,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <NavLink to="/notifications" className="btn btn-circle btn-ghost btn-sm relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}>
+            {session && sharedAccounts?.enabled && sharedAccounts.current?.csrfToken && <button type="button" className="btn btn-outline btn-sm mr-2 hidden gap-2 px-3 lg:inline-flex"
+              disabled={sharedAccounts.busy} onClick={() => void sharedAccounts.switchAccount()}>
+              <SwitchAccountsIcon size={16} aria-hidden="true" />Fast switching
+            </button>}
+            {scopeReady && <NavLink to="/notifications" className="btn btn-circle btn-ghost btn-sm relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}>
               <Bell size={18} />
               {unreadCount > 0 && (
                 <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-error px-1 text-[0.6rem] font-bold leading-4 text-white">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
-            </NavLink>
+            </NavLink>}
             <div className="flex items-center gap-2 px-1" role="status" aria-label={shellStatusLabel} title={shellStatusLabel}>
               <span className="hidden text-xs font-medium text-base-content/50 xl:inline">{shellStatusLabel}</span>
               {isOffline

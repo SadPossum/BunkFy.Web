@@ -13,6 +13,22 @@ function source(path: string): string {
 }
 
 describe("workspace catalogue recovery", () => {
+  it.each(["ready", "loading", "unavailable", "stale"] as const)("admits only the exact personal account route during %s catalogue state", state => {
+    expect(resolveWorkspaceGateMode("/account", state, 0, false, false)).toBe("app");
+    for (const path of ["/account/other", "/calendar", "/reservations", "/spaces", "/staff"]) {
+      expect(resolveWorkspaceGateMode(path, state, 0, false, false)).not.toBe("app");
+    }
+  });
+
+  it("keeps account access discoverable and operational navigation gated without a workspace", () => {
+    expect(source("features/workspaces/WorkspaceGate.tsx")).toContain('to="/account?section=security"');
+    expect(source("features/workspaces/WorkspaceOnboardingPage.tsx")).toContain('to="/account?section=security"');
+    expect(source("components/layout/AppShell.tsx")).toContain("scopeReady && navigationItemAllowed(");
+    expect(source("app/App.tsx")).toContain("<WorkspaceNotificationsProvider>");
+    expect(source("features/account/AccountPage.tsx")).toContain("const needsStaffProfile = workspaceProfileAvailable");
+    expect(source("features/account/AccountPage.tsx")).toContain("session?.tenantId === selectedWorkspace.organization.organizationId");
+    expect(source("components/layout/AppShell.tsx")).toContain("const navigationChecks = scopeReady ?");
+  });
   it("preserves the selected tenant until catalogue evidence is current", () => {
     expect(reconcileSelectedWorkspaceId("workspace-a", [], false)).toBe("workspace-a");
     expect(reconcileSelectedWorkspaceId("workspace-a", ["workspace-b"], false)).toBe("workspace-a");

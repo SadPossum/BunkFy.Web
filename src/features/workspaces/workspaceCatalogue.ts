@@ -30,6 +30,9 @@ export function resolveWorkspaceGateMode(
   selectedWorkspaceKnown: boolean,
   hasSelectedWorkspaceId: boolean,
 ): WorkspaceGateMode {
+  // Auth owns personal security independently of workspace membership/catalogue.
+  // This is exact route admission, not operational or resource authorization.
+  if (pathname === "/account") return "app";
   if (pathname === "/join") return "join";
   if (pathname === "/workspace/new") return "create";
   if (catalogueState === "loading") return "loading";

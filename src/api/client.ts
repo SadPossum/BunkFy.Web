@@ -26,6 +26,22 @@ export class ApiError extends Error {
   }
 }
 
+let rememberedBrowserTransport: { generation: number; csrfToken: string } | null = null;
+
+// Non-authoritative, memory-only transport context returned by the Auth owner.
+// It never holds an account list, PIN, bearer, refresh credential or device proof.
+export function setRememberedBrowserTransport(context: { generation: number; csrfToken: string } | null): void {
+  if (context && (!Number.isSafeInteger(context.generation) || context.generation < 0 ||
+    !context.csrfToken || context.csrfToken.length > 4096)) throw new Error("Invalid shared-browser context.");
+  rememberedBrowserTransport = context ? { ...context } : null;
+}
+
+function rememberedHeaders(headers: Headers): void {
+  if (!rememberedBrowserTransport) return;
+  headers.set("X-Gma-Remembered-Generation", String(rememberedBrowserTransport.generation));
+  headers.set("X-Gma-Remembered-CSRF", rememberedBrowserTransport.csrfToken);
+}
+
 export function resolveApiBaseUrl(): string {
   return trimTrailingSlash(import.meta.env.VITE_BUNKFY_API_BASE_URL?.trim() || "http://localhost:5194");
 }
@@ -34,8 +50,10 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
   session?: Pick<ApiSession, "accessToken" | "tenantId">,
+  ownerOutcome?: { statuses: readonly number[]; parse: (payload: unknown, response: Response) => T },
 ): Promise<T> {
   const headers = new Headers(options.headers);
+  rememberedHeaders(headers);
   headers.set("Accept", "application/json");
 
   if (options.body && !headers.has("Content-Type")) {
@@ -51,9 +69,14 @@ export async function apiRequest<T>(
     headers,
   });
 
-  if (!response.ok) {
+  // Explicit owner-outcome endpoints may return their typed result at declared
+  // failure statuses. Callers must validate that DTO; ordinary requests retain
+  // strict error handling and never turn an HTTP failure into success.
+  if (!response.ok && !ownerOutcome?.statuses.includes(response.status)) {
     throw await toApiError(response);
   }
+
+  if (ownerOutcome) return ownerOutcome.parse(await response.json(), response);
 
   if (response.status === 204 || response.headers.get("content-length") === "0") {
     return undefined as T;
@@ -68,6 +91,7 @@ export async function apiDownload(
   session?: Pick<ApiSession, "accessToken" | "tenantId">,
 ): Promise<ApiDownload> {
   const headers = new Headers(options.headers);
+  rememberedHeaders(headers);
   headers.set("Accept", "application/octet-stream");
   if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
   if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
@@ -91,6 +115,7 @@ export async function apiStream(
   session?: Pick<ApiSession, "accessToken" | "tenantId">,
 ): Promise<Response> {
   const headers = new Headers({ Accept: "text/event-stream" });
+  rememberedHeaders(headers);
   if (session?.tenantId) headers.set("X-Tenant-Id", session.tenantId);
   if (session?.accessToken) headers.set("Authorization", `Bearer ${session.accessToken}`);
   const response = await fetchWithConnectivity(`${resolveApiBaseUrl()}${path}`, { credentials: "include", headers, signal });
@@ -142,7 +167,7 @@ async function fetchWithConnectivity(
   }
 }
 
-function parseRetryAfterMilliseconds(value: string | null): number | undefined {
+export function parseRetryAfterMilliseconds(value: string | null): number | undefined {
   if (!value) return undefined;
 
   const seconds = Number(value);

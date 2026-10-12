@@ -14,6 +14,7 @@ describe("runtime product capabilities", () => {
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: true,
       staffPinEnabled: false,
+      sharedAccountSwitchEnabled: false,
     });
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/product-capabilities");
   });
@@ -24,6 +25,7 @@ describe("runtime product capabilities", () => {
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: false,
       staffPinEnabled: false,
+      sharedAccountSwitchEnabled: false,
     });
   });
 
@@ -36,6 +38,7 @@ describe("runtime product capabilities", () => {
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: false,
       staffPinEnabled: false,
+      sharedAccountSwitchEnabled: false,
     });
   });
 
@@ -47,6 +50,7 @@ describe("runtime product capabilities", () => {
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: false,
       staffPinEnabled: true,
+      sharedAccountSwitchEnabled: false,
     });
   });
 
@@ -58,6 +62,25 @@ describe("runtime product capabilities", () => {
     await expect(loadProductCapabilities()).resolves.toEqual({
       emailVerificationEnabled: true,
       staffPinEnabled: false,
+      sharedAccountSwitchEnabled: false,
     });
+  });
+
+  it("enables normal-account switching only from its own runtime capability", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ sharedAccountSwitchEnabled: true, staffPinEnabled: false }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+    await expect(loadProductCapabilities()).resolves.toEqual({ emailVerificationEnabled: false,
+      staffPinEnabled: false, sharedAccountSwitchEnabled: true });
+  });
+
+  it.each(["true", 1, null, false])("does not enable normal-account switching for %j", async sharedAccountSwitchEnabled => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ sharedAccountSwitchEnabled, staffPinEnabled: true }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+    await expect(loadProductCapabilities()).resolves.toEqual({ emailVerificationEnabled: false,
+      staffPinEnabled: true, sharedAccountSwitchEnabled: false });
   });
 });

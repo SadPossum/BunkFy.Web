@@ -23,8 +23,9 @@ describe("authentication entry source and callback recovery", () => {
     expect(page).toContain('(mode === "register" && !passwordRegistrationAvailable)');
     expect(page).toContain('mode === "register" ? (');
     expect(page).toContain("<AuthModeSwitch");
-    expect(page).toContain("Sign in remains available. Refresh before creating a new account.");
-    expect(page).toContain("Password sign-in remains available");
+    expect(page).toContain("Retry to check whether account creation is available.");
+    expect(page).toContain("Retry to load sign-in options. You can also try your email and password.");
+    expect(page).not.toContain("sign-in remains available");
     expect(page).not.toContain("Connected to {resolveApiBaseUrl()}");
     expect(page).not.toContain("cause instanceof Error ? cause.message");
   });

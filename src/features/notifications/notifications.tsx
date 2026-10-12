@@ -29,13 +29,13 @@ export { shouldRetryNotificationStream } from "./notificationStreamLifecycle";
 type NotificationsContextValue = { unreadCount: number; isLoading: boolean; refresh: () => Promise<void> };
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
-export function NotificationsProvider({ children }: { children: ReactNode }) {
+export function NotificationsProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   const { request, stream, session } = useSession();
   const queryClient = useQueryClient();
   const historySequence = useRef(0);
   const broadcastSequence = useRef(0);
   const [pageLifecycleRevision, setPageLifecycleRevision] = useState(0);
-  const scopeKey = notificationScopeKey(session);
+  const scopeKey = enabled ? notificationScopeKey(session) : "";
   const streamBoundaryKey = sessionIdentityKey(session);
   const history = useQuery({
     queryKey: notificationSummaryQueryKey(scopeKey, "history"),

@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight, Building2, Check, Link2, LogOut, UserRound } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import type { OrganizationMembershipSummary } from "../../api/types";
 import { useNetworkStatus } from "../../app/networkStatus";
 import { useSession } from "../../app/session";
@@ -85,11 +85,13 @@ export function WorkspaceOnboardingPage() {
   return (
     <main className="min-h-screen bg-base-200 px-4 py-8 sm:px-8 sm:py-14">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <BrandMark variant="simple-white-bold" height={48} framed />
             <span className="font-display text-2xl font-semibold">BunkFy</span>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          <Link to="/account?section=security" className="btn btn-ghost btn-sm">Account & security</Link>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -98,6 +100,7 @@ export function WorkspaceOnboardingPage() {
             <LogOut size={16} />
             Sign out
           </button>
+          </div>
         </div>
         <WorkspaceCatalogueNotice
           className="mt-8"

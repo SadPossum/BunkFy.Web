@@ -36,7 +36,8 @@ describe("Spaces-only lease and stable effective routed layout", () => {
     const paths = [...app.matchAll(/<Route path="([^"]+)"/g)].map((match) => match[1]);
     expect(paths).toEqual(["/", "/calendar", "/spaces", "/properties", "/privacy-requests", "/inventory", "/integrations", "/notifications", "/account", "/workspace", "/reservations", "/guests", "/staff", "*"]);
     expect(app).toContain("<Routes location={effectiveLocation}>"); expect(app).toContain("<Route element={<ApplicationRouteLayout />}>");
-    expect(app).toMatch(/<WorkspaceProvider>\s*<AccessAuthorityProvider>\s*<WorkspaceGate>\s*<NotificationsProvider>\s*<RouteNavigationLeaseProvider>/);
+    expect(app).toMatch(/<WorkspaceProvider>\s*<AccessAuthorityProvider>\s*<WorkspaceGate>\s*<WorkspaceNotificationsProvider>\s*<RouteNavigationLeaseProvider>/);
+    expect(app).toContain("<NotificationsProvider enabled={Boolean(selectedWorkspace && selectedWorkspaceId && session?.tenantId === selectedWorkspaceId)}>");
     const layout = app.slice(app.indexOf("function ApplicationRouteLayout()"), app.indexOf("function RouteViewportReset"));
     for (const owned of ["useLocation()", "<OperationalPreviewProvider>", "<AppShell>", "resetKey={location.key}", "<RouteViewportReset pathname={location.pathname}", "<Outlet />", "<OperationalPreviewHost />"]) expect(layout).toContain(owned);
     const facade = readFileSync("src/features/spaces/useSpacesNavigationGuard.ts", "utf8"); expect(facade).not.toContain("useState"); expect(facade).toContain("useCurrentRouteNavigationLease()");

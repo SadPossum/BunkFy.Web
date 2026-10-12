@@ -75,7 +75,9 @@ describe("frontend repository foundation", () => {
     expect(session).toContain("createSingleFlightRefresh");
     expect(session).toContain("refreshFailureInvalidatesSession");
     expect(session).toContain("queryClient.removeQueries()");
-    expect(session).not.toContain("queryClient.clear()");
+    const transitionBoundary = session.slice(session.indexOf("const concealForAccountTransition"));
+    expect(transitionBoundary).toContain("queryClient.clear()");
+    expect(session).toContain("Privacy/UI boundary only");
     expect(client).toContain("X-Tenant-Id");
     expect(client).toContain('credentials: "include"');
     expect(client).toContain("assertRequestCanStart");

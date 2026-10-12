@@ -97,6 +97,8 @@ type SessionContextValue = {
   cancelExternalAuthentication: () => void;
   logout: () => Promise<void>;
   completeConfirmedBrowserSignOut: (expectedSessionId: string) => void;
+  concealForAccountTransition: () => void;
+  adoptBrowserAccount: (account: ApiSession) => void;
   logoutAll: () => Promise<void>;
   stepUpWithPassword: (password: string) => Promise<void>;
   selectWorkspace: (workspaceId: string) => void;
@@ -107,9 +109,15 @@ type SessionContextValue = {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({ children, restoreOnMount = true, prepareBrowserRefresh }: {
+  children: ReactNode;
+  restoreOnMount?: boolean;
+  prepareBrowserRefresh?: (identity: SessionIdentity) => Promise<void>;
+}) {
   const queryClient = useQueryClient();
-  const initialIdentity = useRef(readSessionIdentity());
+  // A managed browser must establish its server device boundary before an old
+  // remembered identity can trigger refresh or render operational content.
+  const initialIdentity = useRef(restoreOnMount ? readSessionIdentity() : null);
   const [session, setSessionState] = useState<ApiSession | null>(null);
   const [isRestoring, setIsRestoring] = useState(
     initialIdentity.current !== null,
@@ -161,6 +169,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const expectedBoundarySequence = boundarySequenceRef.current;
       return runWithBrowserSessionLock(async () => {
         assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        if (prepareBrowserRefresh) await prepareBrowserRefresh(identity);
+        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
 
         const { accessToken } = await apiRequest<BrowserAuthResponse>(
           "/api/auth/browser/refresh",
@@ -184,7 +194,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return refreshed;
       });
     },
-    [setSession],
+    [prepareBrowserRefresh, setSession],
   );
 
   const refreshSession = useMemo(
@@ -689,6 +699,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, [setSession]);
 
+  // Privacy/UI boundary only: the remembered-account owner must separately
+  // confirm server revocation. Never present this as a completed remote lock.
+  const concealForAccountTransition = useCallback(() => {
+    acceptsRefreshRef.current = false;
+    boundarySequenceRef.current += 1;
+    restoringIdentityRef.current = null;
+    setRestoringIdentity(null);
+    setRestorationError(null);
+    setIsRestoring(false);
+    void queryClient.cancelQueries();
+    setSession(null);
+    queryClient.clear();
+  }, [queryClient, setSession]);
+
+  // Called only after the Auth owner returns a confirmed current selection.
+  // Explicit subject/session coordinates are checked against the returned token;
+  // this does not mint identity, permissions or authentication assurance.
+  const adoptBrowserAccount = useCallback((account: ApiSession) => {
+    if (!account.subjectId || !account.sessionId) throw new SessionIdentityMismatchError();
+    const verified = bindApiSessionIdentity(account, null);
+    acceptsRefreshRef.current = true;
+    restoringIdentityRef.current = null;
+    setRestoringIdentity(null);
+    setRestorationError(null);
+    setIsRestoring(false);
+    setSession(verified);
+  }, [setSession]);
+
   const logout = useCallback(async () => {
     const active = sessionRef.current;
     acceptsRefreshRef.current = false;
@@ -762,6 +800,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       cancelExternalAuthentication,
       logout,
       completeConfirmedBrowserSignOut,
+      concealForAccountTransition,
+      adoptBrowserAccount,
       logoutAll,
       stepUpWithPassword,
       selectWorkspace,
@@ -783,6 +823,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isRestoring,
       logout,
       completeConfirmedBrowserSignOut,
+      concealForAccountTransition,
+      adoptBrowserAccount,
       logoutAll,
       request,
       restorationError,

@@ -11,7 +11,7 @@ import {
   loadProductCapabilities,
   ProductCapabilitiesProvider,
 } from "./app/productCapabilities";
-import { SessionProvider } from "./app/session";
+import { SharedAccountRoot } from "./features/account-switch/SharedAccountsProvider";
 import { StationPage } from "./features/stations/StationPage";
 import { isStationPath } from "./features/stations/stationTypes";
 import { installStationHandoff } from "./features/stations/stationHandoff";
@@ -52,11 +52,11 @@ async function bootstrap() {
       <RenderErrorBoundary fallback={<ApplicationRenderFailure />}>
         <ProductCapabilitiesProvider capabilities={capabilities}>
           <QueryClientProvider client={queryClient}>
-            <SessionProvider>
-              <BrowserRouter>
+            <BrowserRouter>
+              <SharedAccountRoot>
                 <App />
-              </BrowserRouter>
-            </SessionProvider>
+              </SharedAccountRoot>
+            </BrowserRouter>
           </QueryClientProvider>
         </ProductCapabilitiesProvider>
       </RenderErrorBoundary>

@@ -42,6 +42,7 @@ import {
 import { AccountSessionsPanel } from "./AccountSessionsPanel";
 import { AccountStaffProfilePanel } from "./AccountStaffProfilePanel";
 import { StaffPinPanel } from "./StaffPinPanel";
+import { RememberAccountPanel } from "../account-switch/RememberAccountPanel";
 import {
   accountSection,
   accountSectionSearchParams,
@@ -51,17 +52,18 @@ import {
 export function AccountPage() {
   const { beginExternalLink, logout, logoutAll, request, session } = useSession();
   const { selectedWorkspace } = useWorkspace();
+  const workspaceProfileAvailable = Boolean(selectedWorkspace && session?.tenantId === selectedWorkspace.organization.organizationId);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const focusRequested = searchParams.get("focus") === "workspace-profile" && Boolean(selectedWorkspace);
-  const requestedSection = accountSection(searchParams.get("section"), Boolean(selectedWorkspace));
+  const focusRequested = searchParams.get("focus") === "workspace-profile" && workspaceProfileAvailable;
+  const requestedSection = accountSection(searchParams.get("section"), workspaceProfileAvailable);
   const section: AccountSection = focusRequested ? "profile" : requestedSection;
 
   const needsMethods = section === "overview" || section === "security";
   const needsProviders = section === "security";
   const needsSessions = section === "overview" || section === "sessions";
   const needsMfa = section === "overview" || section === "security";
-  const needsStaffProfile = Boolean(selectedWorkspace) && (section === "overview" || section === "profile");
+  const needsStaffProfile = workspaceProfileAvailable && (section === "overview" || section === "profile");
 
   const methods = useQuery({
     queryKey: ["auth", "methods", session?.tenantId],
@@ -98,7 +100,7 @@ export function AccountPage() {
   const staffProfileSource = createCompositeSource({ label: "Workspace profile", hasData: staffProfile.data !== undefined, isLoading: staffProfile.isLoading, error: staffProfile.error, isFetching: staffProfile.isFetching, refetch: () => staffProfile.refetch() });
 
   const activeSources = section === "overview"
-    ? [methodsSource, mfaSource, sessionSource, ...(selectedWorkspace ? [staffProfileSource] : [])]
+    ? [methodsSource, mfaSource, sessionSource, ...(workspaceProfileAvailable ? [staffProfileSource] : [])]
     : section === "security"
       ? [methodsSource, mfaSource, providerSource]
       : section === "sessions"
@@ -230,7 +232,7 @@ export function AccountPage() {
   const availableProviders = (providersUsable ? providers.data?.providers ?? [] : []).filter((provider) => !linkedProviderCodes.has(provider));
   const navigation = [
     { value: "overview" as const, label: "Overview", description: "Identity and security", icon: CircleUserRound, visible: true },
-    { value: "profile" as const, label: "Workspace profile", description: "Contact and work details", icon: Building2, visible: Boolean(selectedWorkspace) },
+    { value: "profile" as const, label: "Workspace profile", description: "Contact and work details", icon: Building2, visible: workspaceProfileAvailable },
     { value: "security" as const, label: "Sign-in & recovery", description: "Password, email, MFA", icon: ShieldCheck, visible: true },
     { value: "sessions" as const, label: "Sessions", description: "Browsers and revocation", icon: MonitorSmartphone, visible: true },
   ].filter((item) => item.visible);
@@ -259,7 +261,7 @@ export function AccountPage() {
               <span className="mb-1.5 block text-sm font-semibold">Account section</span>
               <SelectPicker
                 value={section}
-                onValueChange={(value) => selectSection(accountSection(value, Boolean(selectedWorkspace)))}
+                onValueChange={(value) => selectSection(accountSection(value, workspaceProfileAvailable))}
                 ariaLabel="Account section"
                 options={navigation.map((item) => ({ value: item.value, label: item.label, description: item.description }))}
               />
@@ -284,7 +286,7 @@ export function AccountPage() {
             {section === "overview" && (
               <AccountOverview
                 username={session?.username ?? "Unknown account"}
-                workspaceName={selectedWorkspace?.organization.name ?? null}
+                workspaceName={workspaceProfileAvailable ? selectedWorkspace?.organization.name ?? null : null}
                 staffProfile={staffProfileUsable ? staffProfile.data : undefined}
                 staffProfileState={staffProfileSource.state}
                 methods={authentication}
@@ -297,7 +299,7 @@ export function AccountPage() {
               />
             )}
 
-            {section === "profile" && selectedWorkspace && (
+            {section === "profile" && workspaceProfileAvailable && selectedWorkspace && (
               staffProfileUsable && staffProfile.data ? (
                 <AccountStaffProfilePanel
                   member={staffProfile.data}
@@ -321,6 +323,7 @@ export function AccountPage() {
                   {authentication ? <PasswordPanel methods={authentication} action={passwordAction} mutation={security} canMutate={methodsCurrent} onAction={openPasswordAction} /> : <AccountSourcePanel title="Password" description="Password sign-in status and changes." state={methodsSource.state} label="sign-in methods" />}
                   <MultiFactorPanel status={mfaUsable ? mfaStatus.data : undefined} sourceState={mfaSource.state} canMutate={mfaCurrent} />
                   <StaffPinPanel />
+                  <RememberAccountPanel />
                   {authentication && <EmailPanel methods={authentication} mutation={security} canMutate={methodsCurrent} />}
                   {authentication && <ProviderPanel methods={authentication} availableProviders={availableProviders} catalogueState={providerSource.state} linkingProvider={linkingProvider} unlinkIdentity={unlinkIdentity} mutation={security} canLink={methodsCurrent && providersCurrent} canUnlink={methodsCurrent} linkError={providerLinkError} onLink={linkProvider} onUnlink={openUnlink} />}
                 </div>

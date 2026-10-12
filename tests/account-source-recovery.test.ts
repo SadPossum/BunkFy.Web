@@ -59,7 +59,8 @@ describe("account source recovery", () => {
   });
 
   it("loads and recovers the Staff-owned profile only when its section needs it", () => {
-    expect(account).toContain("const needsStaffProfile = Boolean(selectedWorkspace)");
+    expect(account).toContain("const workspaceProfileAvailable = Boolean(selectedWorkspace && session?.tenantId === selectedWorkspace.organization.organizationId)");
+    expect(account).toContain("const needsStaffProfile = workspaceProfileAvailable &&");
     expect(account).toContain("enabled: needsStaffProfile");
     expect(account).toContain('label="workspace profile"');
     expect(account).toContain("staffProfileUsable && staffProfile.data");

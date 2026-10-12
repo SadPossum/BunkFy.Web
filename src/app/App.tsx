@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { AppShell } from "../components/layout/AppShell";
 import { AuthPage } from "../features/auth/AuthPage";
@@ -6,7 +6,7 @@ import { AuthCompletionPage } from "../features/auth/AuthCompletionPage";
 import { SessionRecoveryPage } from "../features/auth/SessionRecoveryPage";
 import { NotificationsProvider } from "../features/notifications/notifications";
 import { useSession } from "./session";
-import { WorkspaceProvider } from "./workspace";
+import { WorkspaceProvider, useWorkspace } from "./workspace";
 import { WorkspaceGate } from "../features/workspaces/WorkspaceGate";
 import { preserveWorkspaceJoinSecret } from "../features/workspaces/workspaceJoin";
 import {
@@ -122,15 +122,21 @@ export function App() {
     <WorkspaceProvider>
       <AccessAuthorityProvider>
         <WorkspaceGate>
-          <NotificationsProvider>
+          <WorkspaceNotificationsProvider>
             <RouteNavigationLeaseProvider>
               <LeasedApplicationRoutes />
             </RouteNavigationLeaseProvider>
-          </NotificationsProvider>
+          </WorkspaceNotificationsProvider>
         </WorkspaceGate>
       </AccessAuthorityProvider>
     </WorkspaceProvider>
   );
+}
+
+function WorkspaceNotificationsProvider({ children }: { children: ReactNode }) {
+  const { session } = useSession();
+  const { selectedWorkspace, selectedWorkspaceId } = useWorkspace();
+  return <NotificationsProvider enabled={Boolean(selectedWorkspace && selectedWorkspaceId && session?.tenantId === selectedWorkspaceId)}>{children}</NotificationsProvider>;
 }
 
 function LeasedApplicationRoutes() {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api/client";
+import { NetworkRequestError, OfflineRequestError } from "../src/api/requestConnectivity";
 import {
   externalProviderAllowed,
   isMultiFactorChallenge,
@@ -10,6 +11,18 @@ import {
 } from "../src/features/auth/authenticationFlow";
 
 describe("browser authentication flow", () => {
+  it("does not blame credentials when authentication cannot reach the service", () => {
+    const credentialsRejected = "Email or password was not accepted.";
+    expect(publicAuthenticationErrorMessage(new NetworkRequestError(), credentialsRejected))
+      .toBe("BunkFy could not reach the sign-in service. Check your connection and try again.");
+    expect(publicAuthenticationErrorMessage(new OfflineRequestError(), credentialsRejected))
+      .toBe("You are offline. Reconnect, then try signing in again.");
+    expect(publicAuthenticationErrorMessage(new ApiError("private detail", 503), credentialsRejected))
+      .toBe("The sign-in service is unavailable. Try again shortly.");
+    expect(publicAuthenticationErrorMessage(new ApiError("invalid", 401), credentialsRejected))
+      .toBe(credentialsRejected);
+  });
+
   it("distinguishes a challenge from an authenticated browser response", () => {
     expect(isMultiFactorChallenge({ accessToken: "access-token" })).toBe(false);
     expect(isMultiFactorChallenge({
@@ -63,7 +76,7 @@ describe("browser authentication flow", () => {
     expect(publicAuthenticationErrorMessage(
       new ApiError("internal subject detail", 500, "Auth.Internal"),
       "Authentication is unavailable.",
-    )).toBe("Authentication is unavailable.");
+    )).toBe("The sign-in service is unavailable. Try again shortly.");
     expect(publicAuthenticationErrorMessage(
       new ApiError("blocked", 400, "Auth.PasswordBlocked"),
       "Registration failed.",

@@ -4,11 +4,13 @@ import { apiRequest } from "../api/client";
 export type ProductCapabilities = {
   emailVerificationEnabled: boolean;
   staffPinEnabled?: boolean;
+  sharedAccountSwitchEnabled?: boolean;
 };
 
 const unavailableCapabilities: ProductCapabilities = {
   emailVerificationEnabled: false,
   staffPinEnabled: false,
+  sharedAccountSwitchEnabled: false,
 };
 
 const ProductCapabilitiesContext = createContext<ProductCapabilities>(
@@ -44,6 +46,7 @@ export async function loadProductCapabilities(): Promise<ProductCapabilities> {
     return {
       emailVerificationEnabled: capabilities.emailVerificationEnabled === true,
       staffPinEnabled: capabilities.staffPinEnabled === true,
+      sharedAccountSwitchEnabled: capabilities.sharedAccountSwitchEnabled === true,
     };
   } catch {
     return unavailableCapabilities;
