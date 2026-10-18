@@ -30,6 +30,11 @@ export type OrganizationListResponse = Omit<Schema<"OrganizationListResponse">, 
   items: OrganizationMembershipSummary[];
 };
 
+export type StationWorkspaceSettings = {
+  sharedStationPinEnabled: boolean;
+  revision: number;
+};
+
 export type OrganizationMemberListResponse = Omit<Schema<"OrganizationMemberListResponse">, "items"> & {
   items: OrganizationMembership[];
 };

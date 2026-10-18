@@ -1625,6 +1625,881 @@
         }
       }
     },
+    "/api/auth/browser/remembered/current": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "GetRememberedBrowserCurrent",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserCurrentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/operations/{operationId}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "GetRememberedBrowserOperation",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/device": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "CreateRememberedBrowserDevice",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserCurrentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/remember": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "RememberBrowserAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberBrowserAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/select": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "SelectRememberedAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectRememberedAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/recover": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "RecoverRememberedOperation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoverRememberedOperationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/lock": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "LockRememberedBrowser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/begin-sign-in": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "BeginRememberedBrowserSignIn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/cancel-sign-in": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "CancelRememberedBrowserSignIn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/forget": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "ForgetRememberedAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetRememberedAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/forget-device": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "ForgetRememberedBrowser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/browser/remembered/activity": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "RecordRememberedBrowserActivity",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberedBrowserActivityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/smoke": {
       "get": {
         "tags": [
@@ -11273,6 +12148,64 @@
         }
       }
     },
+    "/api/station-settings/workspace": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "operationId": "StationsWorkspaceSettingsGet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationWorkspaceSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Stations"
+        ],
+        "operationId": "StationsWorkspaceSettingsUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStationWorkspaceSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationWorkspaceSettingsResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationWorkspaceSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/station-management/properties/{propertyId}/stations": {
       "get": {
         "tags": [
@@ -11304,21 +12237,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationListResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11326,7 +12249,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11334,7 +12257,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11342,7 +12265,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11350,7 +12273,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11358,7 +12281,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationListResponse"
+                }
               }
             }
           }
@@ -11390,21 +12323,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationStaffStatusResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11412,7 +12335,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11420,7 +12343,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11428,7 +12351,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11436,7 +12359,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11444,7 +12367,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationStaffStatusResponse"
+                }
               }
             }
           }
@@ -11476,6 +12409,54 @@
           }
         ],
         "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -11486,30 +12467,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -11517,30 +12474,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/StationManagementHttpResponse"
                 }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           }
@@ -11574,21 +12507,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationManagementHttpResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11596,7 +12519,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11604,7 +12527,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11612,7 +12535,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11620,7 +12543,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11628,7 +12551,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationManagementHttpResponse"
+                }
               }
             }
           }
@@ -11652,21 +12585,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationOwnPinStatusResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11674,7 +12597,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11682,7 +12605,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11690,7 +12613,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11698,7 +12621,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11706,7 +12629,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationOwnPinStatusResponse"
+                }
               }
             }
           }
@@ -11738,21 +12671,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationManagementHttpResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11760,7 +12683,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11768,7 +12691,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11776,7 +12699,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11784,7 +12707,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11792,7 +12715,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationManagementHttpResponse"
+                }
               }
             }
           }
@@ -11824,6 +12757,54 @@
           }
         ],
         "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -11834,30 +12815,6 @@
               }
             }
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -11865,30 +12822,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/StationManagementHttpResponse"
                 }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           }
@@ -11902,21 +12835,11 @@
         ],
         "operationId": "StationsRuntimeCurrent",
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationCurrentResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11924,7 +12847,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11932,7 +12855,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11940,7 +12863,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11948,7 +12871,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -11956,7 +12879,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationCurrentResponse"
+                }
               }
             }
           }
@@ -11993,21 +12926,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationRosterResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12015,7 +12938,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12023,7 +12946,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12031,7 +12954,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12039,7 +12962,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12047,7 +12970,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationRosterResponse"
+                }
               }
             }
           }
@@ -12071,21 +13004,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationRuntimeResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12093,7 +13016,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12101,7 +13024,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12109,7 +13032,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12117,7 +13040,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12125,7 +13048,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationRuntimeResponse"
+                }
               }
             }
           }
@@ -12149,21 +13082,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationRuntimeResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12171,7 +13094,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12179,7 +13102,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12187,7 +13110,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12195,7 +13118,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12203,7 +13126,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationRuntimeResponse"
+                }
               }
             }
           }
@@ -12227,21 +13160,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationRuntimeResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12249,7 +13172,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12257,7 +13180,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12265,7 +13188,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12273,7 +13196,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12281,7 +13204,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationRuntimeResponse"
+                }
               }
             }
           }
@@ -12305,6 +13238,54 @@
           "required": true
         },
         "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -12314,12 +13295,52 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/station-runtime/departures": {
+      "get": {
+        "tags": [
+          "Stations runtime"
+        ],
+        "operationId": "StationsRuntimeDepartures",
+        "parameters": [
+          {
+            "name": "X-BunkFy-Station-Actor",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           },
+          {
+            "name": "X-BunkFy-Station-Generation",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12327,7 +13348,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12335,7 +13356,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12343,7 +13364,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12351,7 +13372,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12359,7 +13380,173 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationDeparturesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/station-runtime/check-out": {
+      "post": {
+        "tags": [
+          "Stations runtime"
+        ],
+        "operationId": "StationsRuntimeCheckOut",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StationCheckOutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationCheckOutResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/station-runtime/check-out/outcome": {
+      "post": {
+        "tags": [
+          "Stations runtime"
+        ],
+        "operationId": "StationsRuntimeCheckOutOutcome",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StationCheckOutOutcomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationCheckOutOutcome"
+                }
               }
             }
           }
@@ -12403,21 +13590,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationArrivalsResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12425,7 +13602,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12433,7 +13610,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12441,7 +13618,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12449,7 +13626,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12457,7 +13634,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationArrivalsResponse"
+                }
               }
             }
           }
@@ -12481,21 +13668,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationCheckInResult"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12503,7 +13680,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12511,7 +13688,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12519,7 +13696,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12527,7 +13704,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12535,7 +13712,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationCheckInResult"
+                }
               }
             }
           }
@@ -12559,21 +13746,11 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationCheckInOutcome"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12581,7 +13758,7 @@
             "description": "Unauthorized",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12589,7 +13766,7 @@
             "description": "Forbidden",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12597,7 +13774,7 @@
             "description": "Conflict",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12605,7 +13782,7 @@
             "description": "Too Many Requests",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
               }
             }
           },
@@ -12613,7 +13790,17 @@
             "description": "Service Unavailable",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": { }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationCheckInOutcome"
+                }
               }
             }
           }
@@ -13309,9 +14496,6 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
           "409": {
             "description": "Conflict",
             "content": {
@@ -13331,6 +14515,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -13456,1135 +14643,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceStaffOnboardingDataRightsCorrectionReceiptDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/station-runtime/check-out": {
-      "post": {
-        "tags": [
-          "Stations runtime"
-        ],
-        "operationId": "StationsRuntimeCheckOut",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StationCheckOutRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationCheckOutResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/station-runtime/check-out/outcome": {
-      "post": {
-        "tags": [
-          "Stations runtime"
-        ],
-        "operationId": "StationsRuntimeCheckOutOutcome",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StationCheckOutOutcomeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationCheckOutOutcome"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/station-runtime/departures": {
-      "get": {
-        "tags": [
-          "Stations runtime"
-        ],
-        "operationId": "StationsRuntimeDepartures",
-        "parameters": [
-          {
-            "name": "X-BunkFy-Station-Actor",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-BunkFy-Station-Generation",
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StationDeparturesResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/activity": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "RecordRememberedBrowserActivity",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RememberedBrowserActivityRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/begin-sign-in": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "BeginRememberedBrowserSignIn",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/cancel-sign-in": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "CancelRememberedBrowserSignIn",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/current": {
-      "get": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "GetRememberedBrowserCurrent",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserCurrentResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/device": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "CreateRememberedBrowserDevice",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserCurrentResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/forget": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "ForgetRememberedAccount",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ForgetRememberedAccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/forget-device": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "ForgetRememberedBrowser",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/lock": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "LockRememberedBrowser",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RememberedBrowserTransitionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/operations/{operationId}": {
-      "get": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "GetRememberedBrowserOperation",
-        "parameters": [
-          {
-            "name": "operationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/recover": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "RecoverRememberedOperation",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecoverRememberedOperationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/remember": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "RememberBrowserAccount",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RememberBrowserAccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/browser/remembered/select": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "operationId": "SelectRememberedAccount",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SelectRememberedAccountRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RememberedBrowserOperationResponse"
                 }
               }
             }
@@ -18472,6 +18530,24 @@
         },
         "additionalProperties": false
       },
+      "ForgetRememberedAccountRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "GuestDataHoldAction": {
         "enum": [
           0,
@@ -21359,7 +21435,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": {}
+        "additionalProperties": { }
       },
       "PropertyCreateRequest": {
         "type": "object",
@@ -21959,6 +22035,26 @@
         },
         "additionalProperties": false
       },
+      "RecoverRememberedOperationRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pin": {
+            "type": "string",
+            "format": "password",
+            "nullable": true,
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RefreshTokenRequest": {
         "type": "object",
         "properties": {
@@ -22119,6 +22215,249 @@
           },
           "confirmed": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberBrowserAccountRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pin": {
+            "type": "string",
+            "format": "password",
+            "nullable": true,
+            "writeOnly": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "consent": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberedBrowserAccount": {
+        "required": [
+          "expiresAtUtc",
+          "proofId",
+          "requiresSignIn",
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "proofId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requiresSignIn": {
+            "type": "boolean"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberedBrowserActiveAccount": {
+        "required": [
+          "memberId",
+          "sessionId",
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proofId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "username": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberedBrowserActivityRequest": {
+        "type": "object",
+        "properties": {
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberedBrowserCurrentResponse": {
+        "required": [
+          "accounts",
+          "generation",
+          "pinDigits",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/RememberedBrowserState"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pinDigits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RememberedBrowserAccount"
+            }
+          },
+          "active": {
+            "required": [
+              "memberId",
+              "sessionId",
+              "username"
+            ],
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sessionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "proofId": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true
+              },
+              "username": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "idleExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "absoluteExpiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "csrfToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberedBrowserOperationResponse": {
+        "required": [
+          "current",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/RememberedBrowserOutcome"
+          },
+          "current": {
+            "$ref": "#/components/schemas/RememberedBrowserCurrentResponse"
+          },
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RememberedBrowserOutcome": {
+        "enum": [
+          "applied",
+          "state-changed",
+          "authentication-required",
+          "pin-rejected",
+          "rate-limited",
+          "session-limit-reached",
+          "unavailable",
+          "not-found"
+        ],
+        "type": "string"
+      },
+      "RememberedBrowserState": {
+        "enum": [
+          "missing",
+          "locked",
+          "active",
+          "signing-in",
+          "revoked",
+          "unavailable"
+        ],
+        "type": "string"
+      },
+      "RememberedBrowserTransitionRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -24148,6 +24487,30 @@
         },
         "additionalProperties": false
       },
+      "SelectRememberedAccountRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pin": {
+            "type": "string",
+            "format": "password",
+            "nullable": true,
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SensitiveHistoryStatus": {
         "enum": [
           0,
@@ -25477,6 +25840,99 @@
         },
         "additionalProperties": false
       },
+      "StationCheckOutOutcome": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/StationCheckOutOutcomeState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StationCheckOutOutcomeRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "browserSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StationCheckOutOutcomeState": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "StationCheckOutRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actorSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedGeneration": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StationCheckOutResult": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/StationReservationState"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/ReservationMutationReceiptDto"
+          },
+          "checkout": {
+            "$ref": "#/components/schemas/StationCheckOutOutcomeState"
+          }
+        },
+        "additionalProperties": false
+      },
       "StationCoreOutcome": {
         "enum": [
           0,
@@ -25514,6 +25970,45 @@
           },
           "jobs": {
             "$ref": "#/components/schemas/StationJobAvailability"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StationDepartureState": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "StationDeparturesResponse": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/StationReservationState"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationFirstJobDeparture"
+            },
+            "nullable": true
+          },
+          "continuation": {
+            "type": "string",
+            "nullable": true
+          },
+          "propertyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "propertyLocalDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -25559,11 +26054,75 @@
         },
         "additionalProperties": false
       },
+      "StationDueDeparture": {
+        "type": "object",
+        "properties": {
+          "reservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "primaryGuestName": {
+            "type": "string",
+            "nullable": true
+          },
+          "arrival": {
+            "type": "string",
+            "format": "date"
+          },
+          "departure": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkedInBusinessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "allocationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "allocationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationAllocationUnit"
+            },
+            "nullable": true
+          },
+          "state": {
+            "$ref": "#/components/schemas/StationDepartureState"
+          }
+        },
+        "additionalProperties": false
+      },
       "StationFirstJobArrival": {
         "type": "object",
         "properties": {
           "reservation": {
             "$ref": "#/components/schemas/StationDueArrival"
+          },
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StationInventoryLabel"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StationFirstJobDeparture": {
+        "type": "object",
+        "properties": {
+          "reservation": {
+            "$ref": "#/components/schemas/StationDueDeparture"
           },
           "places": {
             "type": "array",
@@ -25626,6 +26185,18 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StationJobAvailability": {
+        "type": "object",
+        "properties": {
+          "checkIn": {
+            "$ref": "#/components/schemas/StationReservationState"
+          },
+          "checkOut": {
+            "$ref": "#/components/schemas/StationReservationState"
           }
         },
         "additionalProperties": false
@@ -26145,6 +26716,19 @@
         },
         "additionalProperties": false
       },
+      "StationWorkspaceSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "sharedStationPinEnabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "StayLifecycleRequest": {
         "type": "object",
         "properties": {
@@ -26425,6 +27009,19 @@
             "nullable": true
           },
           "expectedDetailsRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateStationWorkspaceSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "sharedStationPinEnabled": {
+            "type": "boolean"
+          },
+          "expectedRevision": {
             "type": "integer",
             "format": "int64"
           }
@@ -27248,521 +27845,6 @@
         ],
         "type": "integer",
         "format": "int32"
-      },
-      "StationCheckOutRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reservationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "actorSessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationCheckOutResult": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/StationReservationState"
-          },
-          "receipt": {
-            "$ref": "#/components/schemas/ReservationMutationReceiptDto"
-          },
-          "checkout": {
-            "$ref": "#/components/schemas/StationCheckOutOutcomeState"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationCheckOutOutcomeState": {
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "StationCheckOutOutcomeRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reservationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "browserSessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "actorSessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationCheckOutOutcome": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/StationCheckOutOutcomeState"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationJobAvailability": {
-        "type": "object",
-        "properties": {
-          "checkIn": {
-            "$ref": "#/components/schemas/StationReservationState"
-          },
-          "checkOut": {
-            "$ref": "#/components/schemas/StationReservationState"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationDeparturesResponse": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/StationReservationState"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StationFirstJobDeparture"
-            },
-            "nullable": true
-          },
-          "continuation": {
-            "type": "string",
-            "nullable": true
-          },
-          "propertyId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "propertyLocalDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationFirstJobDeparture": {
-        "type": "object",
-        "properties": {
-          "reservation": {
-            "$ref": "#/components/schemas/StationDueDeparture"
-          },
-          "places": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StationInventoryLabel"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationDueDeparture": {
-        "type": "object",
-        "properties": {
-          "reservationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "primaryGuestName": {
-            "type": "string",
-            "nullable": true
-          },
-          "arrival": {
-            "type": "string",
-            "format": "date"
-          },
-          "departure": {
-            "type": "string",
-            "format": "date"
-          },
-          "checkedInBusinessDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "expectedVersion": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "allocationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "allocationVersion": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "units": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StationAllocationUnit"
-            },
-            "nullable": true
-          },
-          "state": {
-            "$ref": "#/components/schemas/StationDepartureState"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StationDepartureState": {
-        "enum": [
-          0,
-          1,
-          2
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "RememberedBrowserActivityRequest": {
-        "type": "object",
-        "properties": {
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
-      "RememberedBrowserOperationResponse": {
-        "required": [
-          "current",
-          "outcome"
-        ],
-        "type": "object",
-        "properties": {
-          "outcome": {
-            "$ref": "#/components/schemas/RememberedBrowserOutcome"
-          },
-          "current": {
-            "$ref": "#/components/schemas/RememberedBrowserCurrentResponse"
-          },
-          "accessToken": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RememberedBrowserOutcome": {
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "RememberedBrowserCurrentResponse": {
-        "required": [
-          "accounts",
-          "generation",
-          "pinDigits",
-          "state"
-        ],
-        "type": "object",
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/RememberedBrowserState"
-          },
-          "generation": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "pinDigits": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "accounts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RememberedBrowserAccount"
-            }
-          },
-          "active": {
-            "required": [
-              "memberId",
-              "sessionId",
-              "username"
-            ],
-            "type": "object",
-            "properties": {
-              "memberId": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "sessionId": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "proofId": {
-                "type": "string",
-                "format": "uuid",
-                "nullable": true
-              },
-              "username": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "additionalProperties": false,
-            "nullable": true
-          },
-          "idleExpiresAtUtc": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "absoluteExpiresAtUtc": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "csrfToken": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RememberedBrowserState": {
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "RememberedBrowserAccount": {
-        "required": [
-          "expiresAtUtc",
-          "proofId",
-          "requiresSignIn",
-          "username"
-        ],
-        "type": "object",
-        "properties": {
-          "proofId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "username": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          },
-          "expiresAtUtc": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "requiresSignIn": {
-            "type": "boolean"
-          },
-          "displayName": {
-            "type": "string",
-            "nullable": true
-          },
-          "jobTitle": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RememberedBrowserActiveAccount": {
-        "required": [
-          "memberId",
-          "sessionId",
-          "username"
-        ],
-        "type": "object",
-        "properties": {
-          "memberId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "proofId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "username": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RememberedBrowserTransitionRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "additionalProperties": false
-      },
-      "ForgetRememberedAccountRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "proofId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
-      "RecoverRememberedOperationRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "pin": {
-            "type": "string",
-            "format": "password",
-            "nullable": true,
-            "writeOnly": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RememberBrowserAccountRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "pin": {
-            "type": "string",
-            "format": "password",
-            "nullable": true,
-            "writeOnly": true
-          },
-          "label": {
-            "type": "string",
-            "nullable": true
-          },
-          "consent": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "SelectRememberedAccountRequest": {
-        "type": "object",
-        "properties": {
-          "operationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "expectedGeneration": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "proofId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "pin": {
-            "type": "string",
-            "format": "password",
-            "nullable": true,
-            "writeOnly": true
-          }
-        },
-        "additionalProperties": false
       }
     }
   },

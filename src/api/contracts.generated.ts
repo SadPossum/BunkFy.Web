@@ -2017,6 +2017,198 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/browser/remembered/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetRememberedBrowserCurrent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/operations/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetRememberedBrowserOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/device": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateRememberedBrowserDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/remember": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RememberBrowserAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SelectRememberedAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RecoverRememberedOperation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["LockRememberedBrowser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/begin-sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BeginRememberedBrowserSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/cancel-sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CancelRememberedBrowserSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ForgetRememberedAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/forget-device": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ForgetRememberedBrowser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/browser/remembered/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RecordRememberedBrowserActivity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/smoke": {
         parameters: {
             query?: never;
@@ -10715,6 +10907,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/station-settings/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StationsWorkspaceSettingsGet"];
+        put: operations["StationsWorkspaceSettingsUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/station-management/properties/{propertyId}/stations": {
         parameters: {
             query?: never;
@@ -10901,6 +11109,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["StationsRuntimeRedeemSetup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/station-runtime/departures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StationsRuntimeDepartures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/station-runtime/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StationsRuntimeCheckOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/station-runtime/check-out/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StationsRuntimeCheckOutOutcome"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11833,246 +12089,6 @@ export interface paths {
                 };
             };
         };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/station-runtime/check-out": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StationsRuntimeCheckOut"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/station-runtime/check-out/outcome": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StationsRuntimeCheckOutOutcome"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/station-runtime/departures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StationsRuntimeDepartures"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/activity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["RecordRememberedBrowserActivity"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/begin-sign-in": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["BeginRememberedBrowserSignIn"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/cancel-sign-in": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CancelRememberedBrowserSignIn"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/current": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GetRememberedBrowserCurrent"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/device": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["CreateRememberedBrowserDevice"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/forget": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ForgetRememberedAccount"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/forget-device": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["ForgetRememberedBrowser"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/lock": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["LockRememberedBrowser"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/operations/{operationId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["GetRememberedBrowserOperation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/recover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["RecoverRememberedOperation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/remember": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["RememberBrowserAccount"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/browser/remembered/select": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["SelectRememberedAccount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13499,6 +13515,14 @@ export interface components {
             /** Format: date-time */
             lastAuthenticatedAtUtc: string | null;
         };
+        ForgetRememberedAccountRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+            /** Format: uuid */
+            proofId: string;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -14768,6 +14792,14 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        RecoverRememberedOperationRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+            /** Format: password */
+            pin: string | null;
+        };
         RefreshTokenRequest: {
             accessToken: string | null;
             refreshToken: string | null;
@@ -14833,6 +14865,81 @@ export interface components {
             /** Format: int64 */
             expectedHoldVersion: number;
             confirmed: boolean;
+        };
+        RememberBrowserAccountRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+            /** Format: password */
+            pin: string | null;
+            label: string | null;
+            consent: boolean;
+        };
+        RememberedBrowserAccount: {
+            /** Format: uuid */
+            proofId: string;
+            username: string;
+            label?: string | null;
+            /** Format: date-time */
+            expiresAtUtc: string;
+            requiresSignIn: boolean;
+            displayName?: string | null;
+            jobTitle?: string | null;
+        };
+        RememberedBrowserActiveAccount: {
+            /** Format: uuid */
+            memberId: string;
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            proofId?: string | null;
+            username: string;
+            label?: string | null;
+        };
+        RememberedBrowserActivityRequest: {
+            /** Format: int64 */
+            expectedGeneration: number;
+            /** Format: uuid */
+            sessionId: string;
+        };
+        RememberedBrowserCurrentResponse: {
+            state: components["schemas"]["RememberedBrowserState"];
+            /** Format: int64 */
+            generation: number;
+            /** Format: int32 */
+            pinDigits: number;
+            accounts: components["schemas"]["RememberedBrowserAccount"][];
+            active?: {
+                /** Format: uuid */
+                memberId: string;
+                /** Format: uuid */
+                sessionId: string;
+                /** Format: uuid */
+                proofId?: string | null;
+                username: string;
+                label?: string | null;
+            } | null;
+            /** Format: date-time */
+            idleExpiresAtUtc?: string | null;
+            /** Format: date-time */
+            absoluteExpiresAtUtc?: string | null;
+            csrfToken?: string | null;
+        };
+        RememberedBrowserOperationResponse: {
+            outcome: components["schemas"]["RememberedBrowserOutcome"];
+            current: components["schemas"]["RememberedBrowserCurrentResponse"];
+            accessToken?: string | null;
+        };
+        /** @enum {string} */
+        RememberedBrowserOutcome: "applied" | "state-changed" | "authentication-required" | "pin-rejected" | "rate-limited" | "session-limit-reached" | "unavailable" | "not-found";
+        /** @enum {string} */
+        RememberedBrowserState: "missing" | "locked" | "active" | "signing-in" | "revoked" | "unavailable";
+        RememberedBrowserTransitionRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
         };
         RemovePasswordRequest: {
             currentPassword: string | null;
@@ -15592,6 +15699,16 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        SelectRememberedAccountRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+            /** Format: uuid */
+            proofId: string;
+            /** Format: password */
+            pin: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -16092,6 +16209,45 @@ export interface components {
             state: components["schemas"]["StationReservationState"];
             receipt: components["schemas"]["ReservationMutationReceiptDto"];
         };
+        StationCheckOutOutcome: {
+            state: components["schemas"]["StationCheckOutOutcomeState"];
+        };
+        StationCheckOutOutcomeRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            browserSessionId: string;
+            /** Format: uuid */
+            actorSessionId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        StationCheckOutOutcomeState: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        StationCheckOutRequest: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            reservationId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            actorSessionId: string;
+            /** Format: int64 */
+            expectedGeneration: number;
+        };
+        StationCheckOutResult: {
+            state: components["schemas"]["StationReservationState"];
+            receipt: components["schemas"]["ReservationMutationReceiptDto"];
+            checkout: components["schemas"]["StationCheckOutOutcomeState"];
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -16105,6 +16261,20 @@ export interface components {
             propertyName: string | null;
             staffDisplayName: string | null;
             jobs: components["schemas"]["StationJobAvailability"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        StationDepartureState: 0 | 1 | 2;
+        StationDeparturesResponse: {
+            state: components["schemas"]["StationReservationState"];
+            items: components["schemas"]["StationFirstJobDeparture"][] | null;
+            continuation: string | null;
+            /** Format: uuid */
+            propertyId: string | null;
+            /** Format: date */
+            propertyLocalDate: string | null;
         };
         StationDueArrival: {
             /** Format: uuid */
@@ -16122,8 +16292,31 @@ export interface components {
             allocationVersion: number;
             units: components["schemas"]["StationAllocationUnit"][] | null;
         };
+        StationDueDeparture: {
+            /** Format: uuid */
+            reservationId: string;
+            primaryGuestName: string | null;
+            /** Format: date */
+            arrival: string;
+            /** Format: date */
+            departure: string;
+            /** Format: date */
+            checkedInBusinessDate: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            allocationId: string;
+            /** Format: int64 */
+            allocationVersion: number;
+            units: components["schemas"]["StationAllocationUnit"][] | null;
+            state: components["schemas"]["StationDepartureState"];
+        };
         StationFirstJobArrival: {
             reservation: components["schemas"]["StationDueArrival"];
+            places: components["schemas"]["StationInventoryLabel"][] | null;
+        };
+        StationFirstJobDeparture: {
+            reservation: components["schemas"]["StationDueDeparture"];
             places: components["schemas"]["StationInventoryLabel"][] | null;
         };
         StationInventoryLabel: {
@@ -16148,6 +16341,10 @@ export interface components {
             roomSourceVersion: number;
             /** Format: int64 */
             bedSourceVersion: number | null;
+        };
+        StationJobAvailability: {
+            checkIn: components["schemas"]["StationReservationState"];
+            checkOut: components["schemas"]["StationReservationState"];
         };
         StationListItem: {
             /** Format: uuid */
@@ -16345,6 +16542,11 @@ export interface components {
             /** Format: password */
             pin: string | null;
         };
+        StationWorkspaceSettingsResponse: {
+            sharedStationPinEnabled: boolean;
+            /** Format: int64 */
+            revision: number;
+        };
         StayLifecycleRequest: {
             /** Format: uuid */
             operationId: string;
@@ -16441,6 +16643,11 @@ export interface components {
             expectedDepartureTime: string | null;
             /** Format: int64 */
             expectedDetailsRevision: number;
+        };
+        UpdateStationWorkspaceSettingsRequest: {
+            sharedStationPinEnabled: boolean;
+            /** Format: int64 */
+            expectedRevision: number;
         };
         UpdateWorkspaceAccessProfileRequest: {
             displayName: string | null;
@@ -16732,193 +16939,6 @@ export interface components {
          * @enum {integer}
          */
         WorkspaceStaffOnboardingStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-        StationCheckOutRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: uuid */
-            reservationId: string;
-            /** Format: int64 */
-            expectedVersion: number;
-            /** Format: uuid */
-            actorSessionId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-        };
-        StationCheckOutResult: {
-            state: components["schemas"]["StationReservationState"];
-            receipt: components["schemas"]["ReservationMutationReceiptDto"];
-            checkout: components["schemas"]["StationCheckOutOutcomeState"];
-        };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        StationCheckOutOutcomeState: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-        StationCheckOutOutcomeRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: uuid */
-            reservationId: string;
-            /** Format: int64 */
-            expectedVersion: number;
-            /** Format: uuid */
-            browserSessionId: string;
-            /** Format: uuid */
-            actorSessionId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-        };
-        StationCheckOutOutcome: {
-            state: components["schemas"]["StationCheckOutOutcomeState"];
-        };
-        StationJobAvailability: {
-            checkIn: components["schemas"]["StationReservationState"];
-            checkOut: components["schemas"]["StationReservationState"];
-        };
-        StationDeparturesResponse: {
-            state: components["schemas"]["StationReservationState"];
-            items: components["schemas"]["StationFirstJobDeparture"][] | null;
-            continuation: string | null;
-            /** Format: uuid */
-            propertyId: string | null;
-            /** Format: date */
-            propertyLocalDate: string | null;
-        };
-        StationFirstJobDeparture: {
-            reservation: components["schemas"]["StationDueDeparture"];
-            places: components["schemas"]["StationInventoryLabel"][] | null;
-        };
-        StationDueDeparture: {
-            /** Format: uuid */
-            reservationId: string;
-            primaryGuestName: string | null;
-            /** Format: date */
-            arrival: string;
-            /** Format: date */
-            departure: string;
-            /** Format: date */
-            checkedInBusinessDate: string;
-            /** Format: int64 */
-            expectedVersion: number;
-            /** Format: uuid */
-            allocationId: string;
-            /** Format: int64 */
-            allocationVersion: number;
-            units: components["schemas"]["StationAllocationUnit"][] | null;
-            state: components["schemas"]["StationDepartureState"];
-        };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        StationDepartureState: 0 | 1 | 2;
-        RememberedBrowserActivityRequest: {
-            /** Format: int64 */
-            expectedGeneration: number;
-            /** Format: uuid */
-            sessionId: string;
-        };
-        RememberedBrowserOperationResponse: {
-            outcome: components["schemas"]["RememberedBrowserOutcome"];
-            current: components["schemas"]["RememberedBrowserCurrentResponse"];
-            accessToken?: string | null;
-        };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        RememberedBrowserOutcome: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-        RememberedBrowserCurrentResponse: {
-            state: components["schemas"]["RememberedBrowserState"];
-            /** Format: int64 */
-            generation: number;
-            /** Format: int32 */
-            pinDigits: number;
-            accounts: components["schemas"]["RememberedBrowserAccount"][];
-            active?: {
-                /** Format: uuid */
-                memberId: string;
-                /** Format: uuid */
-                sessionId: string;
-                /** Format: uuid */
-                proofId?: string | null;
-                username: string;
-                label?: string | null;
-            } | null;
-            /** Format: date-time */
-            idleExpiresAtUtc?: string | null;
-            /** Format: date-time */
-            absoluteExpiresAtUtc?: string | null;
-            csrfToken?: string | null;
-        };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        RememberedBrowserState: 0 | 1 | 2 | 3 | 4 | 5;
-        RememberedBrowserAccount: {
-            /** Format: uuid */
-            proofId: string;
-            username: string;
-            label?: string | null;
-            /** Format: date-time */
-            expiresAtUtc: string;
-            requiresSignIn: boolean;
-            displayName?: string | null;
-            jobTitle?: string | null;
-        };
-        RememberedBrowserActiveAccount: {
-            /** Format: uuid */
-            memberId: string;
-            /** Format: uuid */
-            sessionId: string;
-            /** Format: uuid */
-            proofId?: string | null;
-            username: string;
-            label?: string | null;
-        };
-        RememberedBrowserTransitionRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-        };
-        ForgetRememberedAccountRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-            /** Format: uuid */
-            proofId: string;
-        };
-        RecoverRememberedOperationRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-            /** Format: password */
-            pin: string | null;
-        };
-        RememberBrowserAccountRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-            /** Format: password */
-            pin: string | null;
-            label: string | null;
-            consent: boolean;
-        };
-        SelectRememberedAccountRequest: {
-            /** Format: uuid */
-            operationId: string;
-            /** Format: int64 */
-            expectedGeneration: number;
-            /** Format: uuid */
-            proofId: string;
-            /** Format: password */
-            pin: string | null;
-        };
     };
     responses: never;
     parameters: never;
@@ -16928,6 +16948,842 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    GetRememberedBrowserCurrent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserCurrentResponse"];
+                };
+            };
+        };
+    };
+    GetRememberedBrowserOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    CreateRememberedBrowserDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserCurrentResponse"];
+                };
+            };
+        };
+    };
+    RememberBrowserAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RememberBrowserAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    SelectRememberedAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectRememberedAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    RecoverRememberedOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoverRememberedOperationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    LockRememberedBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    BeginRememberedBrowserSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    CancelRememberedBrowserSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    ForgetRememberedAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgetRememberedAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    ForgetRememberedBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
+    RecordRememberedBrowserActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RememberedBrowserActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
+                };
+            };
+        };
+    };
     GetBunkFyProductCapabilities: {
         parameters: {
             query?: never;
@@ -16944,6 +17800,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BunkFyProductCapabilitiesResponse"];
+                };
+            };
+        };
+    };
+    StationsWorkspaceSettingsGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationWorkspaceSettingsResponse"];
+                };
+            };
+        };
+    };
+    StationsWorkspaceSettingsUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStationWorkspaceSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationWorkspaceSettingsResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationWorkspaceSettingsResponse"];
                 };
             };
         };
@@ -17976,6 +18885,242 @@ export interface operations {
             };
         };
     };
+    StationsRuntimeDepartures: {
+        parameters: {
+            query?: {
+                pageSize?: string;
+                cursor?: string;
+            };
+            header?: {
+                "X-BunkFy-Station-Actor"?: string;
+                "X-BunkFy-Station-Generation"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationDeparturesResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    StationsRuntimeCheckOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationCheckOutRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationCheckOutResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    StationsRuntimeCheckOutOutcome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationCheckOutOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationCheckOutOutcome"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     StationsRuntimeArrivals: {
         parameters: {
             query?: {
@@ -18208,1078 +19353,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-        };
-    };
-    StationsRuntimeCheckOut: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StationCheckOutRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StationCheckOutResult"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    StationsRuntimeCheckOutOutcome: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StationCheckOutOutcomeRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StationCheckOutOutcome"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    StationsRuntimeDepartures: {
-        parameters: {
-            query?: {
-                pageSize?: string;
-                cursor?: string;
-            };
-            header?: {
-                "X-BunkFy-Station-Actor"?: string;
-                "X-BunkFy-Station-Generation"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StationDeparturesResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    RecordRememberedBrowserActivity: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RememberedBrowserActivityRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    BeginRememberedBrowserSignIn: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    CancelRememberedBrowserSignIn: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    GetRememberedBrowserCurrent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserCurrentResponse"];
-                };
-            };
-        };
-    };
-    CreateRememberedBrowserDevice: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserCurrentResponse"];
-                };
-            };
-        };
-    };
-    ForgetRememberedAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ForgetRememberedAccountRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    ForgetRememberedBrowser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    LockRememberedBrowser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RememberedBrowserTransitionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    GetRememberedBrowserOperation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                operationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    RecoverRememberedOperation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecoverRememberedOperationRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    RememberBrowserAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RememberBrowserAccountRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-        };
-    };
-    SelectRememberedAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SelectRememberedAccountRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RememberedBrowserOperationResponse"];
                 };
             };
         };

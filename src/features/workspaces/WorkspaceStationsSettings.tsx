@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { KeyRound, Monitor, ShieldCheck } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/client";
-import type { AuthenticationSessions, StaffPropertyDirectoryListResponse } from "../../api/types";
+import type { AuthenticationSessions, StaffPropertyDirectoryListResponse, StationWorkspaceSettings } from "../../api/types";
 import { OfflineRequestError, assertRequestCanStart } from "../../api/requestConnectivity";
 import { useSession } from "../../app/session";
 import { permissions, tenantAccessScope, usePermissions } from "../../app/permissions";
@@ -14,12 +14,114 @@ import type { StationList, StationManagementResult, StationStaffStatus } from ".
 import { readManagementRecovery, saveManagementRecovery, readPairingContext, savePairingContext,
   type ManagementCommand as Command, type PairingContext } from "../stations/stationManagementRecovery";
 
-export function WorkspaceStationsSettings() {
+type WorkspaceStationsSettingsProps = {
+  settings: StationWorkspaceSettings | null;
+  settingsLoaded: boolean;
+  settingsLoading: boolean;
+  settingsError: unknown;
+  canManageSettings: boolean;
+  onSettingsChanged: () => Promise<void>;
+};
+
+export function WorkspaceStationsSettings(props: Partial<WorkspaceStationsSettingsProps> = {}) {
+  const {
+    settings = { sharedStationPinEnabled: true, revision: 0 },
+    settingsLoaded = true,
+    settingsLoading = false,
+    settingsError = null,
+    canManageSettings = true,
+    onSettingsChanged = async () => undefined,
+  } = props;
   const { selectedProperty } = useWorkspace();
   const { session } = useSession();
-  if (!selectedProperty || !session) return <p className="text-sm leading-6">Choose a property to set up its shared stations.</p>;
-  return <StationsManager key={`${session.generation}:${selectedProperty.propertyId}`}
-    propertyId={selectedProperty.propertyId} propertyName={selectedProperty.name} />;
+  return <div className="space-y-6">
+    <StationFeatureSettings
+      settings={settings}
+      settingsLoaded={settingsLoaded}
+      settingsLoading={settingsLoading}
+      settingsError={settingsError}
+      canManage={canManageSettings}
+      onSaved={onSettingsChanged}
+    />
+    {!settingsLoaded || settingsError || settings?.sharedStationPinEnabled !== true
+      ? <p className="text-sm leading-6 text-base-content/65">
+          {settingsLoading
+            ? "Checking workspace station access…"
+            : settingsError
+              ? "Station access could not be checked. Refresh before managing stations."
+              : "Shared station PIN access is disabled for this workspace."}
+        </p>
+      : !selectedProperty || !session
+        ? <p className="text-sm leading-6">Choose a property to set up its shared stations.</p>
+        : <StationsManager key={`${session.generation}:${selectedProperty.propertyId}`}
+          propertyId={selectedProperty.propertyId} propertyName={selectedProperty.name} />}
+  </div>;
+}
+
+function StationFeatureSettings({
+  settings,
+  settingsLoaded,
+  settingsLoading,
+  settingsError,
+  canManage,
+  onSaved,
+}: {
+  settings: StationWorkspaceSettings | null;
+  settingsLoaded: boolean;
+  settingsLoading: boolean;
+  settingsError: unknown;
+  canManage: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const { request } = useSession();
+  const [message, setMessage] = useState("");
+  const update = useMutation({
+    mutationFn: (enabled: boolean) => request<StationWorkspaceSettings>(
+      "/api/station-settings/workspace",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          sharedStationPinEnabled: enabled,
+          expectedRevision: settings?.revision ?? 0,
+        }),
+      },
+    ),
+    onSuccess: async () => {
+      setMessage("Workspace station access updated.");
+      await onSaved();
+    },
+    onError: (error: unknown) => {
+      setMessage(error instanceof ApiError && error.status === 409
+        ? "The workspace setting changed elsewhere. Refresh and try again."
+        : "The workspace station setting could not be saved.");
+      void onSaved();
+    },
+  });
+  const enabled = settings?.sharedStationPinEnabled === true;
+  return <section className="rounded-lg border border-base-300 bg-base-200/35 p-4 sm:p-5">
+    <div className="flex items-start gap-3">
+      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KeyRound size={18} /></span>
+      <div className="min-w-0">
+        <h2 className="font-display text-lg font-semibold">Shared station PIN access</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-base-content/65">
+          Allow staff to use shared browsers and their workspace PINs. Disabling this hides PIN controls and rejects station sessions for this workspace.
+        </p>
+      </div>
+    </div>
+    <label className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-base-300 bg-base-100 p-3">
+      <span className="text-sm font-semibold">Enable shared station access</span>
+      <input
+        type="checkbox"
+        className="toggle toggle-primary"
+        checked={enabled}
+        disabled={!settingsLoaded || settingsLoading || Boolean(settingsError) || !canManage || update.isPending}
+        onChange={(event) => { setMessage(""); update.mutate(event.target.checked); }}
+        aria-label="Enable shared station access"
+      />
+    </label>
+    {!canManage && <p className="mt-3 text-sm text-base-content/60">A workspace owner or shared-station manager can change this setting.</p>}
+    {message && <p className="mt-3 text-sm" role="status">{message}</p>}
+  </section>;
 }
 
 function StationsManager({ propertyId, propertyName }: { propertyId: string; propertyName: string }) {

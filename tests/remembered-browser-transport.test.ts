@@ -55,6 +55,28 @@ describe("remembered browser owner transport", () => {
     expect(headers.get("X-Gma-Remembered-CSRF")).toBe("csrf-b");
   });
 
+  it("normalizes named Auth enum values at the wire boundary", async () => {
+    const fetcher = vi.fn().mockResolvedValue(reply({
+      state: "missing", generation: 5, pinDigits: 6, accounts: [], active: null,
+      csrfToken: null, idleExpiresAtUtc: null, absoluteExpiresAtUtc: null,
+    }));
+    vi.stubGlobal("fetch", fetcher);
+    const current = await readRememberedBrowser();
+    expect(current.state).toBe(0);
+    expect(current.csrfToken).toBeNull();
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({
+      outcome: "applied",
+      current: {
+        state: "locked", generation: 6, pinDigits: 6, accounts: [], active: null,
+        csrfToken: "synthetic-csrf", idleExpiresAtUtc: null, absoluteExpiresAtUtc: null,
+      },
+    })));
+    const operation = await rememberedOperation("select", { operationId: "synthetic", expectedGeneration: 5 });
+    expect(operation.outcome).toBe(0);
+    expect(operation.current.state).toBe(1);
+  });
+
   it("rejects an out-of-order Current response without restoring stale headers", async () => {
     let resolveFirst!: (response: Response) => void;
     let resolveSecond!: (response: Response) => void;

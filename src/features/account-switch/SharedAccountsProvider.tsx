@@ -7,7 +7,7 @@ import { AccountSwitchScreen } from "./AccountSwitchScreen";
 import { accountPrivacyCovered, clearAccountOperation, clearAccountPrivacy, coverAccountPrivacy, isAccountPrivacyEvent,
   readAccountOperation, safeAccountReturnPath, saveAccountOperation, supersedeRememberWithLock,
   type AccountOperation, type AccountOperationKind } from "./accountSwitchRecovery";
-import { rememberedOutcome, rememberedState, type RememberedAccount, type RememberedBrowser, type RememberedOperationResult } from "./accountSwitchTypes";
+import { isEmptyRememberedBrowser, rememberedOutcome, rememberedState, type RememberedAccount, type RememberedBrowser, type RememberedOperationResult } from "./accountSwitchTypes";
 import { confirmedRememberedSession, installRememberedContext, installRememberedOperationContext,
   prepareRememberedBrowserRefresh, readRememberedBrowser, readRememberedOperation, rememberedEndpoint,
   rememberedOperation, rememberedOutcomeMessage, resetRememberedBrowserTransport } from "./rememberedBrowserApi";
@@ -383,11 +383,17 @@ function SharedAccountsProvider({ initial, children }: { initial: RememberedBrow
 
   const activeMatches = Boolean(auth.session && current.active && auth.session.sessionId === current.active.sessionId && auth.session.subjectId === current.active.memberId);
   const managed = current.state !== rememberedState.missing && current.state !== rememberedState.revoked;
+  // A browser with no remembered accounts has no account-switch boundary to
+  // unlock. This is the normal first-run state for a new user, so let the
+  // ordinary auth/workspace-onboarding flow render. Keeping the check tied to
+  // both collections avoids bypassing the boundary if the server does return
+  // an active remembered account.
+  const emptyRememberedBrowser = isEmptyRememberedBrowser(current) && !pending && !covered;
   const restoringExactActive = !covered && current.state === rememberedState.active &&
     auth.restoringIdentity?.sessionId === current.active?.sessionId && (auth.isRestoring || Boolean(auth.restorationError));
-  const showNormal = !pending && ((allowSignIn && !auth.session) ||
+  const showNormal = emptyRememberedBrowser || (!pending && ((allowSignIn && !auth.session) ||
     restoringExactActive ||
-    (!covered && (!managed || (current.state === rememberedState.active && activeMatches))));
+    (!covered && (!managed || (current.state === rememberedState.active && activeMatches)))));
   const securing = !showNormal && (current.state === rememberedState.unavailable ||
     pending?.kind === "lock" || pending?.kind === "begin-sign-in" || pending?.kind === "cancel-sign-in" || pending?.kind === "forget" || pending?.kind === "forget-device" ||
     (current.state === rememberedState.active && !selected && (!pending || pending.kind === "remember")));

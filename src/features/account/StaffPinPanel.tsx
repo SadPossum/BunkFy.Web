@@ -13,9 +13,9 @@ import { readPinChangeIntent, savePinChangeIntent, type PinChangeIntent } from "
 
 export function StaffPinPanel() {
   const { staffPinEnabled } = useProductCapabilities();
-  const { selectedProperty } = useWorkspace();
+  const { selectedProperty, stationSettings } = useWorkspace();
   const { session } = useSession();
-  if (!staffPinEnabled || !selectedProperty || !session) return null;
+  if (!staffPinEnabled || stationSettings?.sharedStationPinEnabled !== true || !selectedProperty || !session) return null;
   return <OwnPinEditor key={`${session.generation}:${selectedProperty.propertyId}`}
     propertyId={selectedProperty.propertyId} propertyName={selectedProperty.name} />;
 }

@@ -59,6 +59,11 @@ export function WorkspaceSettingsPage() {
     propertiesError,
     refetchProperties,
     refetchWorkspaces,
+    stationSettings,
+    stationSettingsLoaded,
+    stationSettingsLoading,
+    stationSettingsError,
+    refetchStationSettings,
   } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = workspaceSettingsTab(searchParams.get("section"));
@@ -75,6 +80,7 @@ export function WorkspaceSettingsPage() {
       { permission: permissions.workspaceStaffOnboardingManage, scope: tenantScope },
       { permission: permissions.retentionRead, scope: tenantScope },
       { permission: permissions.retentionRetry, scope: tenantScope },
+      { permission: permissions.stationsManage, scope: tenantScope },
     ]
     : []);
   const permissionSource = owner ? null : createCompositeSource({
@@ -107,6 +113,7 @@ export function WorkspaceSettingsPage() {
     retentionRead: permissionAccess.allows(permissions.retentionRead, tenantScope),
     retentionRetry: permissionAccess.allows(permissions.retentionRetry, tenantScope),
   });
+  const canManageStationSettings = owner || permissionAccess.allows(permissions.stationsManage, tenantScope);
   const members = useQuery({
     queryKey: ["organizations", workspace?.organizationId, "members", memberPage],
     queryFn: () => request<OrganizationMemberListResponse>(
@@ -323,7 +330,16 @@ export function WorkspaceSettingsPage() {
               onSaved={refetchWorkspaces}
             />
           )}
-          {tab === "stations" && (staffPinEnabled ? <WorkspaceStationsSettings /> : <p className="text-sm">Shared stations are not enabled for this environment.</p>)}
+          {tab === "stations" && (staffPinEnabled ? (
+            <WorkspaceStationsSettings
+              settings={stationSettings}
+              settingsLoaded={stationSettingsLoaded}
+              settingsLoading={stationSettingsLoading}
+              settingsError={stationSettingsError}
+              canManageSettings={canManageStationSettings && permissionAuthorityCurrent}
+              onSettingsChanged={refetchStationSettings}
+            />
+          ) : <p className="text-sm">Shared stations are not enabled for this environment.</p>)}
           {tab === "members" && capabilities.canReadMembers && (
             <WorkspaceMembersSettings
               workspace={workspace}

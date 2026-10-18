@@ -12,10 +12,12 @@ import type {
   OrganizationListResponse,
   OrganizationMembershipSummary,
   Property,
+  StationWorkspaceSettings,
 } from "../api/types";
 import { loadAllProperties } from "../features/properties/propertiesApi";
 import { reconcileSelectedWorkspaceId } from "../features/workspaces/workspaceCatalogue";
 import { useSession } from "./session";
+import { useProductCapabilities } from "./productCapabilities";
 
 const WORKSPACE_STORAGE_KEY = "bunkfy.workspace.current.v1";
 
@@ -38,12 +40,19 @@ type WorkspaceValue = {
   selectedPropertyId: string;
   setSelectedPropertyId: (id: string) => void;
   refetchProperties: () => Promise<void>;
+  stationSettings: StationWorkspaceSettings | null;
+  stationSettingsLoaded: boolean;
+  stationSettingsLoading: boolean;
+  stationSettingsFetching: boolean;
+  stationSettingsError: unknown;
+  refetchStationSettings: () => Promise<void>;
 };
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { request, selectWorkspace, session } = useSession();
+  const { staffPinEnabled } = useProductCapabilities();
   const [selectedWorkspaceId, setSelectedWorkspaceIdState] = useState(() => {
     if (session?.tenantId && session.tenantId !== "global") return session.tenantId;
     return localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? "";
@@ -103,6 +112,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       !propertiesQuery.isFetching,
   );
 
+  const stationSettingsQuery = useQuery({
+    queryKey: ["station-settings", selectedWorkspaceId],
+    queryFn: () => request<StationWorkspaceSettings>("/api/station-settings/workspace"),
+    enabled: workspaceScopeReady && staffPinEnabled === true,
+    retry: false,
+  });
+
   useEffect(() => {
     setSelectedPropertyIdState(localStorage.getItem(propertyStorageKey) ?? "");
   }, [propertyStorageKey]);
@@ -150,6 +166,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       refetchProperties: async () => {
         await propertiesQuery.refetch();
       },
+      stationSettings: stationSettingsQuery.data ?? null,
+      stationSettingsLoaded: stationSettingsQuery.data !== undefined,
+      stationSettingsLoading: stationSettingsQuery.isLoading,
+      stationSettingsFetching: stationSettingsQuery.isFetching,
+      stationSettingsError: stationSettingsQuery.error,
+      refetchStationSettings: async () => {
+        await stationSettingsQuery.refetch();
+      },
     }),
     [
       properties,
@@ -158,6 +182,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       propertiesQuery.isFetching,
       propertiesQuery.isLoading,
       propertiesQuery.refetch,
+      stationSettingsQuery.data,
+      stationSettingsQuery.error,
+      stationSettingsQuery.isFetching,
+      stationSettingsQuery.isLoading,
+      stationSettingsQuery.refetch,
       selectedPropertyId,
       selectedWorkspaceId,
       setSelectedWorkspaceId,

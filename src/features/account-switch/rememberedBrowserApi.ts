@@ -2,7 +2,7 @@ import { apiRequest, parseRetryAfterMilliseconds, setRememberedBrowserTransport,
 import type { SessionIdentity } from "../../app/singleFlightRefresh";
 import { readAccessTokenIdentity, SessionIdentityMismatchError } from "../../app/sessionTokenIdentity";
 import type { AccountOperation } from "./accountSwitchRecovery";
-import { rememberedOutcome, rememberedState, type RememberedBrowser, type RememberedOperationResult } from "./accountSwitchTypes";
+import { rememberedOutcome, rememberedState, type RememberedBrowser, type RememberedOperationResult, type RememberedOutcome, type RememberedState } from "./accountSwitchTypes";
 
 export const rememberedEndpoint = "/api/auth/browser/remembered";
 const globalHeaders = { "X-Tenant-Id": "global" };
@@ -24,23 +24,59 @@ const date = (value: unknown) => typeof value === "string" && Number.isFinite(Da
 const optionalDate = (value: unknown) => value === undefined || value === null || date(value);
 const username = (value: unknown) => typeof value === "string" && value.length > 0 && value.length <= 512 && !containsControl(value);
 
+const rememberedStateNames: Record<string, RememberedState> = {
+  missing: rememberedState.missing,
+  locked: rememberedState.locked,
+  active: rememberedState.active,
+  "signing-in": rememberedState.signingIn,
+  revoked: rememberedState.revoked,
+  unavailable: rememberedState.unavailable,
+};
+const rememberedOutcomeNames: Record<string, RememberedOutcome> = {
+  applied: rememberedOutcome.applied,
+  "state-changed": rememberedOutcome.stateChanged,
+  "authentication-required": rememberedOutcome.authenticationRequired,
+  "pin-rejected": rememberedOutcome.pinRejected,
+  "rate-limited": rememberedOutcome.rateLimited,
+  "session-limit-reached": rememberedOutcome.sessionLimitReached,
+  unavailable: rememberedOutcome.unavailable,
+  "not-found": rememberedOutcome.notFound,
+};
+
+function normalizeState(value: unknown): RememberedState | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 5) return value as RememberedState;
+  return typeof value === "string" ? rememberedStateNames[value] ?? null : null;
+}
+
+function normalizeOutcome(value: unknown): RememberedOutcome | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 7) return value as RememberedOutcome;
+  return typeof value === "string" ? rememberedOutcomeNames[value] ?? null : null;
+}
+
+function normalizeBrowserWire(value: unknown): unknown {
+  if (!record(value)) return value;
+  const state = normalizeState(value.state);
+  return state === null ? value : { ...value, state };
+}
+
 function validateRememberedBrowser(value: unknown): RememberedBrowser {
-  if (!record(value) || !Number.isSafeInteger(value.generation) || typeof value.generation !== "number" || value.generation < 0 ||
-    typeof value.pinDigits !== "number" || !Number.isInteger(value.pinDigits) || value.pinDigits < 4 || value.pinDigits > 12 ||
-    typeof value.state !== "number" || ![0, 1, 2, 3, 4, 5].includes(value.state) ||
-    !Array.isArray(value.accounts) || !value.accounts.every(account => record(account) && guid(account.proofId) &&
+  const normalized = normalizeBrowserWire(value);
+  if (!record(normalized) || !Number.isSafeInteger(normalized.generation) || typeof normalized.generation !== "number" || normalized.generation < 0 ||
+    typeof normalized.pinDigits !== "number" || !Number.isInteger(normalized.pinDigits) || normalized.pinDigits < 4 || normalized.pinDigits > 12 ||
+    typeof normalized.state !== "number" || ![0, 1, 2, 3, 4, 5].includes(normalized.state) ||
+    !Array.isArray(normalized.accounts) || !normalized.accounts.every(account => record(account) && guid(account.proofId) &&
       username(account.username) && optionalText(account.label) && optionalText(account.displayName) && optionalText(account.jobTitle) &&
       date(account.expiresAtUtc) && typeof account.requiresSignIn === "boolean") ||
-    new Set(value.accounts.map(account => account.proofId)).size !== value.accounts.length ||
-    !optionalDate(value.idleExpiresAtUtc) || !optionalDate(value.absoluteExpiresAtUtc) ||
-    (value.csrfToken != null && (typeof value.csrfToken !== "string" || value.csrfToken.length === 0 || value.csrfToken.length > 4096)) ||
-    ([1, 2, 3].includes(value.state) && !value.csrfToken) ||
-    (value.state === rememberedState.active ? !record(value.active) : value.active != null) ||
-    (value.active != null && (!record(value.active) || !guid(value.active.memberId) || !guid(value.active.sessionId) ||
-      (value.active.proofId != null && !guid(value.active.proofId)) || !username(value.active.username) || !optionalText(value.active.label)))) {
+    new Set(normalized.accounts.map(account => account.proofId)).size !== normalized.accounts.length ||
+    !optionalDate(normalized.idleExpiresAtUtc) || !optionalDate(normalized.absoluteExpiresAtUtc) ||
+    (normalized.csrfToken != null && (typeof normalized.csrfToken !== "string" || normalized.csrfToken.length === 0 || normalized.csrfToken.length > 4096)) ||
+    ([1, 2, 3].includes(normalized.state) && !normalized.csrfToken) ||
+    (normalized.state === rememberedState.active ? !record(normalized.active) : normalized.active != null) ||
+    (normalized.active != null && (!record(normalized.active) || !guid(normalized.active.memberId) || !guid(normalized.active.sessionId) ||
+      (normalized.active.proofId != null && !guid(normalized.active.proofId)) || !username(normalized.active.username) || !optionalText(normalized.active.label)))) {
     throw new Error("The browser status could not be verified.");
   }
-  return value as RememberedBrowser;
+  return normalized as RememberedBrowser;
 }
 
 export class RememberedBrowserBoundaryError extends Error {
@@ -150,20 +186,20 @@ export async function prepareRememberedBrowserRefresh(identity: SessionIdentity)
 }
 
 function validateOperationResult(value: unknown, response: Response, mayIssueToken: boolean): RememberedOperationResult {
-  if (!record(value) || typeof value.outcome !== "number" || !Number.isInteger(value.outcome) ||
-    ![0, 1, 2, 3, 4, 5, 6, 7].includes(value.outcome) || outcomeStatuses[value.outcome] !== response.status) {
+  const outcome = record(value) ? normalizeOutcome(value.outcome) : null;
+  if (!record(value) || outcome === null || outcomeStatuses[outcome] !== response.status) {
     throw new Error("The account-change result could not be verified.");
   }
   const current = validateRememberedBrowser(value.current);
   if (value.accessToken != null) {
     const identity = typeof value.accessToken === "string" ? readAccessTokenIdentity(value.accessToken) : null;
-    if (!mayIssueToken || value.outcome !== rememberedOutcome.applied || current.state !== rememberedState.active ||
+    if (!mayIssueToken || outcome !== rememberedOutcome.applied || current.state !== rememberedState.active ||
       !current.active?.proofId || !identity || identity.subjectId !== current.active.memberId || identity.sessionId !== current.active.sessionId) {
       throw new Error("The account-change result could not be verified.");
     }
   }
   const retryAfterMs = parseRetryAfterMilliseconds(response.headers.get("retry-after"));
-  return { ...(value as RememberedOperationResult), current, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) };
+  return { ...(value as RememberedOperationResult), outcome, current, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) };
 }
 
 export async function readRememberedOperation(operationId: string): Promise<RememberedOperationResult> {

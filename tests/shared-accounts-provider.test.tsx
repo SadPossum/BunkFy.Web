@@ -125,6 +125,13 @@ describe("normal-account PIN boundary", () => {
     expect(host.querySelector("[data-normal]")).toBeNull();
     expect(vi.mocked(apiRequest).mock.calls).toHaveLength(1);
   });
+  it("opens ordinary sign-in for a first-run browser with no remembered workspace account", async () => {
+    localStorage.removeItem("bunkfy.session.identity.v2");
+    vi.mocked(apiRequest).mockResolvedValue({ ...current(0, 4), accounts: [], active: null });
+    await mount();
+    expect(host.querySelector("[data-normal]")).not.toBeNull();
+    expect(host.textContent).toContain("Ordinary password sign-in");
+  });
   it("leaves ordinary auth unchanged and calls no remembered endpoint when disabled", async () => {
     await mount(false);
     expect(host.textContent).toContain("Private product for owner-a");

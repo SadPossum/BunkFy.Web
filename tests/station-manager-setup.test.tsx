@@ -30,7 +30,7 @@ async function prepareBrowser() {
   await act(async () => root.render(<QueryClientProvider client={client}><WorkspaceStationsSettings /></QueryClientProvider>));
   await waitFor(() => Boolean(button("Taylor QA"))); await click(button("Taylor QA"));
   await waitFor(() => Boolean(button("Remove station access")));
-  await click(host.querySelector<HTMLInputElement>('input[type="checkbox"]'));
+  await click(host.querySelector<HTMLInputElement>('input.checkbox[type="checkbox"]'));
   await click(button("Prepare this browser")); await waitFor(() => host.textContent!.includes("Finish preparing this browser") && client.isFetching() === 0);
   await settle();
   expect(host.textContent).toContain("Finish preparing this browser");
