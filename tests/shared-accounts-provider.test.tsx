@@ -52,7 +52,7 @@ async function submitPin() {
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); localStorage.clear(); sessionStorage.clear();
   setRememberedBrowserTransport(null);
-  localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify({ tenantId: "global", username: "owner-a@example.test", subjectId: memberA, sessionId: sidA, generation: "normal-1" }));
+  localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify({ tenantId: "workspace-a", username: "owner-a@example.test", subjectId: memberA, sessionId: sidA, generation: "normal-1" }));
   vi.mocked(apiRequest).mockReset().mockImplementation(async path => {
     if (path.endsWith("/remembered/current")) return current();
     if (path === "/api/auth/browser/refresh") return { accessToken: token(memberA, sidA) };
@@ -138,6 +138,12 @@ describe("normal-account PIN boundary", () => {
     expect(shared).toBeNull();
     expect(vi.mocked(apiRequest).mock.calls.map(([p]) => p)).toEqual(["/api/auth/browser/refresh"]);
   });
+  it("keeps a global-only identity on ordinary authentication even when switching is enabled", async () => {
+    localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify({ tenantId: "global", username: "owner-a@example.test", subjectId: memberA, sessionId: sidA, generation: "normal-1" }));
+    await mount();
+    expect(host.textContent).toContain("Private product for owner-a");
+    expect(vi.mocked(apiRequest).mock.calls.map(([p]) => p)).toEqual(["/api/auth/browser/refresh"]);
+  });
   it("checks the server boundary before restoring or exposing any remembered identity", async () => {
     let resolve!: (value: RememberedBrowser) => void;
     vi.mocked(apiRequest).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
@@ -204,14 +210,11 @@ describe("normal-account PIN boundary", () => {
     expect(readAccountOperation()).toBeNull();
   });
 
-  it("can explicitly lock a managed browser after local identity has been lost", async () => {
+  it("keeps ordinary authentication when the workspace identity has been lost", async () => {
     localStorage.removeItem("bunkfy.session.identity.v2");
     await mount();
-    expect(host.textContent).toContain("Securing this browser");
-    vi.mocked(apiRequest).mockResolvedValueOnce({ outcome: 0, current: current(1, 5) });
-    await click("Retry lock");
-    expect(host.textContent).toContain("Choose your account");
-    expect(vi.mocked(apiRequest).mock.calls.filter(([p]) => p.endsWith("/lock"))).toHaveLength(1);
+    expect(host.textContent).toContain("Ordinary password sign-in");
+    expect(vi.mocked(apiRequest).mock.calls).toHaveLength(0);
   });
 
   it.each([{ outcome: 3, message: "PIN was not accepted" }, { outcome: 4, message: "Too many attempts" }])(

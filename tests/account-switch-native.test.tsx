@@ -33,7 +33,7 @@ const memberB = "33333333-3333-4333-8333-333333333333";
 const sessionB = "44444444-4444-4444-8444-444444444444";
 const proofA = "66666666-6666-4666-8666-666666666666";
 const proofB = "55555555-5555-4555-8555-555555555555";
-const identityA = { tenantId: "global", username: "owner-a@example.test", subjectId: memberA, sessionId: sessionA, generation: "identity-a" };
+const identityA = { tenantId: "workspace-a", username: "owner-a@example.test", subjectId: memberA, sessionId: sessionA, generation: "identity-a" };
 const token = (subjectId: string, sessionId: string) => `e30.${Buffer.from(JSON.stringify({ sub: subjectId, sid: sessionId })).toString("base64url")}.synthetic`;
 const accountA = { proofId: proofA, username: identityA.username, label: "Person A", requiresSignIn: false, expiresAtUtc: "2099-01-01T00:00:00Z" };
 const accountB = { proofId: proofB, username: "staff-b@example.test", label: "Person B", requiresSignIn: false, expiresAtUtc: "2099-01-01T00:00:00Z" };

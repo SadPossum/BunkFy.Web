@@ -4,6 +4,7 @@ import { apiRequest } from "../../api/client";
 import { useProductCapabilities } from "../../app/productCapabilities";
 import { SessionProvider, useSession } from "../../app/session";
 import { AccountSwitchScreen } from "./AccountSwitchScreen";
+import { canUseSharedAccountSwitch } from "./accountSwitchEligibility";
 import { accountPrivacyCovered, clearAccountOperation, clearAccountPrivacy, coverAccountPrivacy, isAccountPrivacyEvent,
   readAccountOperation, safeAccountReturnPath, saveAccountOperation, supersedeRememberWithLock,
   type AccountOperation, type AccountOperationKind } from "./accountSwitchRecovery";
@@ -30,7 +31,8 @@ export function useSharedAccounts(): SharedAccounts | null { return useContext(C
 // the device generation, or paint an old guest page before its lock is known.
 export function SharedAccountRoot({ children }: { children: ReactNode }) {
   const { sharedAccountSwitchEnabled } = useProductCapabilities();
-  return sharedAccountSwitchEnabled ? <ManagedAccountRoot>{children}</ManagedAccountRoot>
+  return sharedAccountSwitchEnabled && canUseSharedAccountSwitch()
+    ? <ManagedAccountRoot>{children}</ManagedAccountRoot>
     : <SessionProvider>{children}</SessionProvider>;
 }
 
