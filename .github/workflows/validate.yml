@@ -12,8 +12,13 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - name: Checkout web
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -33,7 +38,26 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium and system dependencies
+        if: runner.os == 'Linux'
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Chromium
+        if: runner.os == 'Windows'
+        run: pnpm exec playwright install chromium
 
       - name: Verify
         run: pnpm verify
+
+  validate:
+    needs: verify
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both operating systems
+        shell: pwsh
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: |
+          if ($env:VERIFY_RESULT -ne 'success') {
+            throw 'Web verification failed on at least one operating system.'
+          }

@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -40,7 +40,7 @@ function Fixture(){const [quality,setQuality]=useState("ready"),[owner,setOwner]
 let server: ViteDevServer, browser: Browser, origin: string;
 const errors: string[] = [];
 beforeAll(async () => {
-  const fixturePath = process.cwd() + "/__today_rooms_fixture.tsx", providerPath = process.cwd() + "/__today_rooms_provider.tsx";
+  const fixturePath = normalizePath(process.cwd() + "/__today_rooms_fixture.tsx"), providerPath = normalizePath(process.cwd() + "/__today_rooms_provider.tsx");
   // Other mounted suites have different virtual entries. Their optimizer must
   // not replace this server's cached dependency generation during a page load.
   const cacheDir = mkdtempSync(join(tmpdir(), "bunkfy-today-rooms-vite-"));

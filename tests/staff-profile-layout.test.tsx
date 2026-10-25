@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page, type Locator } from "@playwright/test";
@@ -66,14 +66,14 @@ let browser: Browser;
 let origin: string;
 const errors: string[] = [];
 beforeAll(async () => {
-  const entry = process.cwd() + "/__staff_profile_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__staff_profile_fixture.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-staff-layout-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-router", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@radix-ui/react-select", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), {
       name: "staff-native-fixture", resolveId: id => id === "/__staff_profile_fixture.tsx" || id === entry ? entry : undefined,
       load(id) {
         if (id === entry) return fixture;
-        if (id === process.cwd() + "/src/app/session.tsx") return 'export function useSession(){return {session:{tenantId:"tenant",subjectId:"synthetic",sessionId:"synthetic"},request:(...args)=>window.staffRequest(...args)};}';
+        if (id === normalizePath(process.cwd() + "/src/app/session.tsx")) return 'export function useSession(){return {session:{tenantId:"tenant",subjectId:"synthetic",sessionId:"synthetic"},request:(...args)=>window.staffRequest(...args)};}';
       },
       configureServer(vite) { vite.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith("/__staff-profile")) return next();

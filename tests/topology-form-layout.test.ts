@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -44,12 +44,12 @@ createRoot(document.getElementById("root")).render(<MemoryRouter><Fixture/></Mem
 let server: ViteDevServer, browser: Browser, origin: string;
 const runtimeErrors: string[] = [];
 beforeAll(async () => {
-  const entry = process.cwd() + "/__topology_layout_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__topology_layout_fixture.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-topology-layout-vite-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-router", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@radix-ui/react-select", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), { name: "topology-layout-test-fixture",
       resolveId: id => id === "/__topology_layout_fixture.tsx" || id === entry ? entry : undefined,
-      load(id) { if (id === entry) return fixture; if (id === process.cwd() + "/src/features/spaces/SpacesPage.tsx") return readFileSync(id,"utf8") + "\nexport {RoomDetail};"; },
+      load(id) { if (id === entry) return fixture; if (id === normalizePath(process.cwd() + "/src/features/spaces/SpacesPage.tsx")) return readFileSync(id,"utf8") + "\nexport {RoomDetail};"; },
       configureServer(vite) { vite.middlewares.use((req,res,next) => {
         if (!req.url?.startsWith("/__topology-layout")) return next();
         void vite.transformIndexHtml(req.url,'<!doctype html><html><body><div id="root"></div><script type="module" src="/__topology_layout_fixture.tsx"></script></body></html>').then(html => {res.setHeader("Content-Type","text/html");res.end(html);});

@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type BrowserContext } from "@playwright/test";
@@ -52,7 +52,7 @@ let origin: string;
 const runtimeErrors: string[] = [];
 
 beforeAll(async () => {
-  const entry = process.cwd() + "/__account_switch_native_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__account_switch_native_fixture.tsx");
   const cacheDir = mkdtempSync(join(tmpdir(), "bunkfy-account-switch-native-"));
   server = await createServer({
     configFile: false,

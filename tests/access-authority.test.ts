@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
@@ -63,14 +63,14 @@ let nativeBrowser: Browser;
 let nativeOrigin: string;
 const nativeErrors: string[] = [];
 beforeAll(async () => {
-  const entry = process.cwd() + "/__authority_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__authority_fixture.tsx");
   nativeServer = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-authority-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "@tanstack/react-query"] },
     plugins: [react(), {
       name: "authority-native-fixture", resolveId: id => id === "/__authority_fixture.tsx" || id === entry ? entry : undefined,
       load(id) {
         if (id === entry) return nativeFixture;
-        if (id === process.cwd() + "/src/app/session.tsx") return `import React,{createContext,useContext,useState} from 'react';const Context=createContext(null),selectWorkspace=()=>{};export function FixtureSession({children}){const[session,setSession]=useState(window.authoritySession);window.replaceAuthoritySession=patch=>setSession(current=>({...current,...patch}));return <Context.Provider value={{session,selectWorkspace,request:(...args)=>window.authorityRequest(...args)}}>{children}</Context.Provider>;}export function useSession(){return useContext(Context);}`;
+        if (id === normalizePath(process.cwd() + "/src/app/session.tsx")) return `import React,{createContext,useContext,useState} from 'react';const Context=createContext(null),selectWorkspace=()=>{};export function FixtureSession({children}){const[session,setSession]=useState(window.authoritySession);window.replaceAuthoritySession=patch=>setSession(current=>({...current,...patch}));return <Context.Provider value={{session,selectWorkspace,request:(...args)=>window.authorityRequest(...args)}}>{children}</Context.Provider>;}export function useSession(){return useContext(Context);}`;
       },
       configureServer(vite) { vite.middlewares.use((req, res, next) => {
         if (req.url?.split("?")[0] !== "/__authority") return next();
