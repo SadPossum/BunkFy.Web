@@ -142,8 +142,11 @@ describe("native reservation label containment during Calendar panning", () => {
       const button = target(page, kind);
       await button.getByText(/exceptionally long international/).waitFor();
       const siblings = () => button.locator("[data-calendar-endpoint], [data-reservation-attention]").evaluateAll(nodes => nodes.map(node => ({ left: node.getBoundingClientRect().left, right: node.getBoundingClientRect().right })));
-      await pan(page, 24 * 112); const initial = await siblings();
-      await pan(page, 25 * 112); const g = await geometry(page, kind), after = await siblings();
+      // Leave a real prefix slot even with the wider Linux fallback font and
+      // both attention markers. The separate trailing-edge test covers the
+      // point where the remaining interval has no readable label room.
+      await pan(page, 23.5 * 112); const initial = await siblings();
+      await pan(page, 24.5 * 112); const g = await geometry(page, kind), after = await siblings();
       await capture(page, `long-${kind}-${width}-near-end`, g);
       expect(g.glyph.left).toBeGreaterThanOrEqual(g.pane + 2); expect(g.glyph.left).toBeLessThanOrEqual(g.pane + 16);
       expect(g.paintRight - g.paintLeft).toBeGreaterThan(20); expect(g.hit).toBe(true);
