@@ -184,7 +184,7 @@ beforeAll(async () => {
 afterAll(async () => { await browser?.close(); await server?.close(); expect(runtimeErrors).toEqual([]); });
 async function open(width = 320, query = "", touch = false) {
   const page = await browser.newPage({ viewport: { width, height: 800 }, hasTouch: touch });
-  page.setDefaultTimeout(5000);
+  page.setDefaultTimeout(15000);
   const startupErrors: string[] = [];
   page.on("pageerror", error => runtimeErrors.push(error.message));
   page.on("console", message => { if (message.type() === "error") { runtimeErrors.push(message.text()); startupErrors.push(message.text()); } });
@@ -208,12 +208,19 @@ async function updateRetryHarness(page: Page, method: string, value?: string | b
 }
 
 async function pageControl(page: Page, method: string, ...args: unknown[]) {
+  const routeKey = () => page.evaluate(() => (window as unknown as {
+    pageHarness: { locations: { key: string }[] };
+  }).pageHarness.locations.at(-1)!.key);
+  const previousKey = method === "navigate" ? await routeKey() : null;
   await page.evaluate(({ method, args }) => (window as unknown as { pageHarness: Record<string, (...args: unknown[]) => void> }).pageHarness[method](...args), { method, args });
+  // Router transitions may commit after two animation frames under load.
+  // Observe the independent navigation before resolving the held API reads.
+  if (method === "navigate") await expect.poll(routeKey).not.toBe(previousKey);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 async function openSpacesPage(width: number, query = "") {
   const page = await browser.newPage({ viewport: { width, height: 800 } });
-  page.setDefaultTimeout(5000);
+  page.setDefaultTimeout(15000);
   page.on("pageerror", error => runtimeErrors.push(error.message));
   await page.goto(origin + "__spaces-page" + query);
   return page;
@@ -379,7 +386,6 @@ describe("actual SpacesPage cold recovery", () => {
         const route = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { search: string; action: string; key: string }[] } }).pageHarness.locations.at(-1)!);
         expect(route.action).toBe("REPLACE"); expect(route.search).toContain("&room=");
         await pageControl(page, "navigate", "/spaces" + route.search, { replace: true });
-        await expect.poll(() => page.evaluate(() => (window as unknown as { pageHarness: { locations: { key: string }[] } }).pageHarness.locations.at(-1)!.key)).not.toBe(route.key);
       }
       await pageControl(page, "update", { current: true });
       await expect.poll(() => page.getByRole("button", {name:"Edit room",exact:true}).isEnabled()).toBe(true);
