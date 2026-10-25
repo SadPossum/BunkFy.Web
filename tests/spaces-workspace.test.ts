@@ -34,7 +34,7 @@ const room = buildSpacesRooms({ propertyId: "p", inventoryRooms: [inventory], ph
 const units = spacesOverviewUnits(room);
 const row: SpacesAvailabilityRow = { inventoryUnitId: "u2", roomId: "r", bedId: "b2", roomLabel: "Dorm 104", roomDetail: "Demo House", unitLabel: "104-C", unitKind: "bed", targetResolved: true, state: "blocked", lastReportedState: "blocked", activeBlockCount: 1, activeAllocationCount: 0 };
 const group: SpacesBlockGroup = { blockGroupId: "g", label: "104-C", detail: "Dorm 104 · bed", targetResolved: true, targetEvidence: "resolved", inventoryUnitIds: ["u2"], intervals: [range], reasons: ["Deep clean"], status: "active", blockCount: 1 };
-const source = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+const source = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 describe("Spaces local expansion and selected reveal (not browser geometry)", () => {
   type Node = ReactElement<Record<string, unknown> & { children?: unknown }>;
