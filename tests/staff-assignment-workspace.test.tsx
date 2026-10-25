@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page, type Locator } from "@playwright/test";
@@ -44,7 +44,7 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
 
 describe("Staff page with the actual permission registry", () => {
   it.each([false, 640, 800])("keeps the real page mounted and its owned editor visible (composed sequence=%s)", async sequence => {
-    const entry = process.cwd() + "/__staff_integrated_fixture.tsx";
+    const entry = normalizePath(process.cwd() + "/__staff_integrated_fixture.tsx");
     const runtimeErrors: string[] = [];
     const integrated = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-staff-integrated-")), logLevel: "error",
       optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-router", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@radix-ui/react-select", "@daypicker/react"] },
@@ -52,8 +52,8 @@ describe("Staff page with the actual permission registry", () => {
         name: "staff-integrated-fixture", resolveId: id => id === "/__staff_integrated_fixture.tsx" || id === entry ? entry : undefined,
         load(id) {
           if (id === entry) return integratedFixture;
-          if (id === process.cwd() + "/src/app/session.tsx") return 'export function useSession(){return {session:{tenantId:"tenant",username:"operator@example.invalid",subjectId:"operator",sessionId:"session"},request:(...args)=>window.integrationRequest(...args)};}';
-          if (id === process.cwd() + "/src/app/workspace.tsx") return 'export function useWorkspace(){return {properties:window.integrationProperties,selectedProperty:window.integrationProperties[0],propertiesLoaded:true,propertiesLoading:false,propertiesFetching:false,propertiesError:null,refetchProperties:async()=>{},selectProperty:()=>{}};}';
+          if (id === normalizePath(process.cwd() + "/src/app/session.tsx")) return 'export function useSession(){return {session:{tenantId:"tenant",username:"operator@example.invalid",subjectId:"operator",sessionId:"session"},request:(...args)=>window.integrationRequest(...args)};}';
+          if (id === normalizePath(process.cwd() + "/src/app/workspace.tsx")) return 'export function useWorkspace(){return {properties:window.integrationProperties,selectedProperty:window.integrationProperties[0],propertiesLoaded:true,propertiesLoading:false,propertiesFetching:false,propertiesError:null,refetchProperties:async()=>{},selectProperty:()=>{}};}';
         },
         configureServer(vite) { vite.middlewares.use((req, res, next) => {
           if (!req.url?.startsWith("/__staff-integrated")) return next();
@@ -176,15 +176,15 @@ let browser: Browser;
 let origin: string;
 const errors: string[] = [];
 beforeAll(async () => {
-  const entry = process.cwd() + "/__staff_assignment_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__staff_assignment_fixture.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-staff-assignment-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@radix-ui/react-select", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), {
       name: "staff-assignment-native-fixture", resolveId: id => id === "/__staff_assignment_fixture.tsx" || id === entry ? entry : undefined,
       load(id) {
         if (id === entry) return fixture;
-        if (id === process.cwd() + "/src/app/session.tsx") return 'export function useSession(){return {session:window.state.session,request:(...args)=>window.assignmentRequest(...args)};}';
-        if (id === process.cwd() + "/src/app/permissions.ts") return `export const permissions={staffAssignProperties:'staff.assign-properties'};export const propertyAccessScope=(t,p)=>'tenant:'+t+'/property:'+p;export function usePermissions(checks){window.permissionChecks=checks;const s=window.state;return {hasData:s.permissionState!=='loading',isLoading:s.permissionState==='loading',isFetching:s.permissionState==='refreshing',error:['stale','unavailable'].includes(s.permissionState)?Error('Synthetic permission failure'):null,refetch:async()=>{},allows:(p,scope)=>checks.some(c=>c.permission===p&&c.scope===scope)&&!s.denied.some(id=>scope.endsWith('/property:'+id))};}`;
+        if (id === normalizePath(process.cwd() + "/src/app/session.tsx")) return 'export function useSession(){return {session:window.state.session,request:(...args)=>window.assignmentRequest(...args)};}';
+        if (id === normalizePath(process.cwd() + "/src/app/permissions.ts")) return `export const permissions={staffAssignProperties:'staff.assign-properties'};export const propertyAccessScope=(t,p)=>'tenant:'+t+'/property:'+p;export function usePermissions(checks){window.permissionChecks=checks;const s=window.state;return {hasData:s.permissionState!=='loading',isLoading:s.permissionState==='loading',isFetching:s.permissionState==='refreshing',error:['stale','unavailable'].includes(s.permissionState)?Error('Synthetic permission failure'):null,refetch:async()=>{},allows:(p,scope)=>checks.some(c=>c.permission===p&&c.scope===scope)&&!s.denied.some(id=>scope.endsWith('/property:'+id))};}`;
       },
       configureServer(vite) { vite.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith("/__staff-assignment")) return next();

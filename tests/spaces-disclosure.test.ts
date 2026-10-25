@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -140,7 +140,7 @@ let browser: Browser;
 let origin: string;
 const runtimeErrors: string[] = [];
 beforeAll(async () => {
-  const fixturePath = process.cwd() + "/__spaces_disclosure_fixture.tsx";
+  const fixturePath = normalizePath(process.cwd() + "/__spaces_disclosure_fixture.tsx");
   // This virtual entry must not share the app's optimizer generation or scan
   // its unrelated index.html while mounted tests are navigating.
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-spaces-disclosure-vite-")), logLevel: "error",
@@ -151,17 +151,17 @@ beforeAll(async () => {
       resolveId(id, importer) {
         if (id === "/__spaces_disclosure_fixture.tsx" || id === fixturePath) return fixturePath;
         for (const entry of ["/__spaces_page_fixture.tsx", "/__spaces_page_data.ts"]) {
-          if (id === entry || id === process.cwd() + entry) return process.cwd() + entry;
+          if (id === entry || id === normalizePath(process.cwd() + entry)) return normalizePath(process.cwd() + entry);
         }
-        const path = id.startsWith("/src/") ? process.cwd() + id : resolve(importer ? dirname(importer) : process.cwd(), id);
+        const path = normalizePath(id.startsWith("/src/") ? process.cwd() + id : resolve(importer ? dirname(importer) : process.cwd(), id));
         for (const name of ["session", "workspace", "permissions"]) {
-          if (path === process.cwd() + "/src/app/" + name || path === process.cwd() + "/src/app/" + name + (name === "permissions" ? ".ts" : ".tsx")) return "\0spaces-page-" + name;
+          if (path === normalizePath(process.cwd() + "/src/app/") + name || path === normalizePath(process.cwd() + "/src/app/") + name + (name === "permissions" ? ".ts" : ".tsx")) return "\0spaces-page-" + name;
         }
       },
       load(id) {
         if (id === fixturePath) return fixture;
-        if (id === process.cwd() + "/__spaces_page_fixture.tsx") return pageFixture;
-        if (id === process.cwd() + "/__spaces_page_data.ts") return pageData;
+        if (id === normalizePath(process.cwd() + "/__spaces_page_fixture.tsx")) return pageFixture;
+        if (id === normalizePath(process.cwd() + "/__spaces_page_data.ts")) return pageData;
         if (id === "\0spaces-page-session") return `import {useFixture,request} from "/__spaces_page_data.ts";export function useSession(){const s=useFixture();return {request,session:{tenantId:"synthetic",username:"synthetic",subjectId:s.actor,sessionId:"session-"+s.actor}}}`;
         if (id === "\0spaces-page-workspace") return `import {useFixture,property,propertyId} from "/__spaces_page_data.ts";const properties=[property];const noop=()=>{};export function useWorkspace(){const s=useFixture();return {properties,selectedProperty:property,selectedPropertyId:propertyId,propertiesLoaded:true,propertiesLoading:false,propertiesFetching:!s.current,propertiesError:null,setSelectedPropertyId:noop,refetchProperties:async()=>{}}}`;
         if (id === "\0spaces-page-permissions") return `export * from "/src/app/permissions.ts?actual";import {useFixture} from "/__spaces_page_data.ts";export function usePermissions(){const s=useFixture();return {allows:()=>!s.denied,hasData:true,isLoading:false,isFetching:false,error:null,refetch:async()=>{}}}`;

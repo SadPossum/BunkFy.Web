@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -48,7 +48,7 @@ createRoot(document.getElementById("root")).render(<BrowserRouter><Fixture/></Br
 let server: ViteDevServer, browser: Browser, origin: string;
 const errors: string[] = [];
 beforeAll(async () => {
-  const statePath = process.cwd() + "/__today_tabs_state.tsx", previewPath = process.cwd() + "/__today_tabs_preview.tsx", fixturePath = process.cwd() + "/__today_tabs_fixture.tsx";
+  const statePath = normalizePath(process.cwd() + "/__today_tabs_state.tsx"), previewPath = normalizePath(process.cwd() + "/__today_tabs_preview.tsx"), fixturePath = normalizePath(process.cwd() + "/__today_tabs_fixture.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-today-tabs-vite-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom/client", "react-router", "lucide-react"] },
     plugins: [react(), tailwindcss(), { name: "today-tabs-native-fixture", enforce: "pre",

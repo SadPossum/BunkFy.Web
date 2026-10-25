@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -35,7 +35,7 @@ createRoot(document.getElementById("root")).render(<MemoryRouter><Fixture/></Mem
 `;
 let server:ViteDevServer,browser:Browser,origin:string;const runtimeErrors:string[]=[];
 beforeAll(async()=>{
- const entry=process.cwd()+"/__block_inventory_fixture.tsx";
+ const entry=normalizePath(process.cwd()+"/__block_inventory_fixture.tsx");
  server=await createServer({configFile:false,root:process.cwd(),cacheDir:mkdtempSync(join(tmpdir(),"bunkfy-block-layout-vite-")),logLevel:"error",optimizeDeps:{noDiscovery:true,include:["react","react/jsx-runtime","react/jsx-dev-runtime","react-dom","react-dom/client","react-router","@tanstack/react-query","lucide-react","@radix-ui/react-popover","@radix-ui/react-select","@daypicker/react"]},plugins:[react(),tailwindcss(),{name:"block-inventory-layout-fixture",resolveId:id=>id==="/__block_inventory_fixture.tsx"||id===entry?entry:undefined,load:id=>id===entry?fixture:undefined,configureServer(vite){vite.middlewares.use((req,res,next)=>{if(!req.url?.startsWith("/__block-inventory"))return next();void vite.transformIndexHtml(req.url,'<!doctype html><html><body><div id="root"></div><script type="module" src="/__block_inventory_fixture.tsx"></script></body></html>').then(html=>{res.setHeader("Content-Type","text/html");res.end(html);});});}}],server:{host:"127.0.0.1",port:0}});
  await server.listen();origin=server.resolvedUrls!.local[0];browser=await chromium.launch({headless:true});
 },60000);

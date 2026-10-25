@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -42,7 +42,7 @@ function Fixture(){const [viewport,setViewport]=useState({date:first.from,offset
 let server: ViteDevServer, browser: Browser, origin: string;
 const errors: string[] = [];
 beforeAll(async () => {
-  const fixturePath = process.cwd() + "/__calendar_label_fixture.tsx", providerPath = process.cwd() + "/__calendar_label_provider.tsx";
+  const fixturePath = normalizePath(process.cwd() + "/__calendar_label_fixture.tsx"), providerPath = normalizePath(process.cwd() + "/__calendar_label_provider.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-calendar-label-vite-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom/client", "react-router", "lucide-react"] },
     plugins: [react(), tailwindcss(), {

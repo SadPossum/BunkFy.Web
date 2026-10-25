@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -40,7 +40,7 @@ let origin: string;
 const runtimeErrors: string[] = [];
 
 beforeAll(async () => {
-  const entry = process.cwd() + "/__session_boundary_native_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__session_boundary_native_fixture.tsx");
   const cacheDir = mkdtempSync(join(tmpdir(), "bunkfy-session-boundary-native-"));
   server = await createServer({
     configFile: false,

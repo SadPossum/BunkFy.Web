@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -64,7 +64,7 @@ let browser: Browser;
 let origin: string;
 const runtimeErrors: string[] = [];
 beforeAll(async () => {
-  const entry = process.cwd() + "/__property_processing_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__property_processing_fixture.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-property-processing-vite-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-router", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@radix-ui/react-select", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), {
@@ -72,7 +72,7 @@ beforeAll(async () => {
       resolveId: id => id === "/__property_processing_fixture.tsx" || id === entry ? entry : undefined,
       load(id) {
         if (id === entry) return fixture;
-        if (id === process.cwd() + "/src/app/session.tsx") return 'const request=(...args)=>window.processingFixtureRequest(...args); export function useSession(){return {request};}';
+        if (id === normalizePath(process.cwd() + "/src/app/session.tsx")) return 'const request=(...args)=>window.processingFixtureRequest(...args); export function useSession(){return {request};}';
       },
       configureServer(vite) { vite.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith("/__property-processing")) return next();

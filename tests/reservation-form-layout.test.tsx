@@ -1,4 +1,4 @@
-import { createServer, type ViteDevServer } from "vite";
+import { createServer, normalizePath, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -90,7 +90,7 @@ let browser: Browser;
 let origin: string;
 const runtimeErrors: string[] = [];
 beforeAll(async () => {
-  const entry = process.cwd() + "/__reservation_layout_fixture.tsx";
+  const entry = normalizePath(process.cwd() + "/__reservation_layout_fixture.tsx");
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: mkdtempSync(join(tmpdir(), "bunkfy-reservation-layout-vite-")), logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-router", "@tanstack/react-query", "lucide-react", "@radix-ui/react-popover", "@radix-ui/react-select", "@daypicker/react"] },
     plugins: [react(), tailwindcss(), {
@@ -98,7 +98,7 @@ beforeAll(async () => {
       resolveId: id => id === "/__reservation_layout_fixture.tsx" || id === entry ? entry : undefined,
       load(id) {
         if (id === entry) return fixture;
-        if (id === process.cwd() + "/src/app/session.tsx") return 'const session={tenantId:"tenant",subjectId:"subject",sessionId:"session",accessToken:"synthetic"}; const request=(...args)=>window.reservationFixtureRequest(...args); export function useSession(){return {session,request};}';
+        if (id === normalizePath(process.cwd() + "/src/app/session.tsx")) return 'const session={tenantId:"tenant",subjectId:"subject",sessionId:"session",accessToken:"synthetic"}; const request=(...args)=>window.reservationFixtureRequest(...args); export function useSession(){return {session,request};}';
       },
       configureServer(vite) { vite.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith("/__reservation-layout")) return next();
@@ -302,7 +302,7 @@ describe("REC003 primary reservation recovery", () => {
       await expect.poll(() => permissionNotice.count()).toBe(0);
       // Restoring permission re-enables the normal reservation query.
       await expect.poll(() => reservationReadCount(page)).toBe(2);
-      expect(await page.getByText("Reservation history is delayed", { exact: true }).count()).toBe(1);
+      await expect.poll(() => page.getByText("Reservation history is delayed", { exact: true }).count()).toBe(1);
       await noFixtureCommands(page);
     } finally { await page.close(); }
   });
