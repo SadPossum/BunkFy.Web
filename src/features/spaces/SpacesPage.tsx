@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   compositeSourceCurrent,
   compositeSourceNeedsRetry,
@@ -629,15 +629,25 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
         cold: { pending: availabilitySource.isFetching, retryable: compositeSourceNeedsRetry(availabilitySource.state) } },
     },
   });
+  const pendingDefaultRoom = useRef<string | null>(null);
   useEffect(() => {
-    if (!awaitingDefaultRoom || !canonicalRoomId) return;
+    if (!awaitingDefaultRoom || !canonicalRoomId) { pendingDefaultRoom.current = null; return; }
     const next = new URLSearchParams(searchParams);
     next.set("property", targetPropertyId);
     next.set("section", section);
     next.set("room", canonicalRoomId);
-    retryFocus.prepareDefaultRoom(canonicalRoomId, next);
-    setSearchParams(next, { replace: true });
-  }, [awaitingDefaultRoom, canonicalRoomId, searchParams, section, targetPropertyId, retryFocus, setSearchParams]);
+    const targetSearch = "?" + next.toString();
+    if (navigation.rawLocation.search === targetSearch) return;
+    const requestKey = JSON.stringify([navigation.rawLocation.key, navigation.rawLocation.pathname, targetSearch]);
+    // Query updates can render again before the first REPLACE is committed.
+    // Dispatch that automatic navigation once, preserving its recovery receipt.
+    if (pendingDefaultRoom.current === requestKey) return;
+    pendingDefaultRoom.current = requestKey;
+    const recoveryReceipt = retryFocus.prepareDefaultRoom(canonicalRoomId, next);
+    setSearchParams(next, { replace: true,
+      state: recoveryReceipt ? { __bunkfySpacesRetryFocus: recoveryReceipt } : undefined });
+  }, [awaitingDefaultRoom, canonicalRoomId, searchParams, section, targetPropertyId, retryFocus, setSearchParams,
+    navigation.rawLocation.key, navigation.rawLocation.pathname, navigation.rawLocation.search]);
 
   if (routeIssue) return <TargetUnavailable title="Spaces link needs one exact context" description={routeIssue} />;
 

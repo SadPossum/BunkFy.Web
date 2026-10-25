@@ -7,7 +7,7 @@ import { useNetworkStatus } from "../../app/networkStatus";
 type NoticeId = "layout" | "availability";
 type SourceState = { pending: boolean; retryable: boolean };
 type NoticeState = SourceState & { active: boolean; cold?: SourceState };
-type RetryLocation = { key: string; pathname: string; search: string; hash: string; effectiveSearch: string; action: string };
+type RetryLocation = { key: string; pathname: string; search: string; hash: string; effectiveSearch: string; action: string; state?: unknown };
 const locationKey = (location?: RetryLocation) => location ? JSON.stringify([
   location.key, location.pathname, location.search, location.hash, location.effectiveSearch,
 ]) : "";
@@ -25,7 +25,7 @@ export function useSpacesRetryFocus({ owner, location, awaitingDefaultRoom = fal
   const availabilityFallback = useRef<HTMLDivElement>(null);
   const retry = useRef<{
     owner: string; location: string; notice: NoticeId; cold: boolean; button: HTMLButtonElement; cancel: () => void;
-    canonical?: { pathname: string; search: string; hash: string };
+    canonical?: { pathname: string; search: string; hash: string; receiptId: string };
     canonicalUsed: boolean;
   } | null>(null);
   function remember(event: MouseEvent<HTMLDivElement>) {
@@ -67,8 +67,10 @@ export function useSpacesRetryFocus({ owner, location, awaitingDefaultRoom = fal
     // No other canonicalization, filter, date or authority change can hitch a
     // ride. Only the caller's immediate automatic default-room REPLACE counts.
     if (previous.toString() !== next.toString() || location.effectiveSearch !== new URLSearchParams(location.search).toString()) return;
+    const receiptId = crypto.randomUUID();
     intent.canonicalUsed = true;
-    intent.canonical = { pathname: location.pathname, search: "?" + next, hash: location.hash };
+    intent.canonical = { pathname: location.pathname, search: "?" + next, hash: location.hash, receiptId };
+    return receiptId;
   }
   useLayoutEffect(() => {
     for (const [ref, state] of [[layoutFallback, notices.layout.cold], [availabilityFallback, notices.availability.cold]] as const) {
@@ -85,9 +87,15 @@ export function useSpacesRetryFocus({ owner, location, awaitingDefaultRoom = fal
     if (intent.location !== locationKey(location)) {
       const receipt = intent.canonical;
       intent.canonical = undefined;
+      // React may batch the automatic REPLACE with a later navigation to the
+      // same URL. URL equality alone cannot identify the intended transition.
+      const state = location?.state;
+      const matchesReceipt = typeof state === "object" && state !== null &&
+        "__bunkfySpacesRetryFocus" in state && state.__bunkfySpacesRetryFocus === receipt?.receiptId;
       if (!receipt || !location || location.action !== "REPLACE" || location.pathname !== receipt.pathname
         || location.search !== receipt.search || location.hash !== receipt.hash
-        || location.effectiveSearch !== new URLSearchParams(receipt.search).toString()) { intent.cancel(); return; }
+        || location.effectiveSearch !== new URLSearchParams(receipt.search).toString()
+        || !matchesReceipt) { intent.cancel(); return; }
       intent.location = locationKey(location);
     }
     // Reconnecting refreshes the property directory independently. Keep the

@@ -35,10 +35,23 @@ function Fixture() {
   const [current, setCurrent] = useState(true);
   const [eligible, setEligible] = useState(true);
   const [notice, setNotice] = useState("layout");
+  const [retryLocation, setRetryLocation] = useState(location.search.includes("canonicalReceipt") ? {
+    key:"initial",pathname:"/spaces",search:"?property=synthetic&section=layout",hash:"",
+    effectiveSearch:"property=synthetic&section=layout",action:"POP",state:null
+  } : undefined);
   const noticeState = {active:true, pending:mode.startsWith("pending"), retryable:mode === "stale"};
-  const retryFocus = useSpacesRetryFocus({owner:JSON.stringify([context, selection]), enabled:eligible && !editing && mounted, current, ready:mode === "ready", denied,
+  const retryFocus = useSpacesRetryFocus({owner:JSON.stringify([context, selection]), location:retryLocation, enabled:eligible && !editing && mounted, current, ready:mode === "ready", denied,
     notices:{layout:{...noticeState,active:notice === "layout"},availability:{...noticeState,active:notice === "availability"}}});
-  window.spacesHarness = {settle:setMode, setCurrent, setEligible, setEditing, setSelection, setMounted, setDenied, changeContext:setContext, deny:() => setDenied(true), unmount:() => setMounted(false), changeNotice:setNotice, resetWorkspace:()=>setWorkspaceKey(n=>n+1)};
+  window.spacesHarness = {settle:setMode, setCurrent, setEligible, setEditing, setSelection, setMounted, setDenied, changeContext:setContext, deny:() => setDenied(true), unmount:() => setMounted(false), changeNotice:setNotice, resetWorkspace:()=>setWorkspaceKey(n=>n+1),
+    canonicalReplace:superseded=>{
+      const next=new URLSearchParams(retryLocation.search);next.set("room","101");
+      const receipt=retryFocus.prepareDefaultRoom("101",next);
+      // Model React observing only the last location when an automatic
+      // REPLACE and a later same-URL REPLACE are batched together.
+      setRetryLocation({...retryLocation,key:superseded?"duplicate":"canonical",search:"?"+next,
+        effectiveSearch:next.toString(),action:"REPLACE",state:superseded?null:{__bunkfySpacesRetryFocus:receipt}});
+    }
+  };
   const source = {label:"Synthetic inventory", state:mode === "ready" ? "ready" : mode === "pending" && location.search.includes("replaceRetry") ? "loading" : "stale", isFetching:mode.startsWith("pending"),
     refetch:async () => {setRequests(n => n + 1); setMode("pending");}};
   const selected = rooms.find(room => room.roomId === selection) ?? null;
@@ -207,6 +220,23 @@ async function openSpacesPage(width: number, query = "") {
 }
 
 describe("actual SpacesPage cold recovery", () => {
+  it.each([false,true])("a batched canonical REPLACE keeps retry focus only for its own navigation (superseded=%s)", async superseded => {
+    const page = await open(320, "?retry&replaceRetry&canonicalReceipt");
+    try {
+      const retry = page.getByRole("button", { name: "Try again", exact: true });
+      await retry.waitFor(); await retry.focus(); await retry.press("Enter");
+      await updateRetryHarness(page, "setCurrent", false);
+      await updateRetryHarness(page, "canonicalReplace", superseded);
+      await updateRetryHarness(page, "settle", "ready");
+      const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
+      await heading.waitFor();
+      expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+      await updateRetryHarness(page, "setCurrent", true);
+      if (superseded) expect(await heading.evaluate(el => el === document.activeElement)).toBe(false);
+      else await expect.poll(() => heading.evaluate(el => el === document.activeElement)).toBe(true);
+    } finally { await page.close(); }
+  }, 30000);
+
   it.each([{width:320,key:"Enter"},{width:1024,key:"Space"}])("$width global Sellability Retry owns its exact default-room recovery via $key", async ({width,key}) => {
     const page = await openSpacesPage(width, "?noRoom&globalRetry");
     try {
