@@ -20,7 +20,7 @@ import {SharedAccountRoot,useSharedAccounts} from "/src/features/account-switch/
 import "/src/styles.css";
 function Product(){
  const auth=useSession(),shared=useSharedAccounts();
- useEffect(()=>{window.accountHarness={requestOld:()=>{window.oldReadResult=null;void auth.request("/synthetic-old-read").then(()=>{window.oldReadResult="unexpected-success";},error=>{window.oldReadResult=error?.name??"unknown";});},hasSession:()=>auth.session?.username??null};},[auth]);
+ useEffect(()=>{window.accountHarness={signIn:()=>auth.login({username:"owner-a@example.test",password:"synthetic-password"}),chooseWorkspace:()=>auth.selectWorkspace("workspace-a"),requestOld:()=>{window.oldReadResult=null;void auth.request("/synthetic-old-read").then(()=>{window.oldReadResult="unexpected-success";},error=>{window.oldReadResult=error?.name??"unknown";});},hasSession:()=>auth.session?.username??null};},[auth]);
  return <main><output data-user>{auth.session?.username??"Signed out"}</output><button type="button" onClick={()=>void shared?.switchAccount()}>Switch account</button></main>;
 }
 const query=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
@@ -91,6 +91,68 @@ afterAll(async () => {
 });
 
 describe("native normal-account PIN switch", () => {
+  it("keeps ordinary first login and workspace reload when no remembered device exists", async () => {
+    const fresh = await browser.newContext();
+    const page = await fresh.newPage();
+    page.setDefaultTimeout(5000);
+    let stage = "initial sign-out";
+    let currentReads = 0;
+    await page.route("**/api/**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (!path.startsWith("/api/")) { await route.continue(); return; }
+      if (path.endsWith("/remembered/current")) {
+        currentReads++;
+        await route.fulfill(json({ ...current(0, 0, null), accounts: [], csrfToken: null })); return;
+      }
+      if (path === "/api/auth/browser/login" || path === "/api/auth/browser/refresh") {
+        await route.fulfill(json({ accessToken: token(memberA, sessionA) })); return;
+      }
+      throw new Error(`Unexpected first-login request: ${path}`);
+    });
+    try {
+      await page.goto(origin + "__account-switch-native");
+      await page.getByText("Signed out", { exact: true }).waitFor();
+      stage = "password login";
+      await page.evaluate(() => (window as unknown as { accountHarness: { signIn(): Promise<unknown> } }).accountHarness.signIn());
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      expect(await page.locator("[data-user]").count()).toBe(1);
+      expect(await page.locator("[data-user]").textContent()).toBe(identityA.username);
+      await page.evaluate(() => (window as unknown as { accountHarness: { chooseWorkspace(): void } }).accountHarness.chooseWorkspace());
+      stage = "workspace session reload";
+      await page.reload();
+      await expect.poll(() => currentReads).toBeGreaterThanOrEqual(3);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      expect(await page.locator("[data-user]").count()).toBe(1);
+      expect(await page.locator("[data-user]").textContent()).toBe(identityA.username);
+    } catch (error) {
+      throw new Error(`First login failed at ${stage}, Current reads=${currentReads}: ${await page.locator("body").innerText()}`, { cause: error });
+    } finally { await fresh.close(); }
+  }, 30000);
+
+  it("conceals a previously managed session when its remembered device disappears", async () => {
+    const managed = await browser.newContext();
+    await managed.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityA);
+    const page = await managed.newPage();
+    page.setDefaultTimeout(5000);
+    let currentReads = 0;
+    await page.route("**/api/**", async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (!path.startsWith("/api/")) { await route.continue(); return; }
+      if (path.endsWith("/remembered/current")) {
+        currentReads++;
+        await route.fulfill(json(currentReads < 3 ? activeA(1) : { ...current(0, 0, null), accounts: [], csrfToken: null })); return;
+      }
+      if (path === "/api/auth/browser/refresh") { await route.fulfill(json({ accessToken: token(memberA, sessionA) })); return; }
+      throw new Error(`Unexpected managed-session request: ${path}`);
+    });
+    try {
+      await page.goto(origin + "__account-switch-native");
+      await page.getByText("Choose your account", { exact: true }).waitFor();
+      expect(currentReads).toBeGreaterThanOrEqual(3);
+      expect(await page.locator("[data-user]").count()).toBe(0);
+    } finally { await managed.close(); }
+  }, 30000);
+
   it("switches one tab by PIN while another tab fences its delayed old refresh", async () => {
     const pageA = await context.newPage();
     const pageB = await context.newPage();

@@ -169,9 +169,15 @@ function SharedAccountsProvider({ initial, children }: { initial: RememberedBrow
     try {
       const next = await readRememberedBrowser();
       if (sequence !== statusSequence.current || inFlight.current) return;
+      // Choosing a first workspace enables the desktop root on the next load.
+      // No remembered device exists yet, so ordinary Auth still owns refresh.
+      // A previously managed browser must continue to conceal a lost boundary.
+      const ordinaryBrowser = currentRef.current.state === rememberedState.missing &&
+        next.state === rememberedState.missing && isEmptyRememberedBrowser(currentRef.current) &&
+        isEmptyRememberedBrowser(next) && !pendingRef.current && !accountPrivacyCovered();
       update(next, "current");
       const local = authRef.current.session;
-      if (local && (next.state !== rememberedState.active || next.active?.memberId !== local.subjectId || next.active?.sessionId !== local.sessionId)) {
+      if (local && !ordinaryBrowser && (next.state !== rememberedState.active || next.active?.memberId !== local.subjectId || next.active?.sessionId !== local.sessionId)) {
         try { hide(); } catch { /* Keep the local boundary closed. */ }
       }
     } catch { setMessage("The browser status is unavailable. Reconnect, then refresh accounts."); }
