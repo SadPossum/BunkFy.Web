@@ -376,9 +376,10 @@ describe("actual SpacesPage cold recovery", () => {
       const heading = page.locator("#spaces-selection-inspector [data-inspector-heading]");
       await heading.waitFor();
       if (boundary === "second REPLACE") {
-        const route = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { search: string; action: string }[] } }).pageHarness.locations.at(-1)!);
+        const route = await page.evaluate(() => (window as unknown as { pageHarness: { locations: { search: string; action: string; key: string }[] } }).pageHarness.locations.at(-1)!);
         expect(route.action).toBe("REPLACE"); expect(route.search).toContain("&room=");
         await pageControl(page, "navigate", "/spaces" + route.search, { replace: true });
+        await expect.poll(() => page.evaluate(() => (window as unknown as { pageHarness: { locations: { key: string }[] } }).pageHarness.locations.at(-1)!.key)).not.toBe(route.key);
       }
       await pageControl(page, "update", { current: true });
       await expect.poll(() => page.getByRole("button", {name:"Edit room",exact:true}).isEnabled()).toBe(true);

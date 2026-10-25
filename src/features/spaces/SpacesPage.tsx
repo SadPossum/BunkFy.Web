@@ -631,7 +631,8 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
   });
   const pendingDefaultRoom = useRef<string | null>(null);
   useEffect(() => {
-    if (!awaitingDefaultRoom || !canonicalRoomId) { pendingDefaultRoom.current = null; return; }
+    if (!awaitingDefaultRoom) pendingDefaultRoom.current = null;
+    if (!awaitingDefaultRoom || !canonicalRoomId) return;
     const next = new URLSearchParams(searchParams);
     next.set("property", targetPropertyId);
     next.set("section", section);
