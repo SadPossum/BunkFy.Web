@@ -128,6 +128,7 @@ export function PropertyProcessingPanel({
   // re-offer configuration while the property directory or read is refreshing.
   const retired = property.status === "retired" || state?.reasonCode === "Properties.PropertyRetired";
   const binding = state?.governancePolicy ?? null;
+  const previewTestPolicy = binding?.policyId.startsWith("preview-ux-hostel-") ?? false;
   const selectablePolicies = policiesUsable
     ? availableCountryPolicies(policies.data?.items ?? [])
     : [];
@@ -384,14 +385,14 @@ export function PropertyProcessingPanel({
                 <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                   <span className="inline-flex items-center gap-2 font-medium">
                     <MapPin size={15} className="text-primary" />
-                    {countryLabel(binding.operatingCountryCode)}
+                    {previewTestPolicy ? "Test policy" : countryLabel(binding.operatingCountryCode)}
                   </span>
                   {!embedded && <span className="text-base-content/55">
-                    {binding.policyId} v{binding.policyVersion}
+                    {previewTestPolicy ? "Applied automatically for UX testing" : `${binding.policyId} v${binding.policyVersion}`}
                   </span>}
-                  <span className="text-base-content/55">
+                  {!previewTestPolicy && <span className="text-base-content/55">
                     Expires {formatDate(binding.policyExpiresAtUtc)}
-                  </span>
+                  </span>}
                 </div>
                 <button
                   type="button"
