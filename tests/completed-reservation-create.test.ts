@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../src/api/client";
 import type { InventoryAvailabilityResponse, Reservation, RoomInventory } from "../src/api/types";
 import { CreateReservationModal } from "../src/features/reservations/CreateReservationModal";
-import { ReservationCreationRecovery } from "../src/features/reservations/ReservationCreationRecovery";
+import { ReservationCreationRecovery } from "../src/features/reservations/ReservationCreationRecoveryPanel";
 import { ReservationInventoryPicker } from "../src/features/reservations/ReservationInventoryPicker";
 import { completedReservationCreateHref, completedReservationPreselection, completedReservationReturnHref, completedReservationSeed, completedReservationStayRange, parseCompletedReservationCreateContext } from "../src/features/reservations/completedReservationCreate";
 import { newReservationRecoveryCoordinate, readReservationRecovery, storeReservationRecovery } from "../src/features/reservations/reservationCreationRecovery";

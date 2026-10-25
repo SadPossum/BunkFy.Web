@@ -50,7 +50,7 @@ import {
 import { loadAllRoomInventory } from "../inventory/inventoryApi";
 import { calendarBookingRangeValid, reservationAvailabilityMatchesRange, reservationRoomsMatchProperty, reservationSelectionMatchesRooms, resolveCalendarBookingTarget, type CalendarBookingTarget } from "../calendar/calendarBookingRoute";
 import { focusModalRecoveryFeedback } from "../../components/ui/modalFocus";
-import { ReservationCreationRecovery } from "./ReservationCreationRecovery";
+import { ReservationCreationRecovery } from "./ReservationCreationRecoveryPanel";
 import { useReservationCreationRecovery } from "./useReservationCreationRecovery";
 import { newReservationRecoveryCoordinate, recoveryMatchesSession, reservationRecoveryTargetMatches, storeReservationRecovery, updateReservationRecovery, type ReservationRecoveryCoordinate } from "./reservationCreationRecovery";
 import { ReservationAccessResetNotice, type ReservationAccessReset } from "./ReservationAccessResetNotice";
