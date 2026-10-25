@@ -302,7 +302,7 @@ describe("REC003 primary reservation recovery", () => {
       await expect.poll(() => permissionNotice.count()).toBe(0);
       // Restoring permission re-enables the normal reservation query.
       await expect.poll(() => reservationReadCount(page)).toBe(2);
-      expect(await page.getByText("Reservation history is delayed", { exact: true }).count()).toBe(1);
+      await expect.poll(() => page.getByText("Reservation history is delayed", { exact: true }).count()).toBe(1);
       await noFixtureCommands(page);
     } finally { await page.close(); }
   });
