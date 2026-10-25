@@ -68,7 +68,7 @@ describe("opaque same-tab reservation creation recovery", () => {
     expect(storage.value).not.toBeNull();
   });
   it("has GET-only reload recovery, read-authority/abort fences and explicit 404 race handling", () => {
-    const panel = source("features/reservations/ReservationCreationRecovery.tsx");
+    const panel = source("features/reservations/ReservationCreationRecoveryPanel.tsx");
     expect(panel).toContain("!exactProperty || !mayReadCurrent || !contextReady || pending");
     expect(panel).toContain("{ signal: controller.signal }");
     expect(panel).toContain("latest.current.identity !== identity || !latest.current.mayReadCurrent");

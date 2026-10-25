@@ -2,7 +2,7 @@ import type { ComponentProps, ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../src/api/client";
 import type { Reservation } from "../src/api/types";
-import { ReservationCreationRecovery } from "../src/features/reservations/ReservationCreationRecovery";
+import { ReservationCreationRecovery } from "../src/features/reservations/ReservationCreationRecoveryPanel";
 import { newReservationRecoveryCoordinate, readReservationRecovery, storeReservationRecovery } from "../src/features/reservations/reservationCreationRecovery";
 
 // Execute the actual recovery effect with deterministic hooks. Real browser, networking and layout are separate gates.
