@@ -9,7 +9,7 @@ ARG VITE_BUNKFY_API_BASE_URL=/
 ENV VITE_BUNKFY_API_BASE_URL=$VITE_BUNKFY_API_BASE_URL
 RUN pnpm build
 
-FROM nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949 AS web
+FROM nginx:1.31.8-alpine@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606 AS web
 ENV NGINX_ENVSUBST_FILTER=^BUNKFY_RELEASE_ID$ \
     BUNKFY_RELEASE_ID=local-unversioned
 COPY --from=build /app/dist /usr/share/nginx/html
