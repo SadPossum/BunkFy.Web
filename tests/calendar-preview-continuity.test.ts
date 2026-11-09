@@ -68,7 +68,7 @@ function nodes(value: unknown): Node[] { if (Array.isArray(value)) return value.
 function page() { state.cursor = 0; return nodes(CalendarPage()); }
 function weekProps(tree: Node[]) { return tree.find(node => node.type === CalendarWeekView)!.props as unknown as ComponentProps<typeof CalendarWeekView>; }
 beforeEach(() => { state.cursor = 0; state.values = []; state.route = null; state.params = new URLSearchParams({ property: propertyId, date: "2026-09-12", day: "2026-09-08", calViewDate: "2026-09-02", calViewOffset: "946" }); state.denied = false; state.hasData = true; state.fetching = false; state.open.mockReset(); state.setParams.mockReset(); vi.stubGlobal("window", { location: { pathname: "/calendar", get search() { return state.params.size ? `?${state.params}` : ""; }, hash: "" } }); });
-afterEach(() => { state.todayFetching = false; state.generation = 1; state.todayFetchingKey = ""; state.todayFailureKey = ""; state.todayMissingKey = ""; state.todayErrorUpdatedAt = 0; state.todayPaused = false; state.layouts = []; vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { state.todayFetching = false; state.generation = 1; state.todayFetchingKey = ""; state.todayFailureKey = ""; state.todayMissingKey = ""; state.todayErrorUpdatedAt = 0; state.todayPaused = false; state.layouts = []; vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("Today first-load retry source continuity", () => {
   it.each([
@@ -292,6 +292,27 @@ describe("Calendar pure-append layout restoration", () => {
       unmount: () => cleanups.forEach(cleanup => cleanup()),
     };
   }
+
+  it.each(["/", "/example/"])("publishes the actual scroll position when hosted at %s", base => {
+    vi.stubEnv("BASE_URL", base);
+    window.location.pathname = `${base}calendar`;
+    const s = setup(); const view = s.render(); s.flushFrames();
+    s.nativeScroll(view, 1300); vi.advanceTimersByTime(180);
+    expect(s.props.onViewport).toHaveBeenCalledExactlyOnceWith(calendarViewportAt(s.props.from, 1300));
+    s.unmount();
+  });
+
+  it.each(["pathname", "search", "hash"] as const)("rejects a queued viewport write after prefixed browser %s navigation", boundary => {
+    vi.stubEnv("BASE_URL", "/example/");
+    window.location.pathname = "/example/calendar";
+    const s = setup(); const view = s.render(); s.flushFrames();
+    s.nativeScroll(view, 1300);
+    const location = { ...window.location, [boundary]: boundary === "pathname" ? "/example/spaces" : boundary === "search" ? "?property=other" : "#other" };
+    vi.stubGlobal("window", { location });
+    vi.advanceTimersByTime(180);
+    expect(s.props.onViewport).not.toHaveBeenCalled();
+    s.unmount();
+  });
 
   it("keeps initial clamping, then skips both getter and setter on a real right-edge append", () => {
     const s = setup({ viewport: { date: "2026-09-08", offset: 0 } });
