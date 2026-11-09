@@ -252,7 +252,7 @@ export function CalendarWeekView({
       if (pendingPreviewIntent.current) return;
       // A lazy destination can leave Calendar mounted after browser navigation.
       // This publication owns only the location at which it was scheduled.
-      if (window.location.pathname !== ownedLocation.pathname
+      if (applicationPath(window.location.pathname) !== ownedLocation.pathname
         || window.location.search !== ownedLocation.search
         || window.location.hash !== ownedLocation.hash) return;
       const callback = viewportCallback.current;
