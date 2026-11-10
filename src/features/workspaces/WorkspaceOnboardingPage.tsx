@@ -320,7 +320,7 @@ function WorkspaceOnboardingForm() {
               )}
               <button className="btn btn-primary mt-6 w-full text-white" disabled={isOffline || workspaceSetup.isPending || recoveryState === "restoring"} title={isOffline ? "Reconnect before creating a workspace." : undefined}>
                 {workspaceSetup.isPending && <span className="loading loading-spinner loading-sm" />}
-                {createdWorkspaceId ? "Retry workspace setup" : "Create and continue"}
+                {createdWorkspaceId ? "Continue setup" : "Create and continue"}
                 {!workspaceSetup.isPending && <ArrowRight size={17} />}
               </button>
             </form>
