@@ -372,7 +372,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             size="sm"
             options={workspaceOptions}
           />
-          {canReadPropertyDirectory && (
+          {canReadPropertyDirectory && properties.length > 0 && (
             <div className="mt-3 rounded-lg border border-base-300 bg-base-200/70 p-3">
               <div className="mb-2 flex items-center gap-2 text-[0.68rem] font-semibold uppercase text-base-content/50">
                 <Building2 size={13} /> Current property
@@ -449,7 +449,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="text-base-content/25">/</span>
               <strong className="truncate font-semibold">{pageLabel}</strong>
             </div>
-            {canReadPropertyDirectory && (
+            {canReadPropertyDirectory && properties.length > 0 && (
               <div className="w-44 min-w-0 lg:hidden">
                 <SelectPicker
                   className="w-full"

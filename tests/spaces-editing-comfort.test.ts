@@ -308,7 +308,8 @@ describe("Spaces editing comfort — rendered composition, not browser acceptanc
     state.grants.delete(permissions.inventoryRead);
     expect(button(render(), "All holds")).toBeUndefined();
     const denied = render(route().replace("section=layout", "section=blocks"));
-    expect(denied).toContain("Hold history access is not assigned");
+    expect(denied).toContain("You can&#x27;t view hold history");
+    expect(denied).toContain("Ask a workspace owner for inventory access.");
     expect(denied).not.toContain("No block history"); expect(denied).not.toContain("Different space hold reason");
     expect(state.queries.some((q) => q.enabled && ["inventory-rooms", "availability", "blocks"].includes(String(q.key[0])))).toBe(false);
   });

@@ -334,7 +334,7 @@ export function RetentionHealthSettings({
           <EmptyState
             icon={<Clock3 />}
             title="No schedules yet"
-            description="Automatic schedules appear after the workspace scope is projected and a retention owner is registered."
+            description="Automatic cleanup schedules aren't available for this workspace yet. Check again shortly; if they remain missing, contact your administrator."
           />
         </div>
       )}

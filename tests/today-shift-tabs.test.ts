@@ -18,6 +18,7 @@ export let update=()=>{};export function bind(fn){update=fn;}
 export function useTargetProperty(id){useEffect(()=>{if(id&&id!==state.property)update({property:id});},[id]);}
 export const permissions={inventoryRead:"inventory.read",reservationsRead:"reservations.read",reservationsCreate:"reservations.create",propertiesRead:"properties.read",reservationsCheckIn:"reservations.checkin",reservationsCheckOut:"reservations.checkout"};
 export const propertyAccessScope=(_tenant,p)=>p;
+export const tenantAccessScope=tenant=>"tenant:"+tenant;
 export const usePermissions=()=>({hasData:true,error:null,isFetching:false,allows:()=>state.canRead,refetch:async()=>{}});
 export const useSession=()=>({request:async()=>{throw Error("Unexpected request in synthetic fixture")},session:{tenantId:property,subjectId:property,sessionId:property,generation:state.generation}});
 export const useWorkspace=()=>({selectedPropertyId:state.property,selectedProperty:{propertyId:state.property,name:"Synthetic hostel"},properties:[property,other].map(propertyId=>({propertyId,name:"Synthetic hostel"})),propertiesLoading:false,propertiesError:null,refetchProperties:async()=>{}});

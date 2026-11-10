@@ -1269,10 +1269,14 @@ export type AuthenticationMethods = Omit<
   externalIdentities: ExternalIdentity[];
 };
 
-export type AuthenticationSession = NonNullableFields<
+export type AuthenticationSession = Omit<NonNullableFields<
   Schema<"AuthenticationSessionResponse">,
   "authenticationMethod"
->;
+>, "userAgent" | "lastActivityAtUtc"> & {
+  // Optional while older API versions and pre-metadata sessions remain supported.
+  userAgent?: string | null;
+  lastActivityAtUtc?: string | null;
+};
 
 export type AuthenticationSessions = Omit<
   Schema<"AuthenticationSessionsResponse">,

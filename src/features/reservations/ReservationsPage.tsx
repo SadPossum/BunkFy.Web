@@ -29,6 +29,7 @@ import {
   reservationInventorySummary,
 } from "./reservationOperationalView";
 import { OwnerOriginLink } from "../spaces/OwnerOriginLink";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
 import { calendarBookingReturnHref, hasCalendarBookingContext, parseCalendarBookingContext } from "../calendar/calendarBookingRoute";
 import { reservationEditorIdentity } from "./reservationsMutationAuthority";
 import { useReservationCreationRecovery } from "./useReservationCreationRecovery";
@@ -438,7 +439,7 @@ export function ReservationsPage() {
   if (completedEntry && !completedContext && !hasRecovery) return <EmptyState icon={<ShieldCheck />} title="This completed reservation link is invalid" description="Open the completed reservation again. No guest or replacement space has been selected." action={<Link className="btn btn-primary" to="/calendar">Open Calendar</Link>} />;
   if (!propertyBound && searchParams.has("property")) return <><OwnerOriginLink /><EmptyState icon={<ShieldCheck />} title="Opening the requested property" description="Reservations will only load if this exact property is accessible and selected." />{editor}{detail}</>;
 
-  if (!selectedProperty) return <><OwnerOriginLink /><EmptyState icon={<CalendarDays />} title="Choose a property first" description="Reservations belong to a property. Create or select one to continue." />{editor}{detail}</>;
+  if (!selectedProperty) return <><OwnerOriginLink /><PropertyRequiredState />{editor}{detail}</>;
 
   if (!access.hasData) {
     return (

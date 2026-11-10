@@ -234,7 +234,7 @@ export function AccountPage() {
     { value: "overview" as const, label: "Overview", description: "Identity and security", icon: CircleUserRound, visible: true },
     { value: "profile" as const, label: "Workspace profile", description: "Contact and work details", icon: Building2, visible: workspaceProfileAvailable },
     { value: "security" as const, label: "Sign-in & recovery", description: "Password, email, MFA", icon: ShieldCheck, visible: true },
-    { value: "sessions" as const, label: "Sessions", description: "Browsers and revocation", icon: MonitorSmartphone, visible: true },
+    { value: "sessions" as const, label: "Sessions", description: "Devices and sign-out", icon: MonitorSmartphone, visible: true },
   ].filter((item) => item.visible);
 
   return (

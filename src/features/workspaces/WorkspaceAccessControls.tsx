@@ -125,7 +125,7 @@ export function PropertyScopeField({
 
       <p className="mt-2 flex items-start gap-2 text-xs leading-5 text-base-content/50">
         <ShieldCheck size={14} className="mt-0.5 shrink-0 text-primary" />
-        The selected role is applied at this scope. Owner access is managed separately.
+        This role applies to the selected properties. Owner access is managed separately.
       </p>
     </fieldset>
   );

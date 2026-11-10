@@ -11,6 +11,7 @@ import { ErrorState, InlineFormActions, LoadingState, Modal, ModalActions, Statu
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { RecentAuthenticationPrompt } from "../../components/ui/RecentAuthenticationPrompt";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
+import { connectorLabel } from "./connectorPresentation";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { resolveConnectionUpdateAttempt, type ConnectionSettingsUpdate, type ConnectionUpdateAttempt, type ConnectionUpdatePayload } from "./connectionUpdateAttempt";
 import { createConnectionControlRequest, resolveConnectionControlAttempt, type ConnectionControlAttempt, type ConnectionControlPayload } from "./connectionControlAttempt";
@@ -74,7 +75,7 @@ export function ConnectionDetail({ propertyId, connectionId, adapterTypes, adapt
     scheduleAttempt.current = null;
   }, [capabilityCurrent]);
 
-  return <Modal open={Boolean(connectionId)} size="lg" title={item?.adapterType || "Integration connection"} description={item ? `${adapterExecutionModeLabel(item.executionMode)} · connection ${item.connectionId.slice(0, 8).toUpperCase()}` : "Loading connection"} onClose={onClose}>{connection.isLoading ? <LoadingState label="Loading connection" /> : connection.error ? <ErrorState error={connection.error} retry={() => void connection.refetch()} /> : item ? <div className="space-y-5">
+  return <Modal open={Boolean(connectionId)} size="lg" title={item ? connectorLabel(item.adapterType) : "Integration connection"} description={item ? `${adapterExecutionModeLabel(item.executionMode)} · connection ${item.connectionId.slice(0, 8).toUpperCase()}` : "Loading connection"} onClose={onClose}>{connection.isLoading ? <LoadingState label="Loading connection" /> : connection.error ? <ErrorState error={connection.error} retry={() => void connection.refetch()} /> : item ? <div className="space-y-5">
     <div className="flex flex-col gap-4 rounded-lg border border-base-300 bg-base-200/55 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-semibold uppercase text-base-content/45">Configuration</p><p className="mt-1 break-all font-semibold">{item.configurationReference}</p><p className="mt-1 text-xs text-base-content/50">{adapterConflictPolicyLabel(item.conflictPolicy)}</p></div><div className="flex flex-wrap items-center gap-2"><StatusBadge status={adapterConnectionStatusLabel(item.status)} />{canManage && adapterConnectionStatusLabel(item.status) === "enabled" && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmAction("disable")}><PauseCircle size={15} />Disable</button>}{canManage && adapterConnectionStatusLabel(item.status) === "disabled" && <button type="button" className="btn btn-primary btn-sm" onClick={() => setConfirmAction("enable")} disabled={!capabilityCurrent} title={capabilityCurrent ? undefined : "Current adapter capability is required to enable processing."}><PlayCircle size={15} />Enable</button>}</div></div>
     {confirmAction && <ConnectionConfirmation
       action={confirmAction}

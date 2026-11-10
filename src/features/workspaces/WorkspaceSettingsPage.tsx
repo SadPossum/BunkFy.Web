@@ -222,14 +222,14 @@ export function WorkspaceSettingsPage() {
     {
       value: "members" as const,
       label: "Members",
-      description: "Governance and access",
+      description: "People and access",
       icon: UsersRound,
       visible: capabilities.canReadMembers,
     },
     {
       value: "roles" as const,
       label: "Access roles",
-      description: "Reusable permission sets",
+      description: "What each role can do",
       icon: ShieldCheck,
       visible: capabilities.canReadRoles,
     },
@@ -243,7 +243,7 @@ export function WorkspaceSettingsPage() {
     {
       value: "retention" as const,
       label: "Data retention",
-      description: "Workspace governance",
+      description: "Automatic cleanup",
       icon: DatabaseZap,
       visible: capabilities.canReadRetention,
     },
@@ -254,7 +254,7 @@ export function WorkspaceSettingsPage() {
       <PageHeader
         eyebrow="Workspace settings"
         title={workspace.name}
-        description="Manage workspace identity, governance membership, operational access, joining, and data retention."
+        description="Manage your workspace details, team access, invitations and data retention."
         action={(
           <span className={`badge h-8 gap-2 border-0 px-3 font-semibold text-white ${owner && workspaceAuthorityCurrent ? "bg-primary" : owner ? "bg-warning-content" : "bg-neutral"}`}>
             <ShieldCheck size={15} />
@@ -477,8 +477,8 @@ function GeneralSettings({
         <div className="mt-5 flex items-start gap-3 rounded-lg bg-base-200/70 p-4 text-sm text-base-content/60">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" />
           {owner
-            ? "Refresh the workspace list before changing workspace identity."
-            : "Workspace identity can only be changed by the owner."}
+            ? "Refresh workspace details before saving changes."
+            : "Only a workspace owner can change these details."}
         </div>
       )}
       {update.error && <SettingsError error={update.error} />}
