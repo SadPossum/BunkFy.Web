@@ -59,6 +59,33 @@ describe("shared recovery-state contract", () => {
     });
   });
 
+  it.each([
+    ["Organizations.SubjectVerificationRequired", 403, "Verify your email in Account & security"],
+    ["Workspaces.VerifiedIdentityRequired", 403, "Verify your email in Account & security"],
+    ["Organizations.SelfServiceCreationDisabled", 403, "New workspaces can't be created here"],
+    ["Organizations.CreationRejected", 403, "This account can't create a workspace"],
+    ["Organizations.OwnerRequired", 403, "Only a workspace owner"],
+    ["Organizations.SlugConflict", 409, "That short name is already in use"],
+    ["Organizations.CreationOperationConflict", 409, "This setup attempt can no longer be continued"],
+    ["Organizations.CreationAdmissionUnavailable", 503, "Workspace setup is temporarily unavailable"],
+    ["Security.InsufficientAuthentication", 401, "Confirm your identity with a recent sign-in"],
+    ["Security.InsufficientAuthentication", 403, "Confirm your identity with a recent sign-in"],
+  ] as const)("explains %s at HTTP %s before applying a generic status message", (code, status, message) => {
+    const error = new ApiError("Internal server detail", status, code, undefined, "trace-1234");
+    expect(presentError(error, "Setup couldn't finish")).toMatchObject({
+      title: "Setup couldn't finish", referenceId: "trace-1234",
+    });
+    expect(presentError(error).message).toContain(message);
+    expect(presentError(error).message).not.toContain("Internal server detail");
+  });
+
+  it("does not expose raw server errors or claim a failed write could not have saved", () => {
+    const result = presentError(new ApiError("Database constraint SQL error", 500));
+    expect(result.kind).toBe("temporary");
+    expect(result.message).not.toContain("SQL");
+    expect(result.message).toContain("check whether they were saved before retrying");
+  });
+
   it("preserves a safe request reference for support without leaking malformed values", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       title: "Http.ServiceUnavailable",

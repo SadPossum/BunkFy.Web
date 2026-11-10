@@ -200,7 +200,7 @@ export function ErrorState({ error, retry, title }: { error: unknown; retry?: ()
         <p className="mt-0.5 text-sm leading-5 opacity-80">{presentation.message}</p>
         {presentation.referenceId && (
           <p className="mt-2 break-all text-xs opacity-65">
-            Reference <code>{presentation.referenceId}</code>
+            Support reference <code>{presentation.referenceId}</code>
           </p>
         )}
       </div>

@@ -253,7 +253,7 @@ describe("REC003 primary reservation recovery", () => {
     const page = await open(320, "?detail&read-status=403");
     try {
       await page.getByText("Reservation access denied", { exact: true }).waitFor();
-      expect(await page.getByText("Your current workspace role does not allow this action.", { exact: true }).count()).toBe(1);
+      expect(await page.getByText("You don't have permission to do this. Ask a workspace owner or contact support.", { exact: true }).count()).toBe(1);
       expect(await page.getByText("Reservation could not be opened", { exact: true }).count()).toBe(0);
       expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(1);
       await page.getByRole("button", { name: "Booking details history", exact: true }).click();

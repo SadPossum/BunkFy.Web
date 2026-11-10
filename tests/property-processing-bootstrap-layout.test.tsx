@@ -220,7 +220,7 @@ describe.each(variants)("property processing $width embedded=$embedded", ({ widt
     const page = await open(width, embedded, "status=403&viewer");
     try {
       await page.getByText("Data-processing access denied", { exact: true }).waitFor();
-      expect(await page.getByText("Your current workspace role does not allow this action.", { exact: true }).count()).toBe(1);
+      expect(await page.getByText("You don't have permission to do this. Ask a workspace owner or contact support.", { exact: true }).count()).toBe(1);
       expect(await page.getByRole("button", { name: "Try again", exact: true }).count()).toBe(0);
       expect(await count(page, "/country-policies")).toBe(0);
       await noWritesOrOverflow(page);

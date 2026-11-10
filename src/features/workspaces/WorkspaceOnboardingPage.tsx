@@ -228,25 +228,25 @@ function WorkspaceOnboardingForm() {
           <section>
             <p className="text-xs font-bold uppercase text-primary">Workspace setup</p>
             <h1 className="mt-3 font-display text-4xl font-semibold sm:text-5xl">
-              Set up your operating workspace
+              Create your workspace
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-base-content/60">
-              A workspace owns the properties, staff access, reservations, and integrations for one operating team.
+              Manage your properties, staff and reservations in one place. Start by naming your workspace, then add your staff details.
             </p>
             <ol className="mt-8 max-w-md space-y-3" aria-label="Workspace setup progress">
               <SetupStep
                 active={step === "workspace"}
                 complete={step === "profile"}
                 icon={<Building2 size={17} />}
-                title="Workspace identity"
-                description="Name the operating team and create its secure boundary."
+                title="Name your workspace"
+                description="Choose a name your team will recognize."
               />
               <SetupStep
                 active={step === "profile"}
                 complete={false}
                 icon={<UserRound size={17} />}
                 title="Your staff profile"
-                description="Add the details your team will use in daily operations."
+                description="Tell your team what to call you and how to reach you."
               />
             </ol>
             <button
@@ -258,9 +258,9 @@ function WorkspaceOnboardingForm() {
             </button>
           </section>
 
-          {recoveryState === "restoring" && <div className="alert alert-info mb-5 text-sm">Checking for an interrupted workspace setup…</div>}
-          {recoveryState === "created" && <div className="alert alert-info mb-5 text-sm">This workspace was already created. Continue its setup to finish your staff profile.</div>}
-          {recoveryState === "pending" && <div className="alert alert-warning mb-5 text-sm">An interrupted create attempt is ready to retry. Re-enter the same workspace details to reuse it safely.</div>}
+          {recoveryState === "restoring" && <div className="alert alert-info mb-5 text-sm">Checking whether your workspace was already created…</div>}
+          {recoveryState === "created" && <div className="alert alert-info mb-5 text-sm">Your workspace was created. Continue to finish setup.</div>}
+          {recoveryState === "pending" && <div className="alert alert-warning mb-5 text-sm">Your previous setup wasn't finished. Enter the same workspace details and try again to continue.</div>}
           {Boolean(recoveryError) && <div className="mb-5"><ErrorState error={recoveryError} title="Workspace setup could not be checked" /></div>}
           {step === "workspace" ? (
             <form className="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6" onSubmit={submit}>
@@ -290,7 +290,7 @@ function WorkspaceOnboardingForm() {
                 />
               </label>
               <label className="mt-4 block">
-                <span className="mb-1.5 block text-sm font-semibold">Workspace handle</span>
+                <span className="mb-1.5 block text-sm font-semibold">Workspace short name</span>
                 <input
                   className="input input-bordered w-full"
                   value={slug}
@@ -302,19 +302,21 @@ function WorkspaceOnboardingForm() {
                   placeholder="harbor-house"
                   required
                   maxLength={80}
+                  aria-describedby="workspace-short-name-help"
                   disabled={workspaceSetup.isPending || createdWorkspaceId !== null}
                 />
+                <span id="workspace-short-name-help" className="mt-1.5 block text-sm text-base-content/60">A unique short name for your workspace. Use lowercase letters, numbers and hyphens.</span>
               </label>
               {createdWorkspaceId && workspaceSetup.isError && (
                 <div className="alert alert-warning mt-5 py-3 text-sm">
                   <div>
                     <p className="font-semibold">The workspace was created.</p>
-                    <p className="mt-1">Its access setup is still finishing. Retry without creating a duplicate workspace.</p>
+                    <p className="mt-1">Setup hasn't finished yet. Choose Continue setup to try again.</p>
                   </div>
                 </div>
               )}
               {workspaceSetup.error && (
-                <div className="mt-5"><ErrorState error={workspaceSetup.error} title={createdWorkspaceId ? "Workspace access setup is still pending" : "Workspace could not be created"} /></div>
+                <div className="mt-5"><ErrorState error={workspaceSetup.error} title={createdWorkspaceId ? "Workspace setup isn't finished yet" : "Workspace could not be created"} /></div>
               )}
               <button className="btn btn-primary mt-6 w-full text-white" disabled={isOffline || workspaceSetup.isPending || recoveryState === "restoring"} title={isOffline ? "Reconnect before creating a workspace." : undefined}>
                 {workspaceSetup.isPending && <span className="loading loading-spinner loading-sm" />}

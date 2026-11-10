@@ -1,8 +1,8 @@
-import { ApiError } from "../../api/client";
 import type { OrganizationMembershipSummary } from "../../api/types";
 import { completeCurrentStaffProfile, type StaffProfileDraft } from "./staffOnboarding";
 import { waitForWorkspaceAccess } from "./workspaceAccess";
 import type { WorkspaceCreationAttempt } from "./workspaceCreationAttempt";
+import { loadAllWorkspaces } from "./workspacesApi";
 
 type ApiRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -23,30 +23,18 @@ export type WorkspaceOnboardingContinuationServices = {
 
 /**
  * The create operation id is also the organization id. A persisted attempt can
- * therefore reconcile an acknowledged create after a same-tab page reload,
- * without storing the workspace name or slug in browser storage.
+ * therefore reconcile an acknowledged create after a same-tab page reload.
+ * Use the account's membership catalogue: looking up a not-yet-created ID
+ * directly is forbidden because the account has no membership in it yet.
  */
 export async function recoverCreatedWorkspace(
   request: ApiRequest,
   attempt: WorkspaceCreationAttempt,
 ): Promise<OrganizationMembershipSummary | null> {
-  try {
-    const workspace = await request<OrganizationMembershipSummary>(
-      `/api/organizations/${encodeURIComponent(attempt.operationId)}`,
-    );
-    if (
-      workspace.organization.organizationId.toLowerCase() !==
-      attempt.operationId.toLowerCase()
-    ) {
-      throw new Error(
-        "The recovered workspace did not match the pending creation attempt.",
-      );
-    }
-    return workspace;
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
+  const workspaces = await loadAllWorkspaces(request);
+  return workspaces.find(workspace =>
+    workspace.organization.organizationId.toLowerCase() === attempt.operationId.toLowerCase(),
+  ) ?? null;
 }
 
 /**
