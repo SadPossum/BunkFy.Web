@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, Cable, ChevronRight, ClipboardCheck, Plus, Radio, ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeKey, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
 import type { AdapterConnectionCreateRequest, AdapterConnectionListItem, AdapterConnectionListResponse, AdapterConnectionMutationReceipt, AdapterTypeCapability, AdapterTypeCapabilityListResponse } from "../../api/types";
@@ -37,6 +37,8 @@ import {
   type ConnectionStatusFilter,
 } from "./integrationViewState";
 import { ProposalQueue } from "./ProposalQueue";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
+import { connectorDescription, connectorLabel, isDevelopmentConnector } from "./connectorPresentation";
 
 const PAGE_SIZE = 30;
 
@@ -106,7 +108,7 @@ export function IntegrationsPage() {
     <>
       <PageHeader {...pageHeaderProps} />
       <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
-        <EmptyState icon={<Cable />} title="Choose a property first" description="Integration connections are configured for one property at a time." />
+        <PropertyRequiredState />
       </section>
     </>
   );
@@ -316,7 +318,7 @@ function ConnectionRow({ connection, onOpen }: { connection: AdapterConnectionLi
       <span className="min-w-0 flex-1 sm:grid sm:grid-cols-[minmax(0,1.15fr)_minmax(10rem,.85fr)_minmax(11rem,1fr)] sm:items-center sm:gap-5">
         <span className="block min-w-0">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-semibold">{connection.adapterType}</span>
+            <span className="truncate font-semibold">{connectorLabel(connection.adapterType)}</span>
             <span className="sm:hidden"><StatusBadge status={adapterConnectionStatusLabel(connection.status)} /></span>
           </span>
           <span className="mt-1 block truncate text-xs text-base-content/45">
@@ -340,8 +342,10 @@ function ConnectionRow({ connection, onOpen }: { connection: AdapterConnectionLi
 
 function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSource, onClose, onCreated }: { open: boolean; propertyId: string; adapterTypes: AdapterTypeCapability[]; adapterTypeSource: CompositeSource; onClose: () => void; onCreated: (connection: AdapterConnectionMutationReceipt) => Promise<void> }) {
   const { request } = useSession();
+  const [showDevelopment, setShowDevelopment] = useState(false);
+  const availableTypes = useMemo(() => adapterTypes.filter(item => showDevelopment || !isDevelopmentConnector(item.adapterType)), [adapterTypes, showDevelopment]);
   const [adapterType, setAdapterType] = useState(
-    adapterTypes[0]?.adapterType ?? "",
+    adapterTypes.find(item => !isDevelopmentConnector(item.adapterType))?.adapterType ?? "",
   );
   const [executionMode, setExecutionMode] = useState<
     "polling" | "continuous" | "push" | "remotePolling"
@@ -351,7 +355,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
   >("suggestionsOnly");
   const attempt = useRef<ConnectionCreateAttempt | null>(null);
   const wasOpen = useRef(false);
-  const capability = adapterTypes.find(
+  const capability = availableTypes.find(
     (item) => item.adapterType === adapterType,
   );
   const modes = capability?.executionModes
@@ -385,11 +389,11 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
       return;
     }
 
-    const selectedAdapterExists = adapterTypes.some(
+    const selectedAdapterExists = availableTypes.some(
       (item) => item.adapterType === adapterType,
     );
     if (!wasOpen.current || !selectedAdapterExists) {
-      const first = adapterTypes[0];
+      const first = availableTypes[0];
       setAdapterType(first?.adapterType ?? "");
       const firstMode = first?.executionModes
         .map(adapterExecutionModeKey)
@@ -401,7 +405,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
       }
     }
     wasOpen.current = true;
-  }, [adapterType, adapterTypes, open]);
+  }, [adapterType, availableTypes, open]);
 
   useEffect(() => {
     if (modes.length && !modes.includes(executionMode)) {
@@ -411,6 +415,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
 
   function close() {
     if (mutation.isPending) return;
+    setShowDevelopment(false);
     attempt.current = null;
     mutation.reset();
     onClose();
@@ -418,7 +423,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!compositeSourceCurrent(adapterTypeSource)) return;
+    if (!compositeSourceCurrent(adapterTypeSource) || !capability || !modes.includes(executionMode)) return;
     const data = new FormData(event.currentTarget);
     const payload: ConnectionCreatePayload = {
       propertyId,
@@ -444,9 +449,17 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
     <Modal
       open={open}
       title="New integration connection"
-      description="Choose a registered adapter and how it should exchange observations with BunkFy."
+      description="Choose your booking source, then enter the setup references supplied by your administrator."
       onClose={close}
     >
+      {compositeSourceCurrent(adapterTypeSource) && adapterTypes.some(item => isDevelopmentConnector(item.adapterType)) && (
+        <details className="mb-4 rounded-lg border border-base-300 p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Developer tools</summary>
+          <label className="mt-3 flex items-center gap-2"><input type="checkbox" className="checkbox checkbox-sm"
+            checked={showDevelopment} disabled={mutation.isPending} onChange={event => setShowDevelopment(event.target.checked)} />Show test connectors</label>
+          <p className="mt-2 text-xs text-base-content/60">Test connectors are for development, rather than live booking sources.</p>
+        </details>
+      )}
       {!compositeSourceCurrent(adapterTypeSource) ? (
         <div>
           {adapterTypeSource.state === "loading" || (adapterTypeSource.state === "ready" && adapterTypeSource.isFetching) ? (
@@ -466,23 +479,29 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
             <button type="button" className="btn btn-ghost" onClick={close}>Close</button>
           </div>
         </div>
-      ) : adapterTypes.length ? (
+      ) : availableTypes.length ? (
         <form className="space-y-4" onSubmit={submit}>
+          <div className="rounded-lg border border-info/25 bg-info/5 p-4 text-sm">
+            <p className="font-semibold">Administrator setup is required</p>
+            <p className="mt-1 leading-6">Ask your administrator to prepare this booking source and provide its configuration reference and, if needed, a credential reference. Enter those references below to link the prepared source to this property.</p>
+            <p className="mt-2 text-xs text-base-content/60">References identify prepared settings. Do not enter mailbox passwords or API keys in these fields.</p>
+          </div>
           <label className="form-control block">
             <span className="label-text mb-1.5 block text-sm font-semibold">
-              Adapter type
+              Booking source
             </span>
             <SelectPicker
               className="w-full"
               value={adapterType}
               onValueChange={setAdapterType}
-              ariaLabel="Adapter type"
-              options={adapterTypes.map((adapter) => ({
+              ariaLabel="Booking source"
+              options={availableTypes.map((adapter) => ({
                 value: adapter.adapterType,
-                label: adapter.adapterType,
+                label: connectorLabel(adapter.adapterType),
               }))}
             />
           </label>
+          <p className="text-sm text-base-content/65">{connectorDescription(adapterType)}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="form-control block">
               <span className="label-text mb-1.5 block text-sm font-semibold">
@@ -540,12 +559,12 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
           <TextField
             label="Configuration reference"
             name="configurationReference"
-            placeholder="config://booking-provider/property-a"
+            placeholder="Paste the configuration reference from your administrator"
           />
           <TextField
-            label="Secret reference (optional)"
+            label="Credential reference (optional)"
             name="secretReference"
-            placeholder="secret://booking-provider/property-a"
+            placeholder="Paste a credential reference if one was supplied"
             required={false}
           />
           {mutation.error && <ErrorState error={mutation.error} />}
@@ -560,8 +579,8 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
         <div>
           <EmptyState
             icon={<Cable />}
-            title="No adapter types registered"
-            description="Install or register an adapter capability before creating a connection."
+            title="No booking sources are available"
+            description="Ask your administrator to enable a supported booking source for this deployment."
           />
           <div className="mt-4 flex justify-end">
             <button className="btn btn-ghost" onClick={close}>Close</button>

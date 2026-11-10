@@ -3,6 +3,7 @@ import type { AuthenticationSession } from "../../api/types";
 import type { CompositeSourceState } from "../../app/compositeSourceState";
 import { CompositeSourceFallback } from "../../components/ui/CompositeSourceNotice";
 import { ErrorState, StatusBadge } from "../../components/ui/primitives";
+import { sessionActivityDate, sessionDeviceLabel } from "./sessionPresentation";
 
 type AccountSessionsPanelProps = {
   sessions: AuthenticationSession[];
@@ -43,6 +44,9 @@ export function AccountSessionsPanel({
           <p className="mt-1 text-sm leading-6 text-base-content/55">
             Review every browser session and revoke access you no longer recognize or use.
           </p>
+          <p className="mt-2 text-xs leading-5 text-base-content/50">
+            Browser details are reported by the browser. Activity updates when a session starts or refreshes.
+          </p>
         </div>
       </div>
 
@@ -55,11 +59,16 @@ export function AccountSessionsPanel({
             <div key={item.sessionId} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold">{authenticationMethodLabel(item.authenticationMethod)}</p>
+                  <p className="text-sm font-semibold">{sessionDeviceLabel(item.userAgent)}</p>
                   {item.isCurrent && <StatusBadge status="This browser" />}
                 </div>
                 <p className="mt-1 break-words text-xs leading-5 text-base-content/50">
-                  Signed in {formatDateTime(item.loginDateTimeUtc)} · active until {new Date(item.refreshTokenExpiresAtUtc).toLocaleDateString()}
+                  {authenticationMethodLabel(item.authenticationMethod)} · signed in {formatDateTime(item.loginDateTimeUtc)}
+                </p>
+                <p className="mt-1 break-words text-xs leading-5 text-base-content/50">
+                  {sessionActivityDate(item.lastActivityAtUtc)
+                    ? `Last active ${formatDateTime(item.lastActivityAtUtc!)}` : "Activity time not recorded"}
+                  {` · session expires ${new Date(item.refreshTokenExpiresAtUtc).toLocaleDateString()}`}
                 </p>
               </div>
               {!item.isCurrent && (

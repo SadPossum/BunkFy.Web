@@ -13195,6 +13195,9 @@ export interface components {
             /** Format: date-time */
             absoluteExpiresAtUtc: string;
             isCurrent: boolean;
+            userAgent: string | null;
+            /** Format: date-time */
+            lastActivityAtUtc: string | null;
         };
         AuthenticationSessionsResponse: {
             sessions: components["schemas"]["AuthenticationSessionResponse"][] | null;

@@ -42,6 +42,7 @@ import { useCalendarSegments } from "./useCalendarSegments";
 import { useOperationalPreview } from "../operational-preview/OperationalPreviewProvider";
 import { CalendarWeekView } from "./CalendarWeekView";
 import { CalendarBookingRange } from "./CalendarBookingRange";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
 import { calendarBookingHref, parseCalendarBookingFocus, reservationRoomsMatchProperty, type CalendarBookingContext } from "./calendarBookingRoute";
 import type { CalendarResource } from "./calendarSchedule";
 
@@ -201,13 +202,7 @@ export function CalendarPage() {
     description="Choose an accessible property to open Calendar. No other property's schedule is shown for this link." />;
   if (selectedProperty && !target.bound) return <LoadingState label="Opening the requested property" />;
   if (!selectedProperty) {
-    return (
-      <EmptyState
-        icon={<CalendarDays />}
-        title="Choose a property first"
-        description="The calendar shows the operating schedule for one property at a time."
-      />
-    );
+    return <PropertyRequiredState />;
   }
 
   if (access.error) {

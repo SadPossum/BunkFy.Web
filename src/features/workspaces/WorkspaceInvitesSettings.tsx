@@ -158,7 +158,7 @@ export function WorkspaceInvitesSettings({
           <div>
             <h2 className="font-display text-xl font-semibold">Joining people</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-base-content/55">
-              Issue constrained access, manage link lifecycle, and review team requests.
+              Invite your team, manage shared links and review requests to join.
             </p>
           </div>
         </div>
@@ -412,7 +412,7 @@ function JoinSourceCreation({
           <div>
             <MailPlus className="text-primary" size={22} />
             <h2 className="mt-3 font-display text-xl font-semibold">Invite one person</h2>
-            <p className="mt-2 text-sm leading-6 text-base-content/50">Create a recipient-aware single-use link with its role already constrained.</p>
+            <p className="mt-2 text-sm leading-6 text-base-content/50">Invite one person and choose which role and properties they can access.</p>
           </div>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold">Recipient email (optional)</span>
@@ -458,7 +458,7 @@ function JoinSourceCreation({
           <div>
             <QrCode className="text-primary" size={22} />
             <h2 className="mt-3 font-display text-xl font-semibold">Create a team QR</h2>
-            <p className="mt-2 text-sm leading-6 text-base-content/50">Reusable enrollment is limited to built-in low-privilege roles.</p>
+            <p className="mt-2 text-sm leading-6 text-base-content/50">Shared links support standard team roles. Grant manager or owner access separately.</p>
           </div>
           <AccessProfilePicker
             profiles={reusableProfiles}

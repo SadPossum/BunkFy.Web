@@ -72,6 +72,7 @@ import {
 } from "./guestProfilePresentation";
 import { NationalityPicker } from "./NationalityPicker";
 import { LanguagePicker } from "./LanguagePicker";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
 import { guestLanguagePayload, guestLanguageSelection } from "./guestLanguageSelection";
 
 const PAGE_SIZE = 30;
@@ -475,7 +476,7 @@ export function GuestsPage() {
   }
 
   if (!selectedProperty) {
-    return <EmptyState icon={<UsersRound />} title="Choose a property first" description="Guest records are visible through the property where staff work with them." />;
+    return <PropertyRequiredState />;
   }
 
   return (

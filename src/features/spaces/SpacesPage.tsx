@@ -38,6 +38,7 @@ import {
 import { useSession } from "../../app/session";
 import { sessionIdentityKey } from "../../app/singleFlightRefresh";
 import { useWorkspace } from "../../app/workspace";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
 import {
   Modal,
   EmptyState,
@@ -658,11 +659,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
   if (!targetPropertyId && !hasRequestedProperty) {
     return workspace.propertiesLoading
       ? <LoadingState label="Loading property context" />
-      : <EmptyState
-          icon={<Building2 />}
-          title="Choose a property first"
-          description="Spaces are shown within one property. Select a property from the application menu to continue."
-        />;
+      : <PropertyRequiredState />;
   }
 
   if (!propertyCatalogueUsable) {
@@ -727,7 +724,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
           <EmptyState
             icon={<ShieldCheck />}
             title="Spaces access is not assigned"
-            description="The Spaces workspace requires current property context. Inventory-only discovery needs a minimized backend property-context source and is not inferred from old browser state."
+            description="You don't have access to this property's rooms and beds. Ask a workspace owner to update your access."
           />
         </section>
       </>
@@ -841,7 +838,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
         actionsDisabled={Boolean(topologyEditor.target || salesEditor.target || retirementEditor.target || blockEditor.editor)} />}
     </div>
     <div ref={retryFocus.layoutNotice} className="contents" onClickCapture={retryFocus.remember}><CompositeSourceNotice className="mb-4 flex" sources={layoutNoticeSources} title="Some Spaces information is delayed" keepRetryFocusable /></div>
-    {holdsOpen && (mayReadInventory ? holds : <EmptyState icon={<ShieldCheck />} title="Hold history access is not assigned" description="Reading all holds requires inventory access. No empty history is inferred; return to the permitted room workspace." />)}
+    {holdsOpen && (mayReadInventory ? holds : <EmptyState icon={<ShieldCheck />} title="You can't view hold history" description="Ask a workspace owner for inventory access. You can return to the rooms and beds you have access to." />)}
     <section ref={retryFocus.surface} hidden={focusedSurfaceOpen} data-topology-region data-sales-region className="spaces-room-frame overflow-clip rounded-lg border border-base-300 bg-base-100" aria-labelledby="spaces-layout-heading">
       <TopologyMutationNotice notice={topologyEditor.notice} /><SalesModeNotice notice={salesEditor.notice} />
       <h2 id="spaces-layout-heading" className="sr-only focus:not-sr-only focus:px-4 focus:py-2">Rooms &amp; beds</h2>

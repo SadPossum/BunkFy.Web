@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import type {
   RoomInventory,
 } from "../../api/types";
@@ -55,6 +55,7 @@ import { useSalesModeEditor } from "./useSalesModeEditor";
 import { ManualBlockGroupDirectory } from "./ManualBlockGroupDirectory";
 import { sessionIdentityKey } from "../../app/singleFlightRefresh";
 import { OwnerOriginLink } from "../spaces/OwnerOriginLink";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
 
 export function InventoryPage() {
   const { request, session } = useSession();
@@ -81,6 +82,8 @@ export function InventoryPage() {
     { permission: permissions.reservationsRead, scope: accessScope },
     { permission: permissions.inventoryBlocksManage, scope: accessScope },
     { permission: permissions.inventoryBlockGroupsManage, scope: accessScope },
+    { permission: permissions.propertiesRead, scope: accessScope },
+    { permission: permissions.roomsManage, scope: accessScope },
   ] : []);
   const mayRead = access.allows(permissions.inventoryRead, accessScope);
   const canConfigure = access.allows(permissions.inventoryConfigure, accessScope);
@@ -258,7 +261,7 @@ export function InventoryPage() {
   if (!selectedProperty) {
     return (
       <InventoryPageFrame>
-        <EmptyState icon={<DoorOpen />} title="Choose a property first" description="Inventory is managed within a property. Create or select one to continue." />
+        <PropertyRequiredState />
       </InventoryPageFrame>
     );
   }
@@ -334,6 +337,10 @@ export function InventoryPage() {
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_1fr]">
         <SalesSetupSection
           rooms={rooms}
+          propertyId={selectedPropertyId}
+          canSetUpRooms={permissionsCurrent && propertyCurrent
+            && access.allows(permissions.propertiesRead, accessScope)
+            && access.allows(permissions.roomsManage, accessScope)}
           state={inventorySource.state}
           focusedRoomId={focusedRoomId}
           canConfigure={canConfigure}
@@ -441,6 +448,8 @@ function AvailabilitySection({
 
 function SalesSetupSection({
   rooms,
+  propertyId,
+  canSetUpRooms,
   state,
   focusedRoomId,
   canConfigure,
@@ -453,6 +462,8 @@ function SalesSetupSection({
   onRefresh,
 }: {
   rooms: RoomInventory[];
+  propertyId: string;
+  canSetUpRooms: boolean;
   state: CompositeSourceState;
   focusedRoomId: string | null;
   canConfigure: boolean;
@@ -475,7 +486,9 @@ function SalesSetupSection({
         <CompositeSourceFallback state={state} label="sales setup" />
       ) : rooms.length === 0 ? (
         <div className="p-3 sm:p-4">
-          <EmptyState icon={<DoorOpen />} title="No rooms available" description="Set up rooms and beds in Properties before configuring inventory." />
+          <EmptyState icon={<DoorOpen />} title="No rooms available"
+            description={canSetUpRooms ? "Add rooms and beds in Spaces before setting up how they are sold." : "Ask a property manager to add rooms and beds in Spaces."}
+            action={canSetUpRooms ? <Link className="btn btn-primary" to={`/spaces?${new URLSearchParams({ property: propertyId, section: "layout" })}`}>Set up rooms in Spaces</Link> : undefined} />
         </div>
       ) : (
         <div className="divide-y divide-base-300">

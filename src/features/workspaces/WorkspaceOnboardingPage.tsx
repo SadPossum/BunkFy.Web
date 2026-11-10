@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { ArrowRight, Building2, Check, Link2, LogOut, UserRound } from "lucide-react";
+import { ArrowRight, Building2, Check, LogOut, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import type { OrganizationMembershipSummary } from "../../api/types";
@@ -249,13 +249,6 @@ function WorkspaceOnboardingForm() {
                 description="Tell your team what to call you and how to reach you."
               />
             </ol>
-            <button
-              className="btn btn-ghost mt-8 px-0 text-primary"
-              onClick={() => navigate("/join")}
-            >
-              <Link2 size={18} />
-              Join with an invite link
-            </button>
           </section>
 
           {recoveryState === "restoring" && <div className="alert alert-info mb-5 text-sm">Checking whether your workspace was already created…</div>}

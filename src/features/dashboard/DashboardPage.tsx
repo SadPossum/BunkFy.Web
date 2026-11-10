@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Building2, LayoutDashboard, Map, Plus, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Map, Plus, ShieldCheck } from "lucide-react";
 import { useLayoutEffect, useRef, type MouseEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import type {
@@ -19,6 +19,7 @@ import {
 import { permissions, propertyAccessScope, usePermissions } from "../../app/permissions";
 import { useSession } from "../../app/session";
 import { useWorkspace } from "../../app/workspace";
+import { PropertyRequiredState } from "../properties/PropertyRequiredState";
 import { useTargetProperty } from "../../app/resourceFocus";
 import { CompositeSourceNotice } from "../../components/ui/CompositeSourceNotice";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
@@ -211,14 +212,7 @@ export function DashboardPage() {
   if (!requestedPropertyExists) return <EmptyState icon={<ShieldCheck />} title="This property is not available" description="Choose an accessible property to open Today. No other property's details are shown for this link." />;
   if (!propertyBound) return <LoadingState label="Opening the requested property" />;
   if (!selectedProperty) {
-    return (
-      <EmptyState
-        icon={<Building2 />}
-        title="Start with your first property"
-        description="Add a hostel property, then set up rooms, beds, inventory, and reservations."
-        action={<Link className="btn btn-primary" to="/properties"><Plus size={17} />Add property</Link>}
-      />
-    );
+    return <PropertyRequiredState />;
   }
   if (access.error) return <ErrorState error={access.error} retry={() => void access.refetch()} title="Today access could not be checked" />;
   if (!access.hasData) {

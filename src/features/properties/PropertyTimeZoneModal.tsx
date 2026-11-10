@@ -100,11 +100,11 @@ export function PropertyTimeZoneModal({
           <CompositeSourceNotice
             className=""
             sources={[catalog.source]}
-            title="The canonical time-zone catalogue is delayed"
+            title="The time-zone list could not be refreshed"
           />
           <p className="text-sm leading-5 text-base-content/65">
                   {property.timeZoneStatus === "alias"
-                    ? "Canonicalizing this alias keeps the same local-time rules."
+                    ? "Updating this time-zone name keeps the same local-time rules."
                     : "Reservation times, reminders, and operational deadlines depend on this setting."}
           </p>
 
@@ -146,14 +146,14 @@ export function PropertyTimeZoneModal({
           ) : null}
 
           {!authorityCurrent && !pending && !conflict && (
-            <p className="text-sm text-warning-content">Refresh property access, current property data, and the canonical catalogue before changing the time zone.</p>
+            <p className="text-sm text-warning-content">Refresh the property and time-zone list before making this change.</p>
           )}
           {error != null && !conflict && <ErrorState error={error} title="Couldn't change the time zone" />}
           <FormActions
             submitting={pending}
             cancelDisabled={pending}
             disabled={!canSubmit}
-            submitLabel={changed && !requiresConfirmation ? "Use canonical time zone" : "Change time zone"}
+            submitLabel={changed && !requiresConfirmation ? "Update time-zone name" : "Change time zone"}
             onCancel={onClose}
           />
         </form>
