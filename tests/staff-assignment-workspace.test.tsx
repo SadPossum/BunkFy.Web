@@ -596,7 +596,8 @@ describe("staff local work-location workspace", () => {
       await endAtHarbour(page);
       await page.evaluate(() => { (window as unknown as { saveStatus: number }).saveStatus = 503; });
       const save = page.getByRole("button", { name: "End assignment", exact: true });
-      await activate(page, save); await page.getByText("Synthetic assignment failure").waitFor();
+      await activate(page, save); await page.getByRole("alert").filter({ hasText: "BunkFy couldn't complete this request." }).waitFor();
+      expect(await page.getByText("Synthetic assignment failure", { exact: true }).count()).toBe(0);
       await activate(page, save); await page.waitForFunction(() => (window as unknown as { writes: unknown[] }).writes.length === 2);
       await page.getByRole("textbox", { name: "Reason", exact: true }).fill("Different agreed rotation");
       await activate(page, save); await page.waitForFunction(() => (window as unknown as { writes: unknown[] }).writes.length === 3);
