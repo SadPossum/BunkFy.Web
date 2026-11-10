@@ -26,6 +26,16 @@ export type ErrorPresentation = {
 
 const domainMessages: Readonly<Record<string, string>> = {
   "Organizations.MembershipConflict": "You already belong to this workspace.",
+  "Organizations.MembershipRequired": "You don't have access to this workspace. Ask its owner to invite you.",
+  "Organizations.OwnerRequired": "Only a workspace owner can do this. Ask an owner for help.",
+  "Organizations.SubjectVerificationRequired": "Verify your email in Account & security, then try creating your workspace again.",
+  "Organizations.RecipientVerificationRequired": "Verify the email address this invitation was sent to, then open the invitation again.",
+  "Organizations.SelfServiceCreationDisabled": "New workspaces can't be created here right now. Ask the administrator for an invitation.",
+  "Organizations.CreationRejected": "This account can't create a workspace. Contact support or join an existing workspace with an invitation.",
+  "Organizations.CreationAdmissionUnavailable": "Workspace setup is temporarily unavailable. Try again in a few minutes.",
+  "Organizations.SlugConflict": "That short name is already in use. Choose another one.",
+  "Organizations.CreationOperationConflict": "This setup attempt can no longer be continued. Contact support before starting another workspace.",
+  "Workspaces.VerifiedIdentityRequired": "Verify your email in Account & security, then continue workspace setup.",
   "Properties.ConfirmationRequired": "Confirm the change before continuing.",
   "Properties.PropertyProcessingNotEnabled": "Data processing is not enabled for this property.",
   "Properties.CountryPolicy.PolicyExpired": "This country policy has expired. Choose another configured policy.",
@@ -83,7 +93,7 @@ export function presentError(
       return {
         kind: "session",
         title: titleOverride ?? "Session needs attention",
-        message: "BunkFy could not confirm this browser session. Reconnect or sign in again.",
+        message: domainMessage ?? "BunkFy could not confirm this browser session. Reconnect or sign in again.",
         ...common,
       };
     }
@@ -91,7 +101,7 @@ export function presentError(
       return {
         kind: "access",
         title: titleOverride ?? "Access denied",
-        message: "Your current workspace role does not allow this action.",
+        message: domainMessage ?? "You don't have permission to do this. Ask a workspace owner or contact support.",
         ...common,
       };
     }
@@ -115,7 +125,7 @@ export function presentError(
       return {
         kind: "temporary",
         title: titleOverride ?? "Service temporarily unavailable",
-        message: friendlyMessage(error.message, "BunkFy could not load this information right now. Your existing workspace state has not been replaced."),
+        message: domainMessage ?? "BunkFy couldn't complete this request. Try again shortly. If you were saving changes, check whether they were saved before retrying.",
         ...common,
       };
     }

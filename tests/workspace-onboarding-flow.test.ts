@@ -24,7 +24,7 @@ const staffProfile = {
 };
 
 describe("workspace onboarding recovery", () => {
-  it("keeps a pre-send marker when reload reconciliation returns 404", async () => {
+  it("keeps a pre-send marker when the account's catalogue has no created workspace", async () => {
     const memory = storage();
     const attempt = await resolveWorkspaceCreationAttempt(
       null,
@@ -33,8 +33,10 @@ describe("workspace onboarding recovery", () => {
       { storage: memory, createOperationId: () => operationId },
     );
     const request = async <T,>(path: string): Promise<T> => {
-      expect(path).toBe(`/api/organizations/${operationId}`);
-      throw new ApiError("Not found", 404);
+      // The real API forbids direct lookup before membership exists.
+      if (path === `/api/organizations/${operationId}`) throw new ApiError("Forbidden", 403);
+      expect(path).toBe("/api/organizations?page=1&pageSize=100");
+      return { items: [], hasMore: false } as T;
     };
 
     await expect(recoverCreatedWorkspace(request, attempt)).resolves.toBeNull();
@@ -50,7 +52,7 @@ describe("workspace onboarding recovery", () => {
     expect(afterReload.operationId).toBe(operationId);
   });
 
-  it("restores the created organization from its durable operation id", async () => {
+  it("restores the created organization from the account's catalogue using its durable operation id", async () => {
     const memory = storage();
     const attempt = await resolveWorkspaceCreationAttempt(
       null,
@@ -60,8 +62,8 @@ describe("workspace onboarding recovery", () => {
     );
     const restored = workspace(operationId);
     const request = async <T,>(path: string): Promise<T> => {
-      expect(path).toBe(`/api/organizations/${operationId}`);
-      return restored as T;
+      expect(path).toBe("/api/organizations?page=1&pageSize=100");
+      return { items: [restored], hasMore: false } as T;
     };
 
     await expect(recoverCreatedWorkspace(request, attempt)).resolves.toEqual(restored);
@@ -69,7 +71,7 @@ describe("workspace onboarding recovery", () => {
       .resolves.toEqual(attempt);
   });
 
-  it("fails closed when recovery returns a different organization", async () => {
+  it("does not recover an unrelated workspace from the catalogue", async () => {
     const attempt = await resolveWorkspaceCreationAttempt(
       null,
       accountId,
@@ -77,11 +79,32 @@ describe("workspace onboarding recovery", () => {
       { storage: storage(), createOperationId: () => operationId },
     );
     const request = async <T,>(): Promise<T> =>
-      workspace("20000000-0000-4000-8000-000000000099") as T;
+      ({ items: [workspace("20000000-0000-4000-8000-000000000099")], hasMore: false }) as T;
 
-    await expect(recoverCreatedWorkspace(request, attempt)).rejects.toThrow(
-      "did not match the pending creation attempt",
-    );
+    await expect(recoverCreatedWorkspace(request, attempt)).resolves.toBeNull();
+  });
+
+  it("finds a previously created workspace on a later catalogue page", async () => {
+    const attempt = await resolveWorkspaceCreationAttempt(null, accountId, payload,
+      { storage: storage(), createOperationId: () => operationId });
+    const restored = workspace(operationId);
+    const pages: string[] = [];
+    const request = async <T,>(path: string): Promise<T> => {
+      pages.push(path);
+      return (pages.length === 1
+        ? { items: [workspace("20000000-0000-4000-8000-000000000099")], hasMore: true }
+        : { items: [restored], hasMore: false }) as T;
+    };
+    await expect(recoverCreatedWorkspace(request, attempt)).resolves.toEqual(restored);
+    expect(pages).toEqual(["/api/organizations?page=1&pageSize=100", "/api/organizations?page=2&pageSize=100"]);
+  });
+
+  it.each([401, 403, 503])("propagates catalogue failure %s rather than treating it as an absent workspace", async status => {
+    const attempt = await resolveWorkspaceCreationAttempt(null, accountId, payload,
+      { storage: storage(), createOperationId: () => operationId });
+    const error = new ApiError("Catalogue unavailable", status);
+    const request = async <T,>(): Promise<T> => { throw error; };
+    await expect(recoverCreatedWorkspace(request, attempt)).rejects.toBe(error);
   });
 
   it.each(["access", "refetch", "staff"] as const)(

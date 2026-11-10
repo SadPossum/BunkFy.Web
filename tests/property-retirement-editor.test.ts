@@ -217,7 +217,7 @@ describe("property retirement confirmation and readback", () => {
     }
     expect(noticeClass).not.toContain("mx-5");
     expect(noticeClass).not.toContain("sm:mx-6");
-    expect(html.match(/Try again/g)).toHaveLength(1);
+    expect(html.match(/Try again<\/button>/g)).toHaveLength(1);
     client.clear();
   });
 });
