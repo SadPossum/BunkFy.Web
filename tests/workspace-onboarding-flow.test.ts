@@ -171,9 +171,9 @@ describe("workspace onboarding recovery", () => {
 
       expect(events).toEqual([
         `select:${operationId}`,
+        `selected:${operationId}`,
         "access",
         "refetch",
-        `selected:${operationId}`,
         "staff",
         "clear",
       ]);

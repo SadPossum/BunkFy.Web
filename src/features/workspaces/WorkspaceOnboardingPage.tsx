@@ -34,7 +34,7 @@ function WorkspaceOnboardingForm() {
   const { logout, captureRequestContext, session } = useSession();
   const captureContext = useRef(captureRequestContext);
   captureContext.current = captureRequestContext;
-  const { refetchWorkspaces, setSelectedWorkspaceId } = useWorkspace();
+  const { refetchWorkspaces, setSelectedWorkspaceId, ensureWorkspaceVisible } = useWorkspace();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
@@ -141,7 +141,12 @@ function WorkspaceOnboardingForm() {
       const workspaceId = createdWorkspaceId ?? workspace!.organization.organizationId;
       context.assertCurrent();
       setCreatedWorkspaceId(workspaceId);
+      // Load the new membership before selecting it. Otherwise the catalogue
+      // effect can restore the old workspace while scoped setup is in flight.
+      await ensureWorkspaceVisible(workspaceId);
+      context.assertCurrent();
       const workspaceContext = context.selectWorkspace(workspaceId);
+      setSelectedWorkspaceId(workspaceId);
       await waitForWorkspaceAccess(workspaceContext.request, workspaceId);
       workspaceContext.assertCurrent();
       await refetchWorkspaces();
