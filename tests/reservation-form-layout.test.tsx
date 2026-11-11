@@ -609,6 +609,38 @@ describe("R2 reservation repair regressions", () => {
 });
 
 describe("reservation form native content layout", () => {
+  it.each(["Arrival date", "Departure date", "Date of birth (optional)"])("closes the creation %s calendar when permission evidence fails and retains the draft", async label => {
+    const page = await open(1024, "?create", 800);
+    try {
+      await page.getByRole("textbox", { name: "Primary guest", exact: true }).fill("Calendar draft guest");
+      if (label === "Date of birth (optional)") {
+        await room(page).click(); await unit(page).check(); await page.getByRole("button", { name: "Done choosing" }).click();
+        await page.getByRole("checkbox", { name: /Save as a Guest Record/ }).check();
+        await page.getByRole("button", { name: "Continue", exact: true }).click();
+      }
+      const trigger = page.locator(`form button[aria-label^="${label}"]`);
+      const calendar = page.getByRole("dialog", { name: `${label} calendar`, exact: true });
+      if (label === "Date of birth (optional)") {
+        await trigger.click(); await calendar.locator('[role="gridcell"] button:enabled').nth(3).click();
+      }
+      const draft = await trigger.getAttribute("aria-label");
+      await trigger.click();
+      if (label === "Departure date") await calendar.getByRole("button", { name: `${label} month`, exact: true }).click();
+      if (label === "Date of birth (optional)") await calendar.getByRole("button", { name: `${label} choose year`, exact: true }).click();
+      await recoveryAction(page, "setPermissionState", "unavailable");
+      await expect.poll(() => trigger.isDisabled()).toBe(true);
+      await expect.poll(() => calendar.isVisible()).toBe(false);
+      await noFixtureCommands(page);
+      await recoveryAction(page, "setPermissionState", "ready");
+      await expect.poll(() => trigger.isEnabled()).toBe(true);
+      expect(await trigger.getAttribute("aria-label")).toBe(draft);
+      if (label !== "Date of birth (optional)") expect(await page.getByRole("textbox", { name: "Primary guest", exact: true }).inputValue()).toBe("Calendar draft guest");
+      await trigger.click(); await calendar.locator('[role="gridcell"] button:enabled').nth(6).click();
+      expect(await trigger.getAttribute("aria-label")).not.toBe(draft);
+      await noFixtureCommands(page);
+    } finally { await page.close(); }
+  }, 25000);
+
   it.each([320, 1024, 1440])("%i: deliberate selection summary, focus, 58-unit grouping and fixed footer", async width => {
     const page=await open(width);
     try {

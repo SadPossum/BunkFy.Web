@@ -259,6 +259,7 @@ export function StaffAssignmentsPanel({
 
   function editor() {
     if (!target || target.owner !== owner) return null;
+    const fieldsDisabled = !targetAuthorityCurrent || mutation.isPending;
     return <form ref={form} onSubmit={submit} className="min-w-0 border-t border-base-300 pt-5">
       <FormSection title={target.action === "assignment" ? "Add work location" : "End assignment"} headingLevel={4}
         description={target.action === "unassign" ? target.property?.name : undefined}>
@@ -273,12 +274,12 @@ export function StaffAssignmentsPanel({
           ? "You do not have access to manage assignments at this property. Choose another property or ask a workspace administrator."
           : changed ? "This staff record has changed. Cancel and reopen the form to review the latest version before saving."
           : "Confirming current staff, property and assignment access. Your draft is kept; saving is unavailable until these checks finish."} /></div>}
-        {target.property && <fieldset key={target.property.propertyId} disabled={!targetAuthorityCurrent || mutation.isPending} className="min-w-0">
+        {target.property && <fieldset key={target.property.propertyId} disabled={fieldsDisabled} className="min-w-0">
           {target.action === "assignment" ? <FormGrid>
             <TextField label="Property job title (optional)" name="propertyJobTitle" defaultValue={target.member.jobTitle || ""} maxLength={128} />
             <div className="min-w-0">
               <span className="mb-1.5 block text-sm font-semibold">Effective from</span>
-              <FormDatePicker name="effectiveFrom" defaultValue={today} max={today} ariaLabel="Effective from" />
+              <FormDatePicker name="effectiveFrom" defaultValue={today} max={today} ariaLabel="Effective from" disabled={fieldsDisabled} />
               <p className="mt-1.5 text-xs leading-5 text-base-content/65">Starts immediately. This date records when the person began working here.</p>
             </div>
             <FormSpan><label className="flex items-start gap-3 text-sm">
@@ -288,7 +289,7 @@ export function StaffAssignmentsPanel({
           </FormGrid> : <FormGrid>
             <div className="min-w-0">
               <span className="mb-1.5 block text-sm font-semibold">Effective through</span>
-              <FormDatePicker name="effectiveTo" min={targetAssignment?.effectiveFrom} max={today} defaultValue={today} ariaLabel="Effective through" />
+              <FormDatePicker name="effectiveTo" min={targetAssignment?.effectiveFrom} max={today} defaultValue={today} ariaLabel="Effective through" disabled={fieldsDisabled} />
               <p className="mt-1.5 text-xs leading-5 text-base-content/65">Ends this work location now. Employment and sign-in access do not change.</p>
             </div>
             <label className="block min-w-0"><span className="mb-1.5 block text-sm font-semibold">Reason</span>
@@ -371,9 +372,9 @@ function AssignmentRow({ assignment, property, children }: { assignment: StaffAs
 function TextField({ label, name, defaultValue, maxLength }: { label: string; name: string; defaultValue?: string; maxLength: number }) {
   return <label className="block min-w-0"><span className="mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} defaultValue={defaultValue} maxLength={maxLength} /></label>;
 }
-function FormDatePicker({ name, defaultValue, min, max, ariaLabel }: { name: string; defaultValue: string; min?: string; max?: string; ariaLabel: string }) {
+function FormDatePicker({ name, defaultValue, min, max, ariaLabel, disabled }: { name: string; defaultValue: string; min?: string; max?: string; ariaLabel: string; disabled: boolean }) {
   const [value, setValue] = useState(defaultValue);
-  return <DatePicker className="w-full" name={name} value={value} min={min} max={max} onChange={setValue} ariaLabel={ariaLabel} required />;
+  return <DatePicker className="w-full" name={name} value={value} min={min} max={max} onChange={setValue} ariaLabel={ariaLabel} disabled={disabled} required />;
 }
 function emptyToNull(value: FormDataEntryValue | null): string | null { return String(value ?? "").trim() || null; }
 function utcDateKey(date: Date): string { return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`; }
