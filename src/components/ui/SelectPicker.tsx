@@ -45,10 +45,17 @@ function BasicSelectPicker({
   variant = "bordered",
   className = "",
 }: SelectPickerProps) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   return (
     <Select.Root
+      open={open}
+      onOpenChange={(nextOpen) => setOpen(nextOpen && !disabled)}
       value={normalizeSelectValue(value)}
-      onValueChange={onValueChange}
+      onValueChange={(nextValue) => { if (!disabled) onValueChange(nextValue); }}
       name={name}
       disabled={disabled}
     >
@@ -79,7 +86,7 @@ function BasicSelectPicker({
               <Select.Item
                 key={option.value}
                 value={option.value}
-                disabled={option.disabled}
+                disabled={disabled || option.disabled}
                 className="relative flex min-h-10 cursor-default select-none items-center rounded-md py-2 pl-9 pr-3 text-sm outline-none data-[disabled]:opacity-35 data-[highlighted]:bg-primary data-[highlighted]:text-primary-content"
               >
                 <Select.ItemIndicator className="absolute left-3">
