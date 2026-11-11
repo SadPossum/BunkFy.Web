@@ -197,11 +197,13 @@ function WorkspaceOnboardingForm() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isOffline || workspaceSetup.isPending || recoveryState === "restoring") return;
     workspaceSetup.mutate();
   }
 
   function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isOffline || profileSetup.isPending) return;
     profileSetup.mutate();
   }
 
@@ -342,12 +344,12 @@ function WorkspaceOnboardingForm() {
                   <p className="mt-0.5 leading-5 text-base-content/55">Finish your owner profile to enter the workspace.</p>
                 </div>
               </div>
-              <div className="mt-6">
+              <fieldset className="mt-6 min-w-0" disabled={profileSetup.isPending}>
                 <StaffProfileFields value={staffProfile} onChange={(next) => {
                   profileSetup.reset();
                   setStaffProfile(next);
                 }} />
-              </div>
+              </fieldset>
               {profileSetup.error && (
                 <div className="mt-5"><ErrorState error={profileSetup.error} title="Staff profile could not be completed" /></div>
               )}
