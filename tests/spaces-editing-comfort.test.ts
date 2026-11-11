@@ -104,10 +104,10 @@ describe("Spaces editing comfort — rendered composition, not browser acceptanc
     const html=render();const inspector=html.slice(html.indexOf('id="spaces-selection-inspector"'));
     expect(inspector).toContain('aria-label="Selling"');
     expect(inspector).toContain('Whole room not offered separately');
-    expect(inspector).toContain('Whole-room inventory is separate from the physical bed count.');
+    expect(inspector).toContain('Selling setup determines whether guests can book the whole room or individual beds.');
     expect(inspector).not.toContain('<details');expect(inspector).not.toContain('<summary');
     expect(button(inspector,'Edit selling setup')).toBeDefined();
-    expect(button(inspector,'Inspect whole-room option')).toBeDefined();
+    expect(button(inspector,'View whole-room details')).toBeDefined();
     expect(inspector).toContain('aria-label="Retirement actions"');
     expect(inspector.indexOf('aria-label="Retirement actions"')).toBeGreaterThan(inspector.indexOf('aria-label="Selling"'));
     expect(button(inspector,'Retire room')).toContain('btn-ghost');
@@ -352,6 +352,6 @@ describe("Spaces editing comfort — rendered composition, not browser acceptanc
     expect(state.queries.filter((q) => q.enabled && q.key[0] === "blocks").map((q) => q.key)).toEqual([["blocks", propertyId, "all"]]);
     expect(html).toContain("Exact selected hold reason");
     expect(html).not.toContain("Different space hold reason");
-    expect(html).toContain("This selected space only.");
+    expect(html).toContain("Blocks for this space.");
   });
 });

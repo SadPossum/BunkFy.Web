@@ -102,7 +102,7 @@ describe("shared room/bed editor authority and exact receipts", () => {
     expect(form).toContain("maxLength={128}");
     const spaces = read("spaces/SpacesPage.tsx");
     expect(spaces).toContain('bedEvidence === "current" ? physicalBeds.length : "Unconfirmed"');
-    expect(spaces).toContain("Whole-room inventory is separate from the physical bed count.");
+    expect(spaces).toContain("Selling setup determines whether guests can book the whole room or individual beds.");
     expect(spaces).toContain("Whole room not offered separately");
     expect(spaces).not.toContain("Manage topology");
     expect(spaces).toContain("useTopologyRetirementEditor({");
