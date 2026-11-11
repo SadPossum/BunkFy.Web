@@ -134,7 +134,7 @@ describe("block-group preview ownership in the production modal", () => {
       await page.getByRole("button", { name: confirmName(mode), exact: true }).click();
       await expect.poll(() => commands.length).toBe(1);
       expect(commands[0]).toMatchObject({ reason: "New winning definition", expectedSelectionDigest: "b".repeat(64), confirmed: true });
-      expect(await page.locator("[data-completed]").textContent()).toBe("1");
+      await expect.poll(() => page.locator("[data-completed]").textContent()).toBe("1");
     } finally { await cell.close(); }
   }, 30000);
 
@@ -146,6 +146,7 @@ describe("block-group preview ownership in the production modal", () => {
       await page.getByRole("button", { name: confirmName(mode), exact: true }).waitFor(); expect(commands).toEqual([]);
       await page.getByRole("button", { name: confirmName(mode), exact: true }).click(); await expect.poll(() => commands.length).toBe(1);
       expect(commands[0]).toMatchObject({ reason: "First definition", expectedSelectionDigest: "b".repeat(64), confirmed: true });
+      await expect.poll(() => page.locator("[data-completed]").textContent()).toBe("1");
     } finally { await cell.close(); }
   }, 30000);
 });
