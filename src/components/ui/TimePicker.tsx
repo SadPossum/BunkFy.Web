@@ -1,6 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import { ChevronDown, Clock3, Minus, Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type TimePeriod = "AM" | "PM";
 
@@ -32,18 +32,24 @@ export function TimePicker({
   const [draft, setDraft] = useState<TimePickerParts>(() => parseTimeValue(value, hour12));
   const draftValue = timePartsToValue(draft, hour12);
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   function changeOpen(nextOpen: boolean) {
+    if (disabled && nextOpen) return;
     if (nextOpen) setDraft(parseTimeValue(value, hour12));
     setOpen(nextOpen);
   }
 
   function apply() {
-    if (!draftValue) return;
+    if (disabled || !draftValue) return;
     onChange(draftValue);
     setOpen(false);
   }
 
   function clear() {
+    if (disabled) return;
     onChange("");
     setOpen(false);
   }
@@ -83,7 +89,7 @@ export function TimePicker({
             </button>
           )}
         </div>
-        {name && <input type="hidden" name={name} value={value} />}
+        {name && <input type="hidden" name={name} value={value} disabled={disabled} />}
         <Popover.Portal>
           <Popover.Content
             align="start"
@@ -111,6 +117,7 @@ export function TimePicker({
                   label="Hour"
                   value={draft.hour}
                   ariaLabel={`${ariaLabel} hour`}
+                  disabled={disabled}
                   onChange={(hour) => setDraft((current) => ({ ...current, hour }))}
                   onDecrease={() => setDraft((current) => shiftTimeParts(current, -60, hour12))}
                   onIncrease={() => setDraft((current) => shiftTimeParts(current, 60, hour12))}
@@ -120,6 +127,7 @@ export function TimePicker({
                   label="Minute"
                   value={draft.minute}
                   ariaLabel={`${ariaLabel} minute`}
+                  disabled={disabled}
                   onChange={(minute) => setDraft((current) => ({ ...current, minute }))}
                   onDecrease={() => setDraft((current) => shiftTimeParts(current, -5, hour12))}
                   onIncrease={() => setDraft((current) => shiftTimeParts(current, 5, hour12))}
@@ -134,6 +142,7 @@ export function TimePicker({
                       key={period}
                       type="button"
                       aria-pressed={draft.period === period}
+                      disabled={disabled}
                       className={`h-9 rounded-md text-sm font-semibold transition ${draft.period === period ? "bg-primary text-white shadow-sm" : "text-base-content/55 hover:text-base-content"}`}
                       onClick={() => setDraft((current) => ({ ...current, period }))}
                     >
@@ -146,11 +155,11 @@ export function TimePicker({
 
             <div className="flex items-center justify-between border-t border-base-300 px-4 py-3">
               {!required ? (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={clear} disabled={!value}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={clear} disabled={disabled || !value}>
                   Clear
                 </button>
               ) : <span />}
-              <button type="button" className="btn btn-primary btn-sm" onClick={apply} disabled={!draftValue}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={apply} disabled={disabled || !draftValue}>
                 Apply
               </button>
             </div>
@@ -165,6 +174,7 @@ function TimePartControl({
   label,
   value,
   ariaLabel,
+  disabled,
   onChange,
   onDecrease,
   onIncrease,
@@ -173,6 +183,7 @@ function TimePartControl({
   label: string;
   value: string;
   ariaLabel: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
   onDecrease: () => void;
   onIncrease: () => void;
@@ -187,6 +198,7 @@ function TimePartControl({
           className="grid h-full w-10 shrink-0 place-items-center rounded-l-lg text-base-content/45 transition hover:bg-base-200 hover:text-primary"
           aria-label={`Decrease ${label.toLowerCase()}`}
           title={`Decrease ${label.toLowerCase()}`}
+          disabled={disabled}
           onClick={onDecrease}
         >
           <Minus size={15} />
@@ -197,10 +209,12 @@ function TimePartControl({
           autoComplete="off"
           aria-label={ariaLabel}
           value={value}
+          disabled={disabled}
           className="min-w-0 flex-1 bg-transparent text-center font-mono text-lg font-semibold outline-none"
           onFocus={(event) => event.currentTarget.select()}
           onChange={(event) => onChange(event.currentTarget.value.replace(/\D/g, "").slice(0, 2))}
           onKeyDown={(event) => {
+            if (disabled) return;
             if (event.key === "ArrowUp") {
               event.preventDefault();
               onIncrease();
@@ -218,6 +232,7 @@ function TimePartControl({
           className="grid h-full w-10 shrink-0 place-items-center rounded-r-lg text-base-content/45 transition hover:bg-base-200 hover:text-primary"
           aria-label={`Increase ${label.toLowerCase()}`}
           title={`Increase ${label.toLowerCase()}`}
+          disabled={disabled}
           onClick={onIncrease}
         >
           <Plus size={15} />
