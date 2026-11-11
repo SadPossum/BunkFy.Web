@@ -26,8 +26,8 @@ if(scenario==="cancel")Object.assign(incoming,{Kind:2,Arrival:null,Departure:nul
 if(scenario==="future")incoming.FutureCharge={amount:20};
 const encoded=JSON.stringify({PreviousOperationalBaseline:scenario==="no-baseline"?null:JSON.stringify(baseline),IncomingSnapshot:JSON.stringify(incoming)});
 const raw=scenario==="invalid"?'unparsed <img src=x onerror=alert(1)> '+"long-reference-".repeat(40):scenario==="redacted"?null:encoded;
-const proposal={proposalId:"proposal-a",propertyId:"property-a",connectionId:"connection-a",receiptId:"receipt-a",reservationId:"reservation-a",baseReservationDetailsRevision:1,reasonCode:"connection-suggestions-only",sensitiveHistoryStatus:1,status:1,version:11,createdAtUtc:"2026-11-11T08:00:00Z",diff:raw};
-const reservation={reservationId:"reservation-a",propertyId:"property-a",arrival:"2026-12-01",departure:scenario==="stale"?"2026-12-09":"2026-12-03",primaryGuestName:"Current staff name",guestCount:1,inventoryUnitIds:[a],status:2,holdsInventory:true,sourceKind:2,detailsRevision:scenario==="stale"?5:1,version:7,guests:[]};
+const proposal={proposalId:"proposal-a",propertyId:"property-a",connectionId:"connection-a",receiptId:"receipt-a",reservationId:"reservation-a",baseReservationDetailsRevision:1,reasonCode:"connection-suggestions-only",sensitiveHistoryStatus:1,status:scenario==="applied"?3:1,version:11,createdAtUtc:"2026-11-11T08:00:00Z",diff:raw};
+const reservation={reservationId:"reservation-a",propertyId:"property-a",arrival:"2026-12-01",departure:scenario==="stale"||scenario==="applied"?"2026-12-09":"2026-12-03",primaryGuestName:"Current staff name",guestCount:1,inventoryUnitIds:[a],status:2,holdsInventory:true,sourceKind:2,detailsRevision:scenario==="stale"||scenario==="applied"?5:1,version:7,guests:[]};
 const rooms={rooms:[{roomId:"room-a",propertyId:scenario==="spaces-wrong-property"?"property-b":"property-a",roomName:"North Dorm",units:[{inventoryUnitId:a,propertyId:"property-a",roomId:"room-a",kind:2,label:"Bed 1"},{inventoryUnitId:b,propertyId:"property-a",roomId:"room-a",kind:2,label:"Bed 2"}]}],hasMore:false};
 window.proposalReads=[];window.proposalWrites=[];window.recordedDiff=raw;
 window.proposalRequest=async(path,options)=>{
@@ -145,6 +145,20 @@ it("keeps rejection reason and proposal version requirements", async () => {
     await submit.click();
     await page.waitForFunction(() => (window as unknown as { proposalWrites: unknown[] }).proposalWrites.length === 1);
     expect(await page.evaluate(() => (window as unknown as { proposalWrites: unknown[] }).proposalWrites)).toEqual([{ path: "/api/ingestion/properties/property-a/proposals/proposal-a/reject", body: { expectedProposalVersion: 11, reason: "Staff confirmed a different departure" } }]);
+  } finally { await page.close(); }
+}, 20000);
+
+it("keeps applied history readable without pending-review warnings or decision buttons", async () => {
+  const page = await open("applied");
+  try {
+    const dialog = page.getByRole("dialog", { name: "Booking change history", exact: true });
+    await dialog.waitFor();
+    await dialog.getByText("3 Dec 2026", { exact: true }).waitFor();
+    expect(await dialog.getByText(/before applying anything/).count()).toBe(0);
+    expect(await dialog.getByRole("button", { name: "Review and apply", exact: true }).count()).toBe(0);
+    expect(await dialog.getByRole("button", { name: "Reject", exact: true }).count()).toBe(0);
+    expect(await dialog.innerText()).toContain("Review reason: Connection suggestions only");
+    await assertReadOnly(page);
   } finally { await page.close(); }
 }, 20000);
 

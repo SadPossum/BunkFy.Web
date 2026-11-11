@@ -284,6 +284,7 @@ function ProposalDetail({
   const item = proposal.data;
   const isPending = item && proposalStatusLabel(item.status) === "pending";
   const revisionChanged = item
+    && isPending
     && reservation.data
     && reservation.data.detailsRevision !== item.baseReservationDetailsRevision;
   const suggestGuestRecord = canSuggestGuestRecords
@@ -311,7 +312,7 @@ function ProposalDetail({
     <Modal
       open={Boolean(proposalId)}
       size="lg"
-      title={item ? humanize(item.reasonCode) : "Change proposal"}
+      title={item ? (isPending ? "Review booking change" : "Booking change history") : "Change proposal"}
       description={item
         ? `Reservation ${item.reservationId.slice(0, 8).toUpperCase()} · proposal ${item.proposalId.slice(0, 8).toUpperCase()}`
         : "Loading proposal"}
@@ -330,6 +331,7 @@ function ProposalDetail({
                 <p className="mt-1 text-xs text-base-content/50">
                   Connection {item.connectionId.slice(0, 8).toUpperCase()} · receipt {item.receiptId.slice(0, 8).toUpperCase()}
                 </p>
+                <p className="mt-1 text-xs text-base-content/50">Review reason: {humanize(item.reasonCode)}</p>
               </div>
               <StatusBadge status={proposalStatusLabel(item.status)} />
             </div>
