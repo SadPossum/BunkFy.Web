@@ -60,6 +60,7 @@ import {
   integrationSelectionSearchParams,
   integrationViewState,
 } from "./integrationViewState";
+import { IngestionFailure } from "./IngestionFailure";
 
 const PAGE_SIZE = 30;
 
@@ -269,6 +270,9 @@ function RunDetail({
             detail={item.completedAtUtc ? `Completed ${formatDateTime(item.completedAtUtc)}` : "Still running"}
             status={ingestionRunStatusLabel(item.status)}
           />
+          {(item.errorCode || ["failed", "partially succeeded"].includes(ingestionRunStatusLabel(item.status))) && (
+            <IngestionFailure kind="run" reason={item.errorCode} />
+          )}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <Metric label="Observed" value={item.observedCount} />
             <Metric label="Accepted" value={item.acceptedCount} />
@@ -280,7 +284,6 @@ function RunDetail({
             <InfoRow icon={<Activity />} label="Execution" value={executionKindLabel(item.executionKind)} />
             <InfoRow icon={<Clock3 />} label="Task attempt" value={item.taskAttempt != null ? String(item.taskAttempt) : "Not applicable"} />
           </div>
-          {item.errorCode && <TechnicalError code={item.errorCode} />}
           <ModalActions>
             <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Close</button>
           </ModalActions>
@@ -451,6 +454,9 @@ function ReceiptDetail({
             detail={`Source observed ${formatDateTime(item.observedAtUtc)}`}
             status={receiptStatusLabel(item.status)}
           />
+          {(item.rejectionReason || receiptStatusLabel(item.status) === "rejected") && (
+            <IngestionFailure kind="receipt" reason={item.rejectionReason} />
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoRow icon={<FileJson2 />} label="Source record" value={item.sourceRecordType} />
             <InfoRow icon={<Database />} label="External ID" value={item.externalId} />
@@ -463,7 +469,6 @@ function ReceiptDetail({
             />
             <InfoRow icon={<GitBranch />} label="Content hash" value={item.contentHash} />
           </div>
-          {item.rejectionReason && <TechnicalError title="Rejection reason" code={item.rejectionReason} />}
           {downloadMutation.error && <ErrorState error={downloadMutation.error} />}
           <ModalActions>
             <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>Close</button>
@@ -605,13 +610,15 @@ function ReprocessingDetail({
             detail={`Parser version ${item.parserVersion} · task attempt ${item.lastTaskAttempt}`}
             status={reprocessingStatusLabel(item.status)}
           />
+          {(item.lastErrorCode || reprocessingStatusLabel(item.status) === "failed") && (
+            <IngestionFailure kind="reprocessing" reason={item.lastErrorCode} />
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <Metric label="Parsed" value={item.parsedCount} />
             <Metric label="Accepted" value={item.acceptedCount} />
             <Metric label="Duplicates" value={item.duplicateCount} />
             <Metric label="Rejected" value={item.rejectedCount} />
           </div>
-          {item.lastErrorCode && <TechnicalError code={item.lastErrorCode} />}
           <section aria-labelledby="reprocessing-output-heading">
             <h3 id="reprocessing-output-heading" className="font-display text-lg font-semibold">Outputs</h3>
             {details.data?.outputs.length ? (
@@ -915,15 +922,6 @@ function Metric({ label, value }: { label: string; value: number }) {
       <p className="text-lg font-semibold sm:text-xl">{value}</p>
       <p className="mt-1 text-[0.7rem] text-base-content/45 sm:text-xs">{label}</p>
     </div>
-  );
-}
-
-function TechnicalError({ title = "Processing error", code }: { title?: string; code: string }) {
-  return (
-    <section className="rounded-lg border border-error/20 bg-error/8 p-4">
-      <p className="text-xs font-semibold uppercase text-error/70">{title}</p>
-      <p className="mt-2 break-words font-mono text-xs leading-5 text-error">{code}</p>
-    </section>
   );
 }
 
