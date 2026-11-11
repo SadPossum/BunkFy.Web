@@ -10,7 +10,7 @@ import {
   TriangleAlert,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import type {
   DataRightsCase,
@@ -193,6 +193,11 @@ export function PrivacyRequestsPage() {
   const operatorScopeKey = dataRightsOperatorScopeKey(session);
   const activeScopeRef = useRef({ operatorScopeKey, scopeKey });
   activeScopeRef.current = { operatorScopeKey, scopeKey };
+  const pageMounted = useRef(false);
+  useLayoutEffect(() => {
+    pageMounted.current = true;
+    return () => { pageMounted.current = false; };
+  }, []);
   const previousOperatorScopeKeyRef = useRef(operatorScopeKey);
   const previousWorkflowScopeKeyRef = useRef(scopeKey);
   const casesPath = scope ? dataRightsCasesPath(scope) : "";
@@ -477,7 +482,7 @@ export function PrivacyRequestsPage() {
             onClose={() => setCreateOpen(false)}
             onCreated={async (created, submission) => {
               const active = activeScopeRef.current;
-              if (!dataRightsSubmissionMatches(
+              if (!pageMounted.current || !dataRightsSubmissionMatches(
                 active.operatorScopeKey,
                 active.scopeKey,
                 submission.operatorScopeKey,
@@ -488,6 +493,13 @@ export function PrivacyRequestsPage() {
                 created,
               );
               await queryClient.invalidateQueries({ queryKey: ["data-rights-cases", scopeKey] });
+              const latest = activeScopeRef.current;
+              if (!pageMounted.current || !dataRightsSubmissionMatches(
+                latest.operatorScopeKey,
+                latest.scopeKey,
+                submission.operatorScopeKey,
+                submission.scopeKey,
+              )) return;
               setCreateOpen(false);
               selectCase(created.id);
             }}
@@ -606,6 +618,11 @@ function CreatePrivacyRequestModal({
 }) {
   const { request } = useSession();
   const createAttempt = useRef<DataRightsCaseCreateAttempt | null>(null);
+  const formMounted = useRef(false);
+  useLayoutEffect(() => {
+    formMounted.current = true;
+    return () => { formMounted.current = false; };
+  }, []);
   const [purpose, setPurpose] = useState<DataRightsOperationKind>("export");
   const [relationship, setRelationship] = useState("1");
   const operationKind = purpose;
@@ -669,16 +686,17 @@ function CreatePrivacyRequestModal({
     },
     onSuccess: async (created, submission) => {
       const active = authorityRef.current;
-      if (!active.authorityCurrent || !dataRightsSubmissionMatches(
+      if (!formMounted.current || !active.authorityCurrent || !dataRightsSubmissionMatches(
         active.operatorScopeKey,
         active.scopeKey,
         submission.operatorScopeKey,
         submission.scopeKey,
       )) return;
       await onCreated(created, submission);
-      createAttempt.current = null;
+      if (formMounted.current) createAttempt.current = null;
     },
   });
+  const fieldsDisabled = mutation.isPending || !authorityCurrent;
 
   useEffect(() => {
     if (!open) return;
@@ -690,7 +708,7 @@ function CreatePrivacyRequestModal({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!authorityCurrent) return;
+    if (!authorityCurrent || mutation.isPending) return;
     mutation.mutate({
       scopeKey,
       operatorScopeKey,
@@ -707,6 +725,7 @@ function CreatePrivacyRequestModal({
       title={scope.kind === "staff" ? "New staff privacy request" : "New guest privacy request"}
       description="Start a controlled workflow. Matching, approval and execution remain separate actions."
       onClose={onClose}
+      closeDisabled={mutation.isPending}
     >
       <form className="space-y-5" onSubmit={submit}>
         <CompositeSourceNotice
@@ -721,6 +740,7 @@ function CreatePrivacyRequestModal({
             className="w-full"
             value={purpose}
             ariaLabel="Privacy request type"
+            disabled={fieldsDisabled}
             onValueChange={(value) => setPurpose(value as DataRightsOperationKind)}
             options={scope.kind === "staff"
               ? [
@@ -773,6 +793,7 @@ function CreatePrivacyRequestModal({
             value={relationship}
             onValueChange={setRelationship}
             ariaLabel="Privacy request source"
+            disabled={fieldsDisabled}
             options={[
               {
                 value: "1",
@@ -813,6 +834,7 @@ function CreatePrivacyRequestModal({
           submitting={mutation.isPending}
           submitLabel="Create request"
           onCancel={onClose}
+          cancelDisabled={mutation.isPending}
           disabled={!authorityCurrent}
         />
       </form>
