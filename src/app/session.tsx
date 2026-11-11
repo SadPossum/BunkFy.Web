@@ -147,16 +147,22 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
   const boundarySyncRef = useRef("");
   const sessionChannelRef = useRef<BroadcastChannel | null>(null);
   const publishedIdentityRef = useRef(sessionIdentitySignature(initialIdentity.current));
+  const persistedIdentitySignatureRef = useRef(sessionIdentitySignature(initialIdentity.current));
   const externalCompletionRef = useRef<Promise<
     ExternalAuthenticationCompletion
   > | null>(null);
 
   const publishSessionIdentity = useCallback((identity: SessionIdentity | null) => {
     const signature = sessionIdentitySignature(identity);
-    if (publishedIdentityRef.current === signature &&
-      sessionIdentitySignature(readSessionIdentity()) === signature) return;
+    const previousPersistedSignature = sessionIdentitySignature(readSessionIdentity());
+    if (publishedIdentityRef.current === signature && previousPersistedSignature === signature) {
+      persistedIdentitySignatureRef.current = signature;
+      return;
+    }
     publishedIdentityRef.current = signature;
-    writeSessionIdentity(identity);
+    persistedIdentitySignatureRef.current = writeSessionIdentity(identity)
+      ? signature
+      : previousPersistedSignature;
     sessionChannelRef.current?.postMessage(serializableSessionIdentity(identity));
   }, []);
 
@@ -180,47 +186,56 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
   const performRefresh = useCallback(
     async (identity: SessionIdentity): Promise<ApiSession> => {
       const expectedBoundarySequence = boundarySequenceRef.current;
+      // Anchor to the identity this tab observed or wrote, including when its
+      // workspace exists only in memory because durable storage rejected it.
+      const expectedPersistedSignature = persistedIdentitySignatureRef.current;
+      const assertCurrent = () => {
+        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        if (sessionIdentitySignature(readSessionIdentity()) !== expectedPersistedSignature) {
+          throw new SessionBoundarySupersededError();
+        }
+      };
       return runWithBrowserSessionLock(async () => {
-        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
-        if (prepareBrowserRefresh) await prepareBrowserRefresh(identity);
-        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
+        try {
+          assertCurrent();
+          if (prepareBrowserRefresh) await prepareBrowserRefresh(identity);
+          assertCurrent();
 
-        const { accessToken } = await apiRequest<BrowserAuthResponse>(
-          "/api/auth/browser/refresh",
-          {
-            method: "POST",
-            headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
-          },
-        );
-        assertSessionBoundaryCurrent(expectedBoundarySequence, boundarySequenceRef, acceptsRefreshRef);
+          const { accessToken } = await apiRequest<BrowserAuthResponse>(
+            "/api/auth/browser/refresh",
+            {
+              method: "POST",
+              headers: { "X-Tenant-Id": GLOBAL_IDENTITY_SCOPE },
+            },
+          );
+          assertCurrent();
 
-        const tokenIdentity = readAccessTokenIdentity(accessToken);
-        if (!tokenIdentity) throw new SessionIdentityMismatchError();
-        const resolvedIdentity = resolveRefreshedSessionIdentity(
-          identity,
-          readSessionIdentity(),
-          tokenIdentity,
-        );
-        const refreshed = { ...resolvedIdentity, ...tokenIdentity, accessToken };
+          const tokenIdentity = readAccessTokenIdentity(accessToken);
+          if (!tokenIdentity) throw new SessionIdentityMismatchError();
+          const resolvedIdentity = resolveRefreshedSessionIdentity(
+            identity,
+            readSessionIdentity(),
+            tokenIdentity,
+          );
+          const refreshed = { ...resolvedIdentity, ...tokenIdentity, accessToken };
 
-        setSession(refreshed);
-        return refreshed;
+          setSession(refreshed);
+          return refreshed;
+        } catch (error) {
+          // A delayed failure has no authority over a newer tab/session. Keep
+          // invalidation inside the cookie lock as well as the local boundary.
+          assertCurrent();
+          if (sessionFailureInvalidatesActor(error)) setSession(null);
+          throw error;
+        }
       });
     },
     [prepareBrowserRefresh, setSession],
   );
 
   const refreshSession = useMemo(
-    () =>
-      createSingleFlightRefresh(async (identity: SessionIdentity) => {
-        try {
-          return await performRefresh(identity);
-        } catch (error) {
-          if (sessionFailureInvalidatesActor(error)) setSession(null);
-          throw error;
-        }
-      }),
-    [performRefresh, setSession],
+    () => createSingleFlightRefresh(performRefresh),
+    [performRefresh],
   );
 
   const restoreSession = useCallback(async () => {
@@ -231,17 +246,21 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
     setRestorationError(null);
     try {
       await refreshSession(identity);
+      if (restoringIdentityRef.current !== identity) return;
       restoringIdentityRef.current = null;
       setRestoringIdentity(null);
     } catch (error) {
+      if (restoringIdentityRef.current !== identity) return;
       if (sessionFailureInvalidatesActor(error)) {
         restoringIdentityRef.current = null;
         setRestoringIdentity(null);
-      } else {
+      } else if (!(error instanceof SessionBoundarySupersededError)) {
         setRestorationError(error);
       }
     } finally {
-      setIsRestoring(false);
+      if (!restoringIdentityRef.current || restoringIdentityRef.current === identity) {
+        setIsRestoring(false);
+      }
     }
   }, [refreshSession]);
 
@@ -261,14 +280,17 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
 
   const synchronizeBrowserBoundary = useCallback(async (nextIdentity: SessionIdentity | null) => {
     const current = sessionRef.current;
+    const signature = sessionIdentitySignature(nextIdentity);
+    const persistedSignature = sessionIdentitySignature(readSessionIdentity());
     if (!hasSessionBoundaryChanged(current, nextIdentity) &&
       !hasSessionActorGenerationChanged(current, nextIdentity)) {
+      if (persistedSignature === signature) persistedIdentitySignatureRef.current = signature;
       return;
     }
 
-    const signature = sessionIdentitySignature(nextIdentity);
     if (boundarySyncRef.current === signature) return;
     boundarySyncRef.current = signature;
+    persistedIdentitySignatureRef.current = persistedSignature;
     publishedIdentityRef.current = signature;
     boundarySequenceRef.current += 1;
     queryClient.removeQueries();
@@ -460,6 +482,7 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
 
         assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const refreshed = await refreshSession(active);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const result = await apiRequest<T>(path, options, refreshed);
         assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         return result;
@@ -632,6 +655,7 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
           throw error;
         assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const refreshed = await refreshSession(active);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const result = await apiDownload(path, options, refreshed);
         assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         return result;
@@ -663,6 +687,7 @@ export function SessionProvider({ children, restoreOnMount = true, prepareBrowse
           throw error;
         assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const refreshed = await refreshSession(active);
+        assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         const response = await apiStream(path, signal, refreshed);
         assertSessionBoundaryCurrent(boundarySequence, boundarySequenceRef, acceptsRefreshRef);
         return response;
@@ -1001,15 +1026,17 @@ function readSessionIdentity(): SessionIdentity | null {
   }
 }
 
-function writeSessionIdentity(session: SessionIdentity | null) {
+function writeSessionIdentity(session: SessionIdentity | null): boolean {
   try {
     if (session) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableSessionIdentity(session)));
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
+    return true;
   } catch {
     // The in-memory session remains usable when durable browser storage is blocked.
+    return false;
   }
 }
 

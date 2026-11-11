@@ -27,6 +27,9 @@ function Capture(){
  useEffect(()=>{window.sessionHarness={
   registerWithDraft:()=>auth.register({username:"registered@example.invalid",password:"synthetic-password"},subjectId=>saveInviteStaffDraft(privateDraft,subjectId)),
   adoptBrowserAccount:auth.adoptBrowserAccount,conceal:auth.concealForAccountTransition,
+  retryRestore:auth.retrySessionRestore,
+  readResource:async()=>{try{await auth.request("/api/synthetic-read");return "accepted";}catch(error){return error.name;}},
+  transfer:async(kind)=>{try{if(kind==="request")await auth.request("/api/synthetic-transfer",{method:"POST",body:JSON.stringify({operationId:"66666666-6666-4666-8666-666666666666",value:"initiating-actor-command"})});else if(kind==="download")await auth.download("/api/synthetic-transfer");else{const result=await auth.stream("/api/synthetic-transfer",new AbortController().signal);await result.body?.cancel();}return "accepted";}catch(error){return error.name;}},
   captureRequests:()=>{capturedRequests=auth.captureRequestContext();capturePreviousRender=auth.captureRequestContext;},
   sendCaptured:async()=>{try{await capturedRequests.request("/api/synthetic-mutation",{method:"POST"});return "sent";}catch{return "rejected";}},
   captureStaleRender:()=>{try{capturePreviousRender();return "captured";}catch{return "rejected";}},
@@ -35,7 +38,7 @@ function Capture(){
   revokeAll:()=>{window.signOutAllOutcome="pending";void auth.logoutAll().then(()=>{window.signOutAllOutcome="accepted";}).catch(error=>{window.signOutAllOutcome=error.name;});},
   confirmCredential:(operation)=>{window.stepUpOutcome="pending";const pending=operation==="password"?auth.stepUpWithPassword("synthetic-password"):operation==="mfa-step-up"?auth.stepUpWithMultiFactor("synthetic-password","totp","123456"):operation==="activate-totp"?auth.activateTotp("123456"):auth.disableTotp("totp","123456");void pending.then(value=>{window.stepUpResult=value;window.stepUpOutcome="accepted";}).catch(error=>{window.stepUpOutcome=error.name;});},
   setPrivate:(value="old-actor")=>query.setQueryData(["private"],value),hasPrivate:()=>query.getQueryData(["private"])??null};},[auth,query]);
- return <main><output data-session>{auth.session?.username??"Signed out"}</output><output data-session-id>{auth.session?.sessionId??""}</output><output data-tenant>{auth.session?.tenantId??""}</output><output data-restoring>{auth.isRestoring?"restoring":"ready"}</output><output data-subject>{auth.session?.subjectId??""}</output>{auth.session&&location.search.includes("join-probe")&&<MemoryRouter initialEntries={["/join"]}><WorkspaceProvider><JoinWorkspacePage/></WorkspaceProvider></MemoryRouter>}</main>;
+ return <main><output data-session>{auth.session?.username??"Signed out"}</output><output data-session-id>{auth.session?.sessionId??""}</output><output data-tenant>{auth.session?.tenantId??""}</output><output data-restoring>{auth.isRestoring?"restoring":"ready"}</output><output data-restore-subject>{auth.restoringIdentity?.subjectId??""}</output><output data-restore-error>{auth.restorationError?String(auth.restorationError.status??auth.restorationError.name):"none"}</output><output data-subject>{auth.session?.subjectId??""}</output>{auth.session&&location.search.includes("join-probe")&&<MemoryRouter initialEntries={["/join"]}><WorkspaceProvider><JoinWorkspacePage/></WorkspaceProvider></MemoryRouter>}</main>;
 }
 const query=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
 if(location.search.includes("join-probe"))sessionStorage.setItem("bunkfy.join.context.v2",JSON.stringify({kind:"invitation",contextId:"77777777-7777-4777-8777-777777777777"}));
@@ -183,25 +186,28 @@ describe("native cross-tab remembered-session boundary", () => {
     } finally { await page.close(); }
   }, 30000);
 
-  it("rejects a late old refresh after another page publishes a new actor", async () => {
-    const pageA = await context.newPage();
-    const pageB = await context.newPage();
+  it.each([200, 401].flatMap(status => [false, true].map(sameActor => ({ status, sameActor }))))("preserves a replacement actor after an old refresh returns $status (same actor: $sameActor)", async ({ status, sameActor }) => {
+    const replacement = sameActor ? { ...identityA, sessionId: sessionB, generation: "replacement-session" } : identityB;
+    const ownedContext = await browser.newContext();
+    await ownedContext.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityA);
+    const pageA = await ownedContext.newPage();
+    const pageB = await ownedContext.newPage();
     const oldRefreshStarted = new Promise<void>(resolve => {
       let first = true;
       void pageA.route("**/api/auth/browser/refresh", async route => {
         if (first) {
           first = false; resolve();
           await new Promise<void>(release => { (pageA as Page & { releaseOldRefresh?: () => void }).releaseOldRefresh = release; });
-          await route.fulfill(response(token(subjectA, sessionA)));
+          await route.fulfill(status === 200 ? response(token(subjectA, sessionA)) : { status: 401 });
           return;
         }
-        await route.fulfill(response(token(subjectB, sessionB)));
+        await route.fulfill(response(token(replacement.subjectId, replacement.sessionId)));
       });
     });
     await pageB.route("**/api/auth/browser/refresh", route => route.fulfill(response(token(subjectA, sessionA))));
     for (const page of [pageA, pageB]) {
       page.on("pageerror", error => runtimeErrors.push(error.message));
-      page.on("console", message => { if (message.type() === "error") runtimeErrors.push(message.text()); });
+      page.on("console", message => { if (message.type() === "error" && !message.text().startsWith("Failed to load resource: the server responded with a status of 401")) runtimeErrors.push(message.text()); });
     }
 
     try {
@@ -214,7 +220,7 @@ describe("native cross-tab remembered-session boundary", () => {
       await pageB.evaluate(account => {
         const harness = (window as unknown as { sessionHarness: { adoptBrowserAccount(value: unknown): void } }).sessionHarness;
         harness.adoptBrowserAccount(account);
-      }, { ...identityB, accessToken: token(subjectB, sessionB) });
+      }, { ...replacement, accessToken: token(replacement.subjectId, replacement.sessionId) });
 
       // A current actor change is a privacy boundary even before the delayed
       // old response is released; the query cache must not retain old data.
@@ -222,13 +228,188 @@ describe("native cross-tab remembered-session boundary", () => {
 
       const release = (pageA as Page & { releaseOldRefresh?: () => void }).releaseOldRefresh;
       expect(release).toBeTypeOf("function"); release!();
-      await expect.poll(() => pageA.locator("[data-session]").textContent()).toBe("staff-b@example.test");
+      await expect.poll(() => pageA.locator("[data-session]").textContent()).toBe(replacement.username);
+      expect(await pageA.locator("[data-session-id]").textContent()).toBe(replacement.sessionId);
+      expect(await pageB.locator("[data-session-id]").textContent()).toBe(replacement.sessionId);
       expect(await pageA.locator("[data-restoring]").textContent()).toBe("ready");
       expect(await pageA.evaluate(() => localStorage.getItem("bunkfy.session.identity.v2"))).toContain(sessionB);
     } finally {
       await pageA.close();
       await pageB.close();
+      await ownedContext.close();
     }
+  }, 30000);
+
+  it.each([200, 401])("keeps a newer restoration pending and retryable after an old refresh returns %s", async oldStatus => {
+    const ownedContext = await browser.newContext();
+    await ownedContext.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityA);
+    const pageA = await ownedContext.newPage(), pageB = await ownedContext.newPage();
+    let refreshes = 0, releaseOld: (() => void) | undefined, releaseNew: (() => void) | undefined;
+    for (const page of [pageA, pageB]) page.on("pageerror", error => runtimeErrors.push(error.message));
+    await pageA.route("**/api/auth/browser/refresh", async route => {
+      refreshes++;
+      if (refreshes === 1) {
+        await new Promise<void>(resolve => { releaseOld = resolve; });
+        await route.fulfill(oldStatus === 200 ? response(token(subjectA, sessionA)) : { status: 401 });
+      } else if (refreshes === 2) {
+        await new Promise<void>(resolve => { releaseNew = resolve; });
+        await route.fulfill({ status: 503 });
+      } else await route.fulfill(response(token(subjectB, sessionB)));
+    });
+    try {
+      await pageA.goto(origin + "__session-boundary-native");
+      await expect.poll(() => Boolean(releaseOld)).toBe(true);
+      await pageB.goto(origin + "__session-boundary-native?no-restore=1");
+      await expect.poll(() => pageB.evaluate(() => Boolean((window as unknown as { sessionHarness?: unknown }).sessionHarness))).toBe(true);
+      await pageB.evaluate(account => (window as unknown as { sessionHarness: { adoptBrowserAccount(value: unknown): void } }).sessionHarness.adoptBrowserAccount(account), { ...identityB, accessToken: token(subjectB, sessionB) });
+      await expect.poll(() => pageA.locator("[data-restore-subject]").textContent()).toBe(subjectB);
+      releaseOld!();
+      await expect.poll(() => Boolean(releaseNew), { timeout: 3000 }).toBe(true);
+      expect(await pageA.locator("[data-restoring]").textContent()).toBe("restoring");
+      expect(await pageA.locator("[data-restore-error]").textContent()).toBe("none");
+      releaseNew!();
+      await expect.poll(() => pageA.locator("[data-restore-error]").textContent()).toBe("503");
+      expect(await pageA.locator("[data-restore-subject]").textContent()).toBe(subjectB);
+      await pageA.evaluate(() => (window as unknown as { sessionHarness: { retryRestore(): Promise<void> } }).sessionHarness.retryRestore());
+      expect(refreshes).toBe(3);
+      expect(await pageA.locator("[data-session-id]").textContent()).toBe(sessionB);
+      expect(await pageA.locator("[data-restoring]").textContent()).toBe("ready");
+      expect(await pageA.locator("[data-restore-error]").textContent()).toBe("none");
+      expect(await pageA.locator("[data-restore-subject]").textContent()).toBe("");
+    } finally {
+      releaseOld?.(); releaseNew?.();
+      await pageA.evaluate(() => navigator.locks.request("bunkfy.browser-session.cookies", () => {})).catch(() => {});
+      await ownedContext.close();
+    }
+  }, 30000);
+
+  it("preserves an unnotified persisted replacement after an old refresh is rejected", async () => {
+    const ownedContext = await browser.newContext();
+    await ownedContext.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityA);
+    const page = await ownedContext.newPage();
+    let refreshes = 0, release: (() => void) | undefined;
+    page.on("pageerror", error => runtimeErrors.push(error.message));
+    await page.route("**/api/auth/browser/refresh", async route => {
+      refreshes++;
+      if (refreshes === 1) { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ status: 401 }); }
+      else await route.fulfill(response(token(subjectB, sessionB)));
+    });
+    try {
+      await page.goto(origin + "__session-boundary-native");
+      await expect.poll(() => Boolean(release)).toBe(true);
+      // Model persistence reaching this document before its cross-tab event.
+      await page.evaluate(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityB);
+      release!();
+      await expect.poll(() => page.locator("[data-restoring]").textContent()).toBe("ready");
+      expect(await page.evaluate(() => localStorage.getItem("bunkfy.session.identity.v2"))).toContain(sessionB);
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await expect.poll(() => page.locator("[data-session-id]").textContent()).toBe(sessionB);
+      expect(refreshes).toBe(2);
+    } finally { release?.(); await ownedContext.close(); }
+  }, 30000);
+
+  it.each(["initial", "current"])("still invalidates an %s rejected session refresh", async phase => {
+    const ownedContext = await browser.newContext();
+    await ownedContext.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityA);
+    const page = await ownedContext.newPage();
+    let refreshes = 0;
+    page.on("pageerror", error => runtimeErrors.push(error.message));
+    await page.route("**/api/auth/browser/refresh", async route => { refreshes++; await route.fulfill({ status: 401 }); });
+    await page.route("**/api/synthetic-read", route => route.fulfill({ status: 401 }));
+    try {
+      await page.goto(origin + "__session-boundary-native" + (phase === "current" ? "?no-restore=1" : ""));
+      await expect.poll(() => page.evaluate(() => Boolean((window as unknown as { sessionHarness?: unknown }).sessionHarness))).toBe(true);
+      if (phase === "current") {
+        await page.evaluate(account => (window as unknown as { sessionHarness: { adoptBrowserAccount(value: unknown): void } }).sessionHarness.adoptBrowserAccount(account), { ...identityA, accessToken: token(subjectA, sessionA) });
+        await page.evaluate(() => (window as unknown as { sessionHarness: { setPrivate(): void } }).sessionHarness.setPrivate());
+        expect(await page.evaluate(() => (window as unknown as { sessionHarness: { readResource(): Promise<string> } }).sessionHarness.readResource())).toBe("ApiError");
+      }
+      await expect.poll(() => refreshes).toBe(1);
+      await expect.poll(() => page.locator("[data-restoring]").textContent()).toBe("ready");
+      expect(await page.locator("[data-session]").textContent()).toBe("Signed out");
+      expect(await page.evaluate(() => localStorage.getItem("bunkfy.session.identity.v2"))).toBeNull();
+      expect(await page.evaluate(() => (window as unknown as { sessionHarness: { hasPrivate(): unknown } }).sessionHarness.hasPrivate())).toBeNull();
+    } finally { await ownedContext.close(); }
+  }, 30000);
+
+  it.each(["request", "download", "stream"].flatMap(kind => ["unchanged", "actor", "workspace"].map(replacement => ({ kind, replacement }))))("guards the $kind retry after refresh (replacement: $replacement)", async ({ kind, replacement }) => {
+    const replaced = replacement !== "unchanged";
+    const nextIdentity = replacement === "workspace" ? { ...identityA, tenantId: "replacement-workspace", generation: "replacement-workspace-generation" } : identityB;
+    const ownedContext = await browser.newContext();
+    await ownedContext.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), identityA);
+    const page = await ownedContext.newPage();
+    const requests: { authorization: string | undefined; tenant: string | undefined; method: string; body: string | null }[] = [];
+    const refreshedToken = replaced ? token(nextIdentity.subjectId, nextIdentity.sessionId) : token(subjectA, sessionA) + "-renewed";
+    let refreshes = 0;
+    page.on("pageerror", error => runtimeErrors.push(error.message));
+    await page.route("**/api/auth/browser/refresh", async route => { refreshes++; await route.fulfill(response(refreshedToken)); });
+    await page.route("**/api/synthetic-transfer", async route => {
+      requests.push({ authorization: route.request().headers().authorization, tenant: route.request().headers()["x-tenant-id"], method: route.request().method(), body: route.request().postData() });
+      if (requests.length === 1) {
+        // A different page's confirmed identity can reach shared storage before
+        // this tab receives its notification. An old operation must stop
+        // before refresh or retry; the later event restores the new identity.
+        if (replaced) await page.evaluate(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)), nextIdentity);
+        await route.fulfill({ status: 401 });
+      } else await route.fulfill({ status: 200, contentType: kind === "stream" ? "text/event-stream" : kind === "download" ? "application/octet-stream" : "application/json", body: kind === "stream" ? "data: synthetic\n\n" : kind === "download" ? "synthetic-file" : "{}" });
+    });
+    try {
+      await page.goto(origin + "__session-boundary-native?no-restore=1");
+      await expect.poll(() => page.evaluate(() => Boolean((window as unknown as { sessionHarness?: unknown }).sessionHarness))).toBe(true);
+      await page.evaluate(account => (window as unknown as { sessionHarness: { adoptBrowserAccount(value: unknown): void } }).sessionHarness.adoptBrowserAccount(account), { ...identityA, accessToken: token(subjectA, sessionA) });
+      expect(await page.evaluate(value => (window as unknown as { sessionHarness: { transfer(kind: string): Promise<string> } }).sessionHarness.transfer(value), kind)).toBe(replaced ? "SessionBoundarySupersededError" : "accepted");
+      expect(refreshes).toBe(replaced ? 0 : 1);
+      expect(requests).toHaveLength(replaced ? 1 : 2);
+      expect(requests[0].authorization).toBe("Bearer " + token(subjectA, sessionA));
+      if (!replaced) {
+        expect(requests[1].authorization).toBe("Bearer " + refreshedToken);
+        expect(requests[1].body).toBe(requests[0].body);
+        expect(requests[1].method).toBe(requests[0].method);
+      } else {
+        expect(JSON.parse((await page.evaluate(() => localStorage.getItem("bunkfy.session.identity.v2")))!)).toEqual(nextIdentity);
+        await page.evaluate(() => window.dispatchEvent(new Event("online")));
+        await expect.poll(() => page.locator("[data-tenant]").textContent()).toBe(nextIdentity.tenantId);
+        await expect.poll(() => page.locator("[data-session-id]").textContent()).toBe(nextIdentity.sessionId);
+        expect(refreshes).toBe(1);
+        expect(requests).toHaveLength(1);
+      }
+      expect(await page.locator("[data-session-id]").textContent()).toBe(replaced ? nextIdentity.sessionId : sessionA);
+      expect(await page.locator("[data-tenant]").textContent()).toBe(replaced ? nextIdentity.tenantId : identityA.tenantId);
+    } finally { await ownedContext.close(); }
+  }, 30000);
+
+  it("keeps a memory-only workspace usable when durable storage rejects writes", async () => {
+    const ownedContext = await browser.newContext();
+    const page = await ownedContext.newPage();
+    const requests: { tenant: string | undefined; body: string | null }[] = [];
+    let refreshes = 0;
+    page.on("pageerror", error => runtimeErrors.push(error.message));
+    await page.route("**/api/auth/browser/refresh", async route => { refreshes++; await route.fulfill(response(token(subjectA, sessionA))); });
+    await page.route("**/api/synthetic-transfer", async route => {
+      requests.push({ tenant: route.request().headers()["x-tenant-id"], body: route.request().postData() });
+      await route.fulfill(requests.length === 1 ? { status: 401 } : { status: 200, contentType: "application/json", body: "{}" });
+    });
+    try {
+      await page.goto(origin + "__session-boundary-native?no-restore=1");
+      await expect.poll(() => page.evaluate(() => Boolean((window as unknown as { sessionHarness?: unknown }).sessionHarness))).toBe(true);
+      await page.evaluate(account => (window as unknown as { sessionHarness: { adoptBrowserAccount(value: unknown): void } }).sessionHarness.adoptBrowserAccount(account), { ...identityA, accessToken: token(subjectA, sessionA) });
+      await page.evaluate(() => {
+        const original = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+          if (key === "bunkfy.session.identity.v2") throw new DOMException("Synthetic quota failure", "QuotaExceededError");
+          return original.call(this, key, value);
+        };
+        (window as unknown as { sessionHarness: { selectWorkspace(value: string): void } }).sessionHarness.selectWorkspace("memory-only-workspace");
+      });
+      expect(await page.locator("[data-tenant]").textContent()).toBe("memory-only-workspace");
+      expect(JSON.parse((await page.evaluate(() => localStorage.getItem("bunkfy.session.identity.v2")))!).tenantId).toBe(identityA.tenantId);
+      expect(await page.evaluate(() => (window as unknown as { sessionHarness: { transfer(kind: string): Promise<string> } }).sessionHarness.transfer("request"))).toBe("accepted");
+      expect(refreshes).toBe(1);
+      expect(requests).toHaveLength(2);
+      expect(requests.map(request => request.tenant)).toEqual(["memory-only-workspace", "memory-only-workspace"]);
+      expect(requests[1].body).toBe(requests[0].body);
+      expect(await page.locator("[data-tenant]").textContent()).toBe("memory-only-workspace");
+    } finally { await ownedContext.close(); }
   }, 30000);
 
   it.each(["password", "mfa-step-up", "activate-totp", "disable-totp"].flatMap(operation => ["replacement actor", "concealed session"].map(boundary => ({ operation, boundary }))))("rejects a late $operation completion after a $boundary boundary", async ({ operation, boundary }) => {
