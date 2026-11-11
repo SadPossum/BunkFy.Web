@@ -20,9 +20,10 @@ import {WorkspaceProvider,useWorkspace} from "/src/app/workspace.tsx";
 import {WorkspaceGate} from "/src/features/workspaces/WorkspaceGate.tsx";
 import {parseWorkspaceJoinSecret,prepareWorkspaceJoinContext,preserveWorkspaceJoinContext} from "/src/features/workspaces/workspaceJoin.ts";
 const bootstrap=new URLSearchParams(location.search).has("bootstrap");
+const createWorkspace=new URLSearchParams(location.search).has("create");
 if(!bootstrap){const incoming=parseWorkspaceJoinSecret(location.hash);
 if(incoming){const prepared=await prepareWorkspaceJoinContext(incoming);preserveWorkspaceJoinContext(prepared.context);}
-history.replaceState(null,"","/join");}
+history.replaceState(null,"",createWorkspace?"/workspace/new":"/join");}
 const client=new QueryClient({defaultOptions:{queries:{staleTime:20000,retry:1,refetchOnWindowFocus:false},mutations:{networkMode:"always",retry:0}}});
 window.refreshApplication=()=>client.invalidateQueries({queryKey:["workspace-staff-onboarding"]});
 window.joinMutationsSettled=()=>client.getMutationCache().getAll().every(m=>m.state.status!=="pending");
@@ -67,6 +68,53 @@ beforeAll(async () => {
 afterAll(async () => { await browser?.close(); await server?.close(); });
 
 describe("native workspace activation with existing workspace selection", () => {
+  it.each([false, true])("keeps a newly created workspace selected through owner setup, existing workspace=%s", async existingWorkspace => {
+    const context = await browser.newContext();
+    await context.addInitScript(value => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(value)),
+      {...identity, tenantId: existingWorkspace ? homeId : "global"});
+    const page = await context.newPage();
+    let createdId = "";
+    let creates = 0;
+    let profileUpdates = 0;
+    let staleCatalogues = 1;
+    const scopedWrites: (string|undefined)[] = [];
+    const unexpected: string[] = [];
+    await page.route(url=>url.pathname.startsWith("/api/"), async route=>{
+      const request=route.request(), path=new URL(request.url()).pathname;
+      let body: unknown;
+      if(path==="/api/auth/browser/refresh") body={accessToken:token};
+      else if(path==="/api/organizations" && request.method()==="POST") {
+        createdId=request.postDataJSON().operationId;creates++;
+        body=membership(createdId);
+      } else if(path==="/api/organizations") {
+        if(createdId) await new Promise(resolve=>setTimeout(resolve,100));
+        const visible=createdId && staleCatalogues--<=0;
+        body={items:[...(existingWorkspace?[membership(homeId)]:[]),...(visible?[membership(createdId)]:[])],page:1,pageSize:100,hasMore:false};
+      } else if(path==="/api/properties") body={properties:[],page:1,pageSize:100,hasMore:false};
+      else if(path==="/api/staff/me") {
+        if(request.method()==="PUT"){profileUpdates++;scopedWrites.push(request.headers()["x-tenant-id"]);body={staffMemberId:"staff",version:2};}
+        else body={staffMemberId:"staff",version:profileUpdates?2:1,displayName:"Owner"};
+      } else {unexpected.push(path);body={};}
+      await route.fulfill({status:unexpected.includes(path)?500:200,contentType:"application/json",body:JSON.stringify(body)});
+    });
+    try {
+      await page.goto(origin+"join?create=1");
+      await page.getByLabel("Workspace name",{exact:true}).fill("New hostel");
+      await page.getByRole("button",{name:"Create and continue",exact:true}).click();
+      await page.getByRole("heading",{name:"Create your staff profile",exact:true}).waitFor({timeout:8000});
+      expect(await page.locator("[data-tenant]").textContent()).toBe(createdId);
+      expect(await page.locator("[data-selected]").textContent()).toBe(createdId);
+      await page.getByRole("button",{name:"Finish setup",exact:true}).click();
+      await page.getByRole("navigation",{name:"Main navigation"}).waitFor({timeout:5000});
+      expect(creates).toBe(1);expect(profileUpdates).toBe(1);
+      expect(scopedWrites).toEqual([createdId]);
+      expect(await page.locator("[data-selected]").textContent()).toBe(createdId);
+      expect(await page.locator("[data-tenant]").textContent()).toBe(createdId);
+      expect(unexpected).toEqual([]);
+      expect(new URL(page.url()).pathname).toBe("/properties");
+    } finally {await context.close();}
+  },30000);
+
   it.each([false, true])("opens an accepted invitation after its own workspace switch, existing workspace=%s", async existingWorkspace => {
     const context = await browser.newContext();
     await context.addInitScript(value => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(value)),

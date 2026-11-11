@@ -50,9 +50,9 @@ export async function continueWorkspaceOnboarding(
     services.completeStaffProfile ?? completeCurrentStaffProfile;
 
   continuation.selectWorkspace(continuation.workspaceId);
+  continuation.setSelectedWorkspaceId(continuation.workspaceId);
   await waitForAccess(continuation.request, continuation.workspaceId);
   await continuation.refetchWorkspaces();
-  continuation.setSelectedWorkspaceId(continuation.workspaceId);
   await completeStaffProfile(continuation.request, continuation.staffProfile);
   await continuation.clearCreationAttempt();
 }
