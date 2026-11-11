@@ -962,7 +962,9 @@ function RoomDetail({
           <button type="button" className="btn btn-outline btn-sm mt-3" disabled={inventorySource.isFetching || sellingReadback.isOffline}
             onClick={() => void sellingReadback.refresh()}>Refresh selling details</button>
         </div>}
-        {!sellingReadback.needed && <p className="text-sm">{inventoryEvidence !== "current" ? "Selling setup unconfirmed" : room.salesMode === null ? "Unknown" : salesModeLabel(room.salesMode)}</p>}
+        {!sellingReadback.needed && <p className="text-sm">{inventoryEvidence !== "current" ? "Selling setup unconfirmed"
+          : room.salesMode !== null ? salesModeLabel(room.salesMode)
+            : room.inventoryState === "missing" ? "Waiting for selling details" : "Selling mode unavailable"}</p>}
         {!sellingReadback.needed && wholeRoomUnits.map((unit) => <div key={unit.key} className="mt-2 border-l-2 border-base-300 pl-3 text-xs">
           <p className="font-semibold">{inventoryEvidence !== "current" ? "Whole-room offering unconfirmed" : unit.isSellable ? "Whole room offered separately" : "Whole room not offered separately"}</p>
           <p className="mt-1 break-words text-base-content/60">Selling setup determines whether guests can book the whole room or individual beds.</p>
