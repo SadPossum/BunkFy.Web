@@ -57,6 +57,7 @@ import {
   type StaffCreatePayload,
 } from "./staffCreateAttempt";
 import { StaffDetail } from "./StaffDetail";
+import { PropertyStaffDetail } from "./PropertyStaffDetail";
 import { staffMutationAllowed } from "./staffMutationAuthority";
 import {
   staffDetailTab,
@@ -165,10 +166,11 @@ export function StaffPage() {
     "create",
     { permissionsCurrent },
   );
-  const directoryScope = staffDirectoryScope(
-    searchParams.get("scope"),
-    Boolean(selectedProperty),
-  );
+  // Plain /staff opens the narrow directory when workspace access is absent.
+  // An explicit scope remains exact, including a denied workspace bookmark.
+  const directoryScope = !searchParams.has("scope") && permissionUsable && !mayRead && selectedProperty
+    ? "property"
+    : staffDirectoryScope(searchParams.get("scope"), Boolean(selectedProperty));
   const propertyPermissionUsable = Boolean(
     propertyStaffPermissionSource &&
       compositeSourceUsable(propertyStaffPermissionSource.state),
@@ -177,6 +179,15 @@ export function StaffPage() {
     propertyStaffPermissionSource &&
       compositeSourceCurrent(propertyStaffPermissionSource),
   );
+
+  const canOpenStaff = (permissionUsable && mayRead)
+    || (propertyPermissionUsable && mayReadCurrentProperty);
+  const staffAccessCurrent = permissionsCurrent && (!selectedProperty || propertyPermissionCurrent);
+  const activePermissionSource = directoryScope === "property" && propertyStaffPermissionSource
+    ? propertyStaffPermissionSource : permissionSource;
+  const activePermissionUsable = compositeSourceUsable(activePermissionSource.state);
+  const activePermissionCurrent = compositeSourceCurrent(activePermissionSource);
+  const mayReadDirectory = directoryScope === "property" ? mayReadCurrentProperty : mayRead;
 
   const params = new URLSearchParams({
     page: String(page),
@@ -200,10 +211,7 @@ export function StaffPage() {
         )
       : request<StaffDirectoryListResponse>(`/api/staff/members?${params}`),
     enabled: Boolean(
-      tenantId && mayRead && (
-        directoryScope === "workspace" ||
-        (selectedProperty && mayReadCurrentProperty)
-      ),
+      tenantId && activePermissionUsable && mayReadDirectory,
     ),
   });
   const directorySource = createCompositeSource({
@@ -253,9 +261,8 @@ export function StaffPage() {
   }, [setSearchParams, tenantId]);
 
   useEffect(() => {
-    if (!permissionsCurrent) return;
-    if (!mayRead || !mayCreate) setCreateOpen(false);
-    if (!mayRead) {
+    if (permissionsCurrent && (!mayRead || !mayCreate)) setCreateOpen(false);
+    if (activePermissionCurrent && !mayReadDirectory) {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("member");
@@ -263,7 +270,7 @@ export function StaffPage() {
         return next;
       }, { replace: true });
     }
-  }, [mayCreate, mayRead, permissionsCurrent, setSearchParams]);
+  }, [mayCreate, mayRead, permissionsCurrent, activePermissionCurrent, mayReadDirectory, setSearchParams]);
 
   function selectMember(id: string | null) {
     const next = new URLSearchParams(searchParams);
@@ -328,17 +335,17 @@ export function StaffPage() {
         ) : undefined}
       />
 
-      {!permissionUsable || !mayRead ? permissionsCurrent && !mayRead ? (
+      {!canOpenStaff ? staffAccessCurrent ? (
         <EmptyState
           icon={<ShieldAlert />}
           title="Staff access is restricted"
-          description="Your account does not have permission to view staff profiles for this workspace."
+          description="Your account cannot view the workspace Staff directory or Staff assigned to the selected property."
         />
       ) : (
         <>
-          <CompositeSourceNotice sources={[permissionSource]} title="Staff access is delayed" />
+          <CompositeSourceNotice sources={[permissionSource, ...(propertyStaffPermissionSource ? [propertyStaffPermissionSource] : [])]} title="Staff access is delayed" />
           <section className="card overflow-hidden border border-base-300 bg-base-100 shadow-sm">
-            <CompositeSourceFallback state={permissionSource.state} label="Staff access" />
+            <CompositeSourceFallback state={activePermissionSource.state} label="Staff access" />
           </section>
         </>
       ) : (
@@ -350,8 +357,7 @@ export function StaffPage() {
                 ? [propertyStaffPermissionSource]
                 : []),
               ...(
-                directoryScope === "workspace" ||
-                (propertyPermissionUsable && mayReadCurrentProperty)
+                activePermissionUsable && mayReadDirectory
                   ? [directorySource]
                   : []
               ),
@@ -368,7 +374,7 @@ export function StaffPage() {
                     ariaLabel="Staff directory scope"
                     onValueChange={setDirectoryScope}
                     options={[
-                      { value: "workspace", label: "Workspace", icon: <UsersRound size={15} /> },
+                      { value: "workspace", label: "Workspace", icon: <UsersRound size={15} />, disabled: permissionsCurrent && !mayRead },
                       {
                         value: "property",
                         label: selectedProperty?.name ?? "Current property",
@@ -419,16 +425,18 @@ export function StaffPage() {
               </div>
             </div>
 
-            {directoryScope === "property" && !propertyPermissionUsable ? (
+            {!activePermissionUsable ? (
               <CompositeSourceFallback
-                state={propertyStaffPermissionSource?.state ?? "unavailable"}
-                label={`${selectedProperty?.name ?? "current property"} Staff access`}
+                state={activePermissionSource.state}
+                label="Staff directory access"
               />
-            ) : directoryScope === "property" && propertyPermissionCurrent && !mayReadCurrentProperty ? (
+            ) : !mayReadDirectory ? (
               <EmptyState
                 icon={<ShieldAlert />}
-                title="Property Staff access is restricted"
-                description={`Your account cannot view Staff assignments at ${selectedProperty?.name ?? "the selected property"}.`}
+                title={directoryScope === "property" ? "Property Staff access is restricted" : "Workspace Staff access is restricted"}
+                description={directoryScope === "property"
+                  ? `Your account cannot view Staff assignments at ${selectedProperty?.name ?? "the selected property"}.`
+                  : "Choose the property directory to view staff assigned to your location."}
               />
             ) : directorySource.state === "loading" ? (
               <LoadingState label="Loading staff" />
@@ -500,7 +508,7 @@ export function StaffPage() {
         onClose={() => setCreateOpen(false)}
         onCreated={handleCreated}
       />
-      {permissionUsable && mayRead && (
+      {permissionUsable && mayRead && activePermissionUsable && mayReadDirectory && (
         <StaffDetail
           key={`${tenantId}:${searchParams.get("member") ?? "none"}`}
           tenantId={tenantId}
@@ -515,6 +523,16 @@ export function StaffPage() {
           canManageAccountLinks={mayManageAccountLinks}
           canManageLifecycle={mayManageLifecycle}
           onSectionChange={setDetailSection}
+          onClose={() => selectMember(null)}
+        />
+      )}
+      {!mayRead && directoryScope === "property" && selectedProperty && activePermissionUsable && mayReadDirectory && (
+        <PropertyStaffDetail
+          key={`${tenantId}:${selectedProperty.propertyId}:${searchParams.get("member") ?? "none"}`}
+          tenantId={tenantId}
+          property={selectedProperty}
+          memberId={searchParams.get("member")}
+          permissionSource={activePermissionSource}
           onClose={() => selectMember(null)}
         />
       )}

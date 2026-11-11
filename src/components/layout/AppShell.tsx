@@ -86,7 +86,7 @@ const navigationSections: readonly NavigationSection[] = [
   {
     label: "Manage",
     items: [
-      { to: "/staff", label: "Staff", icon: UserRoundCog, scope: "tenant", required: [permissions.staffRead] },
+      { to: "/staff", label: "Staff", icon: UserRoundCog, scope: "tenant-or-property", required: [permissions.staffRead] },
       { to: "/integrations", label: "Integrations", icon: Cable, scope: "tenant-or-property", required: [permissions.ingestionRead] },
       { to: "/privacy-requests", label: "Privacy requests", icon: ShieldCheck, scope: "tenant-or-property", required: [permissions.dataRightsRead] },
     ],
