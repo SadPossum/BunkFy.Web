@@ -645,7 +645,7 @@ function JoinSourceLifecycle({
           </h2>
           <p className="mt-1 text-sm leading-6 text-base-content/55">
             {kind === "invitation"
-              ? "Review recipient links, revoke access, or replace a lost invitation safely."
+              ? "Review invitations, revoke unused links, or replace a lost invitation."
               : "Review reusable links, disable enrollment, or replace a lost QR safely."}
           </p>
         </div>

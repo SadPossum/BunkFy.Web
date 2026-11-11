@@ -225,6 +225,25 @@ describe("property-scoped Staff directory", () => {
 });
 
 describe("invitation verification recovery", () => {
+  it.each([320, 390, 1024])("keeps verification controls usable at %ipx and preserves the code on resize", async width => {
+    const page = await open("?verification=1", width);
+    try {
+      const input = page.getByRole("textbox", { name: "Verification code", exact: true });
+      const confirm = page.getByRole("button", { name: "Verify and continue", exact: true });
+      const send = page.getByRole("button", { name: "Send code to viewer@example.invalid", exact: true });
+      await input.waitFor();
+      expect((await input.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await confirm.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await send.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await input.fill("valid-existing-code");
+      await page.setViewportSize({ width: width < 640 ? 1024 : 390, height: 900 });
+      expect(await input.inputValue()).toBe("valid-existing-code");
+      expect((await input.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await confirm.click(); await page.waitForFunction("window.staffFixture.confirmed===1");
+      expect((await requests(page)).filter(r => r.method === "POST")).toEqual([{ path: "/api/auth/email-verification/confirm", method: "POST", body: '{"code":"valid-existing-code"}' }]);
+    } finally { await page.close(); }
+  });
   it("accepts an existing code immediately without sending a replacement", async () => {
     const page = await open("?verification=1");
     try {
