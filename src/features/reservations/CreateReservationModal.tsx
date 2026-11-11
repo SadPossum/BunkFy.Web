@@ -530,11 +530,11 @@ export function CreateReservationModal({
             <FormGrid>
               <div className="space-y-3">
                 <DateField label="Arrival date" value={range.arrival} min={propertyToday} disabled={fieldsDisabled} onChange={(arrival) => { setRange((current) => ({ ...current, arrival })); setSelectedUnits([]); preselectedRange.current = ""; }} />
-                <TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} />
+                <TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} disabled={fieldsDisabled} onChange={setExpectedArrivalTime} />
               </div>
               <div className="space-y-3">
                 <DateField label="Departure date" value={range.departure} min={nextDate(range.arrival)} disabled={fieldsDisabled} onChange={(departure) => { setRange((current) => ({ ...current, departure })); setSelectedUnits([]); preselectedRange.current = ""; }} />
-                <TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} />
+                <TimeField label="Expected departure time (optional)" value={expectedDepartureTime} disabled={fieldsDisabled} onChange={setExpectedDepartureTime} />
               </div>
             </FormGrid>
             {invalidDates && <p className="text-sm text-error">Departure must be after arrival.</p>}
@@ -802,8 +802,8 @@ function DateField({ label, value, min, max, required = true, disabled, onChange
   return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" value={value} min={min} max={max} onChange={onChange} ariaLabel={label} required={required} disabled={disabled} /></div>;
 }
 
-function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><TimePicker className="w-full" value={value} onChange={onChange} ariaLabel={label} /></div>;
+function TimeField({ label, value, disabled, onChange }: { label: string; value: string; disabled: boolean; onChange: (value: string) => void }) {
+  return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><TimePicker className="w-full" value={value} onChange={onChange} ariaLabel={label} disabled={disabled} /></div>;
 }
 
 function emptyToNull(value: string | null | undefined) {

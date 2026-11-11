@@ -609,6 +609,24 @@ describe("R2 reservation repair regressions", () => {
 });
 
 describe("reservation form native content layout", () => {
+  it.each(["create", "edit"].flatMap(mode => ["Expected arrival time (optional)", "Expected departure time (optional)"].map(label => ({ mode, label }))))("closes the $mode $label time picker during access loss and preserves the applied value", async ({ mode, label }) => {
+    const page = await open(1024, `?${mode}`, 800);
+    try {
+      const trigger = page.getByRole("button", { name: label, exact: true });
+      const picker = page.getByRole("dialog", { name: label + " picker", exact: true });
+      const saved = await trigger.innerText(); await trigger.click();
+      await page.getByRole("textbox", { name: label + " minute", exact: true }).fill("22");
+      if (mode === "create") await recoveryAction(page, "setPermissionState", "unavailable"); else await change(page, "setCurrent", false);
+      await expect.poll(() => trigger.isDisabled()).toBe(true); await expect.poll(() => picker.isVisible()).toBe(false);
+      expect(await trigger.innerText()).toBe(saved); await noFixtureCommands(page);
+      if (mode === "create") await recoveryAction(page, "setPermissionState", "ready"); else await change(page, "setCurrent", true);
+      await expect.poll(() => trigger.isEnabled()).toBe(true); await trigger.click();
+      await page.getByRole("textbox", { name: label + " minute", exact: true }).fill("35");
+      await picker.getByRole("button", { name: "Apply", exact: true }).click();
+      expect(await trigger.innerText()).not.toBe(saved); await noFixtureCommands(page);
+    } finally { await page.close(); }
+  }, 25000);
+
   it.each(["Arrival date", "Departure date", "Date of birth (optional)"])("closes the creation %s calendar when permission evidence fails and retains the draft", async label => {
     const page = await open(1024, "?create", 800);
     try {
