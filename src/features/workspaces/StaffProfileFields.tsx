@@ -25,8 +25,8 @@ export function StaffProfileFields({
       </div>
       {!compact && (
         <div className="grid gap-4 sm:grid-cols-2">
-          <ProfileField label="Job title (optional)" value={value.jobTitle} onChange={(next) => update("jobTitle", next)} />
-          <ProfileField label="Department (optional)" value={value.department} onChange={(next) => update("department", next)} />
+          <ProfileField label="Job title (optional)" value={value.jobTitle} onChange={(next) => update("jobTitle", next)} maxLength={128} />
+          <ProfileField label="Department (optional)" value={value.department} onChange={(next) => update("department", next)} maxLength={128} />
         </div>
       )}
     </div>
@@ -40,6 +40,7 @@ function ProfileField({
   type = "text",
   required,
   autoComplete,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -47,6 +48,7 @@ function ProfileField({
   type?: string;
   required?: boolean;
   autoComplete?: string;
+  maxLength?: number;
 }) {
   return (
     <label className="form-control block">
@@ -58,7 +60,7 @@ function ProfileField({
         onChange={(event) => onChange(event.target.value)}
         required={required}
         autoComplete={autoComplete}
-        maxLength={type === "email" ? 320 : type === "tel" ? 64 : 256}
+        maxLength={maxLength ?? (type === "email" ? 320 : type === "tel" ? 64 : 256)}
       />
     </label>
   );
