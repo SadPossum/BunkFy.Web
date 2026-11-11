@@ -1,5 +1,6 @@
+import { CopyTextActions } from "../../components/ui/CopyTextActions";
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
-import { BadgeCheck, Copy, KeyRound, Link2, Mail, ShieldOff, Smartphone, Unlink } from "lucide-react";
+import { BadgeCheck, KeyRound, Link2, Mail, ShieldOff, Smartphone, Unlink } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import type {
@@ -191,7 +192,7 @@ export function MultiFactorPanel({ status, sourceState, canMutate }: { status: M
           <p className="text-sm font-semibold">Save these recovery codes now</p>
           <p className="mt-1 text-xs leading-5 text-base-content/55">Each code works once. They will not be shown again.</p>
           <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs">{recoveryCodes.map((code) => <code key={code} className="rounded bg-base-100 px-3 py-2">{code}</code>)}</div>
-          <div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" className="btn btn-outline btn-sm" onClick={() => void navigator.clipboard.writeText(recoveryCodes.join("\n"))}><Copy size={15} />Copy codes</button><button type="button" className="btn btn-primary btn-sm text-white" onClick={() => setRecoveryCodes([])}>I saved them</button></div>
+          <div className="mt-4"><CopyTextActions value={recoveryCodes.join("\n")} label="Copy codes" manualLabel="Recovery codes for manual copying" buttonClassName="btn btn-outline btn-sm"><button type="button" className="btn btn-primary btn-sm text-white" onClick={() => setRecoveryCodes([])}>I saved them</button></CopyTextActions></div>
         </div>
       ) : (
         <div className="mt-5 flex flex-col gap-4 rounded-lg bg-base-200/60 p-4 sm:flex-row sm:items-center sm:justify-between">

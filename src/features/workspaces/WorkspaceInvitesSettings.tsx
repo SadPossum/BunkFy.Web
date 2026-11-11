@@ -1,10 +1,9 @@
+import { CopyTextActions } from "../../components/ui/CopyTextActions";
 import { applicationUrl } from "../../app/deploymentBase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import {
-  Check,
   ClipboardCheck,
-  Copy,
   Link2,
   MailPlus,
   QrCode,
@@ -35,7 +34,7 @@ import {
   CompositeSourceFallback,
   CompositeSourceNotice,
 } from "../../components/ui/CompositeSourceNotice";
-import { ErrorState, Modal, ModalActions, StatusBadge } from "../../components/ui/primitives";
+import { ErrorState, Modal, StatusBadge } from "../../components/ui/primitives";
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
@@ -752,13 +751,7 @@ function JoinSourceRow({
 }
 
 function IssuedJoinLinkModal({ issued, onClose }: { issued: IssuedJoinLink; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
   const url = joinUrl(issued);
-  async function copyLink() {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
   return (
     <Modal
       open
@@ -771,12 +764,11 @@ function IssuedJoinLinkModal({ issued, onClose }: { issued: IssuedJoinLink; onCl
       </div>
       <p className="mt-5 break-all rounded-lg bg-base-200 p-3 font-mono text-xs text-base-content/60">{url}</p>
       <p className="mt-2 text-xs text-base-content/45">Configured lifetime: {issued.lifetimeHours} hours.</p>
-      <ModalActions>
-        <button className="btn btn-ghost" onClick={onClose}>Close</button>
-        <button className="btn btn-primary text-white" onClick={() => void copyLink()}>
-          {copied ? <Check size={17} /> : <Copy size={17} />}{copied ? "Copied" : "Copy link"}
-        </button>
-      </ModalActions>
+      <div className="mt-5">
+        <CopyTextActions value={url} label="Copy link" manualLabel="Invitation link for manual copying" buttonClassName="btn btn-primary text-white">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Close</button>
+        </CopyTextActions>
+      </div>
     </Modal>
   );
 }
