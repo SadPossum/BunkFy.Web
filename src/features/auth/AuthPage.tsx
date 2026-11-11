@@ -60,6 +60,11 @@ export function AuthPage({ invitation = false, invitationUnavailable, confirmInv
   } = useSession();
   const [requestedMode, setMode] = useState<"login" | "register">(invitation ? "register" : "login");
   const mode = invitationUnavailable ? "login" : requestedMode;
+  const formGeneration = useRef(0);
+  useLayoutEffect(() => {
+    formGeneration.current++;
+    return () => { formGeneration.current++; };
+  }, [mode]);
   const [staffProfile, setStaffProfile] = useState<StaffProfileDraft>(() => defaultStaffProfile());
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -127,6 +132,7 @@ export function AuthPage({ invitation = false, invitationUnavailable, confirmInv
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const generation = formGeneration.current;
     setSubmitting(true);
     setError("");
     if (mode === "register" && !passwordRegistrationAvailable) {
@@ -149,7 +155,9 @@ export function AuthPage({ invitation = false, invitationUnavailable, confirmInv
     try {
       if (mode === "register") {
         if (confirmInvitation && !await confirmInvitation()) return;
+        if (formGeneration.current !== generation) return;
         const latest = await selfRegistration.refetch();
+        if (formGeneration.current !== generation) return;
         const latestCurrent = !latest.isFetching && latest.error == null;
         if (!passwordRegistrationAllowed(latestCurrent, latest.data)) {
           if (latest.error) {

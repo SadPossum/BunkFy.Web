@@ -632,6 +632,56 @@ const inactiveLinks = [
 ] as const;
 
 describe("inactive invitation links and existing access recovery", () => {
+  it.each(["source", "policy", "sign-in mode"] as const)("abandons registration when the form is replaced during %s", async phase => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const contexts = new Map<string, { sourceKind: number }>();
+    const writes: string[] = [];
+    let checkingRegistration = false;
+    let held = false;
+    let release: (() => void) | undefined;
+    await page.route(url => url.pathname.startsWith("/api/"), async route => {
+      const path = await resolveJoinTransport(route, contexts);
+      if (path === null) return;
+      if (checkingRegistration && !held && path.endsWith(phase === "source" ? "/preview" : "/self-registration")) {
+        held = true;
+        await new Promise<void>(resolve => { release = resolve; });
+      }
+      if (route.request().method() !== "GET" && !path.endsWith("/preview")) writes.push(path);
+      const body = path.endsWith("/preview") ? {
+        organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId,
+        expiresAtUtc: "2030-01-01T00:00:00Z", approvalMode: "requiresApproval", status: "active",
+      } : path.endsWith("/self-registration") ? { passwordEnabled: true, externalEnabled: true } : { providers: [] };
+      await route.fulfill({ status: path.endsWith("/register") ? 500 : 200, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    try {
+      await page.goto(origin + "join?bootstrap=1#enrollment=synthetic-first-registration-link");
+      await page.getByRole("heading", { name: "Join your team", exact: true }).waitFor();
+      await page.evaluate(() => { (window as unknown as { navigationProbe: string }).navigationProbe = "same-document"; });
+      await page.getByLabel("Email", { exact: true }).fill("applicant@example.invalid");
+      await page.locator('input[name="password"]').fill("Synthetic-Password-For-Tests-42!");
+      await page.locator('input[name="confirmPassword"]').fill("Synthetic-Password-For-Tests-42!");
+      await page.getByLabel("Display name", { exact: true }).fill("Synthetic applicant");
+      checkingRegistration = true;
+      await page.getByRole("button", { name: "Create account", exact: true }).click();
+      await expect.poll(() => held).toBe(true);
+      if (phase === "sign-in mode") {
+        await page.getByRole("button", { name: "Sign in", exact: true }).click();
+        await page.getByRole("heading", { name: "Sign in to join", exact: true }).waitFor();
+      } else {
+        await page.goto(origin + "join?bootstrap=1#enrollment=synthetic-replacement-link");
+        await expect.poll(() => contexts.size).toBe(2);
+        await page.getByRole("heading", { name: "Join your team", exact: true }).waitFor();
+        expect(await page.locator('input[name="username"]').inputValue()).toBe("");
+      }
+      expect(await page.evaluate(() => (window as unknown as { navigationProbe: string }).navigationProbe)).toBe("same-document");
+      release!();
+      await page.waitForLoadState("networkidle");
+      expect(writes).toEqual([]);
+      expect(await page.locator('input[name="username"]').inputValue()).toBe(phase === "sign-in mode" ? "applicant@example.invalid" : "");
+    } finally { release?.(); await context.close(); }
+  }, 15000);
+
   it.each(["disabled", "unavailable"] as const)("rechecks a link before registration when it becomes %s", async outcome => {
     const context = await browser.newContext();
     const page = await context.newPage();
