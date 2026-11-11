@@ -107,14 +107,16 @@ export function ManualBlockGroupWorkflowModal({
   const [previewFingerprint, setPreviewFingerprint] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ManualBlockGroupMutationReceipt | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const previewSequenceRef = useRef(0);
 
   const previewMutation = useMutation({
-    mutationFn: (candidate: ManualBlockGroupDraft) => {
+    mutationFn: ({ candidate }: { candidate: ManualBlockGroupDraft; sequence: number }) => {
       requireAuthority();
       return previewManualBlockGroup(request, propertyId, buildManualBlockGroupPreviewRequest(candidate, replacing));
     },
-    onSuccess: (_preview, candidate) => {
-      if (!mounted.current) return;
+    onSuccess: (_preview, { candidate, sequence }) => {
+      // Resetting the observer does not cancel its older request's callbacks.
+      if (!mounted.current || sequence !== previewSequenceRef.current) return;
       setPreviewFingerprint(manualBlockGroupDraftFingerprint(propertyId, candidate, replacing));
       setStep("review");
     },
@@ -204,6 +206,7 @@ export function ManualBlockGroupWorkflowModal({
   }
 
   function invalidatePreview() {
+    previewSequenceRef.current += 1;
     setValidationError(null);
     setPreviewFingerprint(null);
     if (step !== "result") setStep("edit");
@@ -229,7 +232,14 @@ export function ManualBlockGroupWorkflowModal({
     const error = validateDraft(draft, selectedOption);
     setValidationError(error);
     if (error) return;
-    previewMutation.mutate({ ...draft, reason: draft.reason.trim() });
+    startPreview();
+  }
+
+  function startPreview() {
+    previewMutation.mutate({
+      candidate: { ...draft, reason: draft.reason.trim() },
+      sequence: ++previewSequenceRef.current,
+    });
   }
 
   function confirm() {
@@ -238,6 +248,7 @@ export function ManualBlockGroupWorkflowModal({
   }
 
   function previewAgain() {
+    previewSequenceRef.current += 1;
     attemptRef.current = null;
     confirmMutation.reset();
     setPreviewFingerprint(null);
@@ -338,7 +349,7 @@ export function ManualBlockGroupWorkflowModal({
             <span className="mt-1 block text-right text-xs text-base-content/40">{draft.reason.length}/500</span>
           </label>
           {validationError && <div role="alert" className="alert alert-warning text-sm">{validationError}</div>}
-          {previewMutation.error && <ErrorState error={previewMutation.error} retry={() => previewMutation.mutate({ ...draft, reason: draft.reason.trim() })} title="Couldn't preview the block group" />}
+          {previewMutation.error && <ErrorState error={previewMutation.error} retry={startPreview} title="Couldn't preview the block group" />}
           <ModalActions>
             <button type="button" className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose} disabled={busy}>Cancel</button>
             <button type="submit" className="btn btn-primary btn-sm min-w-32 sm:btn-md" disabled={busy || !selectedOption || !authorityCurrent}>
