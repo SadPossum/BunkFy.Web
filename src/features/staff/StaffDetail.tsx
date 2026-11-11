@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
   BriefcaseBusiness,
@@ -26,7 +26,6 @@ import type {
   StaffMemberMutationReceipt,
 } from "../../api/types";
 import { staffStatusLabel } from "../../api/labels";
-import { ApiError } from "../../api/client";
 import { browserIsOnline } from "../../api/requestConnectivity";
 import { useNetworkStatus } from "../../app/networkStatus";
 import { isInsufficientAuthenticationError } from "../../app/authenticationAssurance";
@@ -60,6 +59,7 @@ import {
 import {
   resolveStaffAuthSubjectTransition,
 } from "./staffAuthSubjectTransition";
+import { useStaffReadDenial } from "./useStaffReadDenial";
 import { StaffAuthorityNotice } from "./StaffAuthorityNotice";
 import { StaffAssignmentsPanel } from "./StaffAssignmentsPanel";
 import {
@@ -178,8 +178,8 @@ export function StaffDetail({
     queryFn: () => request<StaffMember>(`/api/staff/members/${memberId}/profile`),
     enabled: Boolean(memberId && canReadSensitive),
   });
-  const directoryDenied = useStaffReadDenial(directory, tenantId, memberId, "directory");
-  const profileDenied = useStaffReadDenial(profile, tenantId, memberId, "profile");
+  const directoryDenied = useStaffReadDenial(directory, ["staff-member", memberId, tenantId, "directory"]);
+  const profileDenied = useStaffReadDenial(profile, ["staff-member", memberId, tenantId, "profile"]);
   const directorySource = createCompositeSource({
     label: "Staff directory detail",
     hasData: !directoryDenied && directory.data !== undefined,
@@ -784,38 +784,6 @@ export function StaffDetail({
     </Modal>
     </div>
   );
-}
-
-// A denied read is not an ordinary stale-data outage. Conceal immediately, then
-// evict only the settled denied cache entry owned by this tenant/member/source.
-// The observer can retain its old result after removal, so keep a local latch
-// until that observer receives a successful fresh result. Cache eviction also
-// prevents a later route/modal mount from reviving the rejected snapshot on503.
-function useStaffReadDenial(query: UseQueryResult<unknown, Error>, tenantId: string, memberId: string | null, kind: "directory" | "profile") {
-  const client = useQueryClient();
-  const identity = JSON.stringify([tenantId, memberId, kind]);
-  const [deniedIdentity, setDeniedIdentity] = useState<string | null>(null);
-  const observedDenial = query.error instanceof ApiError && (query.error.status === 403 || query.error.status === 401);
-  const successfulRead = query.isSuccess && !query.isFetching && query.data !== undefined;
-  const denied = observedDenial || (deniedIdentity === identity && !successfulRead);
-
-  useEffect(() => {
-    if (!memberId) return;
-    if (observedDenial) {
-      setDeniedIdentity(identity);
-      if (query.isFetching || query.data === undefined) return;
-      const key = ["staff-member", memberId, tenantId, kind];
-      const cached = client.getQueryState(key);
-      if (cached?.status === "error" && cached.fetchStatus === "idle"
-        && cached.error === query.error && cached.data === query.data
-        && cached.errorUpdatedAt === query.errorUpdatedAt && cached.dataUpdatedAt === query.dataUpdatedAt) {
-        client.removeQueries({ queryKey: key, exact: true });
-      }
-    } else if (successfulRead && deniedIdentity === identity) {
-      setDeniedIdentity(null);
-    }
-  }, [client, tenantId, memberId, kind, identity, observedDenial, successfulRead, deniedIdentity, query.isFetching, query.data, query.error, query.errorUpdatedAt, query.dataUpdatedAt]);
-  return denied;
 }
 
 type StaffProfileFocusIntent = {
