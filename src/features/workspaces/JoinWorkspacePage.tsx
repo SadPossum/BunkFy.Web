@@ -451,6 +451,7 @@ export function JoinWorkspacePage() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (join.isPending || workspaceActivation.isPending || preview.isFetching) return;
     if (showAccessProgress || requestRejected || withdrawalResolution || (!sourceAcceptsApplications && !acceptedInvitation)) return;
     join.mutate();
   }
@@ -577,7 +578,7 @@ export function JoinWorkspacePage() {
                 disabled={preview.isFetching} onClick={() => void preview.refetch()}>Refresh invitation</button>
             </div>}
             {sourceAcceptsApplications && !withdrawalResolution && !showAccessProgress && !requestRejected && !provisioningFailed && (
-              <div className="py-6">
+              <fieldset className="min-w-0 py-6" disabled={join.isPending || workspaceActivation.isPending}>
                 <h2 className="font-display text-xl font-semibold">
                   Your staff profile
                 </h2>
@@ -588,7 +589,7 @@ export function JoinWorkspacePage() {
                   value={staffProfile}
                   onChange={updateStaffProfile}
                 />
-              </div>
+              </fieldset>
             )}
 
             {withdrawalResolution && (

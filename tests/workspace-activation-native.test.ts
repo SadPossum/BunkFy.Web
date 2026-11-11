@@ -68,6 +68,138 @@ beforeAll(async () => {
 afterAll(async () => { await browser?.close(); await server?.close(); });
 
 describe("native workspace activation with existing workspace selection", () => {
+  it.each(["write", "readback", "retry"] as const)("keeps the pending owner profile fixed through %s and preserves retry identity", async phase => {
+    const context = await browser.newContext();
+    await context.addInitScript(value => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(value)), identity);
+    const page = await context.newPage();
+    let createdId = "", held = false, rejectSave = phase === "retry";
+    let release: (() => void) | undefined;
+    const writes: Record<string, unknown>[] = [], unexpected: string[] = [];
+    await page.route(url => url.pathname.startsWith("/api/"), async route => {
+      const request = route.request(), path = new URL(request.url()).pathname;
+      let status = 200, body: unknown;
+      if (path === "/api/auth/browser/refresh") body = { accessToken: token };
+      else if (path === "/api/organizations" && request.method() === "POST") {
+        createdId = request.postDataJSON().operationId;
+        body = membership(createdId);
+      } else if (path === "/api/organizations") {
+        body = { items: [membership(homeId), ...(createdId ? [membership(createdId)] : [])], page: 1, pageSize: 100, hasMore: false };
+      } else if (path === "/api/properties") body = { properties: [], page: 1, pageSize: 100, hasMore: false };
+      else if (path === "/api/staff/me" && request.method() === "PUT") {
+        writes.push(request.postDataJSON());
+        if (phase !== "readback" && writes.length === 1) {
+          held = true;
+          await new Promise<void>(resolve => { release = resolve; });
+        }
+        status = rejectSave ? 503 : 200;
+        body = rejectSave ? { code: "Test.SaveUnavailable", message: "Synthetic save unavailable" } : { staffMemberId: "staff", version: 2 };
+      } else if (path === "/api/staff/me") {
+        if (phase === "readback" && writes.length) {
+          held = true;
+          await new Promise<void>(resolve => { release = resolve; });
+        }
+        body = { staffMemberId: "staff", version: writes.length && !rejectSave ? 2 : 1, displayName: "Owner" };
+      } else { unexpected.push(path); status = 500; body = { code: "Test.UnexpectedRoute" }; }
+      await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    try {
+      await page.goto(origin + "join?create=1");
+      await page.getByLabel("Workspace name", { exact: true }).fill("New hostel");
+      await page.getByRole("button", { name: "Create and continue", exact: true }).click();
+      await page.getByRole("heading", { name: "Create your staff profile", exact: true }).waitFor();
+      const displayName = page.getByLabel("Display name", { exact: true });
+      await displayName.fill("Submitted owner");
+      await page.getByLabel("Job title (optional)", { exact: true }).fill("Night manager");
+      const finish = page.getByRole("button", { name: "Finish setup", exact: true });
+      await finish.click();
+      await expect.poll(() => held).toBe(true);
+      const fields = await page.locator("form input").all();
+      expect(fields).toHaveLength(6);
+      for (const field of fields) expect(await field.isDisabled()).toBe(true);
+      expect(await finish.isDisabled()).toBe(true);
+      await page.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      expect(writes).toHaveLength(1);
+      release!();
+      if (phase === "retry") {
+        await page.getByRole("alert").waitFor();
+        expect(await displayName.inputValue()).toBe("Submitted owner");
+        expect(await page.getByLabel("Job title (optional)", { exact: true }).inputValue()).toBe("Night manager");
+        expect(await displayName.isEnabled()).toBe(true);
+        rejectSave = false;
+        await finish.click();
+      }
+      await page.getByRole("navigation", { name: "Main navigation" }).waitFor();
+      expect(writes).toHaveLength(phase === "retry" ? 2 : 1);
+      if (phase === "retry") expect(writes[1]).toEqual(writes[0]);
+      expect(writes[0]).toMatchObject({ displayName: "Submitted owner", jobTitle: "Night manager", expectedVersion: 1 });
+      expect(await page.locator("[data-tenant]").textContent()).toBe(createdId);
+      expect(unexpected).toEqual([]);
+    } finally { release?.(); await context.close(); }
+  }, 30000);
+
+  it.each(["recheck", "application"] as const)("keeps the pending joining profile fixed during %s", async phase => {
+    const context = await browser.newContext();
+    await context.addInitScript(value => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(value)), identity);
+    const page = await context.newPage(), contexts = new Map<string, { sourceKind: number }>();
+    let previewReads = 0, held = false, acceptances = 0, submitting = false, readsAtHold = 0;
+    let release: (() => void) | undefined;
+    const applications: Record<string, unknown>[] = [], unexpected: string[] = [];
+    await page.route(url => url.pathname.startsWith("/api/"), async route => {
+      const path = await resolveJoinTransport(route, contexts);
+      if (path === null) return;
+      let status = 200, body: unknown;
+      if (path === "/api/auth/browser/refresh") body = { accessToken: token };
+      else if (path === "/api/organizations") body = { items: [membership(homeId), membership(targetId)], page: 1, pageSize: 100, hasMore: false };
+      else if (path === "/api/properties") body = { properties: [], page: 1, pageSize: 100, hasMore: false };
+      else if (path === "/api/organization-invitations/preview") {
+        previewReads++;
+        if (phase === "recheck" && submitting && !held) {
+          held = true;
+          readsAtHold = previewReads;
+          await new Promise<void>(resolve => { release = resolve; });
+        }
+        body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", invitationId: sourceId,
+          expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: false, status: "pending" };
+      } else if (path === "/api/workspace-staff-enrollment/applications") {
+        applications.push(route.request().postDataJSON());
+        if (phase === "application" && applications.length === 1) {
+          held = true;
+          readsAtHold = previewReads;
+          await new Promise<void>(resolve => { release = resolve; });
+        }
+        body = { organizationId: targetId, applicationId: "application", status: 1 };
+      } else if (path === "/api/organization-invitations/accept") {
+        acceptances++;
+        body = { membership: membership(targetId) };
+      } else { unexpected.push(path); status = 500; body = { code: "Test.UnexpectedRoute" }; }
+      await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    try {
+      await page.goto(origin + "join#invitation=synthetic-pending-profile");
+      await page.getByLabel("Display name", { exact: true }).fill("Submitted colleague");
+      await page.getByLabel("Job title (optional)", { exact: true }).fill("Front desk");
+      const joinButton = page.getByRole("button", { name: "Join workspace", exact: true });
+      await expect.poll(() => joinButton.isEnabled()).toBe(true);
+      submitting = true;
+      await joinButton.click();
+      await expect.poll(() => held).toBe(true);
+      const fields = await page.locator("form input").all();
+      expect(fields).toHaveLength(6);
+      for (const field of fields) expect(await field.isDisabled()).toBe(true);
+      await page.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      expect(previewReads).toBe(readsAtHold);
+      expect(applications).toHaveLength(phase === "application" ? 1 : 0);
+      release!();
+      await page.getByRole("navigation", { name: "Main navigation" }).waitFor();
+      expect(applications).toHaveLength(1);
+      expect(applications[0]).toMatchObject({ displayName: "Submitted colleague", jobTitle: "Front desk" });
+      expect(acceptances).toBe(1);
+      expect(unexpected).toEqual([]);
+    } finally { release?.(); await context.close(); }
+  }, 30000);
+
   it.each([false, true])("keeps a newly created workspace selected through owner setup, existing workspace=%s", async existingWorkspace => {
     const context = await browser.newContext();
     await context.addInitScript(value => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(value)),
