@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Cable, ChevronRight, ClipboardCheck, Plus, Radio, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Activity, Cable, ChevronRight, ClipboardCheck, Plus, Radio, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { adapterConflictPolicyLabel, adapterConflictPolicyValue, adapterConnectionStatusLabel, adapterExecutionModeKey, adapterExecutionModeLabel, adapterExecutionModeValue } from "../../api/labels";
@@ -20,6 +20,7 @@ import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { ConnectionDetail } from "./ConnectionDetail";
+import { ConflictPolicyNotice } from "./ConflictPolicyNotice";
 import {
   resolveConnectionCreateAttempt,
   type ConnectionCreateAttempt,
@@ -539,23 +540,7 @@ function CreateConnectionModal({ open, propertyId, adapterTypes, adapterTypeSour
               />
             </label>
           </div>
-          <div className="rounded-lg border border-primary/15 bg-primary/5 p-4">
-            <div className="flex items-start gap-3">
-              <ShieldCheck size={17} className="mt-0.5 text-primary" />
-              <div>
-                <p className="text-sm font-semibold">
-                  {conflictPolicy === "suggestionsOnly"
-                    ? "Staff review every conflicting update"
-                    : "Apply only against an unchanged adapter baseline"}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-base-content/50">
-                  {conflictPolicy === "suggestionsOnly"
-                    ? "Nothing changes a reservation until an authorized staff member accepts the proposal."
-                    : "BunkFy applies an update only while the reservation still matches the last accepted adapter revision."}
-                </p>
-              </div>
-            </div>
-          </div>
+          <ConflictPolicyNotice policy={adapterConflictPolicyValue(conflictPolicy)} />
           <TextField
             label="Configuration reference"
             name="configurationReference"
