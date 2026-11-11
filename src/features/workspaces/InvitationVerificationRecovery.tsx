@@ -98,7 +98,7 @@ export function InvitationVerificationRecovery({
       {activeEmail && !codeSent && (
         <button
           type="button"
-          className="btn btn-outline btn-sm mt-4 h-auto min-h-8 w-full justify-start whitespace-normal py-2 text-left leading-5 [overflow-wrap:anywhere] sm:w-auto sm:justify-center sm:text-center"
+          className="btn btn-outline btn-sm mt-4 h-auto min-h-12 w-full justify-start whitespace-normal py-2 text-left leading-5 [overflow-wrap:anywhere] sm:w-auto sm:justify-center sm:text-center"
           disabled={verification.isPending}
           onClick={() =>
             verification.mutate({ kind: "send", emailId: activeEmail.id })
@@ -113,7 +113,7 @@ export function InvitationVerificationRecovery({
       {activeEmail && (
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input
-            className="input input-bordered flex-1 bg-base-100"
+            className="input input-bordered h-12 min-h-12 w-full min-w-0 bg-base-100 sm:flex-1"
             aria-label="Verification code"
             value={code}
             onChange={(event) => setCode(event.target.value)}
@@ -122,7 +122,7 @@ export function InvitationVerificationRecovery({
           />
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary min-h-12"
             disabled={verification.isPending || !code.trim()}
             onClick={() =>
               verification.mutate({ kind: "confirm", code: code.trim() })
