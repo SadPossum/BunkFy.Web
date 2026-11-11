@@ -456,6 +456,8 @@ export function CreateReservationModal({
     setPhone(guest.phone || "");
   }
 
+  const fieldsDisabled = mutation.isPending || !mayLoadInventory;
+
   return (
     <Modal
       open
@@ -504,7 +506,7 @@ export function CreateReservationModal({
         </p>}
         {showReservationForm && exactReplay && <p className="rounded border border-warning/30 p-3 text-sm" role="status">The previous creation result is unconfirmed. Retry the same reservation to recover it without a duplicate, even if its bed is now held. Check or acknowledge the previous save before sending any changed booking.</p>}
 
-        <fieldset className="min-w-0 space-y-4" disabled={mutation.isPending || !mayLoadInventory}>
+        <fieldset className="min-w-0 space-y-4" disabled={fieldsDisabled}>
         {showPersonalFields && (entered || mayLoadInventory) && (step === "reservation" ? (
           <>
             {completedSource && <p className="rounded border border-base-300 p-3 text-sm" data-completed-space-hint>
@@ -527,11 +529,11 @@ export function CreateReservationModal({
             <FormSection title="Stay" headingRef={stepHeading}>
             <FormGrid>
               <div className="space-y-3">
-                <DateField label="Arrival date" value={range.arrival} min={propertyToday} onChange={(arrival) => { setRange((current) => ({ ...current, arrival })); setSelectedUnits([]); preselectedRange.current = ""; }} />
+                <DateField label="Arrival date" value={range.arrival} min={propertyToday} disabled={fieldsDisabled} onChange={(arrival) => { setRange((current) => ({ ...current, arrival })); setSelectedUnits([]); preselectedRange.current = ""; }} />
                 <TimeField label="Expected arrival time (optional)" value={expectedArrivalTime} onChange={setExpectedArrivalTime} />
               </div>
               <div className="space-y-3">
-                <DateField label="Departure date" value={range.departure} min={nextDate(range.arrival)} onChange={(departure) => { setRange((current) => ({ ...current, departure })); setSelectedUnits([]); preselectedRange.current = ""; }} />
+                <DateField label="Departure date" value={range.departure} min={nextDate(range.arrival)} disabled={fieldsDisabled} onChange={(departure) => { setRange((current) => ({ ...current, departure })); setSelectedUnits([]); preselectedRange.current = ""; }} />
                 <TimeField label="Expected departure time (optional)" value={expectedDepartureTime} onChange={setExpectedDepartureTime} />
               </div>
             </FormGrid>
@@ -612,6 +614,7 @@ export function CreateReservationModal({
         ) : (
           <GuestProfileStep
             headingRef={stepHeading}
+            fieldsDisabled={fieldsDisabled}
             nationalityDisabled={mutation.isPending || !mayLoadInventory || !canCreateGuests || !canManageGuests}
             guestName={guestName}
             email={email}
@@ -664,6 +667,7 @@ function ReservationStepIndicator({ step }: { step: ReservationStep }) {
 }
 
 function GuestProfileStep({
+  fieldsDisabled,
   headingRef,
   nationalityDisabled,
   guestName,
@@ -683,6 +687,7 @@ function GuestProfileStep({
 }: {
   headingRef: Ref<HTMLHeadingElement>;
   nationalityDisabled: boolean;
+  fieldsDisabled: boolean;
   guestName: string;
   email: string;
   phone: string;
@@ -710,7 +715,7 @@ function GuestProfileStep({
         </div>
       </div></FormSpan>
       <FormSpan><ControlledTextField label="Legal name (optional)" value={legalName} onChange={onLegalNameChange} placeholder="As shown on identification" autoComplete="name" required={false} maxLength={256} /></FormSpan>
-        <DateField label="Date of birth (optional)" value={dateOfBirth} max={maximumDateOfBirth} required={false} onChange={onDateOfBirthChange} />
+        <DateField label="Date of birth (optional)" value={dateOfBirth} max={maximumDateOfBirth} disabled={fieldsDisabled} required={false} onChange={onDateOfBirthChange} />
         <div className="form-control min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">Nationality (optional)</span><NationalityPicker value={nationalityCountryCode} onChange={onNationalityChange} disabled={nationalityDisabled} /></div>
       <FormSpan><LanguagePicker value={languageTags} onChange={onLanguageChange} disabled={nationalityDisabled}
         onDisabledClose={() => recoveryHeading.current?.focus()} /></FormSpan>
@@ -793,8 +798,8 @@ function ControlledTextArea({ label, value, onChange, placeholder, maxLength }: 
   );
 }
 
-function DateField({ label, value, min, max, required = true, onChange }: { label: string; value: string; min?: string; max?: string; required?: boolean; onChange: (value: string) => void }) {
-  return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" value={value} min={min} max={max} onChange={onChange} ariaLabel={label} required={required} /></div>;
+function DateField({ label, value, min, max, required = true, disabled, onChange }: { label: string; value: string; min?: string; max?: string; required?: boolean; disabled: boolean; onChange: (value: string) => void }) {
+  return <div className="form-control block"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" value={value} min={min} max={max} onChange={onChange} ariaLabel={label} required={required} disabled={disabled} /></div>;
 }
 
 function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

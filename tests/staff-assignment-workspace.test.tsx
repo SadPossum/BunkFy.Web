@@ -385,6 +385,29 @@ describe("assignment focused field reflow", () => {
 });
 
 describe("staff local work-location workspace", () => {
+  it.each(["add", "end"].flatMap(action => ["refreshing", "unavailable"].map(boundary => ({ action, boundary }))))("closes the $action assignment calendar during $boundary access and preserves its draft", async ({ action, boundary }) => {
+    const page = await open(1024);
+    try {
+      if (action === "add") await addAtCanal(page); else await endAtHarbour(page);
+      const label = action === "add" ? "Effective from" : "Effective through";
+      const date = page.locator(`input[name="${action === "add" ? "effectiveFrom" : "effectiveTo"}"]`);
+      const trigger = page.getByRole("button", { name: new RegExp(`^${label}:`) });
+      const calendar = page.getByRole("dialog", { name: `${label} calendar`, exact: true });
+      await trigger.click(); await calendar.locator('[role="gridcell"] button:enabled').nth(3).click();
+      const draft = await date.inputValue();
+      await trigger.click();
+      await change(page, { permissionState: boundary });
+      expect(await trigger.isDisabled()).toBe(true);
+      await expect.poll(() => calendar.isVisible()).toBe(false);
+      expect(await writes(page)).toEqual([]);
+      await change(page, { permissionState: "ready" });
+      expect(await trigger.isEnabled()).toBe(true); expect(await date.inputValue()).toBe(draft);
+      await trigger.click(); await calendar.locator('[role="gridcell"] button:enabled').nth(6).click();
+      expect(await date.inputValue()).not.toBe(draft);
+      expect(await writes(page)).toEqual([]);
+    } finally { await page.close(); }
+  }, 20000);
+
   it("keeps short contextual actions contained at320 and returns Cancel to the exact row", async () => {
     const page = await open();
     try {
