@@ -56,6 +56,7 @@ import { ManualBlockGroupDirectory } from "./ManualBlockGroupDirectory";
 import { sessionIdentityKey } from "../../app/singleFlightRefresh";
 import { OwnerOriginLink } from "../spaces/OwnerOriginLink";
 import { PropertyRequiredState } from "../properties/PropertyRequiredState";
+import { initialInventoryRefreshInterval } from "./initialInventoryRefresh";
 
 export function InventoryPage() {
   const { request, session } = useSession();
@@ -119,6 +120,7 @@ export function InventoryPage() {
     queryKey: ["inventory-rooms", selectedPropertyId],
     queryFn: ({ signal }) => loadAllRoomInventory(request, selectedPropertyId!, signal),
     enabled,
+    refetchInterval: initialInventoryRefreshInterval,
   });
   const availability = useQuery({
     queryKey: ["availability", selectedPropertyId, range.arrival, range.departure],
@@ -130,6 +132,7 @@ export function InventoryPage() {
       signal,
     ),
     enabled: enabled && validStayDateRange(range),
+    refetchInterval: initialInventoryRefreshInterval,
   });
   const blocks = useQuery({
     queryKey: ["blocks", selectedPropertyId, "active", range.arrival, range.departure],
@@ -141,6 +144,7 @@ export function InventoryPage() {
       { from: range.arrival, to: range.departure },
     ),
     enabled: enabled && validStayDateRange(range),
+    refetchInterval: initialInventoryRefreshInterval,
   });
   const inventoryContextMismatch = Boolean(
     inventory.data && !roomInventoryMatchesProperty(inventory.data.rooms, selectedPropertyId),

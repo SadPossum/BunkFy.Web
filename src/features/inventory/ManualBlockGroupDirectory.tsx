@@ -18,6 +18,7 @@ import { ManualBlockGroupWorkflowModal, type ManualBlockGroupWorkflow } from "./
 import { manualBlockGroupStatusLabel, manualBlockGroupTargetLabel } from "./manualBlockGroupWorkflow";
 import type { ManualBlockMutationAttempt } from "./manualBlockMutationAttempt";
 import { ReleaseManualBlockGroupModal } from "./ReleaseManualBlockGroupModal";
+import { initialInventoryRefreshInterval } from "./initialInventoryRefresh";
 
 type View = "active" | "partial" | "all";
 
@@ -54,6 +55,7 @@ function DirectoryPage({ propertyId, propertyName, propertyTimeZoneId, rooms, ma
     queryKey: ["inventory-block-groups", propertyId, view, page.cursor],
     queryFn: ({ signal }) => loadManualBlockGroupPage(request, propertyId, view === "all" ? null : view === "partial" ? 2 : 1, page.cursor, signal),
     enabled: mayReadCurrent,
+    refetchInterval: initialInventoryRefreshInterval,
   });
   const source = createCompositeSource({ label: "Block groups", hasData: groups.data !== undefined,
     isLoading: groups.isLoading, error: groups.error, isFetching: groups.isFetching, refetch: () => groups.refetch() });
