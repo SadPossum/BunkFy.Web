@@ -37,6 +37,7 @@ import {
 import { PaginationBar } from "../../components/ui/PaginationBar";
 import { SelectPicker } from "../../components/ui/SelectPicker";
 import { hasPrimaryGuestRecord } from "../reservations/guestRecordWorkflow";
+import { ProposalDifference } from "./ProposalDifference";
 import {
   integrationSelectionSearchParams,
   integrationViewState,
@@ -53,11 +54,13 @@ export function ProposalQueue({
   canReadSensitiveHistory,
   canDecide,
   canSuggestGuestRecords,
+  canReadInventory = false,
 }: {
   propertyId: string;
   canReadSensitiveHistory: boolean;
   canDecide: boolean;
   canSuggestGuestRecords: boolean;
+  canReadInventory?: boolean;
 }) {
   const { request } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -161,6 +164,7 @@ export function ProposalQueue({
         proposalId={canReadSensitiveHistory ? view.selectedProposalId : null}
         canDecide={canDecide}
         canSuggestGuestRecords={canSuggestGuestRecords}
+        canReadInventory={canReadInventory}
         onClose={() => select(null)}
       />
     </>
@@ -210,12 +214,14 @@ function ProposalDetail({
   proposalId,
   canDecide,
   canSuggestGuestRecords,
+  canReadInventory,
   onClose,
 }: {
   propertyId: string;
   proposalId: string | null;
   canDecide: boolean;
   canSuggestGuestRecords: boolean;
+  canReadInventory: boolean;
   onClose: () => void;
 }) {
   const { request } = useSession();
@@ -278,6 +284,7 @@ function ProposalDetail({
   const item = proposal.data;
   const isPending = item && proposalStatusLabel(item.status) === "pending";
   const revisionChanged = item
+    && isPending
     && reservation.data
     && reservation.data.detailsRevision !== item.baseReservationDetailsRevision;
   const suggestGuestRecord = canSuggestGuestRecords
@@ -305,7 +312,7 @@ function ProposalDetail({
     <Modal
       open={Boolean(proposalId)}
       size="lg"
-      title={item ? humanize(item.reasonCode) : "Change proposal"}
+      title={item ? (isPending ? "Review booking change" : "Booking change history") : "Change proposal"}
       description={item
         ? `Reservation ${item.reservationId.slice(0, 8).toUpperCase()} · proposal ${item.proposalId.slice(0, 8).toUpperCase()}`
         : "Loading proposal"}
@@ -324,6 +331,7 @@ function ProposalDetail({
                 <p className="mt-1 text-xs text-base-content/50">
                   Connection {item.connectionId.slice(0, 8).toUpperCase()} · receipt {item.receiptId.slice(0, 8).toUpperCase()}
                 </p>
+                <p className="mt-1 text-xs text-base-content/50">Review reason: {humanize(item.reasonCode)}</p>
               </div>
               <StatusBadge status={proposalStatusLabel(item.status)} />
             </div>
@@ -346,6 +354,7 @@ function ProposalDetail({
               </span>
             </div>
           )}
+          <ProposalDifference value={item.diff} propertyId={propertyId} canReadInventory={canReadInventory} />
           {suggestGuestRecord && (
             <div className="flex flex-col gap-3 rounded-lg border border-primary/15 bg-primary/5 p-4 sm:flex-row sm:items-center">
               <UserPlus size={19} className="shrink-0 text-primary" />
@@ -361,18 +370,6 @@ function ProposalDetail({
               </Link>
             </div>
           )}
-          <section aria-labelledby="proposal-difference-heading">
-            <h3 id="proposal-difference-heading" className="font-display text-lg font-semibold">Proposed difference</h3>
-            {item.diff ? (
-              <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-base-300 bg-base-200/70 p-4 font-mono text-xs leading-6 text-base-content/75">
-                {formatDiff(item.diff)}
-              </pre>
-            ) : (
-              <div className="mt-3 rounded-lg border border-dashed border-base-300 p-6 text-center text-sm text-base-content/50">
-                The difference is unavailable or has been redacted by retention policy.
-              </div>
-            )}
-          </section>
           {item.decisionReason && (
             <section className="rounded-lg border border-base-300 p-4">
               <p className="text-xs font-semibold uppercase text-base-content/45">Decision reason</p>
@@ -465,14 +462,6 @@ function proposalDecisionSummary(proposal: ChangeProposal): string {
   if (status === "applied") return proposal.completedAtUtc ? `Applied ${formatDateTime(proposal.completedAtUtc)}` : "Applied";
   if (status === "rejected") return proposal.decidedAtUtc ? `Rejected ${formatDateTime(proposal.decidedAtUtc)}` : "Rejected";
   return capitalize(status);
-}
-
-function formatDiff(value: string) {
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2);
-  } catch {
-    return value;
-  }
 }
 
 function humanize(value: string) {
