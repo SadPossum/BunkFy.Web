@@ -63,6 +63,7 @@ export function IntegrationsPage() {
     { permission: permissions.ingestionRawPayloadsRead, scope },
     { permission: permissions.ingestionSensitiveHistoryRead, scope },
     { permission: permissions.ingestionProposalsDecide, scope },
+    { permission: permissions.inventoryRead, scope },
     { permission: permissions.guestsRead, scope },
     { permission: permissions.guestsCreate, scope },
     { permission: permissions.reservationsManageGuests, scope },
@@ -266,6 +267,7 @@ export function IntegrationsPage() {
           canReadSensitiveHistory={canReadSensitiveHistory}
           canDecide={canDecideProposals}
           canSuggestGuestRecords={canSuggestGuestRecords}
+          canReadInventory={access.allows(permissions.inventoryRead, scope)}
         />
       )}
       {tab === "activity" && (
