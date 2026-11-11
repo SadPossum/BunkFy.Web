@@ -924,7 +924,7 @@ export function GuestEditor({ state, submitting, error, sources, authorityCurren
           </FormSection>
           <FormSection icon={<Globe2 size={17} />} title="Additional details" headingRef={detailsHeading}>
             <FormGrid>
-              <FormDatePicker label="Date of birth (optional)" name="dateOfBirth" defaultValue={guest?.dateOfBirth} />
+              <FormDatePicker label="Date of birth (optional)" name="dateOfBirth" defaultValue={guest?.dateOfBirth} disabled={fieldsDisabled} />
               <FormNationalityPicker defaultValue={guest?.nationalityCountryCode} disabled={fieldsDisabled} />
               <FormSpan>
                 <LanguagePicker value={languageTags} onChange={value => { setLanguageTags(value); setLanguageError(null); }} disabled={fieldsDisabled}
@@ -976,9 +976,9 @@ function FormField({ label, name, defaultValue, placeholder, type = "text", minL
   return <label className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><input className="input input-bordered w-full" name={name} type={type} defaultValue={defaultValue ?? ""} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} pattern={pattern} autoComplete={autoComplete} autoCapitalize={autoCapitalize} spellCheck={spellCheck} aria-describedby={hint ? hintId : undefined} />{hint && <span id={hintId} className="mt-1.5 block text-xs leading-5 text-base-content/45">{hint}</span>}</label>;
 }
 
-function FormDatePicker({ label, name, defaultValue }: { label: string; name: string; defaultValue?: string | null }) {
+function FormDatePicker({ label, name, defaultValue, disabled }: { label: string; name: string; defaultValue?: string | null; disabled: boolean }) {
   const [value, setValue] = useState(defaultValue ?? "");
-  return <div className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" name={name} value={value} onChange={setValue} ariaLabel={label} /></div>;
+  return <div className="form-control block min-w-0"><span className="label-text mb-1.5 block text-sm font-semibold">{label}</span><DatePicker className="w-full" name={name} value={value} onChange={setValue} ariaLabel={label} disabled={disabled} /></div>;
 }
 
 function FormNationalityPicker({ defaultValue, disabled }: { defaultValue?: string | null; disabled: boolean }) {
