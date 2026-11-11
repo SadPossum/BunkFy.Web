@@ -12,7 +12,8 @@ export function CopyTextActions({
   buttonClassName?: string;
   children?: ReactNode;
 }) {
-  const [state, setState] = useState<CopyState>("idle");
+  const [feedback, setFeedback] = useState<{ state: CopyState }>({ state: "idle" });
+  const state = feedback.state;
   const owner = useRef({ attempt: 0 });
   const field = useRef<HTMLTextAreaElement>(null);
   const fieldId = useId();
@@ -20,28 +21,28 @@ export function CopyTextActions({
   useLayoutEffect(() => {
     const current = { attempt: 0 };
     owner.current = current;
-    setState("idle");
+    setFeedback({ state: "idle" });
     return () => { current.attempt++; };
   }, [value]);
 
   useEffect(() => {
-    if (state !== "failed") return;
+    if (feedback.state !== "failed") return;
     field.current?.focus();
     field.current?.select();
-  }, [state]);
+  }, [feedback]);
 
   async function copy() {
     const current = owner.current;
     const attempt = ++current.attempt;
     const isCurrent = () => owner.current === current && current.attempt === attempt;
-    setState("copying");
+    setFeedback({ state: "copying" });
     try {
       await navigator.clipboard.writeText(value);
-      if (isCurrent()) setState("copied");
+      if (isCurrent()) setFeedback({ state: "copied" });
     } catch {
       // Clipboard support and permission vary by browser. Keep the displayed
       // one-time value available without issuing or requesting another one.
-      if (isCurrent()) setState("failed");
+      if (isCurrent()) setFeedback({ state: "failed" });
     }
   }
 

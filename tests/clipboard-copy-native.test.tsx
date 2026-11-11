@@ -138,6 +138,19 @@ it("still offers the token when the clipboard API is unavailable", async () => {
   } finally { await page.close(); }
 }, 30000);
 
+it("selects the manual value again after a repeated unsupported clipboard attempt", async () => {
+  const page = await open("token", "missing");
+  try {
+    const button = page.getByRole("button", { name: "Copy token", exact: true });
+    const manual = page.getByRole("textbox", { name: "Credential token for manual copying", exact: true });
+    await button.click();
+    await manual.waitFor();
+    await button.click();
+    await page.waitForFunction(() => document.activeElement instanceof HTMLTextAreaElement && document.activeElement.value === "synthetic-token-a");
+    expect(await manual.evaluate((element: HTMLTextAreaElement) => [element.selectionStart, element.selectionEnd])).toEqual([0, "synthetic-token-a".length]);
+  } finally { await page.close(); }
+}, 30000);
+
 it("does not label a replacement token copied when an older write completes", async () => {
   const page = await open("token", "pending");
   try {
