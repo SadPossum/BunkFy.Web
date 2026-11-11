@@ -77,7 +77,7 @@ export function SpacesBlocksContent({
       <div className={`flex flex-col gap-3 border-b border-base-300 px-4 py-3 sm:px-5 ${embedded ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
         <div className="min-w-0">
           <h2 id="spaces-blocks-heading" tabIndex={-1} className="text-base font-semibold outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary">{heading}</h2>
-          <p className="mt-1 text-xs leading-5 text-base-content/55">{scope === "selected" ? "This selected space only. Released records do not widen the scope." : "All spaces in this property · dates, scope, reason and history."}</p>
+          <p className="mt-1 text-xs leading-5 text-base-content/55">{scope === "selected" ? "Blocks for this space. Choose All history to include released blocks." : "Blocks across this property. Review the dates, rooms or beds, and reason for each block."}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedTabs

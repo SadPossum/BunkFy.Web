@@ -941,8 +941,8 @@ function RoomDetail({
         <p className="text-sm">{inventoryEvidence !== "current" ? "Selling setup unconfirmed" : room.salesMode === null ? "Unknown" : salesModeLabel(room.salesMode)}</p>
         {wholeRoomUnits.map((unit) => <div key={unit.key} className="mt-2 border-l-2 border-base-300 pl-3 text-xs">
           <p className="font-semibold">{inventoryEvidence !== "current" ? "Whole-room offering unconfirmed" : unit.isSellable ? "Whole room offered separately" : "Whole room not offered separately"}</p>
-          <p className="mt-1 break-words text-base-content/60">Whole-room inventory is separate from the physical bed count.</p>
-          <button type="button" className="btn btn-ghost btn-xs mt-1 min-h-9" disabled={locked} onClick={() => onSelectUnit(unit)}>Inspect whole-room option</button>
+          <p className="mt-1 break-words text-base-content/60">Selling setup determines whether guests can book the whole room or individual beds.</p>
+          <button type="button" className="btn btn-ghost btn-xs mt-1 min-h-9" disabled={locked} onClick={() => onSelectUnit(unit)}>View whole-room details</button>
         </div>)}
         {mayConfigureInventory && salesRoom && <button type="button" className="btn btn-outline btn-sm mt-3" disabled={!salesEditor.canOpen(salesRoom) || locked}
           onClick={(event) => salesEditor.open(salesRoom, event.currentTarget, salesOrigin)}><SlidersHorizontal size={15} />Edit selling setup</button>}
@@ -973,7 +973,7 @@ function PhysicalFact({ unit }: { unit: SpacesUnit }) {
 function TargetUnavailable({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
   return (
     <>
-      <PageHeader eyebrow="Spaces" title={title} description={description} />
+      <PageHeader title="Spaces" description="Rooms, beds, and how they are sold." />
       <section className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm">
         <EmptyState icon={<AlertTriangle />} title={title} description={description} action={action} />
       </section>

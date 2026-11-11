@@ -229,9 +229,9 @@ export function GuestsPage() {
       ? updateAuthorityCurrent
       : false;
   const formAuthorityMessage = formState === null
-    ? "Current create permission could not be confirmed. Retry the access source before submitting."
-    : "Current Guest Record and access evidence is refreshing or no longer matches this form. If it remains disabled, close and reopen the latest profile."
-  const archiveAuthorityMessage = "Current Guest Record and access evidence is refreshing or no longer matches this confirmation. If it remains disabled, close it and review the latest profile.";
+    ? "Your access to add guest records could not be checked. Try again before saving."
+    : "Guest details or your access have changed or are still loading. If saving remains unavailable, close this form and reopen the guest record."
+  const archiveAuthorityMessage = "Guest details or your access have changed or are still loading. If archiving remains unavailable, close this confirmation and reopen the guest record.";
   const recoveryAllowed = Boolean(updateRecovery?.uncertain && formIntent.current?.ownerKey === ownerKey &&
     guestUpdateRecoveryAllowed(updateRecovery.attempt, {
       propertyId: selectedPropertyId, guestId: selectedGuestId, permissionsCurrent, mayRead, mayManage,
@@ -252,7 +252,7 @@ export function GuestsPage() {
           : mayRead && mayCreate && guestMutationAllowed("create", { permissionsCurrent })
       );
       if (!authorityCurrent) {
-        throw new ApiError("Current Guest Record access and profile evidence could not be confirmed. Review the latest profile before making another change.", 409);
+        throw new ApiError("Guest details or your access have changed or are unavailable. Reopen the guest record before making another change.", 409);
       }
 
       const body = guest
@@ -313,7 +313,7 @@ export function GuestsPage() {
           guestCurrent: detailCurrent && guestRecordMatches(detail.data, guest),
         });
       if (!authorityCurrent) {
-        throw new Error("Current Guest Record access and profile evidence could not be confirmed. Refresh and try again.");
+        throw new Error("Guest details or your access have changed or are unavailable. Refresh the guest record and try again.");
       }
 
       archiveAttempt.current = resolveGuestArchiveAttempt(
@@ -894,7 +894,7 @@ export function GuestEditor({ state, submitting, error, sources, authorityCurren
   return (
       <form onSubmit={submit} className="min-w-0 space-y-4">
         <div ref={authorityFeedback} tabIndex={-1} className="rounded outline-none focus:ring-2 focus:ring-primary">
-          <CompositeSourceNotice className="mb-0" sources={sources} title="Guest command context is delayed" />
+          <CompositeSourceNotice className="mb-0" sources={sources} title="Guest details or access could not be checked" />
           {recovery ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm" role="alert">
             <p className="font-semibold">{recovery.uncertain ? "Save result not confirmed" : "This save could not be completed"}</p>
             <p className="mt-1">{recovery.uncertain ? "Retry the same save to confirm its result. Your submitted details are locked until it is resolved." : "No replacement save has been sent. Review the latest profile before making another change."}</p>
@@ -1003,7 +1003,7 @@ function ArchiveGuestModal({ guest, submitting, error, sources, authorityCurrent
           <CompositeSourceNotice
             className="mb-0"
             sources={sources}
-            title="Guest command context is delayed"
+            title="Guest details or access could not be checked"
           />
           {!authorityCurrent && <MutationAuthorityNotice message={authorityMessage} />}
           <div className="flex items-center gap-3 rounded-lg bg-base-200 p-4">

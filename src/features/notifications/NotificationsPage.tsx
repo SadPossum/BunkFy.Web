@@ -140,7 +140,7 @@ export function NotificationsPage() {
       const authorityCurrent = !isOffline && targetKind === kind &&
         notificationReadAllowed(scopeKey, targetScopeKey, listCurrent);
       if (!authorityCurrent) {
-        throw new Error("Current notification inbox evidence could not be confirmed. Refresh and try again.");
+        throw new Error("The notification list is out of date or unavailable. Refresh it and try again.");
       }
       return request<MarkAllNotificationsReadResponse>(
         `${notificationInboxPath(targetKind)}/read-all`,
@@ -169,7 +169,7 @@ export function NotificationsPage() {
         !submission.item.readAtUtc &&
         notificationReadAllowed(scopeKey, submission.scopeKey, submission.sourceCurrent);
       if (!authorityCurrent) {
-        throw new Error("Current notification evidence could not be confirmed. Refresh and try again.");
+        throw new Error("This notification is out of date or unavailable. Refresh the list and try again.");
       }
       return request<void>(
         `${notificationInboxPath(submission.kind)}/${submission.notificationId}/read`,

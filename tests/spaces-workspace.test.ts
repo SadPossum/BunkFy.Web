@@ -163,8 +163,8 @@ describe("unified Rooms & beds composition (not rendered browser evidence)", () 
     const page = source("features/spaces/SpacesPage.tsx");
     expect(page).toContain('units.filter((unit) => unit.kind === "room")');
     expect(page).toContain("Whole room not offered separately");
-    expect(page).toContain("Inspect whole-room option");
-    expect(page).toContain('onClick={() => onSelectUnit(unit)}>Inspect whole-room option</button>');
+    expect(page).toContain("View whole-room details");
+    expect(page).toContain('onClick={() => onSelectUnit(unit)}>View whole-room details</button>');
   });
   it("keeps sellable whole-room, retired and unsellable bed rows operationally reachable", () => {
     const changed = { ...room, inventoryUnits: room.inventoryUnits.map((unit) => ({ ...unit, isSellable: unit.inventoryUnitId !== "u0", isTopologyActive: unit.inventoryUnitId !== "u1" })) };
