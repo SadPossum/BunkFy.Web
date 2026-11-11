@@ -23,7 +23,7 @@ const sessionId = "70000000-0000-4000-8000-000000000001";
 const fixture = `
 import React from "react";
 import {createRoot} from "react-dom/client";
-import {MemoryRouter} from "react-router";
+import {MemoryRouter,useNavigate} from "react-router";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {SessionProvider} from "/src/app/session.tsx";
 import {WorkspaceProvider} from "/src/app/workspace.tsx";
@@ -32,10 +32,15 @@ import {InventoryPage} from "/src/features/inventory/InventoryPage.tsx";
 import "/src/styles.css";
 const query=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
 window.inventoryReleaseHarness={refreshPermissions:()=>query.invalidateQueries({queryKey:["access-permissions"]})};
+function InventoryFixture() {
+ const navigate=useNavigate();
+ window.inventoryReleaseHarness.selectProperty=id=>navigate("/inventory?property="+id+"&arrival=2026-11-05&departure=2026-11-07");
+ return <InventoryPage/>;
+}
 createRoot(document.getElementById("root")).render(
  <MemoryRouter initialEntries={["/inventory?property=${propertyId}&arrival=2026-11-05&departure=2026-11-07"+(window.location.search.includes("pendingRoom=1")?"&room=${roomId}&focus=${roomId}":"")]}>
   <QueryClientProvider client={query}><SessionProvider><WorkspaceProvider><AccessAuthorityProvider>
-   <InventoryPage/>
+   <InventoryFixture/>
   </AccessAuthorityProvider></WorkspaceProvider></SessionProvider></QueryClientProvider>
  </MemoryRouter>);
 `;
@@ -66,7 +71,7 @@ beforeAll(async () => {
 }, 60000);
 afterAll(async () => { await browser?.close(); await server?.close(); expect(runtimeErrors).toEqual([]); });
 
-async function open(individualAllowed = true, pendingRoom = false) {
+async function open(individualAllowed = true, pendingRoom = false, initialReadError?: { failures: number; status?: number; code?: string }) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   await context.addInitScript(identity => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(identity)),
     { tenantId: workspaceId, username: "fixture@example.test", subjectId, sessionId, generation: "fixture" });
@@ -75,8 +80,10 @@ async function open(individualAllowed = true, pendingRoom = false) {
   const writes: { path: string; body: Record<string, unknown> }[] = [];
   const reads: string[] = [];
   let allowed = individualAllowed, released = false, failRelease = false, commitBeforeFailure = false, holdRefresh = false;
-  let projected = !pendingRoom, otherRoom = false, inventoryReadAllowed = true, failRooms = false;
+  let projected = !pendingRoom, otherRoom = false, inventoryReadAllowed = true, failRooms: number | null = null;
   let committedReleases = 0;
+  let initialFailures = initialReadError?.failures ?? 0;
+  const initialReads = new Map<string, number>();
   const pendingRefresh: (() => void)[] = [];
   const blocks = () => [
     { blockId, inventoryUnitId: unitId, status: released ? 2 : 1, version: released ? 5 : 4 },
@@ -120,9 +127,18 @@ async function open(individualAllowed = true, pendingRoom = false) {
       response = { propertyId, blockId, blockGroupId: groupId, status: 2, version: 5 };
     } else {
       reads.push(path);
+      if (/\/(rooms|availability|blocks|block-groups)$/.test(path)) {
+        const count = (initialReads.get(path) ?? 0) + 1;
+        initialReads.set(path, count);
+        if (count <= initialFailures) {
+          await route.fulfill({ status: initialReadError?.status ?? 404, contentType: "application/problem+json",
+            body: JSON.stringify({ code: initialReadError?.code ?? "Inventory.PropertyNotFound", detail: "Inventory is not available." }) });
+          return;
+        }
+      }
       if (holdRefresh) await new Promise<void>(resolve => pendingRefresh.push(resolve));
       if (path.endsWith("/rooms")) {
-        if (failRooms) { failRooms = false; await route.fulfill({ status: 503, contentType: "application/problem+json", body: JSON.stringify({ title: "Room projection unavailable" }) }); return; }
+        if (failRooms) { const status = failRooms; failRooms = null; await route.fulfill({ status, contentType: "application/problem+json", body: JSON.stringify({ title: "Room projection unavailable", code: status === 404 ? "Inventory.PropertyNotFound" : undefined }) }); return; }
         response = { rooms: projected ? [otherRoom ? { ...room, roomId: "20000000-0000-4000-8000-000000000002", roomName: "Other room", units: [] } : room] : [], hasMore: false };
       }
       else if (path.endsWith("/availability")) response = { propertyId, arrival: url.searchParams.get("arrival"), departure: url.searchParams.get("departure"),
@@ -146,12 +162,12 @@ async function open(individualAllowed = true, pendingRoom = false) {
     }
     await page.getByRole("heading", { name: "Members", exact: true }).waitFor();
   }
-  return { context, page, writes, reads, revoke: async () => {
+  return { context, page, writes, reads, initialReads, finishInitialProjection: () => { initialFailures = 0; projected = true; }, revoke: async () => {
     allowed = false;
     await page.evaluate(() => (window as unknown as { inventoryReleaseHarness: { refreshPermissions(): Promise<void> } }).inventoryReleaseHarness.refreshPermissions());
   }, failNextRelease: (committed = false) => { failRelease = true; commitBeforeFailure = committed; }, pendingRefresh,
   projectRoom: () => { projected = true; otherRoom = false; },
-  projectOtherRoom: () => { projected = true; otherRoom = true; }, failNextRoomRead: () => { failRooms = true; },
+  projectOtherRoom: () => { projected = true; otherRoom = true; }, failNextRoomRead: (status = 503) => { failRooms = status; },
   revokeInventoryRead: async () => {
     inventoryReadAllowed = false;
     await page.evaluate(() => (window as unknown as { inventoryReleaseHarness: { refreshPermissions(): Promise<void> } }).inventoryReleaseHarness.refreshPermissions());
@@ -161,6 +177,90 @@ async function open(individualAllowed = true, pendingRoom = false) {
 }
 
 describe("Inventory individual block release", () => {
+  it("automatically recovers initial property projection reads without an operator refresh", async () => {
+    const { context, page, writes, initialReads, finishInitialProjection } = await open(true, true, { failures: 1 });
+    try {
+      await page.getByRole("button", { name: "Refresh room inventory", exact: true }).waitFor();
+      finishInitialProjection();
+      await page.locator("[data-sales-region]").getByText("Garden", { exact: true }).waitFor();
+      await expect.poll(() => [...initialReads.values()]).toEqual([2, 2, 2, 2]);
+      await page.getByRole("button", { name: "View details for Garden", exact: true }).waitFor();
+      expect(writes).toEqual([]);
+    } finally { await context.close(); }
+  }, 30000);
+
+  it("bounds initial projection recovery and retains a working manual refresh", async () => {
+    const { context, page, writes, initialReads, finishInitialProjection } = await open(true, true, { failures: Infinity });
+    try {
+      await expect.poll(() => [...initialReads.values()], { timeout: 6000 }).toEqual([3, 3, 3, 3]);
+      await page.waitForTimeout(1300);
+      expect([...initialReads.values()]).toEqual([3, 3, 3, 3]);
+      expect(await page.locator("[data-sales-region]").getByText("Garden", { exact: true }).count()).toBe(0);
+      finishInitialProjection();
+      await page.getByRole("button", { name: "Refresh room inventory", exact: true }).click();
+      await page.locator("[data-sales-region]").getByText("Garden", { exact: true }).waitFor();
+      expect(initialReads.get(`/api/inventory/properties/${propertyId}/rooms`)).toBe(4);
+      expect(writes).toEqual([]);
+    } finally { await context.close(); }
+  }, 30000);
+
+  it.each([
+    { status: 403, code: "Access.Forbidden" },
+    { status: 404, code: "Inventory.RoomNotFound" },
+    { status: 503, code: "Inventory.PropertyNotFound" },
+  ])("does not start projection refreshes for $status $code", async error => {
+    const { context, page, writes, initialReads } = await open(true, true, { failures: Infinity, ...error });
+    try {
+      await page.getByRole("button", { name: "Refresh room inventory", exact: true }).waitFor();
+      await expect.poll(() => initialReads.size).toBe(4);
+      await page.waitForTimeout(1300);
+      expect([...initialReads.values()]).toEqual([1, 1, 1, 1]);
+      expect(writes).toEqual([]);
+    } finally { await context.close(); }
+  }, 30000);
+
+  it("stops initial projection recovery when inventory read access is revoked", async () => {
+    const { context, page, writes, reads, revokeInventoryRead } = await open(true, true, { failures: Infinity });
+    try {
+      await page.getByRole("button", { name: "Refresh room inventory", exact: true }).waitFor();
+      await revokeInventoryRead();
+      await page.getByText("Inventory access is not assigned", { exact: true }).waitFor();
+      const count = reads.length;
+      await page.waitForTimeout(1300);
+      expect(reads).toHaveLength(count);
+      expect(writes).toEqual([]);
+    } finally { await context.close(); }
+  }, 30000);
+
+  it("does not poll an established snapshot after a later property-not-found error", async () => {
+    const { context, page, writes, initialReads, failNextRoomRead } = await open(true, true);
+    try {
+      const refresh = page.getByRole("button", { name: "Refresh room inventory", exact: true });
+      await refresh.waitFor();
+      await expect.poll(() => initialReads.get(`/api/inventory/properties/${propertyId}/rooms`)).toBe(1);
+      failNextRoomRead(404);
+      await refresh.click();
+      await expect.poll(() => initialReads.get(`/api/inventory/properties/${propertyId}/rooms`)).toBe(2);
+      await page.waitForTimeout(1300);
+      expect(initialReads.get(`/api/inventory/properties/${propertyId}/rooms`)).toBe(2);
+      expect(writes).toEqual([]);
+    } finally { await context.close(); }
+  }, 30000);
+
+  it("stops old-property projection recovery when the route targets another property", async () => {
+    const { context, page, writes, reads } = await open(true, true, { failures: Infinity });
+    try {
+      await page.getByRole("button", { name: "Refresh room inventory", exact: true }).waitFor();
+      await page.evaluate(() => (window as unknown as { inventoryReleaseHarness: { selectProperty(id: string): void } })
+        .inventoryReleaseHarness.selectProperty("10000000-0000-4000-8000-000000000002"));
+      await page.getByRole("heading", { name: "Choose a property first", exact: true }).waitFor();
+      const count = reads.length;
+      await page.waitForTimeout(1300);
+      expect(reads).toHaveLength(count);
+      expect(writes).toEqual([]);
+    } finally { await context.close(); }
+  }, 30000);
+
   it("recovers a requested room after the first directory precedes its projection", async () => {
     const { context, page, writes, projectRoom } = await open(true, true);
     try {
