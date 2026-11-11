@@ -112,8 +112,10 @@ export function AccountStaffProfilePanel({
 
       <div className="pt-5">
         {editing ? (
-          <form onSubmit={(event) => { event.preventDefault(); if (canMutate) update.mutate(); }}>
-            <StaffProfileFields value={profile} onChange={setProfile} />
+          <form onSubmit={(event) => { event.preventDefault(); if (canMutate && !update.isPending) update.mutate(); }}>
+            <fieldset disabled={update.isPending || !canMutate} className="min-w-0">
+              <StaffProfileFields value={profile} onChange={setProfile} />
+            </fieldset>
             {update.error && <div className="mt-4"><ErrorState error={update.error} /></div>}
             <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-base-300 pt-5">
               <button type="button" className="btn btn-ghost" onClick={cancelEditing} disabled={update.isPending}>Cancel</button>
