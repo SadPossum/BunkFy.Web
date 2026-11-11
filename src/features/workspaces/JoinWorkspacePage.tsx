@@ -52,6 +52,11 @@ import {
   hasPendingEnrollment,
   rememberPendingEnrollment,
 } from "./workspaceJoinPending";
+import {
+  workspaceJoinAllowsInvitationReplay,
+  workspaceJoinAllowsNewApplication,
+  workspaceJoinUnavailableNotice,
+} from "./workspaceJoinAvailability";
 
 export function JoinWorkspacePage() {
   const navigate = useNavigate();
@@ -109,6 +114,9 @@ export function JoinWorkspacePage() {
     retry: false,
   });
   const data = preview.data;
+  const sourceAcceptsApplications = Boolean(secret && data && !preview.error && workspaceJoinAllowsNewApplication(secret, data));
+  const acceptedInvitation = Boolean(secret && data && !preview.error && workspaceJoinAllowsInvitationReplay(secret, data));
+  const unavailableNotice = secret && data ? workspaceJoinUnavailableNotice(secret, data) : null;
   const recipientBound = secret?.kind === "invitation" &&
     (data as OrganizationInvitationPreview | undefined)?.recipientBound === true;
   const sourceId = data && secret
@@ -162,45 +170,74 @@ export function JoinWorkspacePage() {
         if (!activeJoinPage.current) throw new Error("This invitation page has been closed.");
       };
 
-      try {
-        await context.request<WorkspaceStaffOnboarding>(
-          workspaceJoinContextPath(secret) + "/applications",
-          {
-            method: "POST",
-            headers: workspaceJoinContextHeaders(secret),
-            body: JSON.stringify({
-              displayName: staffProfile.displayName.trim(),
-              legalName: emptyToNull(staffProfile.legalName),
-              workEmail: emptyToNull(staffProfile.workEmail),
-              workPhone: emptyToNull(staffProfile.workPhone),
-              employeeNumber: null,
-              jobTitle: emptyToNull(staffProfile.jobTitle),
-              department: emptyToNull(staffProfile.department),
-            }),
-          },
-        );
-      } catch (error) {
-        assertJoinCurrent();
-        if (
-          secret.kind !== "invitation" ||
-          !(error instanceof ApiError) ||
-          error.status !== 409 ||
-          error.code !== "Workspaces.StaffOnboardingProfileMutationAuthorityUnavailable" ||
-          !data?.organizationId || !sourceId || !subjectId
-        ) throw error;
+      // Recheck before submitting profile data. Source status may have changed
+      // since this page opened; existing application reads remain independent.
+      const latest = await preview.refetch();
+      assertJoinCurrent();
+      if (latest.error || !latest.data) throw new Error("The invitation could not be checked. Refresh it and try again.");
+      const replay = workspaceJoinAllowsInvitationReplay(secret, latest.data);
+      if (!workspaceJoinAllowsNewApplication(secret, latest.data) && !replay) {
+        throw new Error(workspaceJoinUnavailableNotice(secret, latest.data)!.description);
+      }
 
-        // Staff owns a completed profile. Read only the applicant's current
-        // status, then let the protected invitation endpoint revalidate replay.
-        const application = await context.request<WorkspaceStaffOnboarding>(
-          `/api/workspace-staff-enrollment/${encodeURIComponent(data.organizationId)}/applications/current` +
-            `?sourceKind=1&sourceId=${encodeURIComponent(sourceId)}`,
-        );
+      const readCompletedInvitationApplication = async () => {
+        if (!data?.organizationId || !sourceId || !subjectId) throw new Error("This invitation could not be confirmed for your account.");
+        const unavailable = "This invitation was already used. Sign in with the account that accepted it, or ask the workspace owner for a new invitation.";
+        let application: WorkspaceStaffOnboarding;
+        try {
+          application = await context.request<WorkspaceStaffOnboarding>(
+            `/api/workspace-staff-enrollment/${encodeURIComponent(data.organizationId)}/applications/current` +
+              `?sourceKind=1&sourceId=${encodeURIComponent(sourceId)}`,
+          );
+        } catch (error) {
+          assertJoinCurrent();
+          if (error instanceof ApiError && error.status === 404 && error.code === "Workspaces.StaffOnboardingNotFound") throw new Error(unavailable, { cause: error });
+          throw error;
+        }
         assertJoinCurrent();
         if (
           application.status !== 5 || !application.applicationId || !application.staffMemberId ||
           application.organizationId !== data.organizationId || application.sourceKind !== 1 ||
           application.sourceId !== sourceId || application.subjectId !== subjectId
-        ) throw error;
+        ) throw new Error(unavailable);
+      };
+
+      if (replay) {
+        // Staff owns the completed profile. Never collect or resubmit it to
+        // recover an accepted invitation; the protected join still revalidates.
+        await readCompletedInvitationApplication();
+      } else {
+        try {
+          await context.request<WorkspaceStaffOnboarding>(
+            workspaceJoinContextPath(secret) + "/applications",
+            {
+              method: "POST",
+              headers: workspaceJoinContextHeaders(secret),
+              body: JSON.stringify({
+                displayName: staffProfile.displayName.trim(),
+                legalName: emptyToNull(staffProfile.legalName),
+                workEmail: emptyToNull(staffProfile.workEmail),
+                workPhone: emptyToNull(staffProfile.workPhone),
+                employeeNumber: null,
+                jobTitle: emptyToNull(staffProfile.jobTitle),
+                department: emptyToNull(staffProfile.department),
+              }),
+            },
+          );
+        } catch (error) {
+          assertJoinCurrent();
+          if (
+            secret.kind !== "invitation" ||
+            !(error instanceof ApiError) ||
+            error.status !== 409 ||
+            error.code !== "Workspaces.StaffOnboardingProfileMutationAuthorityUnavailable" ||
+            !data?.organizationId || !sourceId || !subjectId
+          ) throw error;
+
+          // Staff owns a completed profile. Read only the applicant's current
+          // status, then let the protected invitation endpoint revalidate replay.
+          await readCompletedInvitationApplication();
+        }
       }
       assertJoinCurrent();
 
@@ -414,7 +451,7 @@ export function JoinWorkspacePage() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (showAccessProgress || requestRejected || withdrawalResolution) return;
+    if (showAccessProgress || requestRejected || withdrawalResolution || (!sourceAcceptsApplications && !acceptedInvitation)) return;
     join.mutate();
   }
 
@@ -474,7 +511,7 @@ export function JoinWorkspacePage() {
           </p>
         </div>
         <h1 className="mt-4 font-display text-3xl font-semibold">
-          {data ? `Join ${data.organizationName}` : "Open an invitation"}
+          {data ? `${unavailableNotice ? "Access to" : "Join"} ${data.organizationName}` : "Open an invitation"}
         </h1>
 
         {!secret && (
@@ -532,7 +569,14 @@ export function JoinWorkspacePage() {
                 It expires {new Date(data.expiresAtUtc).toLocaleString()}.
               </p>
             </div>
-            {!withdrawalResolution && !showAccessProgress && (
+            {unavailableNotice && <div role="alert" className="mt-5 rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm">
+              <h2 className="font-semibold">{unavailableNotice.title}</h2>
+              <p className="mt-2 leading-6">{unavailableNotice.description}</p>
+              {isEnrollment && <p className="mt-2 leading-6">If you already requested access, BunkFy will check its status. Existing members can return to their workspace.</p>}
+              <button type="button" className="btn btn-outline btn-sm mt-3"
+                disabled={preview.isFetching} onClick={() => void preview.refetch()}>Refresh invitation</button>
+            </div>}
+            {sourceAcceptsApplications && !withdrawalResolution && !showAccessProgress && !requestRejected && !provisioningFailed && (
               <div className="py-6">
                 <h2 className="font-display text-xl font-semibold">
                   Your staff profile
@@ -693,7 +737,7 @@ export function JoinWorkspacePage() {
               </div>
             )}
 
-            {verificationRequired && (
+            {verificationRequired && (sourceAcceptsApplications || acceptedInvitation) && (
               <InvitationVerificationRecovery
                 request={request}
                 recipientBound={recipientBound}
@@ -754,13 +798,14 @@ export function JoinWorkspacePage() {
                 >
                   Open workspace
                 </button>
-              ) : !showAccessProgress && !requestRejected && !withdrawalResolution ? (
+              ) : (sourceAcceptsApplications || acceptedInvitation) && !showAccessProgress && !requestRejected && !withdrawalResolution ? (
                 <button
                   className="btn btn-primary"
                   disabled={
                     join.isPending ||
+                    preview.isFetching ||
                     workspaceActivation.isPending ||
-                    !staffProfile.displayName.trim()
+                    (!acceptedInvitation && !staffProfile.displayName.trim())
                   }
                 >
                   {join.isPending ? (
@@ -768,7 +813,7 @@ export function JoinWorkspacePage() {
                   ) : (
                     <CheckCircle2 size={18} />
                   )}
-                  {isEnrollment ? "Request access" : "Join workspace"}
+                  {acceptedInvitation ? "Continue to workspace" : isEnrollment ? "Request access" : "Join workspace"}
                 </button>
               ) : null}
             </div>

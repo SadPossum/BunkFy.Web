@@ -140,7 +140,7 @@ describe("native workspace activation with existing workspace selection", () => 
         // replacement a real async interval; its absence is not a new source.
         if (accepted) await new Promise(resolve => setTimeout(resolve, 100));
         body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target",
-          invitationId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: false };
+          invitationId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: false, status: "pending" };
       } else if (path === "/api/workspace-staff-enrollment/applications") body = { organizationId: targetId, applicationId: "application", status: 1 };
       else if (path === "/api/organization-invitations/accept") {
         accepted = true;
@@ -188,7 +188,7 @@ describe("native workspace activation with existing workspace selection", () => 
       else if (path === "/api/organizations") body = { items: [membership(homeId), membership(targetId)], page: 1, pageSize: 100, hasMore: false };
       else if (path === "/api/organization-invitations/preview") body = {
         organizationId: targetId, organizationName: "Target", organizationSlug: "target",
-        invitationId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: true,
+        invitationId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: true, status: "pending",
       };
       else if (path === "/api/workspace-staff-enrollment/applications") {
         profileAttempts++;
@@ -290,7 +290,7 @@ describe("native workspace activation with existing workspace selection", () => 
       const path = await resolveJoinTransport(route, contexts);
       if (path === null) return;
       let body: unknown;
-      if (path.endsWith("/preview")) body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", invitationId: sourceId, enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: true, approvalMode: "requiresApproval" };
+      if (path.endsWith("/preview")) body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", invitationId: sourceId, enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", recipientBound: true, approvalMode: "requiresApproval", status: path.includes("invitations") ? "pending" : "active" };
       else if (path === "/api/auth/external/providers") { authRequests.push(path); body = { providers: [] }; }
       else if (path === "/api/auth/self-registration") { authRequests.push(path); body = { passwordEnabled: true, externalEnabled: true }; }
       else {
@@ -344,7 +344,7 @@ describe("native workspace activation with existing workspace selection", () => 
       let body: unknown;
       if (path === "/api/auth/browser/refresh") body = { accessToken: token };
       else if (path === "/api/organizations") body = { items: joined ? [membership(homeId), membership(targetId)] : [membership(homeId)], page: 1, pageSize: 100, hasMore: false };
-      else if (path === "/api/organization-enrollment/preview") body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalMode: "automatic" };
+      else if (path === "/api/organization-enrollment/preview") body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalMode: "automatic", status: "active" };
       else if (path.endsWith("/applications/current")) { status = 404; body = { code: "Workspaces.ApplicationNotFound" }; }
       else if (path === "/api/workspace-staff-enrollment/applications") body = { organizationId: targetId, applicationId: "application", status: 1 };
       else if (path === "/api/organization-enrollment/claim") {
@@ -387,7 +387,7 @@ describe("native workspace activation with existing workspace selection", () => 
       let body: unknown;
       if (path === "/api/auth/browser/refresh") body = { accessToken: token };
       else if (path === "/api/organizations") body = { items: [membership(homeId)], page: 1, pageSize: 100, hasMore: false };
-      else if (path === "/api/organization-enrollment/preview") body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalMode: "requiresApproval" };
+      else if (path === "/api/organization-enrollment/preview") body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalMode: "requiresApproval", status: "active" };
       else if (path.endsWith("/applications/current")) body = { organizationId: targetId, applicationId: "application", status: 2, claimId: "77777777-7777-4777-8777-777777777777", claimVersion: 1 };
       else if (path === "/api/properties") body = { properties: [], page: 1, pageSize: 100, hasMore: false };
       else { status = 500; body = { code: "Test.UnexpectedRoute" }; }
@@ -446,7 +446,7 @@ describe("native workspace activation with existing workspace selection", () => 
       } else if (path === "/api/organizations") {
         body = { items: [membership(homeId)], page: 1, pageSize: 100, hasMore: false };
       } else if (path === "/api/organization-enrollment/preview") {
-        body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalMode: "ownerReview" };
+        body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalMode: "ownerReview", status: "active" };
       } else if (path.endsWith("/applications/current")) {
         if (applicationUnavailable || !claimed || currentSubject !== subjectId) {
           status = applicationUnavailable ? 503 : 404;
@@ -565,7 +565,7 @@ describe("native workspace activation with existing workspace selection", () => 
         if (approved && catalogueDelay) await new Promise(resolve => setTimeout(resolve, catalogueDelay));
         const current = approved && remainingStaleCatalogues-- <= 0;
         body = { items: current ? [membership(homeId), membership(targetId)] : [membership(homeId)], page: 1, pageSize: 100, hasMore: false };
-      } else if (path === "/api/organization-enrollment/preview") body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalRequired: true };
+      } else if (path === "/api/organization-enrollment/preview") body = { organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId, expiresAtUtc: "2027-01-01T00:00:00Z", approvalRequired: true, status: "active" };
       else if (path.endsWith("/applications/current")) body = { organizationId: targetId, applicationId: "application", status: approved ? 5 : 2, staffMemberId: approved ? "staff" : null, claimId: "claim", claimVersion: 1 };
       else if (path === "/api/properties") {
         if (approved && tenant === targetId && new URL(request.url()).searchParams.get("pageSize") === "1" && remainingDenials-- > 0) {
@@ -617,6 +617,217 @@ describe("native workspace activation with existing workspace selection", () => 
       expect(runtimeErrors).toEqual([]);
     } finally { releaseCatalogue?.(); await context.close(); }
   }, 30000);
+});
+
+const inactiveLinks = [
+  ["enrollment", "disabled", "Team link disabled"],
+  ["enrollment", "rotated", "Team link replaced"],
+  ["enrollment", "expired", "Team link expired"],
+  ["enrollment", "capacity-reached", "Team link is full"],
+  ["invitation", "accepted", "Invitation already accepted"],
+  ["invitation", "revoked", "Invitation revoked"],
+  ["invitation", "superseded", "Invitation replaced"],
+  ["invitation", "expired", "Invitation expired"],
+  ["enrollment", "future-status", "Invitation status unavailable"],
+] as const;
+
+describe("inactive invitation links and existing access recovery", () => {
+  it.each(["source", "policy", "sign-in mode"] as const)("abandons registration when the form is replaced during %s", async phase => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const contexts = new Map<string, { sourceKind: number }>();
+    const writes: string[] = [];
+    let checkingRegistration = false;
+    let held = false;
+    let release: (() => void) | undefined;
+    await page.route(url => url.pathname.startsWith("/api/"), async route => {
+      const path = await resolveJoinTransport(route, contexts);
+      if (path === null) return;
+      if (checkingRegistration && !held && path.endsWith(phase === "source" ? "/preview" : "/self-registration")) {
+        held = true;
+        await new Promise<void>(resolve => { release = resolve; });
+      }
+      if (route.request().method() !== "GET" && !path.endsWith("/preview")) writes.push(path);
+      const body = path.endsWith("/preview") ? {
+        organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId,
+        expiresAtUtc: "2030-01-01T00:00:00Z", approvalMode: "requiresApproval", status: "active",
+      } : path.endsWith("/self-registration") ? { passwordEnabled: true, externalEnabled: true } : { providers: [] };
+      await route.fulfill({ status: path.endsWith("/register") ? 500 : 200, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    try {
+      await page.goto(origin + "join?bootstrap=1#enrollment=synthetic-first-registration-link");
+      await page.getByRole("heading", { name: "Join your team", exact: true }).waitFor();
+      await page.evaluate(() => { (window as unknown as { navigationProbe: string }).navigationProbe = "same-document"; });
+      await page.getByLabel("Email", { exact: true }).fill("applicant@example.invalid");
+      await page.locator('input[name="password"]').fill("Synthetic-Password-For-Tests-42!");
+      await page.locator('input[name="confirmPassword"]').fill("Synthetic-Password-For-Tests-42!");
+      await page.getByLabel("Display name", { exact: true }).fill("Synthetic applicant");
+      checkingRegistration = true;
+      await page.getByRole("button", { name: "Create account", exact: true }).click();
+      await expect.poll(() => held).toBe(true);
+      if (phase === "sign-in mode") {
+        await page.getByRole("button", { name: "Sign in", exact: true }).click();
+        await page.getByRole("heading", { name: "Sign in to join", exact: true }).waitFor();
+      } else {
+        await page.goto(origin + "join?bootstrap=1#enrollment=synthetic-replacement-link");
+        await expect.poll(() => contexts.size).toBe(2);
+        await page.getByRole("heading", { name: "Join your team", exact: true }).waitFor();
+        expect(await page.locator('input[name="username"]').inputValue()).toBe("");
+      }
+      expect(await page.evaluate(() => (window as unknown as { navigationProbe: string }).navigationProbe)).toBe("same-document");
+      release!();
+      await page.waitForLoadState("networkidle");
+      expect(writes).toEqual([]);
+      expect(await page.locator('input[name="username"]').inputValue()).toBe(phase === "sign-in mode" ? "applicant@example.invalid" : "");
+    } finally { release?.(); await context.close(); }
+  }, 15000);
+
+  it.each(["disabled", "unavailable"] as const)("rechecks a link before registration when it becomes %s", async outcome => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const contexts = new Map<string, { sourceKind: number }>();
+    const writes: string[] = [];
+    let changed = false;
+    await page.route(url => url.pathname.startsWith("/api/"), async route => {
+      const path = await resolveJoinTransport(route, contexts);
+      if (path === null) return;
+      if (route.request().method() !== "GET" && !path.endsWith("/preview")) writes.push(path);
+      const preview = path.endsWith("/preview");
+      const status = preview && changed && outcome === "unavailable" ? 503 : 200;
+      const body = preview ? {
+        organizationId: targetId, organizationName: "Target", organizationSlug: "target", enrollmentLinkId: sourceId,
+        expiresAtUtc: "2030-01-01T00:00:00Z", approvalMode: "requiresApproval", status: changed ? "disabled" : "active",
+      } : path.endsWith("/self-registration") ? { passwordEnabled: true, externalEnabled: true } : { providers: [] };
+      await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    try {
+      await page.goto(origin + "join?bootstrap=1#enrollment=synthetic-registration-link");
+      await page.getByRole("heading", { name: "Join your team", exact: true }).waitFor();
+      await page.getByLabel("Email", { exact: true }).fill("applicant@example.invalid");
+      await page.locator('input[name="password"]').fill("Synthetic-Password-For-Tests-42!");
+      await page.locator('input[name="confirmPassword"]').fill("Synthetic-Password-For-Tests-42!");
+      await page.getByLabel("Display name", { exact: true }).fill("Synthetic applicant");
+      changed = true;
+      await page.getByRole("button", { name: "Create account", exact: true }).click();
+      await page.getByRole("heading", { name: outcome === "disabled" ? "Team link disabled" : "Invitation unavailable", exact: true }).waitFor();
+      expect(writes).toEqual([]);
+      expect(await page.getByRole("button", { name: "Create account", exact: true }).count()).toBe(0);
+      expect(await page.getByRole("heading", { name: "Your staff profile", exact: true }).count()).toBe(0);
+      await page.getByRole("button", { name: "Sign in", exact: true }).waitFor();
+    } finally { await context.close(); }
+  });
+
+  it.each(inactiveLinks)("keeps %s/%s sign-in available without offering registration", async (kind, status, title) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    const contexts = new Map<string, { sourceKind: number }>();
+    const mutations: string[] = [];
+    await page.route(url => url.pathname.startsWith("/api/"), async route => {
+      const path = await resolveJoinTransport(route, contexts);
+      if (path === null) return;
+      if (route.request().method() !== "GET" && !path.endsWith("/preview")) mutations.push(path);
+      const body = path.endsWith("/preview") ? {
+        organizationId: targetId, organizationName: "Target", organizationSlug: "target",
+        invitationId: sourceId, enrollmentLinkId: sourceId, recipientBound: false,
+        approvalMode: "owner-review", expiresAtUtc: "2030-01-01T00:00:00Z", status,
+      } : path.endsWith("/self-registration") ? { passwordEnabled: true, externalEnabled: true }
+        : { providers: [] };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    });
+    try {
+      await page.goto(origin + `join?bootstrap=1#${kind}=synthetic-inactive-link`);
+      await page.getByRole("button", { name: "Sign in", exact: true }).waitFor();
+      expect(await page.getByRole("button", { name: "Register", exact: true }).count()).toBe(0);
+      expect(await page.getByRole("button", { name: "Create account", exact: true }).count()).toBe(0);
+      await page.getByRole("heading", { name: title, exact: true }).waitFor();
+      expect(await page.getByText("Your staff profile", { exact: true }).count()).toBe(0);
+      expect(await page.getByText(/Your invitation stays ready/).count()).toBe(0);
+      expect(new URL(page.url()).hash).toBe("");
+      await page.reload();
+      await page.getByRole("heading", { name: title, exact: true }).waitFor();
+      expect(await page.getByRole("button", { name: "Create account", exact: true }).count()).toBe(0);
+      expect(await page.evaluate(() => JSON.stringify(Object.entries(sessionStorage)))).not.toContain("synthetic-inactive-link");
+      expect(mutations).toEqual([]);
+    } finally { await context.close(); }
+  });
+
+  it.each(["unclaimed", "pending", "approved", "accepted", "accepted-no-request", "wrong-subject", "replay-denied", "closed-before-submit"] as const)(
+    "handles %s without creating another profile or broadening access", async scenario => {
+      const context = await browser.newContext();
+      await context.addInitScript(value => localStorage.setItem("bunkfy.session.identity.v2", JSON.stringify(value)), identity);
+      const page = await context.newPage();
+      const contexts = new Map<string, { sourceKind: number }>();
+      const isInvitation = ["accepted", "accepted-no-request", "wrong-subject", "replay-denied"].includes(scenario);
+      const writes: string[] = [];
+      let closed = scenario !== "closed-before-submit";
+      let currentReads = 0;
+      const runtimeErrors: string[] = [];
+      page.on("pageerror", error => runtimeErrors.push(error.message));
+      await page.route(url => url.pathname.startsWith("/api/"), async route => {
+        const path = await resolveJoinTransport(route, contexts);
+        if (path === null) return;
+        if (route.request().method() !== "GET" && !path.endsWith("/preview") && !path.startsWith("/api/auth/")) writes.push(path);
+        let status = 200;
+        let body: unknown;
+        if (path === "/api/auth/browser/refresh") body = { accessToken: token };
+        else if (path === "/api/organizations") body = { items: [membership(homeId), membership(targetId)], page: 1, pageSize: 100, hasMore: false };
+        else if (path === "/api/properties") body = { properties: [], page: 1, pageSize: 100, hasMore: false };
+        else if (path.endsWith("/preview")) body = {
+          organizationId: targetId, organizationName: "Target", organizationSlug: "target",
+          invitationId: sourceId, enrollmentLinkId: sourceId, recipientBound: false,
+          approvalMode: "owner-review", expiresAtUtc: "2030-01-01T00:00:00Z",
+          status: isInvitation ? "accepted" : closed ? "disabled" : "active",
+        };
+        else if (path === `/api/workspace-staff-enrollment/${targetId}/applications/current`) {
+          currentReads++;
+          const query = new URL(route.request().url()).searchParams;
+          expect(query.get("sourceKind")).toBe(isInvitation ? "1" : "2");
+          expect(query.get("sourceId")).toBe(sourceId);
+          status = scenario === "unclaimed" || scenario === "closed-before-submit" || scenario === "accepted-no-request" ? 404 : 200;
+          body = status === 404 ? { code: "Workspaces.StaffOnboardingNotFound" } : {
+            applicationId: "77777777-7777-4777-8777-777777777777", staffMemberId: "88888888-8888-4888-8888-888888888888",
+            organizationId: targetId, sourceId, sourceKind: isInvitation ? 1 : 2,
+            subjectId: scenario === "wrong-subject" ? sessionId : subjectId,
+            status: scenario === "pending" ? 2 : 5,
+            claimId: "99999999-9999-4999-8999-999999999999", claimVersion: 1,
+          };
+        } else if (path === "/api/organization-invitations/accept") {
+          status = scenario === "replay-denied" ? 403 : 200;
+          body = status === 403 ? { code: "Organizations.InvitationUnavailable" } : { membership: membership(targetId) };
+        } else { status = 500; body = { code: "Test.UnexpectedRoute" }; }
+        await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+      });
+      try {
+        await page.goto(origin + `join#${isInvitation ? "invitation" : "enrollment"}=synthetic-recovery-link`);
+        if (scenario === "closed-before-submit") {
+          await page.getByRole("heading", { name: "Your staff profile", exact: true }).waitFor();
+          closed = true;
+          await page.getByRole("button", { name: "Request access", exact: true }).click();
+        } else if (isInvitation) {
+          await page.getByRole("button", { name: "Continue to workspace", exact: true }).click();
+        }
+        if (scenario === "approved" || scenario === "accepted") {
+          await page.getByRole("navigation", { name: "Main navigation" }).waitFor({ timeout: 5000 });
+          expect(await page.locator("[data-tenant]").textContent()).toBe(targetId);
+          expect(await page.locator("[data-selected]").textContent()).toBe(targetId);
+        } else if (scenario === "pending") {
+          await page.getByRole("heading", { name: "Request sent", exact: true }).waitFor();
+          await page.getByRole("button", { name: "Check approval now", exact: true }).waitFor();
+          await page.getByRole("button", { name: "Withdraw request", exact: true }).waitFor();
+        } else {
+          await page.getByRole("heading", { name: isInvitation ? "Invitation already accepted" : "Team link disabled", exact: true }).waitFor();
+          if (isInvitation) await expect.poll(() => page.evaluate(() => (window as unknown as { joinMutationsSettled(): boolean }).joinMutationsSettled())).toBe(true);
+          expect(await page.getByRole("button", { name: "Request access", exact: true }).count()).toBe(0);
+          expect(await page.getByRole("button", { name: "Join workspace", exact: true }).count()).toBe(0);
+          expect(await page.locator("[data-selected]").textContent()).toBe(homeId);
+        }
+        expect(await page.getByRole("heading", { name: "Your staff profile", exact: true }).count()).toBe(0);
+        expect(writes).toEqual(scenario === "accepted" || scenario === "replay-denied" ? ["/api/organization-invitations/accept"] : []);
+        expect(currentReads).toBeGreaterThan(0);
+        expect(runtimeErrors).toEqual([]);
+      } finally { await context.close(); }
+    }, 30000,
+  );
 });
 
 // Only the transport responses are controlled here. The server's real DP,
