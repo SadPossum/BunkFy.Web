@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router";
 import { AppShell } from "../components/layout/AppShell";
 import { AuthPage } from "../features/auth/AuthPage";
+import { WorkspaceJoinAuthenticationPage } from "../features/workspaces/WorkspaceJoinAuthenticationPage";
 import { AuthCompletionPage } from "../features/auth/AuthCompletionPage";
 import { SessionRecoveryPage } from "../features/auth/SessionRecoveryPage";
 import { NotificationsProvider } from "../features/notifications/notifications";
@@ -151,7 +152,7 @@ export function App() {
       onUseAnotherAccount={abandonSessionRestore}
     />;
   }
-  if (!session) return <AuthPage invitation={location.pathname === "/join"} />;
+  if (!session) return location.pathname === "/join" ? <WorkspaceJoinAuthenticationPage /> : <AuthPage />;
 
   return (
     <WorkspaceProvider>

@@ -41,8 +41,15 @@ import {
 } from "./authenticationFlow";
 import { authPasswordLengthHelp, authPasswordPolicy } from "./authPasswordPolicy";
 import { useSharedAccounts } from "../account-switch/SharedAccountsProvider";
+import type { WorkspaceJoinNotice } from "../workspaces/workspaceJoinAvailability";
 
-export function AuthPage({ invitation = false }: { invitation?: boolean }) {
+export function AuthPage({ invitation = false, invitationUnavailable, confirmInvitation, onRefreshInvitation, refreshingInvitation = false }: {
+  invitation?: boolean;
+  invitationUnavailable?: WorkspaceJoinNotice | null;
+  confirmInvitation?: () => Promise<boolean>;
+  onRefreshInvitation?: () => void;
+  refreshingInvitation?: boolean;
+}) {
   const sharedAccounts = useSharedAccounts();
   const emailInput = useRef<HTMLInputElement>(null);
   const {
@@ -51,7 +58,8 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
     login,
     register,
   } = useSession();
-  const [mode, setMode] = useState<"login" | "register">(invitation ? "register" : "login");
+  const [requestedMode, setMode] = useState<"login" | "register">(invitation ? "register" : "login");
+  const mode = invitationUnavailable ? "login" : requestedMode;
   const [staffProfile, setStaffProfile] = useState<StaffProfileDraft>(() => defaultStaffProfile());
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -140,6 +148,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
 
     try {
       if (mode === "register") {
+        if (confirmInvitation && !await confirmInvitation()) return;
         const latest = await selfRegistration.refetch();
         const latestCurrent = !latest.isFetching && latest.error == null;
         if (!passwordRegistrationAllowed(latestCurrent, latest.data)) {
@@ -280,18 +289,25 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
             {multiFactor
               ? "Verify sign-in"
               : mode === "login"
-              ? invitation ? "Sign in to join" : "Welcome back"
+              ? invitationUnavailable ? "Sign in" : invitation ? "Sign in to join" : "Welcome back"
               : invitation ? "Join your team" : "Create your account"}
           </h2>
           <p className="mt-3 text-sm leading-6 text-base-content/55">
             {multiFactor
               ? "Enter a code from your authenticator or use one recovery code."
               : mode === "login"
-              ? "Sign in to continue managing your property."
+              ? invitationUnavailable ? "Use the same account to check an existing request or workspace membership." : "Sign in to continue managing your property."
               : invitation
-                ? "Create your account and staff profile. Your invitation stays ready after registration."
+                ? "Create your account and staff profile to continue with this invitation."
                 : "Register once, then create a workspace or join your team."}
           </p>
+
+          {invitationUnavailable && <div role="alert" className="mt-6 rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm">
+            <h3 className="font-semibold">{invitationUnavailable.title}</h3>
+            <p className="mt-2 leading-6">{invitationUnavailable.description}</p>
+            {onRefreshInvitation && <button type="button" className="btn btn-outline btn-sm mt-3"
+              disabled={refreshingInvitation} onClick={onRefreshInvitation}>Refresh invitation</button>}
+          </div>}
 
           {multiFactor ? (
             <MultiFactorChallengeForm
@@ -415,7 +431,7 @@ export function AuthPage({ invitation = false }: { invitation?: boolean }) {
                 </div>
               )}
 
-              {mode === "register" ? (
+              {invitationUnavailable ? null : mode === "register" ? (
                 <>
                   <AuthModeSwitch
                     mode={mode}
