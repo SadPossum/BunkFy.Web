@@ -86,6 +86,7 @@ import { spacesBlockSuccessParams, spacesHasCurrentAllocation, spacesRelevantHol
 import { SpacesPropertySection } from "./SpacesPropertySection";
 import { withSpacesReturnRoute, type SpacesReturnRoute } from "./spacesReturnRoute";
 import { useSalesModeEditor, type SalesModeEditor } from "../inventory/useSalesModeEditor";
+import { inventoryTopologyNeedsRefresh, useSpacesInventoryReadback } from "./useSpacesInventoryReadback";
 import { SalesModeChangeModal, SalesModeNotice } from "../inventory/SalesModeChangeModal";
 import { salesModeLabel } from "../inventory/salesModeEditorModel";
 import { useTopologyRetirementEditor, type TopologyRetirementEditor } from "../properties/useTopologyRetirementEditor";
@@ -603,6 +604,18 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
     if (value) next.set("q", value); else next.delete("q");
     return next;
   }, { replace: true });
+  const sellingReadbackNeeded = Boolean(!propertyOpen && !focusedSurfaceOpen && !workspaceLocked && !navigation.paused
+    && canLoadProperty && propertyDirectoryCurrent && mayReadInventory
+    && compositeSourceCurrent(roomSource) && compositeSourceCurrent(bedSource)
+    && inventoryQuery.data && !inventoryQuery.error && !inventoryMismatch
+    && inventoryTopologyNeedsRefresh(targetPropertyId, physicalRoom, physicalBeds, inventoryQuery.data.rooms));
+  const sellingReadback = useSpacesInventoryReadback({
+    owner: JSON.stringify([sessionIdentityKey(session), targetPropertyId, selectedRoom?.roomId,
+      physicalRoom?.version, physicalBeds.map(bed => [bed.bedId, bed.version]).sort()]),
+    needed: sellingReadbackNeeded,
+    current: inventoryCurrent,
+    refresh: () => Promise.all([roomSource.refetch(), bedSource.refetch(), inventorySource.refetch()]),
+  });
   const primarySources = [permissionSource, ...(propertyOpen ? [] : [propertySource, roomSource])];
   if (mayReadInventory && !propertyOpen) primarySources.push(inventorySource);
   const hasUsableLayoutSource = compositeSourceUsable(roomSource.state)
@@ -784,7 +797,7 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
       : roomSelection.status === "unavailable" ? <TargetUnavailablePanel title={`Requested ${roomSelection.targetKind} changed or is unavailable`}
         description="The exact target remains in the URL. Choose a room deliberately; no other room has been substituted." />
         : selectedRoom ? <RoomDetail
-          room={selectedRoom} units={unitLayout.units} unitSelection={unitSelection} bedSource={bedSource} inventorySource={inventorySource}
+          room={selectedRoom} units={unitLayout.units} unitSelection={unitSelection} bedSource={bedSource} inventorySource={inventorySource} sellingReadback={sellingReadback}
           bedEvidence={bedEvidence} inventoryEvidence={inventoryEvidence}
           editor={topologyEditor} physicalRoom={physicalRoom} physicalBeds={physicalBeds}
           mayRetireInventory={mayRetireInventory && propertyDirectoryCurrent} retirementEditor={retirementEditor}
@@ -875,13 +888,14 @@ function SpacesWorkspace({ navigation }: { navigation: SpacesNavigationGuard }) 
 }
 
 function RoomDetail({
-  room, units, unitSelection, bedSource, bedEvidence, inventoryEvidence,
+  room, units, unitSelection, bedSource, inventorySource, sellingReadback, bedEvidence, inventoryEvidence,
   editor, physicalRoom, physicalBeds, mayRetireInventory, retirementEditor, mayConfigureInventory,
   salesEditor, salesRoom, salesOrigin, mayReadReservations, issueCount, onSelectUnit, onClearUnavailableTarget,
   operationalContent, otherEditorOpen,
 }: {
   room: SpacesRoom; units: SpacesUnit[]; unitSelection: ReturnType<typeof resolveSpacesUnitSelection>;
   bedSource: CompositeSource; inventorySource: CompositeSource; bedEvidence: SpacesEvidenceState; inventoryEvidence: SpacesEvidenceState;
+  sellingReadback: ReturnType<typeof useSpacesInventoryReadback>;
   editor: TopologyEditor; physicalRoom: Room | null; physicalBeds: Bed[];
   mayRetireInventory: boolean; retirementEditor: TopologyRetirementEditor; mayConfigureInventory: boolean;
   salesEditor: SalesModeEditor; salesRoom?: RoomInventory; salesOrigin: URLSearchParams; mayReadReservations: boolean;
@@ -938,13 +952,23 @@ function RoomDetail({
     <section aria-label="Selling" className="border-t border-base-300">
       <h4 className="px-4 py-3 text-base font-semibold">Selling</h4>
       <div className="px-4 pb-4">
-        <p className="text-sm">{inventoryEvidence !== "current" ? "Selling setup unconfirmed" : room.salesMode === null ? "Unknown" : salesModeLabel(room.salesMode)}</p>
-        {wholeRoomUnits.map((unit) => <div key={unit.key} className="mt-2 border-l-2 border-base-300 pl-3 text-xs">
+        {inventoryEvidence !== "restricted" && <CompositeSourceNotice className="mb-4 flex" sources={[inventorySource]} title="Selling details are not current" />}
+        {inventoryEvidence === "restricted" && <p className="mb-3 text-sm text-base-content/60">Selling details are not assigned to this account.</p>}
+        {inventoryEvidence !== "restricted" && inventorySource.state === "loading" && <SourceActivity className="mb-3" label="Loading selling details" />}
+        {inventorySource.state === "ready" && inventorySource.isFetching && !sellingReadback.needed && <SourceActivity className="mb-3" label="Refreshing selling details" />}
+        {sellingReadback.needed && <div role="status" className="mb-4 rounded-lg border border-warning/30 bg-warning/8 p-4 text-sm">
+          <p className="font-semibold">{sellingReadback.isOffline ? "Reconnect to refresh selling details" : sellingReadback.exhausted ? "Selling details are delayed" : "Updating selling details"}</p>
+          <p className="mt-1 leading-6">Room and bed records are saved. Their latest selling details are not shown yet.</p>
+          <button type="button" className="btn btn-outline btn-sm mt-3" disabled={inventorySource.isFetching || sellingReadback.isOffline}
+            onClick={() => void sellingReadback.refresh()}>Refresh selling details</button>
+        </div>}
+        {!sellingReadback.needed && <p className="text-sm">{inventoryEvidence !== "current" ? "Selling setup unconfirmed" : room.salesMode === null ? "Unknown" : salesModeLabel(room.salesMode)}</p>}
+        {!sellingReadback.needed && wholeRoomUnits.map((unit) => <div key={unit.key} className="mt-2 border-l-2 border-base-300 pl-3 text-xs">
           <p className="font-semibold">{inventoryEvidence !== "current" ? "Whole-room offering unconfirmed" : unit.isSellable ? "Whole room offered separately" : "Whole room not offered separately"}</p>
           <p className="mt-1 break-words text-base-content/60">Selling setup determines whether guests can book the whole room or individual beds.</p>
           <button type="button" className="btn btn-ghost btn-xs mt-1 min-h-9" disabled={locked} onClick={() => onSelectUnit(unit)}>View whole-room details</button>
         </div>)}
-        {mayConfigureInventory && salesRoom && <button type="button" className="btn btn-outline btn-sm mt-3" disabled={!salesEditor.canOpen(salesRoom) || locked}
+        {mayConfigureInventory && salesRoom && <button type="button" className="btn btn-outline btn-sm mt-3" disabled={!salesEditor.canOpen(salesRoom) || locked || sellingReadback.needed}
           onClick={(event) => salesEditor.open(salesRoom, event.currentTarget, salesOrigin)}><SlidersHorizontal size={15} />Edit selling setup</button>}
       </div>
     </section>
